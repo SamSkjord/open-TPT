@@ -6,8 +6,10 @@ It runs on Raspberry Pi 4 with a HyperPixel touchscreen and visualises real-time
 ---
 
 ![openTPT Overview](overlay.png)
+
 ###Shamelessly 'inspired' by the ACC tyre widget
 ---
+
 
 ## 🔧 Hardware Requirements
 
