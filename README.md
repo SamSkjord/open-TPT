@@ -1,75 +1,127 @@
-# openTPT – Open Tyre, Pressure & Temp Monitoring System
+# openTPT - Open Tyre Pressure and Temperature Telemetry
 
-**openTPT** is an open-source thermal and pressure monitoring widget for motorsport. 
-It runs on Raspberry Pi 4 with a HyperPixel touchscreen and visualises real-time tyre temps, brake rotor temps, and tyre pressures — with a full-screen rear-view camera toggle.
+A modular GUI system for live racecar telemetry using a Raspberry Pi 4 and HyperPixel display.
 
----
+## Overview
 
-![openTPT Overview](overlay.png)
-##### Shamelessly 'inspired' by the ACC tyre widget
----
+openTPT provides real-time monitoring of:
+- 🛞 Tyre pressure & temperature (via TPMS)
+- 🔥 Brake rotor temperatures (via IR sensors + ADC)
+- 🌡️ Tyre surface heatmaps (via MLX90640 thermal cameras)
+- 🎥 Full-screen rear-view toggle (USB UVC camera)
 
+The system is designed for racing applications where real-time monitoring of tyre and brake conditions is critical for optimal performance and safety.
 
-## 🔧 Hardware Requirements
+## Hardware Requirements
 
-- Raspberry Pi 4
-- HyperPixel 4.0 Touchscreen Display
-- NeoKey 1x4 (I2C Keypad)
-- SparkFun TCA9548A I2C Mux
-- MLX90640 Thermal Cameras (x4)
-- ADS1115 or ADS1015 ADC (IR brake sensors)
-- USB TPMS Receiver (Serial)
-- USB UVC Rear Camera
+- Raspberry Pi 4 (2GB+ RAM recommended)
+- HyperPixel or compatible display (800x480 resolution)
+- TPMS receivers and sensors
+- ADS1115/ADS1015 ADC for IR brake temperature sensors
+- MLX90640 thermal cameras (one per tyre)
+- TCA9548A I2C multiplexer for thermal cameras
+- Adafruit NeoKey 1x4 for input control
+- USB UVC camera (optional, for rear view)
 
----
+## Software Requirements
 
-## 📋 Features
+- Python 3.7+
+- Required Python packages (see requirements.txt)
 
-- 🔥 Per-tyre thermal mapping via MLX90640
-- 🛞 Brake rotor temp readings via IR + ADC
-- 💨 Tyre pressure + internal temp from TPMS
-- 🎥 Toggleable full-screen rear camera view
-- 🧠 Designed for future CAN bus + data logging
-- 🚗 Built with motorsport use in mind
+## Installation
 
----
+1. Clone this repository:
+```
+git clone https://github.com/yourusername/open-TPT.git
+cd open-TPT
+```
 
-## 🧩 Project Structure
+2. Install the required Python packages:
+```
+pip install -r requirements.txt
+```
 
-- `main.py` – Launches GUI and polling threads
-- `hardware/` – Sensor interfaces and camera toggle
-- `gui/` – HyperPixel GUI + NeoKey input
-- `assets/` – Icons or overlays for display
-- `utils/` – Centralised configs or math utilities
+3. Make the main script executable:
+```
+chmod +x main.py
+```
 
----
+## Usage
 
-## ✅ Tasks Overview
+### Running the Application
 
-See full scope [here](#phase-1-core-gui--controls)
+To run openTPT in normal mode (with hardware):
 
-- [ ] GUI and button input handling
-- [ ] Thermal data acquisition and display
-- [ ] Brake IR sensor reading and display
-- [ ] TPMS pressure display
-- [ ] Rear camera toggle
-- [ ] CAN output (future)
+```
+./main.py
+```
 
----
+For development or testing without hardware, use mock mode:
 
-## 🔧 Dependencies
+```
+./main.py --mock
+```
 
-- `pygame` or `tkinter`
-- `adafruit-blinka`
-- `adafruit-circuitpython-mlx90640`
-- `adafruit-circuitpython-neokey`
-- `adafruit-circuitpython-tca9548a`
-- `adafruit-circuitpython-ads1x15`
-- `pyserial`
-- `opencv-python` (for rear view, optional)
+To run in windowed mode (instead of fullscreen):
 
----
+```
+./main.py --windowed
+```
 
-## 📜 License
+### Controls
 
-MIT License
+When using physical NeoKey 1x4:
+- Button 0: Increase brightness
+- Button 1: Decrease brightness
+- Button 2: Toggle rear-view camera
+- Button 3: Reserved for future use
+
+Keyboard controls (for development):
+- Up/Down arrows: Increase/decrease brightness
+- Spacebar: Toggle rear-view camera
+- 'M' key: Toggle mock mode
+- ESC: Exit application
+
+## Configuration
+
+The system can be configured by editing the `utils/config.py` file, which contains settings for:
+- Display dimensions and FPS target
+- Positions for telemetry indicators
+- Color thresholds for temperature and pressure
+- Mock mode parameters
+- I2C addresses and bus settings
+
+## Development Mode
+
+The mock mode allows development and testing without physical hardware. In this mode:
+- TPMS data is simulated with realistic variations
+- Brake temperatures are simulated with realistic behavior
+- Thermal cameras show simulated heat patterns
+- All hardware interfaces gracefully handle missing devices
+
+## Project Structure
+
+```
+openTPT/
+├── main.py                      # App entrypoint
+├── requirements.txt
+├── assets/
+│   ├── overlay.png              # Fullscreen static GUI overlay
+│   └── icons/                   # Optional: status, brake, tyre symbols
+├── gui/
+│   ├── display.py               # Draw pressure, temps, heatmaps
+│   ├── overlay.py               # Load + render static overlay
+│   ├── camera.py                # Rear-view USB camera logic
+│   └── input.py                 # NeoKey 1x4 (brightness + camera toggle)
+├── hardware/
+│   ├── tpms_input.py            # TPMS data wrapper
+│   ├── ir_brakes.py             # ADS1115/ADS1015 for brake rotors
+│   ├── mlx_handler.py           # MLX90640 thermal I2C polling
+│   └── i2c_mux.py               # TCA9548A Mux control
+└── utils/
+    └── config.py                # Constants: positions, colours, thresholds
+```
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.

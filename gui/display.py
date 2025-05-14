@@ -1,0 +1,550 @@
+"""
+Display module for openTPT.
+Handles rendering of dynamic telemetry data on the display.
+"""
+
+import pygame
+import numpy as np
+from utils.config import (
+    TPMS_POSITIONS,
+    FONT_SIZE_LARGE,
+    FONT_SIZE_MEDIUM,
+    FONT_SIZE_SMALL,
+    WHITE,
+    BLACK,
+    RED,
+    GREEN,
+    YELLOW,
+    BLUE,
+    GREY,
+    PRESSURE_LOW,
+    PRESSURE_OPTIMAL,
+    PRESSURE_HIGH,
+    TEMP_COLD,
+    TEMP_OPTIMAL,
+    TEMP_HOT,
+    TEMP_DANGER,
+    BRAKE_POSITIONS,
+    BRAKE_TEMP_MIN,
+    BRAKE_TEMP_MAX,
+    BRAKE_OPTIMAL,
+    MLX_POSITIONS,
+    MLX_DISPLAY_WIDTH,
+    MLX_DISPLAY_HEIGHT,
+    OVERLAY_PATH,
+    TEMP_UNIT,
+    PRESSURE_UNIT,
+    DISPLAY_WIDTH,
+    DISPLAY_HEIGHT,
+)
+
+
+# Unit conversion functions
+def celsius_to_fahrenheit(celsius):
+    """Convert Celsius to Fahrenheit."""
+    return (celsius * 9 / 5) + 32
+
+
+def fahrenheit_to_celsius(fahrenheit):
+    """Convert Fahrenheit to Celsius."""
+    return (fahrenheit - 32) * 5 / 9
+
+
+def psi_to_bar(psi):
+    """Convert PSI to BAR."""
+    return psi * 0.0689476
+
+
+def psi_to_kpa(psi):
+    """Convert PSI to kPa."""
+    return psi * 6.89476
+
+
+def bar_to_psi(bar):
+    """Convert BAR to PSI."""
+    return bar * 14.5038
+
+
+def kpa_to_psi(kpa):
+    """Convert kPa to PSI."""
+    return kpa * 0.145038
+
+
+class Display:
+    def __init__(self, surface):
+        """
+        Initialize the display manager.
+
+        Args:
+            surface: The pygame surface to draw on
+        """
+        self.surface = surface
+
+        # Initialize fonts
+        pygame.font.init()
+        self.font_large = pygame.font.SysFont(None, FONT_SIZE_LARGE)
+        self.font_medium = pygame.font.SysFont(None, FONT_SIZE_MEDIUM)
+        self.font_small = pygame.font.SysFont(None, FONT_SIZE_SMALL)
+
+        # Initialize color maps for thermal display
+        self.colormap = self._create_thermal_colormap()
+
+        self.overlay_mask = pygame.image.load(OVERLAY_PATH).convert_alpha()
+
+    def _create_thermal_colormap(self):
+        """Create a colormap for thermal imaging."""
+        # Create a colormap from blue (cold) to red (hot)
+        colors = []
+
+        # Blue to green (cold to optimal)
+        for i in range(64):
+            r = int((i / 64) * 255)
+            g = int((i / 64) * 255)
+            b = 255 - int((i / 64) * 128)
+            colors.append((r, g, b))
+
+        # Green to yellow (optimal to hot)
+        for i in range(64):
+            r = int(128 + (i / 64) * 127)
+            g = 255
+            b = int(128 - (i / 64) * 128)
+            colors.append((r, g, b))
+
+        # Yellow to red (hot to danger)
+        for i in range(64):
+            r = 255
+            g = 255 - int((i / 64) * 255)
+            b = 0
+            colors.append((r, g, b))
+
+        # Create a PyGame Surface with the colormap
+        colormap_surf = pygame.Surface((192, 1))
+        for i, color in enumerate(colors):
+            colormap_surf.set_at((i, 0), color)
+
+        return colormap_surf
+
+    def get_color_for_pressure(self, pressure):
+        """
+        Get the color for a given pressure value.
+
+        Args:
+            pressure: Pressure value in the current units (PSI, BAR, or KPA)
+
+        Returns:
+            RGB color tuple
+        """
+        if pressure is None:
+            return GREY
+        elif pressure < PRESSURE_LOW:
+            return RED  # Too low
+        elif pressure > PRESSURE_HIGH:
+            return RED  # Too high
+        elif PRESSURE_LOW <= pressure <= PRESSURE_OPTIMAL:
+            return YELLOW  # Low but acceptable
+        else:  # Between optimal and high
+            return GREEN  # Optimal
+
+    def get_color_for_temp(self, temp):
+        """
+        Get the color for a given temperature value.
+
+        Args:
+            temp: Temperature value in the current units (C or F)
+
+        Returns:
+            RGB color tuple
+        """
+        if temp < TEMP_COLD:
+            return BLUE  # Too cold
+        elif temp < TEMP_OPTIMAL:
+            return GREEN  # Cold but acceptable
+        elif temp < TEMP_HOT:
+            return YELLOW  # Getting hot
+        else:
+            return RED  # Too hot
+
+    def draw_pressure_temp(self, position, pressure, temp, status="OK"):
+        """
+        Draw pressure and temperature values for a tire.
+
+        Args:
+            position: String key for tire position (FL, FR, RL, RR)
+            pressure: Pressure value in current unit
+            temp: Temperature value in current unit
+            status: Status string (OK, LOW, etc.)
+        """
+        if position not in TPMS_POSITIONS:
+            return
+
+        # Get positions
+        pressure_pos = TPMS_POSITIONS[position]["pressure"]
+        temp_pos = TPMS_POSITIONS[position]["temp"]
+
+        # Render pressure with appropriate color (without unit)
+        pressure_color = self.get_color_for_pressure(pressure)
+        pressure_text = self.font_large.render(f"{pressure:.1f}", True, pressure_color)
+        self.surface.blit(pressure_text, pressure_pos)
+
+        # Render temperature with appropriate color (without unit)
+        # Uncomment if you want to display temperature
+        # temp_color = self.get_color_for_temp(temp)
+        # temp_text = self.font_large.render(f"{temp:.1f}", True, temp_color)
+        # self.surface.blit(temp_text, temp_pos)
+
+        # Render status if not OK
+        # if status != "OK":
+        #     status_pos = (pressure_pos[0], pressure_pos[1] - FONT_SIZE_SMALL)
+        #     status_text = self.font_small.render(status, True, RED)
+        #     self.surface.blit(status_text, status_pos)
+
+    def draw_brake_temp(self, position, temp):
+        """
+        Draw brake temperature visualization as a color scale.
+
+        Args:
+            position: String key for brake position (FL, FR, RL, RR)
+            temp: Temperature value in current unit
+        """
+        if position not in BRAKE_POSITIONS:
+            return
+
+        # Get position
+        pos = BRAKE_POSITIONS[position]
+
+        # Calculate normalized temperature (0.0 to 1.0)
+        normalized = max(
+            0.0, min(1.0, (temp - BRAKE_TEMP_MIN) / (BRAKE_TEMP_MAX - BRAKE_TEMP_MIN))
+        )
+
+        # Determine color based on temperature
+        # Map from blue (cold) through green, yellow to red (hot)
+        if normalized < 0.25:
+            # Blue to Green
+            factor = normalized * 4  # 0 to 1 in this range
+            color = (
+                int(factor * 255),  # R increases
+                int(factor * 255),  # G increases
+                255,  # B stays at max
+            )
+        elif normalized < 0.5:
+            # Green to Yellow
+            factor = (normalized - 0.25) * 4  # 0 to 1 in this range
+            color = (
+                int(factor * 255 + (1 - factor) * 255),  # R increases to max
+                255,  # G stays at max
+                int((1 - factor) * 255),  # B decreases
+            )
+        elif normalized < 0.75:
+            # Yellow to Orange
+            factor = (normalized - 0.5) * 4  # 0 to 1 in this range
+            color = (
+                255,  # R stays at max
+                int((1 - factor) * 255),  # G decreases
+                0,  # B stays at 0
+            )
+        else:
+            # Orange to Red
+            factor = (normalized - 0.75) * 4  # 0 to 1 in this range
+            color = (
+                255,  # R stays at max
+                int((1 - factor) * 128),  # G decreases further to dark red
+                0,  # B stays at 0
+            )
+
+        # Draw a rectangular shape with the color to match the brake rotors in the overlay
+        # The brakes are represented as dark blue sections in the overlay
+        rect_width = 34
+        rect_height = 114
+        rect = pygame.Rect(
+            pos[0] - rect_width // 2,
+            pos[1] - rect_height // 2,
+            rect_width,
+            rect_height,
+        )
+        pygame.draw.rect(self.surface, color, rect, border_radius=3)
+
+        # Add a border
+        # pygame.draw.rect(self.surface, BLACK, rect, width=1, border_radius=3)
+
+    def draw_thermal_image(self, position, thermal_data):
+        """
+        Draw thermal camera image for a tire, divided into inner, middle, and outer sections
+        with colored blocks representing temperature averages.
+
+        Args:
+            position: String key for tire position (FL, FR, RL, RR)
+            thermal_data: 2D numpy array of temperatures
+        """
+        if position not in MLX_POSITIONS or thermal_data is None:
+            return
+
+        # Get position
+        pos = MLX_POSITIONS[position]
+
+        # Calculate temperatures for inner, middle and outer sections
+        # Divide the thermal data into three vertical sections
+        section_width = thermal_data.shape[1] // 3
+
+        # Extract each section
+        inner_section = thermal_data[:, :section_width]
+        middle_section = thermal_data[:, section_width : 2 * section_width]
+        outer_section = thermal_data[:, 2 * section_width :]
+
+        # Calculate average temperature for each section
+        inner_temp = np.mean(inner_section)
+        middle_temp = np.mean(middle_section)
+        outer_temp = np.mean(outer_section)
+
+        # Determine section layout based on position (left or right side)
+        is_right_side = position in ["FR", "RR"]
+
+        # Size of each section
+        section_width_px = MLX_DISPLAY_WIDTH // 3
+        section_height_px = MLX_DISPLAY_HEIGHT
+
+        # Create a surface for the thermal image
+        thermal_surface = pygame.Surface((MLX_DISPLAY_WIDTH, MLX_DISPLAY_HEIGHT))
+
+        # Draw each section as a color block
+        sections = [
+            (inner_section, inner_temp, 0),
+            (middle_section, middle_temp, section_width_px),
+            (outer_section, outer_temp, 2 * section_width_px),
+        ]
+
+        # If right side, reverse the order to match the car orientation
+        if is_right_side:
+            sections = sections[::-1]
+
+        # Draw each section
+        for section_data, avg_temp, x_offset in sections:
+            color = self._get_heat_color(avg_temp)
+            rect = pygame.Rect(x_offset, 0, section_width_px, section_height_px)
+            pygame.draw.rect(thermal_surface, color, rect)
+
+        # Always draw vertical lines at fixed intervals
+        pygame.draw.line(
+            thermal_surface,
+            (0, 0, 0),
+            (section_width_px, 0),
+            (section_width_px, section_height_px),
+            5,
+        )
+        pygame.draw.line(
+            thermal_surface,
+            (0, 0, 0),
+            (2 * section_width_px, 0),
+            (2 * section_width_px, section_height_px),
+            5,
+        )
+
+        # # Add a border around the entire image
+        # pygame.draw.rect(
+        #     thermal_surface,
+        #     BLACK,
+        #     (0, 0, MLX_DISPLAY_WIDTH, MLX_DISPLAY_HEIGHT),
+        #     1,
+        #     border_radius=25,
+        # )
+        # pygame.draw.rect(self.surface, WHITE, rect, width=1, border_radius=3)
+
+        # Display the thermal image
+        self.surface.blit(thermal_surface, pos)
+
+        # Create text labels for the temperatures
+        # Adjust positions based on whether it's left or right side
+        section_font = self.font_small
+
+        # Position text below the thermal image
+        text_y = pos[1] + MLX_DISPLAY_HEIGHT + 6
+
+        # For text spacing
+        text_spacing = MLX_DISPLAY_WIDTH // 3
+
+        # Order of sections (left to right on display)
+        if is_right_side:
+            # Right side: Inner, Middle, Outer
+            sections_order = [(inner_temp, "I"), (middle_temp, "M"), (outer_temp, "O")]
+        else:
+            # Left side: Outer, Middle, Inner
+            sections_order = [(outer_temp, "O"), (middle_temp, "M"), (inner_temp, "I")]
+
+        # Draw the temperature labels
+        for i, (temp, label) in enumerate(sections_order):
+            # Position text centered under each section
+            text_x = pos[0] + (i * text_spacing) + (text_spacing // 2)
+
+            # Get color based on temperature
+            text_color = self.get_color_for_temp(temp)
+
+            # Render text
+            text = section_font.render(f"{label}: {temp:.1f}", True, text_color)
+            text_rect = text.get_rect(center=(text_x, text_y))
+            # self.surface.blit(text, text_rect)
+
+    def _get_heat_color(self, temp):
+        """
+        Get a color on a heat scale from blue (cold) to red (hot) based on temperature.
+
+        Args:
+            temp: Temperature value in current unit
+
+        Returns:
+            tuple: RGB color value
+        """
+        # Normalize temperature to 0-1 range
+        normalized = max(
+            0.0,
+            min(1.0, (temp - TEMP_COLD) / (TEMP_DANGER - TEMP_COLD)),
+        )
+
+        # Color scale: Blue (cold) -> Green -> Yellow -> Red (hot)
+        if normalized < 0.25:
+            # Blue to Green (cold)
+            factor = normalized * 4
+            r = int(factor * 255)
+            g = int(factor * 255)
+            b = 255
+        elif normalized < 0.5:
+            # Green to Yellow
+            factor = (normalized - 0.25) * 4
+            r = int(factor * 255)
+            g = 255
+            b = int((1 - factor) * 255)
+        elif normalized < 0.75:
+            # Yellow to Orange
+            factor = (normalized - 0.5) * 4
+            r = 255
+            g = int((1 - factor) * 255)
+            b = 0
+        else:
+            # Orange to Red (hot)
+            factor = (normalized - 0.75) * 4
+            r = 255
+            g = int((1 - factor) * 128)
+            b = 0
+
+        return (r, g, b)
+
+    def get_unit_strings(self):
+        """
+        Get the current unit strings for display.
+
+        Returns:
+            tuple: (temp_unit_string, pressure_unit_string)
+        """
+        if TEMP_UNIT == "F":
+            temp_unit = "°F"
+        else:
+            temp_unit = "°C"
+
+        if PRESSURE_UNIT == "BAR":
+            pressure_unit = "BAR"
+        elif PRESSURE_UNIT == "KPA":
+            pressure_unit = "kPa"
+        else:
+            pressure_unit = "PSI"
+
+        return temp_unit, pressure_unit
+
+    def convert_temperature(self, temp):
+        """
+        Return the temperature value and unit string based on config.
+        No actual conversion is performed - values are expected to be in the configured unit.
+
+        Args:
+            temp: Temperature value in the configured unit
+
+        Returns:
+            tuple: (value, unit_string)
+        """
+        temp_unit, _ = self.get_unit_strings()
+        return temp, temp_unit
+
+    def convert_pressure(self, pressure):
+        """
+        Return the pressure value and unit string based on config.
+        No actual conversion is performed - values are expected to be in the configured unit.
+
+        Args:
+            pressure: Pressure value in the configured unit
+
+        Returns:
+            tuple: (value, unit_string)
+        """
+        _, pressure_unit = self.get_unit_strings()
+        return pressure, pressure_unit
+
+    def draw_units_indicator(self):
+        """Draw the current units in the lower right corner."""
+        # Get the current configured units
+        temp_unit, pressure_unit = self.get_unit_strings()
+
+        # Create the units text
+        units_text = f"{temp_unit} / {pressure_unit}"
+
+        # Render the text
+        units_surface = self.font_medium.render(units_text, True, WHITE)
+
+        # Position in lower right corner
+        units_pos = (
+            DISPLAY_WIDTH - units_surface.get_width() - 10,
+            DISPLAY_HEIGHT - units_surface.get_height() - 10,
+        )
+
+        # Draw the text
+        self.surface.blit(units_surface, units_pos)
+
+    def draw_debug_info(self, fps, mode="Normal"):
+        """
+        Draw debug information on the screen.
+
+        Args:
+            fps: Current frames per second
+            mode: Current operation mode
+        """
+        # Draw in the top-left corner
+        debug_text = self.font_small.render(
+            f"FPS: {fps:.1f} | Mode: {mode}", True, WHITE
+        )
+        self.surface.blit(debug_text, (10, 10))
+
+        # Draw the current units indicator
+        self.draw_units_indicator()
+
+    def draw_status_message(self, message, duration=None):
+        """
+        Draw a status message at the bottom of the screen.
+
+        Args:
+            message: Text message to display
+            duration: Optional display duration in seconds
+        """
+        if not message:
+            return
+
+        # Draw at the bottom center
+        status_text = self.font_medium.render(message, True, WHITE)
+        text_pos = (
+            self.surface.get_width() // 2 - status_text.get_width() // 2,
+            self.surface.get_height() - status_text.get_height() - 10,
+        )
+        self.surface.blit(status_text, text_pos)
+
+        # If duration is specified, draw a progress bar
+        if duration is not None:
+            bar_width = 200
+            bar_height = 5
+            bar_x = self.surface.get_width() // 2 - bar_width // 2
+            bar_y = self.surface.get_height() - 5
+
+            # Background
+            pygame.draw.rect(
+                self.surface, (50, 50, 50), (bar_x, bar_y, bar_width, bar_height)
+            )
+
+            # Progress bar (to be updated externally based on elapsed time)
+            pygame.draw.rect(
+                self.surface, WHITE, (bar_x, bar_y, bar_width, bar_height), 1
+            )

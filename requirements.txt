@@ -1,0 +1,16 @@
+# Core dependencies
+pygame>=2.1.0
+numpy>=1.22.0
+pillow>=9.0.0
+
+# Hardware interfaces
+adafruit-circuitpython-neokey>=1.2.0
+adafruit-circuitpython-tca9548a>=1.3.0
+adafruit-circuitpython-ads1x15>=2.2.0
+tpms==2.0.1
+
+# Thermal camera
+adafruit-circuitpython-mlx90640>=1.2.0
+
+# Optional - for logging and development
+pytest>=7.0.0
