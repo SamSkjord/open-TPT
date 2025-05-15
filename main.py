@@ -10,6 +10,7 @@ import time
 import argparse
 import pygame
 import numpy as np
+import pygame.time as pgtime
 
 # Import GUI modules
 # from gui.template import Template
@@ -44,6 +45,7 @@ from utils.config import (
     BRAKE_TEMP_MIN,
     BRAKE_TEMP_MAX,
     BRAKE_OPTIMAL,
+    BUTTON_RESERVED,
 )
 
 
@@ -92,6 +94,12 @@ class OpenTPT:
         self.fps = 0
         self.frame_count = 0
         self.last_time = time.time()
+
+        # Add UI visibility timer variables
+        self.ui_last_interaction_time = time.time()
+        self.ui_auto_hide_delay = 30  # seconds before auto-hide
+        self.ui_fade_alpha = 255  # 255 = fully visible, 0 = invisible
+        self.ui_fading = False
 
         # Inform user about mode
         if self.mock_mode:
@@ -202,10 +210,62 @@ class OpenTPT:
                     self.mock_mode = not self.mock_mode
                     print(f"Mock mode {'enabled' if self.mock_mode else 'disabled'}")
 
+                # Add to _handle_events in main.py
+                elif event.key == pygame.K_t:  # 'T' key to toggle UI
+                    self.input_handler.simulate_button_press(BUTTON_RESERVED)
+
+                if event.type in (
+                    pygame.KEYDOWN,
+                    pygame.MOUSEBUTTONDOWN,
+                    pygame.MOUSEMOTION,
+                ):
+                    self.ui_last_interaction_time = time.time()
+                    if not self.input_handler.ui_manually_toggled:
+                        self.input_handler.ui_visible = True
+                        self.ui_fade_alpha = 255
+                        self.ui_fading = False
+
+    def _update_ui_visibility(self):
+        """Update UI visibility based on timer and manual toggle state."""
+        current_time = time.time()
+
+        # If manually toggled, respect that setting completely
+        if self.input_handler.ui_manually_toggled:
+            # When manually toggled, UI state is fixed until user changes it
+            self.ui_fade_alpha = 255 if self.input_handler.ui_visible else 0
+            self.ui_fading = False
+            return
+
+        # Auto-hide after delay if not manually toggled
+        if (
+            current_time - self.ui_last_interaction_time > self.ui_auto_hide_delay
+            and not self.ui_fading
+            and self.ui_fade_alpha > 0
+        ):
+            self.ui_fading = True
+
+        # Handle fade animation
+        if self.ui_fading:
+            # Decrease alpha by 10 per frame for a smooth fade effect
+            self.ui_fade_alpha = max(0, self.ui_fade_alpha - 10)
+
+            # When fully faded, update visibility state
+            if self.ui_fade_alpha == 0:
+                self.input_handler.ui_visible = False
+                self.ui_fading = False
+
     def _update_hardware(self):
         """Update hardware states."""
         # Check for NeoKey inputs
         input_events = self.input_handler.check_input()
+
+        # When UI is toggled via button, reset the fade state and timer
+        if input_events.get("ui_toggled", False):
+            self.ui_fade_alpha = 255 if self.input_handler.ui_visible else 0
+            self.ui_fading = False
+            # Reset the interaction timer when manually toggled on
+            if self.input_handler.ui_visible:
+                self.ui_last_interaction_time = time.time()
 
         # Update camera frame if active
         if self.camera.is_active():
@@ -221,9 +281,7 @@ class OpenTPT:
             self.camera.render()
         else:
             # Otherwise render the normal view
-
-            # Render the static Template
-            # self.Template.render()
+            self._update_ui_visibility()
 
             # Get brake temperatures
             brake_temps = self.brakes.get_temps()
@@ -240,23 +298,36 @@ class OpenTPT:
 
             # Get TPMS data
             tpms_data = self.tpms.get_data()
-            # print("TPMS Data:", tpms_data)
             for position, data in tpms_data.items():
                 self.display.draw_pressure_temp(
                     position, data["pressure"], data["temp"], data["status"]
                 )
 
-            # Render debug info and units indicator
+            # Render debug info (FPS and mode) - these don't fade
             mode = "MOCK" if self.mock_mode else "NORMAL"
             self.display.draw_debug_info(self.fps, mode)
 
-            # Draw the current units indicator
-            self.display.draw_units_indicator()
+            # Remove direct draw of units indicator - it should only be on the fading UI surface
 
-            # Render the icons
-            self.icon_handler.render_all()
+            # Create separate surface for UI elements that can fade
+            if self.input_handler.ui_visible or self.ui_fade_alpha > 0:
+                ui_surface = pygame.Surface(
+                    (DISPLAY_WIDTH, DISPLAY_HEIGHT), pygame.SRCALPHA
+                )
 
-            self.scale_bars.render()
+                # Render icons and scale bars to this surface
+                if self.icon_handler:
+                    self.icon_handler.render_to_surface(ui_surface)
+
+                if self.scale_bars:
+                    self.scale_bars.render_to_surface(ui_surface)
+
+                # Draw the units indicator to the UI surface
+                self.display.draw_units_indicator_to_surface(ui_surface)
+
+                # Apply fade alpha to all UI elements including the units indicator
+                ui_surface.set_alpha(self.ui_fade_alpha)
+                self.screen.blit(ui_surface, (0, 0))
 
         # Apply brightness adjustment
         brightness = self.input_handler.get_brightness()

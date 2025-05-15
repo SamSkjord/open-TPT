@@ -60,6 +60,10 @@ class InputHandler:
         }
         self.debounce_time = 0.2  # seconds
 
+        # New UI visibility state variables
+        self.ui_visible = True
+        self.ui_manually_toggled = False
+
         # Initialize the NeoKey if available
         self.initialize()
 
@@ -110,20 +114,26 @@ class InputHandler:
             else:
                 self.neokey.pixels[BUTTON_CAMERA_TOGGLE] = (0, 0, 64)
 
-            # Set reserved button (off)
-            self.neokey.pixels[BUTTON_RESERVED] = (0, 16, 0)
+            # Set reserved button (green when UI visible, dim green when hidden)
+            if self.ui_visible:
+                self.neokey.pixels[BUTTON_RESERVED] = (0, 128, 0)
+            else:
+                self.neokey.pixels[BUTTON_RESERVED] = (0, 16, 0)
 
         except Exception as e:
             print(f"Error updating NeoKey LEDs: {e}")
 
     def check_input(self):
-        """
-        Check for button presses from the NeoKey.
+        """Check for button presses from the NeoKey.
 
         Returns:
             dict: Dictionary with events that occurred
         """
-        events = {"brightness_changed": False, "camera_toggled": False}
+        events = {
+            "brightness_changed": False,
+            "camera_toggled": False,
+            "ui_toggled": False,
+        }
 
         if MOCK_MODE:
             # In mock mode, do nothing but return empty events
@@ -159,7 +169,9 @@ class InputHandler:
                         elif i == BUTTON_CAMERA_TOGGLE and self.camera:
                             self.camera.toggle()
                             events["camera_toggled"] = True
-                        # Reserved button does nothing for now
+                        elif i == BUTTON_RESERVED:
+                            self.toggle_ui_visibility()
+                            events["ui_toggled"] = True
 
             # Update LED states
             self.update_leds()
@@ -168,6 +180,21 @@ class InputHandler:
             print(f"Error reading NeoKey input: {e}")
 
         return events
+
+    def toggle_ui_visibility(self):
+        """
+        Toggle the visibility of UI elements (icons and scale bars).
+
+        When manually toggled ON, the UI will stay permanently visible
+        until manually toggled OFF again. This completely overrides the
+        automatic fadeout behavior.
+
+        Returns:
+            bool: New visibility state
+        """
+        self.ui_visible = not self.ui_visible
+        self.ui_manually_toggled = True
+        return self.ui_visible
 
     def increase_brightness(self, amount=0.1):
         """
@@ -227,7 +254,11 @@ class InputHandler:
         Returns:
             dict: Dictionary with events that occurred
         """
-        events = {"brightness_changed": False, "camera_toggled": False}
+        events = {
+            "brightness_changed": False,
+            "camera_toggled": False,
+            "ui_toggled": False,
+        }
 
         if button_index == BUTTON_BRIGHTNESS_UP:
             self.increase_brightness()
@@ -238,5 +269,8 @@ class InputHandler:
         elif button_index == BUTTON_CAMERA_TOGGLE and self.camera:
             self.camera.toggle()
             events["camera_toggled"] = True
+        elif button_index == BUTTON_RESERVED:
+            self.toggle_ui_visibility()
+            events["ui_toggled"] = True
 
         return events

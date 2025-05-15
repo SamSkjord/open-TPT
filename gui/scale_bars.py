@@ -349,3 +349,18 @@ class ScaleBars:
         """Render both scale bars."""
         self.draw_brake_scale()
         self.draw_tire_scale()
+
+    def render_to_surface(self, surface):
+        """Render both scale bars to the provided surface."""
+        # Store original surface
+        original_surface = self.surface
+
+        # Set to new surface temporarily
+        self.surface = surface
+
+        # Draw the scales
+        self.draw_brake_scale()
+        self.draw_tire_scale()
+
+        # Restore original surface
+        self.surface = original_surface

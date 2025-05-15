@@ -121,3 +121,17 @@ class IconHandler:
         except Exception as e:
             print(f"Error reloading icon {name} from {path}: {e}")
             return False
+
+    def render_to_surface(self, surface):
+        """Render all icons to the provided surface."""
+        # Store original surface
+        original_surface = self.surface
+
+        # Set to new surface temporarily
+        self.surface = surface
+
+        # Render the icons
+        self.render_all()
+
+        # Restore original surface
+        self.surface = original_surface

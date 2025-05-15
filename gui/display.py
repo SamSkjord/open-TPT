@@ -510,8 +510,7 @@ class Display:
         )
         self.surface.blit(debug_text, (10, 10))
 
-        # Draw the current units indicator
-        self.draw_units_indicator()
+        # Units indicator is now drawn to the fadeable UI surface
 
     def draw_status_message(self, message, duration=None):
         """
@@ -548,3 +547,23 @@ class Display:
             pygame.draw.rect(
                 self.surface, WHITE, (bar_x, bar_y, bar_width, bar_height), 1
             )
+
+    def draw_units_indicator_to_surface(self, surface):
+        """Draw the current units directly to the specified surface."""
+        # Get the current configured units
+        temp_unit, pressure_unit = self.get_unit_strings()
+
+        # Create the units text
+        units_text = f"{temp_unit} / {pressure_unit}"
+
+        # Render the text
+        units_surface = self.font_medium.render(units_text, True, WHITE)
+
+        # Position in lower right corner
+        units_pos = (
+            DISPLAY_WIDTH - units_surface.get_width() - 10,
+            DISPLAY_HEIGHT - units_surface.get_height() - 10,
+        )
+
+        # Draw the text directly to the provided surface
+        surface.blit(units_surface, units_pos)
