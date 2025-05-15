@@ -83,15 +83,6 @@ YELLOW = (255, 255, 0)
 BLUE = (0, 0, 255)
 
 
-# TPMS thresholds and positions
-TPMS_POSITIONS = {
-    # (x, y) coordinates for each tire's pressure and temperature display
-    "FL": {"pressure": (255, 15), "temp": (235, 60)},
-    "FR": {"pressure": (491, 15), "temp": (522, 60)},
-    "RL": {"pressure": (255, 430), "temp": (235, 460)},
-    "RR": {"pressure": (491, 430), "temp": (560, 460)},
-}
-
 # Brake temperature positions
 BRAKE_POSITIONS = {
     "FL": (379, 136),
@@ -111,3 +102,37 @@ MLX_POSITIONS = {
 }
 MLX_DISPLAY_WIDTH = 150  # Width of displayed heatmap - to cover the complete tire width
 MLX_DISPLAY_HEIGHT = 172  # Height of displayed heatmap
+
+# TPMS positions dynamically calculated based on MLX positions
+# The pressure text is centered above each tire's thermal display
+TPMS_POSITIONS = {
+    # Calculate pressure position as centered horizontally above the MLX display
+    "FL": {
+        "pressure": (
+            MLX_POSITIONS["FL"][0] + MLX_DISPLAY_WIDTH // 2,
+            MLX_POSITIONS["FL"][1] - 18,
+        ),
+        "temp": (MLX_POSITIONS["FL"][0], MLX_POSITIONS["FL"][1] - 10),
+    },
+    "FR": {
+        "pressure": (
+            MLX_POSITIONS["FR"][0] + MLX_DISPLAY_WIDTH // 2,
+            MLX_POSITIONS["FR"][1] - 18,
+        ),
+        "temp": (MLX_POSITIONS["FR"][0], MLX_POSITIONS["FR"][1] - 10),
+    },
+    "RL": {
+        "pressure": (
+            MLX_POSITIONS["RL"][0] + MLX_DISPLAY_WIDTH // 2,
+            MLX_POSITIONS["RL"][1] + 195,
+        ),
+        "temp": (MLX_POSITIONS["RL"][0], MLX_POSITIONS["RL"][1] - 10),
+    },
+    "RR": {
+        "pressure": (
+            MLX_POSITIONS["RR"][0] + MLX_DISPLAY_WIDTH // 2,
+            MLX_POSITIONS["RR"][1] + 195,
+        ),
+        "temp": (MLX_POSITIONS["RR"][0], MLX_POSITIONS["RR"][1] - 10),
+    },
+}

@@ -181,22 +181,28 @@ class Display:
         pressure_pos = TPMS_POSITIONS[position]["pressure"]
         temp_pos = TPMS_POSITIONS[position]["temp"]
 
-        # Render pressure with appropriate color (without unit)
+        # Render pressure with appropriate color
         pressure_color = self.get_color_for_pressure(pressure)
         pressure_text = self.font_large.render(f"{pressure:.1f}", True, pressure_color)
-        self.surface.blit(pressure_text, pressure_pos)
 
-        # Render temperature with appropriate color (without unit)
-        # Uncomment if you want to display temperature
+        # Create a rect for the text with center at pressure_pos
+        pressure_rect = pressure_text.get_rect(center=pressure_pos)
+
+        # Blit using the rect instead of the position directly
+        self.surface.blit(pressure_text, pressure_rect)
+
+        # Render temperature with appropriate color (if you want to enable this)
         # temp_color = self.get_color_for_temp(temp)
         # temp_text = self.font_large.render(f"{temp:.1f}", True, temp_color)
-        # self.surface.blit(temp_text, temp_pos)
+        # temp_rect = temp_text.get_rect(center=temp_pos)
+        # self.surface.blit(temp_text, temp_rect)
 
         # Render status if not OK
         # if status != "OK":
         #     status_pos = (pressure_pos[0], pressure_pos[1] - FONT_SIZE_SMALL)
         #     status_text = self.font_small.render(status, True, RED)
-        #     self.surface.blit(status_text, status_pos)
+        #     status_rect = status_text.get_rect(center=(status_pos[0], status_pos[1]))
+        #     self.surface.blit(status_text, status_rect)
 
     def draw_brake_temp(self, position, temp):
         """
