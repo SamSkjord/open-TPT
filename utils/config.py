@@ -21,7 +21,7 @@ PRESSURE_UNIT = "PSI"
 # - Temperature conversion: F = (C * 9/5) + 32
 # - Pressure conversion: 1 PSI = 0.0689476 BAR = 6.89476 kPa
 
-# Pressure thresholds
+# Tyre Pressure thresholds
 PRESSURE_LOW = 28.0
 PRESSURE_OPTIMAL = 32.0
 PRESSURE_HIGH = 36.0
@@ -61,8 +61,17 @@ FONT_SIZE_SMALL = 18
 
 
 # Paths
-TEMPLATE_PATH = "assets/template.png"
+# TEMPLATE_PATH = "assets/template.png"
 OVERLAY_PATH = "assets/overlay.png"
+
+
+# Icons
+TYRE_ICON_PATH = "assets/icons/icons8-tire-60.png"
+BRAKE_ICON_PATH = "assets/icons/icons8-brake-discs-60.png"
+ICON_SIZE = (40, 40)
+TYRE_ICON_POSITION = (725, 35)
+BRAKE_ICON_POSITION = (35, 35)
+
 
 # Colors (RGB)
 GREY = (128, 128, 128)
@@ -95,11 +104,10 @@ BRAKE_POSITIONS = {
 MLX_WIDTH = 32
 MLX_HEIGHT = 24
 MLX_POSITIONS = {
-    # Positioned directly over the tire images in the Template
-    "FL": (206, 50),  # Left side, top (green tire section)
-    "FR": (443, 50),  # Right side, top (green tire section)
-    "RL": (206, 258),  # Left side, bottom (green tire section)
-    "RR": (443, 258),  # Right side, bottom (green tire section)
+    "FL": (206, 50),
+    "FR": (443, 50),
+    "RL": (206, 258),
+    "RR": (443, 258),
 }
 MLX_DISPLAY_WIDTH = 150  # Width of displayed heatmap - to cover the complete tire width
 MLX_DISPLAY_HEIGHT = 172  # Height of displayed heatmap

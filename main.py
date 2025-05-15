@@ -12,10 +12,12 @@ import pygame
 import numpy as np
 
 # Import GUI modules
-from gui.template import Template
+# from gui.template import Template
 from gui.display import Display
 from gui.camera import Camera
 from gui.input import InputHandler
+from gui.scale_bars import ScaleBars
+from gui.icon_handler import IconHandler
 
 # Import hardware modules
 from hardware.tpms_input import TPMSHandler
@@ -126,10 +128,13 @@ class OpenTPT:
         self.clock = pygame.time.Clock()
 
         # Set up GUI components
-        self.Template = Template(self.screen)
+        # self.Template = Template(self.screen)
         self.display = Display(self.screen)
         self.camera = Camera(self.screen)
         self.input_handler = InputHandler(self.camera)
+
+        self.scale_bars = ScaleBars(self.screen)
+        self.icon_handler = IconHandler(self.screen)
 
     def _init_subsystems(self):
         """Initialize the hardware subsystems."""
@@ -218,7 +223,7 @@ class OpenTPT:
             # Otherwise render the normal view
 
             # Render the static Template
-            self.Template.render()
+            # self.Template.render()
 
             # Get brake temperatures
             brake_temps = self.brakes.get_temps()
@@ -248,8 +253,12 @@ class OpenTPT:
             # Draw the current units indicator
             self.display.draw_units_indicator()
 
-        # Apply br
-        # ightness adjustment
+            # Render the icons
+            self.icon_handler.render_all()
+
+            self.scale_bars.render()
+
+        # Apply brightness adjustment
         brightness = self.input_handler.get_brightness()
         if brightness < 1.0:
             # Create a semi-transparent black Template to dim the screen

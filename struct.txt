@@ -1,0 +1,39 @@
+sam@MBP open-TPT % tree
+.
+├── assets
+│   ├── icons
+│   │   ├── brake_icon.png
+│   │   ├── brake.xcf
+│   │   ├── icons8-brake-60.png
+│   │   ├── icons8-brake-discs-60.png
+│   │   ├── icons8-tire-60.png
+│   │   ├── tyre_icon.png
+│   │   ├── tyre.xcf
+│   │   └── Untitled.xcf
+│   ├── overlay.png
+│   ├── overlay.xcf
+│   ├── template.png
+│   └── template.xcf
+├── Body3.stl
+├── gui
+│   ├── camera.py
+│   ├── display.py
+│   ├── icon_handler.py
+│   ├── input.py
+│   ├── scale_bars.py
+│   └── template.py
+├── hardware
+│   ├── i2c_mux.py
+│   ├── ir_brakes.py
+│   ├── mlx_handler.py
+│   └── tpms_input.py
+├── LICENSE
+├── main.py
+├── overlay.png
+├── overlay.psd
+├── README.md
+├── requirements.txt
+├── skjord.jpg
+└── utils
+    └── config.py
+
