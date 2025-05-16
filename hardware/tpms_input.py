@@ -117,7 +117,9 @@ class TPMSHandler:
                     PRESSURE_OPTIMAL
                     + (random.random() * 2 - 1) * MOCK_PRESSURE_VARIANCE
                 )
-                temp = TEMP_OPTIMAL + (random.random() * 2 - 1) * MOCK_TEMP_VARIANCE
+                temp = (
+                    TYRE_TEMP_OPTIMAL + (random.random() * 2 - 1) * MOCK_TEMP_VARIANCE
+                )
 
                 # Add some variance in sensor update times
                 if random.random() > 0.8:  # 80% chance of update

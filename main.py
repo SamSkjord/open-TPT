@@ -38,14 +38,13 @@ from utils.config import (
     TYRE_TEMP_OPTIMAL,
     TYRE_TEMP_OPTIMAL_RANGE,
     TYRE_TEMP_HOT,
-    TYRE_TEMP_DANGER,
     PRESSURE_LOW,
     PRESSURE_OPTIMAL,
     PRESSURE_HIGH,
     BRAKE_TEMP_MIN,
-    BRAKE_TEMP_MAX,
     BRAKE_TEMP_OPTIMAL,
     BRAKE_TEMP_OPTIMAL_RANGE,
+    BRAKE_TEMP_HOT,
     BUTTON_RESERVED,
 )
 
@@ -181,7 +180,10 @@ class OpenTPT:
         except KeyboardInterrupt:
             print("\nExiting gracefully...")
         except Exception as e:
+            import traceback
+
             print(f"Error in main loop: {e}")
+            traceback.print_exc()
         finally:
             self._cleanup()
 

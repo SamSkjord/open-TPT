@@ -29,16 +29,17 @@ PRESSURE_HIGH = 36.0
 # Tyre Temperature thresholds (Celsius)
 TYRE_TEMP_COLD = 40.0  # Blue
 TYRE_TEMP_OPTIMAL = 80.0  # Green
-TYRE_TEMP_HOT = 100.0  # Yellow
-TYRE_TEMP_DANGER = 120.0  # Red
-TYRE_TEMP_OPTIMAL_RANGE = 10.0  # Range around optimal temperature
+TYRE_TEMP_OPTIMAL_RANGE = 7.5  # Range around optimal temperature
+TYRE_TEMP_HOT = 100.0  # Yellow to red
+TYRE_TEMP_HOT_TO_BLACK = 50.0  # Range over which red fades to black after HOT
 
 
 # Brake temperature thresholds
-BRAKE_TEMP_MIN = 100.0  # Min temperature for scale
-BRAKE_TEMP_MAX = 800.0  # Max temperature for scale
-BRAKE_TEMP_OPTIMAL = 400.0  # Optimal operating temperature
+BRAKE_TEMP_MIN = 75.0  # Min temperature for scale
+BRAKE_TEMP_OPTIMAL = 200.0  # Optimal operating temperature
 BRAKE_TEMP_OPTIMAL_RANGE = 50.0  # Range around optimal temperature
+BRAKE_TEMP_HOT = 300.0  # Yellow to red
+BRAKE_TEMP_HOT_TO_BLACK = 100.0  # Range over which red fades to black after HOT
 
 
 # NeoKey 1x4 button mappings

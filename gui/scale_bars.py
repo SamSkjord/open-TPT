@@ -11,12 +11,13 @@ from utils.config import (
     TYRE_TEMP_COLD,
     TYRE_TEMP_OPTIMAL,
     TYRE_TEMP_HOT,
-    TYRE_TEMP_DANGER,
     TYRE_TEMP_OPTIMAL_RANGE,
+    TYRE_TEMP_HOT_TO_BLACK,
     BRAKE_TEMP_MIN,
-    BRAKE_TEMP_MAX,
     BRAKE_TEMP_OPTIMAL,
+    BRAKE_TEMP_HOT,
     BRAKE_TEMP_OPTIMAL_RANGE,
+    BRAKE_TEMP_HOT_TO_BLACK,
     WHITE,
     BLACK,
     FONT_SIZE_SMALL,
@@ -72,11 +73,19 @@ class ScaleBars:
 
         # Calculate the extended temperature range
         min_temp = 0  # Start at 0°C
-        max_temp = BRAKE_TEMP_MAX + 100  # 100°C past the maximum
+        max_temp = (
+            BRAKE_TEMP_HOT + BRAKE_TEMP_HOT_TO_BLACK
+        )  # Range past the hot temperature
 
         # Calculate normalized positions for key temperature points
-        optimal_norm = (BRAKE_OPTIMAL - min_temp) / (max_temp - min_temp)
-        max_norm = (BRAKE_TEMP_MAX - min_temp) / (max_temp - min_temp)
+        optimal_lower_norm = (
+            BRAKE_TEMP_OPTIMAL - BRAKE_TEMP_OPTIMAL_RANGE - min_temp
+        ) / (max_temp - min_temp)
+        optimal_upper_norm = (
+            BRAKE_TEMP_OPTIMAL + BRAKE_TEMP_OPTIMAL_RANGE - min_temp
+        ) / (max_temp - min_temp)
+        hot_norm = (BRAKE_TEMP_HOT - min_temp) / (max_temp - min_temp)
+        # We don't have a danger level anymore, red starts at HOT
 
         # Black (0°C) to Blue (cold) - first 10% of the range
         cold_steps = int(steps * 0.1)
@@ -87,8 +96,8 @@ class ScaleBars:
             b = int(factor * 255)  # 0 to 255 (black to blue)
             colors.append((r, g, b))
 
-        # Blue to Green (cold to optimal) - next section to optimal temp
-        blue_to_green_steps = int(steps * optimal_norm) - cold_steps
+        # Blue to Green (cold to optimal lower bound)
+        blue_to_green_steps = int(steps * optimal_lower_norm) - cold_steps
         if blue_to_green_steps <= 0:  # Ensure at least some steps
             blue_to_green_steps = 20
 
@@ -99,9 +108,16 @@ class ScaleBars:
             b = int(255 - factor * 255)  # B decreases to 0
             colors.append((r, g, b))
 
-        # Green to Yellow - from optimal to 60% between optimal and max
-        mid_point = optimal_norm + (max_norm - optimal_norm) * 0.6
-        green_to_yellow_steps = int(steps * (mid_point - optimal_norm))
+        # Green plateau within optimal range
+        green_plateau_steps = int(steps * (optimal_upper_norm - optimal_lower_norm))
+        if green_plateau_steps <= 0:
+            green_plateau_steps = 10
+
+        for i in range(green_plateau_steps):
+            colors.append((0, 255, 0))  # Stay green within optimal range
+
+        # Green to Yellow/Orange - from optimal upper bound to hot
+        green_to_yellow_steps = int(steps * (hot_norm - optimal_upper_norm))
         if green_to_yellow_steps <= 0:  # Ensure at least some steps
             green_to_yellow_steps = 20
 
@@ -112,10 +128,10 @@ class ScaleBars:
             b = 0  # B stays at 0
             colors.append((r, g, b))
 
-        # Yellow to Red - from 60% point to max
-        yellow_to_red_steps = int(steps * (max_norm - mid_point))
-        if yellow_to_red_steps <= 0:  # Ensure at least some steps
-            yellow_to_red_steps = 20
+        # Yellow to Red (at hot temperature)
+        yellow_to_red_steps = int(steps * 0.1)  # 10% of total steps
+        if yellow_to_red_steps <= 0:
+            yellow_to_red_steps = 10
 
         for i in range(yellow_to_red_steps):
             factor = i / yellow_to_red_steps
@@ -124,10 +140,10 @@ class ScaleBars:
             b = 0  # B stays at 0
             colors.append((r, g, b))
 
-        # Red to Black (max to max+100)
+        # Red to Black (after hot temperature)
         remaining_steps = steps - len(colors)
-        if remaining_steps <= 0:  # Ensure at least some steps
-            remaining_steps = 20
+        if remaining_steps <= 0:
+            remaining_steps = 10
 
         for i in range(remaining_steps):
             factor = i / remaining_steps
@@ -150,13 +166,14 @@ class ScaleBars:
 
         # Calculate the extended temperature range
         min_temp = 0  # Start at 0°C
-        max_temp = TYRE_TEMP_DANGER + 20  # 20°C past the danger temperature
+        max_temp = TYRE_TEMP_HOT + TYRE_TEMP_HOT_TO_BLACK  # Range past hot temperature
 
         # Calculate normalized positions for key temperature points
         cold_norm = TYRE_TEMP_COLD / max_temp
-        optimal_norm = TYRE_TEMP_OPTIMAL / max_temp
+        optimal_lower_norm = (TYRE_TEMP_OPTIMAL - TYRE_TEMP_OPTIMAL_RANGE) / max_temp
+        optimal_upper_norm = (TYRE_TEMP_OPTIMAL + TYRE_TEMP_OPTIMAL_RANGE) / max_temp
         hot_norm = TYRE_TEMP_HOT / max_temp
-        danger_norm = TYRE_TEMP_DANGER / max_temp
+        # No danger level, red starts at HOT
 
         # Black (0°C) to Blue (cold)
         black_to_blue_steps = int(steps * cold_norm)
@@ -167,26 +184,37 @@ class ScaleBars:
             b = int(factor * 255)  # 0 to 255 (black to blue)
             colors.append((r, g, b))
 
-        # Blue to Green (cold to optimal)
-        blue_to_green_steps = int(steps * (optimal_norm - cold_norm))
+        # Blue to Green (cold to optimal lower bound)
+        blue_to_green_steps = int(steps * (optimal_lower_norm - cold_norm))
         for i in range(blue_to_green_steps):
             factor = i / blue_to_green_steps
-            r = int(factor * 0)  # R increases to 0
+            r = 0
             g = int(factor * 255)  # G increases to 255
             b = int(255 - factor * 200)  # B decreases from 255 to ~50
             colors.append((r, g, b))
 
-        # Green to Yellow (optimal to hot)
-        green_to_yellow_steps = int(steps * (hot_norm - optimal_norm))
+        # Green plateau within optimal range
+        green_plateau_steps = int(steps * (optimal_upper_norm - optimal_lower_norm))
+        if green_plateau_steps <= 0:
+            green_plateau_steps = 10
+
+        for i in range(green_plateau_steps):
+            colors.append((0, 255, 0))  # Stay green within optimal range
+
+        # Green to Yellow/Orange (optimal upper bound to hot)
+        green_to_yellow_steps = int(steps * (hot_norm - optimal_upper_norm))
         for i in range(green_to_yellow_steps):
             factor = i / green_to_yellow_steps
             r = int(factor * 255)  # R increases to 255
             g = 255  # G stays at 255
-            b = int(50 * (1 - factor))  # B decreases from ~50 to 0
+            b = 0  # B stays at 0
             colors.append((r, g, b))
 
-        # Yellow to Red (hot to danger)
-        yellow_to_red_steps = int(steps * (danger_norm - hot_norm))
+        # Yellow to Red (at hot temperature)
+        yellow_to_red_steps = int(steps * 0.1)  # 10% of total steps
+        if yellow_to_red_steps <= 0:
+            yellow_to_red_steps = 10
+
         for i in range(yellow_to_red_steps):
             factor = i / yellow_to_red_steps
             r = 255  # R stays at 255
@@ -194,13 +222,11 @@ class ScaleBars:
             b = 0  # B stays at 0
             colors.append((r, g, b))
 
-        # Red to Black (danger to danger+20)
-        remaining_steps = steps - (
-            black_to_blue_steps
-            + blue_to_green_steps
-            + green_to_yellow_steps
-            + yellow_to_red_steps
-        )
+        # Red to Black (configured range after hot temperature)
+        remaining_steps = steps - len(colors)
+        if remaining_steps <= 0:
+            remaining_steps = 10
+
         for i in range(remaining_steps):
             factor = i / remaining_steps
             r = int(255 * (1 - factor))  # R decreases from 255 to 0
@@ -231,28 +257,55 @@ class ScaleBars:
             # Draw horizontal line with the color
             pygame.draw.line(scale_surf, color, (0, y), (self.bar_width, y))
 
-        # Extended temperature range
-        min_temp = 0  # Starting at 0°C
-        max_temp = BRAKE_TEMP_MAX + 100  # 100°C past maximum
+        # Define temperature range in native unit (Celsius as defined in config)
+        min_temp_c = 0  # Starting at 0°C
+        max_temp_c = (
+            BRAKE_TEMP_HOT + BRAKE_TEMP_HOT_TO_BLACK
+        )  # Range past hot temperature
+        brake_min_c = BRAKE_TEMP_MIN
+        optimal_c = BRAKE_TEMP_OPTIMAL
+        optimal_plus_range_c = BRAKE_TEMP_OPTIMAL + BRAKE_TEMP_OPTIMAL_RANGE
+        hot_c = BRAKE_TEMP_HOT
 
-        # Prepare temperature values based on configured unit
+        # Convert to display unit if needed
         if TEMP_UNIT == "F":
-            min_temp = (min_temp * 9 / 5) + 32
-            max_temp = (max_temp * 9 / 5) + 32
-            optimal_temp = (BRAKE_OPTIMAL * 9 / 5) + 32
+            min_temp = (min_temp_c * 9 / 5) + 32
+            max_temp = (max_temp_c * 9 / 5) + 32
+            brake_temp_min = (brake_min_c * 9 / 5) + 32
+            optimal_temp = (optimal_c * 9 / 5) + 32
+            optimal_plus_range = (optimal_plus_range_c * 9 / 5) + 32
+            hot_temp = (hot_c * 9 / 5) + 32
         else:
-            optimal_temp = BRAKE_OPTIMAL
+            min_temp = min_temp_c
+            max_temp = max_temp_c
+            brake_temp_min = brake_min_c
+            optimal_temp = optimal_c
+            optimal_plus_range = optimal_plus_range_c
+            hot_temp = hot_c
 
-        # Calculate vertical position for optimal temperature
+        # Calculate vertical positions for key temperatures using the native Celsius values
+        # for position calculations (to match colormap) but display the converted values
+        min_pos = int(
+            self.bar_height
+            * (1 - (brake_min_c - min_temp_c) / (max_temp_c - min_temp_c))
+        )
         optimal_pos = int(
-            self.bar_height * (1 - (BRAKE_OPTIMAL - min_temp) / (max_temp - min_temp))
+            self.bar_height * (1 - (optimal_c - min_temp_c) / (max_temp_c - min_temp_c))
+        )
+        optimal_plus_range_pos = int(
+            self.bar_height
+            * (1 - (optimal_plus_range_c - min_temp_c) / (max_temp_c - min_temp_c))
+        )
+        hot_pos = int(
+            self.bar_height * (1 - (hot_c - min_temp_c) / (max_temp_c - min_temp_c))
         )
 
-        # Add temperature labels
+        # Add temperature labels - using converted temperature values for display
         labels = [
-            (min_temp, self.bar_height - 5),  # Bottom (0°C/32°F)
-            (max_temp, 5),  # Top (BRAKE_TEMP_MAX + 100)
+            (brake_temp_min, min_pos),  # Min brake temp
             (optimal_temp, optimal_pos),  # Optimal point
+            # (optimal_plus_range, optimal_plus_range_pos),  # Optimal + range
+            (hot_temp, hot_pos),  # Hot point
         ]
 
         # Blit the scale to the main surface
@@ -291,61 +344,81 @@ class ScaleBars:
             # Draw horizontal line with the color
             pygame.draw.line(scale_surf, color, (0, y), (self.bar_width, y))
 
-        # Extended temperature range
-        min_temp = 0  # Starting at 0°C
-        max_temp = TEMP_DANGER + 20  # 20°C past danger temperature
+        # Define temperature range in native unit (Celsius as defined in config)
+        min_temp_c = 0  # Starting at 0°C
+        max_temp_c = (
+            TYRE_TEMP_HOT + TYRE_TEMP_HOT_TO_BLACK
+        )  # Range past hot temperature
+        cold_c = TYRE_TEMP_COLD
+        optimal_c = TYRE_TEMP_OPTIMAL
+        # optimal_minus_range_c = TYRE_TEMP_OPTIMAL - TYRE_TEMP_OPTIMAL_RANGE
+        # optimal_plus_range_c = TYRE_TEMP_OPTIMAL + TYRE_TEMP_OPTIMAL_RANGE
+        hot_c = TYRE_TEMP_HOT
 
-        # Prepare temperature values based on configured unit
+        # Convert to display unit if needed
         if TEMP_UNIT == "F":
-            min_temp = (min_temp * 9 / 5) + 32
-            max_temp = (max_temp * 9 / 5) + 32
-            cold_temp = (TYRE_TEMP_COLD * 9 / 5) + 32
-            optimal_temp = (TYRE_TEMP_OPTIMAL * 9 / 5) + 32
-            danger_temp = (TYRE_TEMP_DANGER * 9 / 5) + 32
+            min_temp = (min_temp_c * 9 / 5) + 32
+            max_temp = (max_temp_c * 9 / 5) + 32
+            cold_temp = (cold_c * 9 / 5) + 32
+            optimal_temp = (optimal_c * 9 / 5) + 32
+            # optimal_minus_range = (optimal_minus_range_c * 9 / 5) + 32
+            # optimal_plus_range = (optimal_plus_range_c * 9 / 5) + 32
+            hot_temp = (hot_c * 9 / 5) + 32
         else:
-            cold_temp = TYRE_TEMP_COLD
-            optimal_temp = TYRE_TEMP_OPTIMAL
-            danger_temp = TYRE_TEMP_DANGER
+            min_temp = min_temp_c
+            max_temp = max_temp_c
+            cold_temp = cold_c
+            optimal_temp = optimal_c
+            # optimal_minus_range = optimal_minus_range_c
+            # optimal_plus_range = optimal_plus_range_c
+            hot_temp = hot_c
 
-        # Calculate positions for key temperatures
+        # Calculate positions for key temperatures using the native Celsius values
+        # for position calculations (to match colormap) but display the converted values
         cold_pos = int(
-            self.bar_height * (1 - (TYRE_TEMP_COLD - min_temp) / (max_temp - min_temp))
+            self.bar_height * (1 - (cold_c - min_temp_c) / (max_temp_c - min_temp_c))
         )
+        # optimal_minus_range_pos = int(
+        #     self.bar_height
+        #     * (1 - (optimal_minus_range_c - min_temp_c) / (max_temp_c - min_temp_c))
+        # )
         optimal_pos = int(
-            self.bar_height
-            * (1 - (TYRE_TEMP_OPTIMAL - min_temp) / (max_temp - min_temp))
+            self.bar_height * (1 - (optimal_c - min_temp_c) / (max_temp_c - min_temp_c))
         )
-        danger_pos = int(
-            self.bar_height
-            * (1 - (TYRE_TEMP_DANGER - min_temp) / (max_temp - min_temp))
+        # optimal_plus_range_pos = int(
+        #     self.bar_height
+        #     * (1 - (optimal_plus_range_c - min_temp_c) / (max_temp_c - min_temp_c))
+        # )
+        hot_pos = int(
+            self.bar_height * (1 - (hot_c - min_temp_c) / (max_temp_c - min_temp_c))
         )
 
-        # Add temperature labels
+        # Add temperature labels - display the converted temperature values
         labels = [
-            (min_temp, self.bar_height - 5),  # Bottom (0°C/32°F)
-            (max_temp, 5),  # Top (TEMP_DANGER + 20)
             (cold_temp, cold_pos),  # Cold point
+            # (optimal_minus_range, optimal_minus_range_pos),  # Lower bound of optimal
             (optimal_temp, optimal_pos),  # Optimal point
-            (danger_temp, danger_pos),  # Danger point
+            # (optimal_plus_range, optimal_plus_range_pos),  # Upper bound of optimal
+            (hot_temp, hot_pos),  # Hot point
         ]
 
         # Blit the scale to the main surface
-        self.surface.blit(scale_surf, (self.tyre, self.tyre))
+        self.surface.blit(scale_surf, (self.tyre_bar_x, self.tyre_bar_y))
 
         # Draw temperature labels
         for temp, y_pos in labels:
             # Temperature value
             text = self.font_small.render(f"{int(temp)}", True, WHITE)
-            text_x = self.tyre - text.get_width() - 5
-            text_y = self.tyre + y_pos - text.get_height() // 2
+            text_x = self.tyre_bar_x - text.get_width() - 5
+            text_y = self.tyre_bar_y + y_pos - text.get_height() // 2
             self.surface.blit(text, (text_x, text_y))
 
             # Tick mark
             pygame.draw.line(
                 self.surface,
                 WHITE,
-                (self.tyre, self.tyre + y_pos),
-                (self.tyre + 5, self.tyre + y_pos),
+                (self.tyre_bar_x, self.tyre_bar_y + y_pos),
+                (self.tyre_bar_x + 5, self.tyre_bar_y + y_pos),
                 1,
             )
 

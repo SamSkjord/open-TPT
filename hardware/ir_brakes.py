@@ -7,10 +7,10 @@ import time
 import random
 import threading
 from utils.config import (
-    BRAKE_OPTIMAL,
+    BRAKE_TEMP_OPTIMAL,
     MOCK_MODE,
     BRAKE_TEMP_MIN,
-    BRAKE_TEMP_MAX,
+    BRAKE_TEMP_HOT,
     ADS_ADDRESS,
     I2C_BUS,
 )
@@ -41,10 +41,10 @@ class BrakeTemperatureHandler:
 
         # Temperature data structure
         self.temp_data = {
-            "FL": {"temp": BRAKE_OPTIMAL, "last_update": 0},
-            "FR": {"temp": BRAKE_OPTIMAL, "last_update": 0},
-            "RL": {"temp": BRAKE_OPTIMAL, "last_update": 0},
-            "RR": {"temp": BRAKE_OPTIMAL, "last_update": 0},
+            "FL": {"temp": BRAKE_TEMP_OPTIMAL, "last_update": 0},
+            "FR": {"temp": BRAKE_TEMP_OPTIMAL, "last_update": 0},
+            "RL": {"temp": BRAKE_TEMP_OPTIMAL, "last_update": 0},
+            "RR": {"temp": BRAKE_TEMP_OPTIMAL, "last_update": 0},
         }
 
         # Channel mapping (ADS1115 has 4 channels, one for each brake)
@@ -136,7 +136,7 @@ class BrakeTemperatureHandler:
         with self.lock:
             for position in self.temp_data:
                 # Simulate temperature changes around optimal value
-                base_temp = BRAKE_OPTIMAL
+                base_temp = BRAKE_TEMP_OPTIMAL
 
                 # Add some realistic variations
                 # Higher temps during braking, cooling when not braking
@@ -146,13 +146,13 @@ class BrakeTemperatureHandler:
                 else:
                     # Gradual cooling when not braking
                     current_temp = self.temp_data[position]["temp"]
-                    temp_change = (BRAKE_OPTIMAL - current_temp) * 0.1
+                    temp_change = (BRAKE_TEMP_OPTIMAL - current_temp) * 0.1
 
                 # Apply the change
                 new_temp = self.temp_data[position]["temp"] + temp_change
 
                 # Ensure temperature stays within reasonable bounds
-                new_temp = max(BRAKE_TEMP_MIN, min(new_temp, BRAKE_TEMP_MAX))
+                new_temp = max(BRAKE_TEMP_MIN, min(new_temp, BRAKE_TEMP_HOT))
 
                 # Update the data
                 self.temp_data[position]["temp"] = new_temp
@@ -210,7 +210,7 @@ class BrakeTemperatureHandler:
         temp = voltage * gain * 100.0 + offset  # Example: 0-5V maps to 0-500°C range
 
         # Ensure temperature is within reasonable bounds
-        temp = max(BRAKE_TEMP_MIN, min(temp, BRAKE_TEMP_MAX))
+        temp = max(BRAKE_TEMP_MIN, min(temp, BRAKE_TEMP_HOT))
         return temp
 
     def get_temps(self):

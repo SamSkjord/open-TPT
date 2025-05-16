@@ -10,9 +10,9 @@ from utils.config import (
     MLX_WIDTH,
     MLX_HEIGHT,
     MOCK_MODE,
-    TEMP_COLD,
-    TEMP_HOT,
-    TEMP_OPTIMAL,
+    TYRE_TEMP_COLD,
+    TYRE_TEMP_HOT,
+    TYRE_TEMP_OPTIMAL,
 )
 from hardware.i2c_mux import I2CMux
 
@@ -177,25 +177,25 @@ class MLXHandler:
             for position in self.thermal_data:
                 # Create a base temperature - different for each tire to make it clear which is which
                 if position == "FL":
-                    base_temp = TEMP_OPTIMAL - 5
+                    base_temp = TYRE_TEMP_OPTIMAL - 5
                     # FL tire typically has hotter inner edge in many racing scenarios
                     inner_factor = 1.3
                     middle_factor = 1.0
                     outer_factor = 0.8
                 elif position == "FR":
-                    base_temp = TEMP_OPTIMAL
+                    base_temp = TYRE_TEMP_OPTIMAL
                     # FR tire might have more balanced temperature
                     inner_factor = 1.1
                     middle_factor = 1.0
                     outer_factor = 0.9
                 elif position == "RL":
-                    base_temp = TEMP_OPTIMAL + 5
+                    base_temp = TYRE_TEMP_OPTIMAL + 5
                     # RL tire might have hotter outer edge due to power delivery
                     inner_factor = 0.9
                     middle_factor = 1.0
                     outer_factor = 1.2
                 else:  # RR
-                    base_temp = TEMP_OPTIMAL + 10
+                    base_temp = TYRE_TEMP_OPTIMAL + 10
                     # RR tire often has highest temps overall due to being on outside of many tracks
                     inner_factor = 0.8
                     middle_factor = 1.0
@@ -279,7 +279,7 @@ class MLXHandler:
                     temp_data += 15 * np.exp(-(r2**2) / (section_width * 1.2) ** 2)
 
                 # Ensure temperatures stay within reasonable bounds
-                temp_data = np.clip(temp_data, TEMP_COLD, TEMP_HOT + 20)
+                temp_data = np.clip(temp_data, TYRE_TEMP_COLD, TYRE_TEMP_HOT + 20)
 
                 # Store the data
                 self.thermal_data[position] = temp_data

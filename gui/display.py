@@ -23,13 +23,14 @@ from utils.config import (
     TYRE_TEMP_COLD,
     TYRE_TEMP_OPTIMAL,
     TYRE_TEMP_HOT,
-    TYRE_TEMP_DANGER,
     TYRE_TEMP_OPTIMAL_RANGE,
+    TYRE_TEMP_HOT_TO_BLACK,
     BRAKE_POSITIONS,
     BRAKE_TEMP_MIN,
-    BRAKE_TEMP_MAX,
     BRAKE_TEMP_OPTIMAL,
     BRAKE_TEMP_OPTIMAL_RANGE,
+    BRAKE_TEMP_HOT,
+    BRAKE_TEMP_HOT_TO_BLACK,
     MLX_POSITIONS,
     MLX_DISPLAY_WIDTH,
     MLX_DISPLAY_HEIGHT,
@@ -159,12 +160,44 @@ class Display:
         """
         if temp < TYRE_TEMP_COLD:
             return BLUE  # Too cold
-        elif temp < TYRE_TEMP_OPTIMAL:
-            return GREEN  # Cold but acceptable
+        elif temp < TYRE_TEMP_OPTIMAL - TYRE_TEMP_OPTIMAL_RANGE:
+            # Between cold and optimal range lower bound - blue to green transition
+            ratio = (temp - TYRE_TEMP_COLD) / (
+                (TYRE_TEMP_OPTIMAL - TYRE_TEMP_OPTIMAL_RANGE) - TYRE_TEMP_COLD
+            )
+            r = 0
+            g = int(255 * ratio)
+            b = int(255 * (1 - ratio))
+            return (r, g, b)
+        elif temp <= TYRE_TEMP_OPTIMAL + TYRE_TEMP_OPTIMAL_RANGE:
+            return GREEN  # Within optimal range
         elif temp < TYRE_TEMP_HOT:
-            return YELLOW  # Getting hot
+            # Between optimal range upper bound and hot - green to yellow/orange transition
+            ratio = (temp - (TYRE_TEMP_OPTIMAL + TYRE_TEMP_OPTIMAL_RANGE)) / (
+                TYRE_TEMP_HOT - (TYRE_TEMP_OPTIMAL + TYRE_TEMP_OPTIMAL_RANGE)
+            )
+            r = int(255 * ratio)
+            g = 255
+            b = 0
+            return (r, g, b)
+        elif (
+            temp < TYRE_TEMP_HOT + TYRE_TEMP_HOT_TO_BLACK
+        ):  # Transition to black past HOT
+            # Yellow to red to black transition
+            ratio = (temp - TYRE_TEMP_HOT) / TYRE_TEMP_HOT_TO_BLACK
+            if ratio < 0.5:  # First transition to full red (yellow→red)
+                r = 255
+                g = int(255 * (1 - ratio * 2))  # Decrease green
+                b = 0
+            else:  # Then transition to black (red→black)
+                adjusted_ratio = (ratio - 0.5) * 2  # Scale 0.5-1.0 to 0-1.0
+                r = int(255 * (1 - adjusted_ratio))  # Decrease red
+                g = 0
+                b = 0
+            return (r, g, b)
         else:
-            return RED  # Too hot
+            # Beyond transition range - black
+            return (0, 0, 0)
 
     def draw_pressure_temp(self, position, pressure, temp, status="OK"):
         """
@@ -220,45 +253,55 @@ class Display:
         # Get position
         pos = BRAKE_POSITIONS[position]
 
-        # Calculate normalized temperature (0.0 to 1.0)
-        normalized = max(
-            0.0, min(1.0, (temp - BRAKE_TEMP_MIN) / (BRAKE_TEMP_MAX - BRAKE_TEMP_MIN))
-        )
-
         # Determine color based on temperature
-        # Map from blue (cold) through green, yellow to red (hot)
-        if normalized < 0.25:
-            # Blue to Green
-            factor = normalized * 4  # 0 to 1 in this range
-            color = (
-                int(factor * 255),  # R increases
-                int(factor * 255),  # G increases
-                255,  # B stays at max
+        if temp < BRAKE_TEMP_MIN:
+            # Blue for cold (below min)
+            color = (0, 0, 255)
+        elif temp < BRAKE_TEMP_OPTIMAL - BRAKE_TEMP_OPTIMAL_RANGE:
+            # Blue to Green transition
+            ratio = (temp - BRAKE_TEMP_MIN) / (
+                (BRAKE_TEMP_OPTIMAL - BRAKE_TEMP_OPTIMAL_RANGE) - BRAKE_TEMP_MIN
             )
-        elif normalized < 0.5:
-            # Green to Yellow
-            factor = (normalized - 0.25) * 4  # 0 to 1 in this range
             color = (
-                int(factor * 255 + (1 - factor) * 255),  # R increases to max
-                255,  # G stays at max
-                int((1 - factor) * 255),  # B decreases
+                0,  # R stays at 0
+                int(ratio * 255),  # G increases to 255
+                int(255 * (1 - ratio)),  # B decreases to 0
             )
-        elif normalized < 0.75:
-            # Yellow to Orange
-            factor = (normalized - 0.5) * 4  # 0 to 1 in this range
+        elif temp <= BRAKE_TEMP_OPTIMAL + BRAKE_TEMP_OPTIMAL_RANGE:
+            # Green for optimal range
+            color = (0, 255, 0)
+        elif temp < BRAKE_TEMP_HOT:
+            # Green to Yellow transition
+            # Calculate how far we are between optimal+range and hot
+            ratio = (temp - (BRAKE_TEMP_OPTIMAL + BRAKE_TEMP_OPTIMAL_RANGE)) / (
+                BRAKE_TEMP_HOT - (BRAKE_TEMP_OPTIMAL + BRAKE_TEMP_OPTIMAL_RANGE)
+            )
             color = (
-                255,  # R stays at max
-                int((1 - factor) * 255),  # G decreases
+                int(ratio * 255),  # R increases to 255
+                255,  # G stays at 255
                 0,  # B stays at 0
             )
+        elif (
+            temp < BRAKE_TEMP_HOT + BRAKE_TEMP_HOT_TO_BLACK
+        ):  # Transition to black past HOT
+            # Yellow/orange to red to black transition
+            ratio = (temp - BRAKE_TEMP_HOT) / BRAKE_TEMP_HOT_TO_BLACK
+            if ratio < 0.3:  # First transition to red (yellow→red) - 30% of the way
+                color = (
+                    255,  # R stays at 255
+                    int(255 * (1 - ratio / 0.3)),  # G decreases to 0
+                    0,  # B stays at 0
+                )
+            else:  # Then transition to black (red→black) - remaining 70%
+                adjusted_ratio = (ratio - 0.3) / 0.7  # Scale 0.3-1.0 to 0-1.0
+                color = (
+                    int(255 * (1 - adjusted_ratio)),  # R decreases from 255 to 0
+                    0,  # G stays at 0
+                    0,  # B stays at 0
+                )
         else:
-            # Orange to Red
-            factor = (normalized - 0.75) * 4  # 0 to 1 in this range
-            color = (
-                255,  # R stays at max
-                int((1 - factor) * 128),  # G decreases further to dark red
-                0,  # B stays at 0
-            )
+            # Beyond transition range - black
+            color = (0, 0, 0)
 
         # Draw a rectangular shape with the color to match the brake rotors in the overlay
         # The brakes are represented as dark blue sections in the overlay
@@ -401,39 +444,8 @@ class Display:
         Returns:
             tuple: RGB color value
         """
-        # Normalize temperature to 0-1 range
-        normalized = max(
-            0.0,
-            min(1.0, (temp - TEMP_COLD) / (TEMP_DANGER - TEMP_COLD)),
-        )
-
-        # Color scale: Blue (cold) -> Green -> Yellow -> Red (hot)
-        if normalized < 0.25:
-            # Blue to Green (cold)
-            factor = normalized * 4
-            r = int(factor * 255)
-            g = int(factor * 255)
-            b = 255
-        elif normalized < 0.5:
-            # Green to Yellow
-            factor = (normalized - 0.25) * 4
-            r = int(factor * 255)
-            g = 255
-            b = int((1 - factor) * 255)
-        elif normalized < 0.75:
-            # Yellow to Orange
-            factor = (normalized - 0.5) * 4
-            r = 255
-            g = int((1 - factor) * 255)
-            b = 0
-        else:
-            # Orange to Red (hot)
-            factor = (normalized - 0.75) * 4
-            r = 255
-            g = int((1 - factor) * 128)
-            b = 0
-
-        return (r, g, b)
+        # Use the color_for_temp function to maintain consistency
+        return self.get_color_for_temp(temp)
 
     def get_unit_strings(self):
         """
