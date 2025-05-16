@@ -27,15 +27,18 @@ PRESSURE_OPTIMAL = 32.0
 PRESSURE_HIGH = 36.0
 
 # Tyre Temperature thresholds (Celsius)
-TEMP_COLD = 40.0  # Blue
-TEMP_OPTIMAL = 80.0  # Green
-TEMP_HOT = 100.0  # Yellow
-TEMP_DANGER = 120.0  # Red
+TYRE_TEMP_COLD = 40.0  # Blue
+TYRE_TEMP_OPTIMAL = 80.0  # Green
+TYRE_TEMP_HOT = 100.0  # Yellow
+TYRE_TEMP_DANGER = 120.0  # Red
+TYRE_TEMP_OPTIMAL_RANGE = 10.0  # Range around optimal temperature
+
 
 # Brake temperature thresholds
 BRAKE_TEMP_MIN = 100.0  # Min temperature for scale
 BRAKE_TEMP_MAX = 800.0  # Max temperature for scale
-BRAKE_OPTIMAL = 400.0  # Optimal operating temperature
+BRAKE_TEMP_OPTIMAL = 400.0  # Optimal operating temperature
+BRAKE_TEMP_OPTIMAL_RANGE = 50.0  # Range around optimal temperature
 
 
 # NeoKey 1x4 button mappings
@@ -100,11 +103,11 @@ MLX_POSITIONS = {
     "RL": (206, 258),
     "RR": (443, 258),
 }
-MLX_DISPLAY_WIDTH = 150  # Width of displayed heatmap - to cover the complete tire width
+MLX_DISPLAY_WIDTH = 150  # Width of displayed heatmap - to cover the complete tyre width
 MLX_DISPLAY_HEIGHT = 172  # Height of displayed heatmap
 
 # TPMS positions dynamically calculated based on MLX positions
-# The pressure text is centered above each tire's thermal display
+# The pressure text is centered above each tyre's thermal display
 TPMS_POSITIONS = {
     # Calculate pressure position as centered horizontally above the MLX display
     "FL": {

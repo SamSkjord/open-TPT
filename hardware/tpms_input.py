@@ -1,6 +1,6 @@
 """
 TPMS Input module for openTPT.
-Handles reading tire pressure and temperature from TPMS sensors.
+Handles reading Tyre pressure and temperature from TPMS sensors.
 """
 
 import time
@@ -8,7 +8,7 @@ import random
 import threading
 from utils.config import (
     PRESSURE_OPTIMAL,
-    TEMP_OPTIMAL,
+    TYRE_TEMP_OPTIMAL,
     MOCK_PRESSURE_VARIANCE,
     MOCK_TEMP_VARIANCE,
     MOCK_MODE,
@@ -177,7 +177,7 @@ class TPMSHandler:
 
     def _map_sensor_id_to_position(self, sensor_id):
         """
-        Map a sensor ID to a tire position. This would need to be customized
+        Map a sensor ID to a tyre position. This would need to be customized
         for your specific TPMS sensors and vehicle configuration.
 
         Args:
@@ -197,10 +197,10 @@ class TPMSHandler:
 
     def get_data(self):
         """
-        Get the current TPMS data for all tires.
+        Get the current TPMS data for all tyres.
 
         Returns:
-            dict: Dictionary with tire data for all positions
+            dict: Dictionary with tyre data for all positions
         """
         result = {}
         current_time = time.time()
@@ -216,15 +216,15 @@ class TPMSHandler:
 
         return result
 
-    def get_tire_data(self, position):
+    def get_tyre_data(self, position):
         """
-        Get TPMS data for a specific tire.
+        Get TPMS data for a specific tyre.
 
         Args:
-            position: Tire position ("FL", "FR", "RL", "RR")
+            position: Tyre position ("FL", "FR", "RL", "RR")
 
         Returns:
-            dict: Dictionary with tire data or None if position invalid
+            dict: Dictionary with tyre data or None if position invalid
         """
         if position not in self.sensor_data:
             return None

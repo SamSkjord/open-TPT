@@ -20,14 +20,16 @@ from utils.config import (
     PRESSURE_LOW,
     PRESSURE_OPTIMAL,
     PRESSURE_HIGH,
-    TEMP_COLD,
-    TEMP_OPTIMAL,
-    TEMP_HOT,
-    TEMP_DANGER,
+    TYRE_TEMP_COLD,
+    TYRE_TEMP_OPTIMAL,
+    TYRE_TEMP_HOT,
+    TYRE_TEMP_DANGER,
+    TYRE_TEMP_OPTIMAL_RANGE,
     BRAKE_POSITIONS,
     BRAKE_TEMP_MIN,
     BRAKE_TEMP_MAX,
-    BRAKE_OPTIMAL,
+    BRAKE_TEMP_OPTIMAL,
+    BRAKE_TEMP_OPTIMAL_RANGE,
     MLX_POSITIONS,
     MLX_DISPLAY_WIDTH,
     MLX_DISPLAY_HEIGHT,
@@ -155,21 +157,21 @@ class Display:
         Returns:
             RGB color tuple
         """
-        if temp < TEMP_COLD:
+        if temp < TYRE_TEMP_COLD:
             return BLUE  # Too cold
-        elif temp < TEMP_OPTIMAL:
+        elif temp < TYRE_TEMP_OPTIMAL:
             return GREEN  # Cold but acceptable
-        elif temp < TEMP_HOT:
+        elif temp < TYRE_TEMP_HOT:
             return YELLOW  # Getting hot
         else:
             return RED  # Too hot
 
     def draw_pressure_temp(self, position, pressure, temp, status="OK"):
         """
-        Draw pressure and temperature values for a tire.
+        Draw pressure and temperature values for a tyre.
 
         Args:
-            position: String key for tire position (FL, FR, RL, RR)
+            position: String key for tyre position (FL, FR, RL, RR)
             pressure: Pressure value in current unit
             temp: Temperature value in current unit
             status: Status string (OK, LOW, etc.)
@@ -275,11 +277,11 @@ class Display:
 
     def draw_thermal_image(self, position, thermal_data):
         """
-        Draw thermal camera image for a tire, divided into inner, middle, and outer sections
+        Draw thermal camera image for a tyre, divided into inner, middle, and outer sections
         with colored blocks representing temperature averages.
 
         Args:
-            position: String key for tire position (FL, FR, RL, RR)
+            position: String key for tyre position (FL, FR, RL, RR)
             thermal_data: 2D numpy array of temperatures
         """
         if position not in MLX_POSITIONS or thermal_data is None:
