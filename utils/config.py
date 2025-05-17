@@ -22,9 +22,10 @@ PRESSURE_UNIT = "PSI"
 # - Pressure conversion: 1 PSI = 0.0689476 BAR = 6.89476 kPa
 
 # Tyre Pressure thresholds
-PRESSURE_LOW = 28.0
-PRESSURE_OPTIMAL = 32.0
-PRESSURE_HIGH = 36.0
+PRESSURE_OFFSET = 5.0  # Offset from optimal pressure (+/- this value)
+PRESSURE_FRONT_OPTIMAL = 32.0  # Front tyre optimal pressure
+PRESSURE_REAR_OPTIMAL = 34.0  # Rear tyre optimal pressure (typically higher than front)
+# Low/high thresholds are now calculated as optimal +/- offset
 
 # Tyre Temperature thresholds (Celsius)
 TYRE_TEMP_COLD = 40.0  # Blue

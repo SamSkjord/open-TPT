@@ -7,7 +7,9 @@ import time
 import random
 import threading
 from utils.config import (
-    PRESSURE_OPTIMAL,
+    PRESSURE_FRONT_OPTIMAL,
+    PRESSURE_REAR_OPTIMAL,
+    PRESSURE_OFFSET,
     TYRE_TEMP_OPTIMAL,
     MOCK_PRESSURE_VARIANCE,
     MOCK_TEMP_VARIANCE,
@@ -112,11 +114,17 @@ class TPMSHandler:
 
         with self.lock:
             for position in self.sensor_data:
-                # Random variations around optimal values
-                pressure = (
-                    PRESSURE_OPTIMAL
-                    + (random.random() * 2 - 1) * MOCK_PRESSURE_VARIANCE
-                )
+                # Random variations around optimal values depending on position
+                if position.startswith("F"):  # Front tire
+                    pressure = (
+                        PRESSURE_FRONT_OPTIMAL
+                        + (random.random() * 2 - 1) * MOCK_PRESSURE_VARIANCE
+                    )
+                else:  # Rear tire
+                    pressure = (
+                        PRESSURE_REAR_OPTIMAL
+                        + (random.random() * 2 - 1) * MOCK_PRESSURE_VARIANCE
+                    )
                 temp = (
                     TYRE_TEMP_OPTIMAL + (random.random() * 2 - 1) * MOCK_TEMP_VARIANCE
                 )

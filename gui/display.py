@@ -17,9 +17,9 @@ from utils.config import (
     YELLOW,
     BLUE,
     GREY,
-    PRESSURE_LOW,
-    PRESSURE_OPTIMAL,
-    PRESSURE_HIGH,
+    PRESSURE_OFFSET,
+    PRESSURE_FRONT_OPTIMAL,
+    PRESSURE_REAR_OPTIMAL,
     TYRE_TEMP_COLD,
     TYRE_TEMP_OPTIMAL,
     TYRE_TEMP_HOT,
@@ -127,23 +127,35 @@ class Display:
 
         return colormap_surf
 
-    def get_color_for_pressure(self, pressure):
+    def get_color_for_pressure(self, pressure, position=None):
         """
         Get the color for a given pressure value.
 
         Args:
             pressure: Pressure value in the current units (PSI, BAR, or KPA)
+            position: Tire position ('FL', 'FR', 'RL', 'RR') or None
 
         Returns:
             RGB color tuple
         """
         if pressure is None:
             return GREY
-        elif pressure < PRESSURE_LOW:
+
+        # Determine which optimal pressure to use based on position
+        if position and position.startswith("F"):  # Front tire
+            optimal_pressure = PRESSURE_FRONT_OPTIMAL
+        else:  # Rear tire or position not specified
+            optimal_pressure = PRESSURE_REAR_OPTIMAL
+
+        # Calculate low/high thresholds based on optimal pressure and offset
+        pressure_low = optimal_pressure - PRESSURE_OFFSET
+        pressure_high = optimal_pressure + PRESSURE_OFFSET
+
+        if pressure < pressure_low:
             return RED  # Too low
-        elif pressure > PRESSURE_HIGH:
+        elif pressure > pressure_high:
             return RED  # Too high
-        elif PRESSURE_LOW <= pressure <= PRESSURE_OPTIMAL:
+        elif pressure_low <= pressure < optimal_pressure:
             return YELLOW  # Low but acceptable
         else:  # Between optimal and high
             return GREEN  # Optimal
@@ -216,8 +228,8 @@ class Display:
         pressure_pos = TPMS_POSITIONS[position]["pressure"]
         temp_pos = TPMS_POSITIONS[position]["temp"]
 
-        # Render pressure with appropriate color
-        pressure_color = self.get_color_for_pressure(pressure)
+        # Render pressure with appropriate color (passing position to determine front/rear)
+        pressure_color = self.get_color_for_pressure(pressure, position)
         pressure_text = self.font_large.render(f"{pressure:.1f}", True, pressure_color)
 
         # Create a rect for the text with center at pressure_pos

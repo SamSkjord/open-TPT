@@ -23,6 +23,9 @@ from utils.config import (
     FONT_SIZE_SMALL,
     TEMP_UNIT,
     PRESSURE_UNIT,
+    PRESSURE_OFFSET,
+    PRESSURE_FRONT_OPTIMAL,
+    PRESSURE_REAR_OPTIMAL,
 )
 
 
@@ -422,13 +425,158 @@ class ScaleBars:
                 1,
             )
 
+    def draw_pressure_scale(self):
+        """Draw the pressure scale showing front and rear optimal values."""
+        # Position the pressure scale in the center bottom of the screen
+        scale_width = 200
+        scale_height = 30
+        scale_x = (DISPLAY_WIDTH - scale_width) // 2
+        scale_y = DISPLAY_HEIGHT - scale_height - 10
+
+        # Draw the scale background
+        pygame.draw.rect(
+            self.surface, (30, 30, 30), (scale_x, scale_y, scale_width, scale_height)
+        )
+
+        # Calculate low and high pressures for front and rear
+        front_low = PRESSURE_FRONT_OPTIMAL - PRESSURE_OFFSET
+        front_high = PRESSURE_FRONT_OPTIMAL + PRESSURE_OFFSET
+        rear_low = PRESSURE_REAR_OPTIMAL - PRESSURE_OFFSET
+        rear_high = PRESSURE_REAR_OPTIMAL + PRESSURE_OFFSET
+
+        # Find the overall lowest and highest values to determine the scale range
+        low_pressure = min(front_low, rear_low)
+        high_pressure = max(front_high, rear_high)
+        pressure_range = high_pressure - low_pressure
+
+        # Draw the pressure range
+        # Calculate pixel positions for key pressure points
+        low_x = scale_x
+        front_low_x = scale_x + int(
+            (front_low - low_pressure) / pressure_range * scale_width
+        )
+        front_optimal_x = scale_x + int(
+            (PRESSURE_FRONT_OPTIMAL - low_pressure) / pressure_range * scale_width
+        )
+        front_high_x = scale_x + int(
+            (front_high - low_pressure) / pressure_range * scale_width
+        )
+        rear_low_x = scale_x + int(
+            (rear_low - low_pressure) / pressure_range * scale_width
+        )
+        rear_optimal_x = scale_x + int(
+            (PRESSURE_REAR_OPTIMAL - low_pressure) / pressure_range * scale_width
+        )
+        rear_high_x = scale_x + int(
+            (rear_high - low_pressure) / pressure_range * scale_width
+        )
+        high_x = scale_x + scale_width
+
+        # Draw colored sections
+        # Front ranges
+        # 1. From front_low to front_optimal (yellow)
+        pygame.draw.rect(
+            self.surface,
+            (255, 255, 0),
+            (front_low_x, scale_y, front_optimal_x - front_low_x, scale_height // 2),
+        )
+        # 2. From front_optimal to front_high (green)
+        pygame.draw.rect(
+            self.surface,
+            (0, 255, 0),
+            (
+                front_optimal_x,
+                scale_y,
+                front_high_x - front_optimal_x,
+                scale_height // 2,
+            ),
+        )
+
+        # Rear ranges (bottom half)
+        # 1. From rear_low to rear_optimal (yellow)
+        pygame.draw.rect(
+            self.surface,
+            (255, 255, 0),
+            (
+                rear_low_x,
+                scale_y + scale_height // 2,
+                rear_optimal_x - rear_low_x,
+                scale_height // 2,
+            ),
+        )
+        # 2. From rear_optimal to rear_high (green)
+        pygame.draw.rect(
+            self.surface,
+            (0, 255, 0),
+            (
+                rear_optimal_x,
+                scale_y + scale_height // 2,
+                rear_high_x - rear_optimal_x,
+                scale_height // 2,
+            ),
+        )
+
+        # Draw a dividing line between front and rear sections
+        pygame.draw.line(
+            self.surface,
+            WHITE,
+            (scale_x, scale_y + scale_height // 2),
+            (scale_x + scale_width, scale_y + scale_height // 2),
+            1,
+        )
+
+        # Draw tick marks for front and rear optimal values
+        pygame.draw.line(
+            self.surface,
+            WHITE,
+            (front_optimal_x, scale_y),
+            (front_optimal_x, scale_y - 5),
+            2,
+        )
+        pygame.draw.line(
+            self.surface,
+            WHITE,
+            (rear_optimal_x, scale_y + scale_height),
+            (rear_optimal_x, scale_y + scale_height + 5),
+            2,
+        )
+
+        # Add pressure labels
+        front_text = self.font_small.render(
+            f"F: {PRESSURE_FRONT_OPTIMAL:.1f}±{PRESSURE_OFFSET:.1f}", True, WHITE
+        )
+        rear_text = self.font_small.render(
+            f"R: {PRESSURE_REAR_OPTIMAL:.1f}±{PRESSURE_OFFSET:.1f}", True, WHITE
+        )
+
+        # Position labels
+        self.surface.blit(
+            front_text,
+            (scale_x, scale_y - 20),
+        )
+        self.surface.blit(
+            rear_text,
+            (scale_x, scale_y + scale_height + 7),
+        )
+
+        # Add unit label
+        unit_text = self.font_small.render(self.pressure_unit_str, True, WHITE)
+        self.surface.blit(
+            unit_text,
+            (
+                scale_x + scale_width + 5,
+                scale_y + scale_height // 2 - unit_text.get_height() // 2,
+            ),
+        )
+
     def render(self):
-        """Render both scale bars."""
+        """Render all scale bars."""
         self.draw_brake_scale()
         self.draw_tyre_scale()
+        # self.draw_pressure_scale()
 
     def render_to_surface(self, surface):
-        """Render both scale bars to the provided surface."""
+        """Render all scale bars to the provided surface."""
         # Store original surface
         original_surface = self.surface
 
@@ -438,6 +586,7 @@ class ScaleBars:
         # Draw the scales
         self.draw_brake_scale()
         self.draw_tyre_scale()
+        # self.draw_pressure_scale()
 
         # Restore original surface
         self.surface = original_surface
