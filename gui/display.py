@@ -557,7 +557,7 @@ class Display:
 
         # Draw at the bottom center
         status_text = self.font_medium.render(message, True, WHITE)
-        text_pos = (
+        text_pos = ( 
             self.surface.get_width() // 2 - status_text.get_width() // 2,
             self.surface.get_height() - status_text.get_height() - 10,
         )

@@ -8,6 +8,7 @@ DISPLAY_WIDTH = 800
 DISPLAY_HEIGHT = 480
 FPS_TARGET = 60
 DEFAULT_BRIGHTNESS = 0.8  # 0.0 to 1.0
+ROTATION = 0  # Degrees: 0, 90, 180, 270     
 
 # Unit settings
 # Temperature unit: 'C' for Celsius, 'F' for Fahrenheit
