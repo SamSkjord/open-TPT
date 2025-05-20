@@ -11,7 +11,7 @@ os.environ["SDL_VIDEODRIVER"] = "KMSDRM"
 
 # Optional: use this if you're running from SSH and want to avoid input errors
 os.environ["SDL_NOMOUSE"] = "1"
- 
+
 import sys
 import time
 import argparse
@@ -288,24 +288,30 @@ class OpenTPT:
         # Clear the screen
         render_surface.fill((0, 0, 0))
 
-        # If camera is active, render it as the base layer 
+        # If camera is active, render it as the base layer
         if self.camera.is_active():
             self.camera.render()
         else:
             # Otherwise render the normal view
             self._update_ui_visibility()
-            
+
             # Create the main data surface
-            data_surface = pygame.Surface((DISPLAY_WIDTH, DISPLAY_HEIGHT), pygame.SRCALPHA)
-            
-            # Blit the overlay mask to the data surface
-            data_surface.blit(self.display.overlay_mask, (0, 0))
-            
+            data_surface = pygame.Surface(
+                (DISPLAY_WIDTH, DISPLAY_HEIGHT), pygame.SRCALPHA
+            )
+
+            # Create an overlay surface that will be applied last
+            self.overlay_surface = pygame.Surface(
+                (DISPLAY_WIDTH, DISPLAY_HEIGHT), pygame.SRCALPHA
+            )
+
             # Get brake temperatures
             brake_temps = self.brakes.get_temps()
             for position, data in brake_temps.items():
                 # Draw to the temporary surface
-                temp_surface = pygame.Surface((DISPLAY_WIDTH, DISPLAY_HEIGHT), pygame.SRCALPHA)
+                temp_surface = pygame.Surface(
+                    (DISPLAY_WIDTH, DISPLAY_HEIGHT), pygame.SRCALPHA
+                )
                 self.display.surface = temp_surface
                 self.display.draw_brake_temp(position, data["temp"])
                 self.display.surface = self.screen
@@ -316,30 +322,53 @@ class OpenTPT:
                 thermal_data = self.thermal.get_thermal_data(position)
                 if thermal_data is not None:
                     # Draw to the temporary surface
-                    temp_surface = pygame.Surface((DISPLAY_WIDTH, DISPLAY_HEIGHT), pygame.SRCALPHA)
+                    temp_surface = pygame.Surface(
+                        (DISPLAY_WIDTH, DISPLAY_HEIGHT), pygame.SRCALPHA
+                    )
                     self.display.surface = temp_surface
                     self.display.draw_thermal_image(position, thermal_data)
                     self.display.surface = self.screen
                     data_surface.blit(temp_surface, (0, 0))
 
-            # Get TPMS data
+            # Add the data surface to the render surface (excluding TPMS data for now)
+            render_surface.blit(data_surface, (0, 0))
+
+            # Apply overlay mask next
+            # Rotate overlay to match the final rotation
+            rotated_overlay = pygame.transform.rotate(self.display.overlay_mask, 270)
+            # Calculate position to center the rotated overlay
+            overlay_pos = (
+                (DISPLAY_WIDTH - rotated_overlay.get_width()) // 2,
+                (DISPLAY_HEIGHT - rotated_overlay.get_height()) // 2,
+            )
+            # Apply the overlay directly to the render surface
+            render_surface.blit(rotated_overlay, overlay_pos)
+
+            # Now render TPMS data on top of the overlay mask
+            tpms_surface = pygame.Surface(
+                (DISPLAY_WIDTH, DISPLAY_HEIGHT), pygame.SRCALPHA
+            )
             tpms_data = self.tpms.get_data()
             for position, data in tpms_data.items():
                 # Draw to the temporary surface
-                temp_surface = pygame.Surface((DISPLAY_WIDTH, DISPLAY_HEIGHT), pygame.SRCALPHA)
+                temp_surface = pygame.Surface(
+                    (DISPLAY_WIDTH, DISPLAY_HEIGHT), pygame.SRCALPHA
+                )
                 self.display.surface = temp_surface
                 self.display.draw_pressure_temp(
                     position, data["pressure"], data["temp"], data["status"]
                 )
                 self.display.surface = self.screen
-                data_surface.blit(temp_surface, (0, 0))
-                
-            # Add the data surface to the render surface
-            render_surface.blit(data_surface, (0, 0))
+                tpms_surface.blit(temp_surface, (0, 0))
+
+            # Apply TPMS data on top of overlay
+            render_surface.blit(tpms_surface, (0, 0))
 
             # Render debug info (FPS and mode) - these don't fade
             mode = "MOCK" if self.mock_mode else "NORMAL"
-            debug_surface = pygame.Surface((DISPLAY_WIDTH, DISPLAY_HEIGHT), pygame.SRCALPHA)
+            debug_surface = pygame.Surface(
+                (DISPLAY_WIDTH, DISPLAY_HEIGHT), pygame.SRCALPHA
+            )
             self.display.surface = debug_surface
             self.display.draw_debug_info(self.fps, mode)
             self.display.surface = self.screen

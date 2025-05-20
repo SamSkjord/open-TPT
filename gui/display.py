@@ -39,6 +39,7 @@ from utils.config import (
     PRESSURE_UNIT,
     DISPLAY_WIDTH,
     DISPLAY_HEIGHT,
+    ROTATION,
 )
 
 
@@ -92,7 +93,21 @@ class Display:
         # Initialize color maps for thermal display
         self.colormap = self._create_thermal_colormap()
 
-        self.overlay_mask = pygame.image.load(OVERLAY_PATH).convert_alpha()
+        # Try loading the overlay mask from both the configured path and the root directory
+        try:
+            self.overlay_mask = pygame.image.load(OVERLAY_PATH).convert_alpha()
+            print(f"Loaded overlay mask from {OVERLAY_PATH}")
+        except pygame.error:
+            # Try loading from root directory as fallback
+            try:
+                self.overlay_mask = pygame.image.load("overlay.png").convert_alpha()
+                print("Loaded overlay mask from root directory")
+            except pygame.error as e:
+                print(f"ERROR: Failed to load overlay mask: {e}")
+                # Create a placeholder transparent overlay
+                self.overlay_mask = pygame.Surface(
+                    (DISPLAY_WIDTH, DISPLAY_HEIGHT), pygame.SRCALPHA
+                )
 
     def _create_thermal_colormap(self):
         """Create a colormap for thermal imaging."""
@@ -557,7 +572,7 @@ class Display:
 
         # Draw at the bottom center
         status_text = self.font_medium.render(message, True, WHITE)
-        text_pos = ( 
+        text_pos = (
             self.surface.get_width() // 2 - status_text.get_width() // 2,
             self.surface.get_height() - status_text.get_height() - 10,
         )
