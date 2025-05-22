@@ -3,13 +3,14 @@ Description=openTPT Main Display Service
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/python3 /home/pi/open-TPT/main.py 
+ExecStart=/usr/bin/python3 /home/pi/open-TPT/main.py
 WorkingDirectory=/home/pi/open-TPT
+User=pi
+Environment=SDL_VIDEODRIVER=KMSDRM
+Environment=PYGAME_HIDE_SUPPORT_PROMPT=1
+Environment=LD_LIBRARY_PATH=/usr/local/lib
 StandardOutput=journal
 Restart=always
-Environment=SDL_VIDEODRIVER=KMSDRM
-Environment=SDL_NOMOUSE=1
-Environment=PYGAME_HIDE_SUPPORT_PROMPT=1
 
 [Install]
 WantedBy=multi-user.target
