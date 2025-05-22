@@ -1,6 +1,6 @@
 # openTPT - Open Tyre Pressure and Temperature Telemetry
 
-A modular GUI system for live racecar telemetry using a Raspberry Pi 4 and HyperPixel display.
+A modular GUI system for live racecar telemetry using a Raspberry Pi
 
 ## Overview
 
@@ -34,6 +34,16 @@ The system is designed for racing applications where real-time monitoring of tyr
 ```
 git clone https://github.com/yourusername/open-TPT.git
 cd open-TPT
+```
+
+2. Install the required Python packages:
+```
+pip install -r requirements.txt
+```
+
+3. Make the main script executable:
+```
+chmod +x main.py
 ```
 
 ## Usage
@@ -115,3 +125,109 @@ openTPT/
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## ✅ KMSDRM Implementation on Raspberry Pi (Bookworm Lite)
+
+This guide explains how to build and configure `pygame` with SDL2 and KMSDRM for fullscreen graphical output on Raspberry Pi without using X11 or Wayland.
+
+---
+
+### ⚙️ Goal
+
+Run `openTPT` as a fullscreen `pygame` application using the KMSDRM backend (no desktop, no login required), with proper support for:
+
+- Fonts (`SDL_ttf`)
+- PNG/JPEG/WebP images (`SDL_image`)
+- Systemd service launching on boot
+
+---
+
+### 🧱 Prerequisites
+
+Ensure you're running Raspberry Pi OS Bookworm Lite on a Pi 4 (or compatible).
+
+---
+
+### 🛠️ Setup Script
+
+Save this as `install_openTPT.sh` and run with `chmod +x install_openTPT.sh && ./install_openTPT.sh`.
+
+```bash
+#!/bin/bash
+set -e
+
+echo "==== openTPT Installation Script ===="
+echo "This script will install all dependencies and set up openTPT to run on boot"
+echo "This may take up to 30 minutes to complete"
+
+# Update system
+sudo apt update
+sudo apt upgrade -y
+
+# Install dependencies for SDL2, SDL_ttf, SDL_image
+sudo apt install -y \
+  libdrm-dev libgbm-dev libudev-dev libevdev-dev libasound2-dev libpulse-dev \
+  libwayland-dev libxkbcommon-dev libfreetype6-dev libharfbuzz-dev \
+  libpng-dev libjpeg-dev libtiff-dev libwebp-dev zlib1g-dev \
+  cmake ninja-build build-essential python3-dev git
+
+# Build SDL2 from release-2.28.5 with KMSDRM
+cd /tmp
+rm -rf SDL2
+git clone --branch release-2.28.5 https://github.com/libsdl-org/SDL.git SDL2
+cd SDL2
+mkdir -p build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release -DSDL_VIDEO_DRIVER_KMSDRM=ON
+make -j$(nproc)
+sudo make install
+sudo ldconfig
+
+# Build SDL_ttf
+cd /tmp
+rm -rf SDL2_ttf
+git clone --branch release-2.20.2 https://github.com/libsdl-org/SDL_ttf.git SDL2_ttf
+cd SDL2_ttf
+mkdir -p build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(nproc)
+sudo make install
+sudo ldconfig
+
+# Build SDL_image
+cd /tmp
+rm -rf SDL2_image
+git clone --branch release-2.8.2 https://github.com/libsdl-org/SDL_image.git SDL2_image
+cd SDL2_image
+mkdir -p build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(nproc)
+sudo make install
+sudo ldconfig
+
+# Install numpy
+sudo /usr/bin/python3 -m pip install numpy --break-system-packages
+
+# Rebuild pygame with all SDL features linked
+sudo /usr/bin/python3 -m pip uninstall -y pygame || true
+sudo /usr/bin/python3 -m pip install pygame --no-binary :all: --break-system-packages
+
+# Verify pygame SDL linkage
+python3 -c "import pygame; print('Pygame SDL version:', pygame.get_sdl_version())"
+
+# Enable openTPT systemd service
+CURRENT_DIR=$(pwd)
+sudo cp $CURRENT_DIR/openTPT.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable openTPT.service
+
+echo "==== Installation complete ===="
+echo "Start now with: sudo systemctl start openTPT.service"
+```
+
+---
+
+### ✅ Result
+
+- `pygame` uses `KMSDRM` backend — no X11
+- Fonts (`pygame.font`) and PNG/JPG/WebP support (`pygame.image.load()`)
+- Fullscreen rendering from systemd at boot

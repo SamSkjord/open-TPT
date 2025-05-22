@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 openTPT - Open Tyre Pressure and Temperature Telemetry
-A modular GUI system for live racecar telemetry using Raspberry Pi 4 and HyperPixel display.
+A modular GUI system for live racecar telemetry using Raspberry Pi 4
 """
 
 import os

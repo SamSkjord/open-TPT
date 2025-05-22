@@ -8,6 +8,7 @@ DISPLAY_WIDTH = 800
 DISPLAY_HEIGHT = 480
 FPS_TARGET = 60
 DEFAULT_BRIGHTNESS = 0.8  # 0.0 to 1.0
+ROTATION = 90  # Degrees: 0, 90, 180, 270
 
 # Unit settings
 # Temperature unit: 'C' for Celsius, 'F' for Fahrenheit
@@ -24,7 +25,7 @@ PRESSURE_UNIT = "PSI"
 # Tyre Pressure thresholds
 PRESSURE_OFFSET = 5.0  # Offset from optimal pressure (+/- this value)
 PRESSURE_FRONT_OPTIMAL = 32.0  # Front tyre optimal pressure
-PRESSURE_REAR_OPTIMAL = 34.0  # Rear tyre optimal pressure (typically higher than front)
+PRESSURE_REAR_OPTIMAL = 34.0  # Rear tyre optimal pressure
 # Low/high thresholds are now calculated as optimal +/- offset
 
 # Tyre Temperature thresholds (Celsius)

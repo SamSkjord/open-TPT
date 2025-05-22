@@ -39,7 +39,7 @@ from utils.config import (
     PRESSURE_UNIT,
     DISPLAY_WIDTH,
     DISPLAY_HEIGHT,
-    ROTATION,
+    # ROTATION,
 )
 
 
