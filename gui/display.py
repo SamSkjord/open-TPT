@@ -39,6 +39,10 @@ from utils.config import (
     PRESSURE_UNIT,
     DISPLAY_WIDTH,
     DISPLAY_HEIGHT,
+    REFERENCE_WIDTH,
+    REFERENCE_HEIGHT,
+    SCALE_X,
+    SCALE_Y,
     # ROTATION,
 )
 
@@ -95,13 +99,23 @@ class Display:
 
         # Try loading the overlay mask from both the configured path and the root directory
         try:
-            self.overlay_mask = pygame.image.load(OVERLAY_PATH).convert_alpha()
+            original_overlay = pygame.image.load(OVERLAY_PATH).convert_alpha()
             print(f"Loaded overlay mask from {OVERLAY_PATH}")
+
+            # Scale the overlay to match the current display dimensions
+            self.overlay_mask = pygame.transform.scale(
+                original_overlay, (DISPLAY_WIDTH, DISPLAY_HEIGHT)
+            )
         except pygame.error:
             # Try loading from root directory as fallback
             try:
-                self.overlay_mask = pygame.image.load("overlay.png").convert_alpha()
+                original_overlay = pygame.image.load("overlay.png").convert_alpha()
                 print("Loaded overlay mask from root directory")
+
+                # Scale the overlay to match the current display dimensions
+                self.overlay_mask = pygame.transform.scale(
+                    original_overlay, (DISPLAY_WIDTH, DISPLAY_HEIGHT)
+                )
             except pygame.error as e:
                 print(f"ERROR: Failed to load overlay mask: {e}")
                 # Create a placeholder transparent overlay
@@ -331,9 +345,9 @@ class Display:
             color = (0, 0, 0)
 
         # Draw a rectangular shape with the color to match the brake rotors in the overlay
-        # The brakes are represented as dark blue sections in the overlay
-        rect_width = 34
-        rect_height = 114
+        # Scale the rectangle size based on the display scale factors
+        rect_width = int(34 * SCALE_X)
+        rect_height = int(114 * SCALE_Y)
         rect = pygame.Rect(
             pos[0] - rect_width // 2,
             pos[1] - rect_height // 2,

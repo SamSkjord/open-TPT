@@ -3,9 +3,59 @@ Configuration settings for the openTPT system.
 Contains constants for display, positions, colors, and thresholds.
 """
 
+import os
+import json
+
 # Display settings
-DISPLAY_WIDTH = 800
-DISPLAY_HEIGHT = 480
+# Reference resolution for scaling (Pimoroni Hyperpixel)
+REFERENCE_WIDTH = 800
+REFERENCE_HEIGHT = 480
+
+# Load display settings from config file
+CONFIG_FILE = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "display_config.json"
+)
+
+try:
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, "r") as f:
+            display_config = json.load(f)
+            DISPLAY_WIDTH = display_config.get("width", REFERENCE_WIDTH)
+            DISPLAY_HEIGHT = display_config.get("height", REFERENCE_HEIGHT)
+    else:
+        # Create default config file if it doesn't exist
+        default_config = {
+            "width": REFERENCE_WIDTH,
+            "height": REFERENCE_HEIGHT,
+            "notes": "Default resolution for Pimoroni Hyperpixel display. Change values to match your HDMI display resolution.",
+        }
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(default_config, f, indent=4)
+        DISPLAY_WIDTH = REFERENCE_WIDTH
+        DISPLAY_HEIGHT = REFERENCE_HEIGHT
+        print(f"Created default display config at {CONFIG_FILE}")
+except Exception as e:
+    print(f"Error loading display config: {e}. Using reference values.")
+    DISPLAY_WIDTH = REFERENCE_WIDTH
+    DISPLAY_HEIGHT = REFERENCE_HEIGHT
+
+# Calculate scaling factors based on reference resolution
+SCALE_X = DISPLAY_WIDTH / REFERENCE_WIDTH
+SCALE_Y = DISPLAY_HEIGHT / REFERENCE_HEIGHT
+
+
+# Function to scale a position tuple
+def scale_position(pos):
+    """Scale a position tuple (x, y) according to the current display resolution."""
+    return (int(pos[0] * SCALE_X), int(pos[1] * SCALE_Y))
+
+
+# Function to scale a size tuple
+def scale_size(size):
+    """Scale a size tuple (width, height) according to the current display resolution."""
+    return (int(size[0] * SCALE_X), int(size[1] * SCALE_Y))
+
+
 FPS_TARGET = 60
 DEFAULT_BRIGHTNESS = 0.8  # 0.0 to 1.0
 ROTATION = 90  # Degrees: 0, 90, 180, 270
@@ -51,7 +101,7 @@ BUTTON_CAMERA_TOGGLE = 2
 BUTTON_RESERVED = 3
 
 # Mock mode settings
-MOCK_MODE = True  # Set to True to enable mock data without hardware
+MOCK_MODE = False  # Set to True to enable mock data without hardware
 MOCK_PRESSURE_VARIANCE = 2.0  # Random variance for mock pressure values
 MOCK_TEMP_VARIANCE = 5.0  # Random variance for mock temperature values
 
@@ -61,9 +111,9 @@ I2C_MUX_ADDRESS = 0x70  # TCA9548A default address
 ADS_ADDRESS = 0x48  # ADS1115/ADS1015 default address
 
 # Font settings
-FONT_SIZE_LARGE = 60
-FONT_SIZE_MEDIUM = 24
-FONT_SIZE_SMALL = 18
+FONT_SIZE_LARGE = int(60 * min(SCALE_X, SCALE_Y))
+FONT_SIZE_MEDIUM = int(24 * min(SCALE_X, SCALE_Y))
+FONT_SIZE_SMALL = int(18 * min(SCALE_X, SCALE_Y))
 
 
 # Paths
@@ -74,9 +124,9 @@ OVERLAY_PATH = "assets/overlay.png"
 # Icons
 TYRE_ICON_PATH = "assets/icons/icons8-tire-60.png"
 BRAKE_ICON_PATH = "assets/icons/icons8-brake-discs-60.png"
-ICON_SIZE = (40, 40)
-TYRE_ICON_POSITION = (725, 35)
-BRAKE_ICON_POSITION = (35, 35)
+ICON_SIZE = scale_size((40, 40))
+TYRE_ICON_POSITION = scale_position((725, 35))
+BRAKE_ICON_POSITION = scale_position((35, 35))
 
 
 # Colors (RGB)
@@ -91,23 +141,25 @@ BLUE = (0, 0, 255)
 
 # Brake temperature positions
 BRAKE_POSITIONS = {
-    "FL": (379, 136),
-    "FR": (420, 136),
-    "RL": (379, 344),
-    "RR": (420, 344),
+    "FL": scale_position((379, 136)),
+    "FR": scale_position((420, 136)),
+    "RL": scale_position((379, 344)),
+    "RR": scale_position((420, 344)),
 }
 
 # MLX90640 thermal camera settings
 MLX_WIDTH = 32
 MLX_HEIGHT = 24
 MLX_POSITIONS = {
-    "FL": (206, 50),
-    "FR": (443, 50),
-    "RL": (206, 258),
-    "RR": (443, 258),
+    "FL": scale_position((206, 50)),
+    "FR": scale_position((443, 50)),
+    "RL": scale_position((206, 258)),
+    "RR": scale_position((443, 258)),
 }
-MLX_DISPLAY_WIDTH = 150  # Width of displayed heatmap - to cover the complete tyre width
-MLX_DISPLAY_HEIGHT = 172  # Height of displayed heatmap
+MLX_DISPLAY_WIDTH = int(
+    150 * SCALE_X
+)  # Width of displayed heatmap - to cover the complete tyre width
+MLX_DISPLAY_HEIGHT = int(172 * SCALE_Y)  # Height of displayed heatmap
 
 # TPMS positions dynamically calculated based on MLX positions
 # The pressure text is centered above each tyre's thermal display
@@ -116,29 +168,29 @@ TPMS_POSITIONS = {
     "FL": {
         "pressure": (
             MLX_POSITIONS["FL"][0] + MLX_DISPLAY_WIDTH // 2,
-            MLX_POSITIONS["FL"][1] - 18,
+            MLX_POSITIONS["FL"][1] - int(18 * SCALE_Y),
         ),
-        "temp": (MLX_POSITIONS["FL"][0], MLX_POSITIONS["FL"][1] - 10),
+        "temp": (MLX_POSITIONS["FL"][0], MLX_POSITIONS["FL"][1] - int(10 * SCALE_Y)),
     },
     "FR": {
         "pressure": (
             MLX_POSITIONS["FR"][0] + MLX_DISPLAY_WIDTH // 2,
-            MLX_POSITIONS["FR"][1] - 18,
+            MLX_POSITIONS["FR"][1] - int(18 * SCALE_Y),
         ),
-        "temp": (MLX_POSITIONS["FR"][0], MLX_POSITIONS["FR"][1] - 10),
+        "temp": (MLX_POSITIONS["FR"][0], MLX_POSITIONS["FR"][1] - int(10 * SCALE_Y)),
     },
     "RL": {
         "pressure": (
             MLX_POSITIONS["RL"][0] + MLX_DISPLAY_WIDTH // 2,
-            MLX_POSITIONS["RL"][1] + 195,
+            MLX_POSITIONS["RL"][1] + int(195 * SCALE_Y),
         ),
-        "temp": (MLX_POSITIONS["RL"][0], MLX_POSITIONS["RL"][1] - 10),
+        "temp": (MLX_POSITIONS["RL"][0], MLX_POSITIONS["RL"][1] - int(10 * SCALE_Y)),
     },
     "RR": {
         "pressure": (
             MLX_POSITIONS["RR"][0] + MLX_DISPLAY_WIDTH // 2,
-            MLX_POSITIONS["RR"][1] + 195,
+            MLX_POSITIONS["RR"][1] + int(195 * SCALE_Y),
         ),
-        "temp": (MLX_POSITIONS["RR"][0], MLX_POSITIONS["RR"][1] - 10),
+        "temp": (MLX_POSITIONS["RR"][0], MLX_POSITIONS["RR"][1] - int(10 * SCALE_Y)),
     },
 }

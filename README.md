@@ -15,7 +15,9 @@ The system is designed for racing applications where real-time monitoring of tyr
 ## Hardware Requirements
 
 - Raspberry Pi 4 (2GB+ RAM recommended)
-- HyperPixel or compatible display (800x480 resolution)
+- Display options:
+  - HyperPixel display (800x480 resolution), or
+  - Standard HDMI display of any resolution (system now supports dynamic scaling)
 - TPMS receivers and sensors
 - ADS1115/ADS1015 ADC for IR brake temperature sensors
 - MLX90640 thermal cameras (one per tyre)
@@ -74,9 +76,27 @@ Keyboard controls (for development):
 
 ## Configuration
 
-The system can be configured by editing the `utils/config.py` file, which contains settings for:
-- Display dimensions and FPS target
-- Positions for telemetry indicators
+### Display Configuration
+
+openTPT now supports any display resolution. To configure your display:
+
+1. Run the configuration utility:
+   ```
+   python3 configure_display.py
+   ```
+
+2. Options:
+   - Show current settings: `python3 configure_display.py --show`
+   - Auto-detect resolution: `python3 configure_display.py --detect`
+   - Set resolution manually: `python3 configure_display.py --width 1280 --height 720`
+
+The display settings are stored in `display_config.json` in the project root directory.
+
+### System Configuration
+
+Other system settings can be configured by editing the `utils/config.py` file, which contains settings for:
+- FPS target and brightness
+- Positions for telemetry indicators (automatically scaled based on resolution)
 - Color thresholds for temperature and pressure
 - Mock mode parameters
 - I2C addresses and bus settings

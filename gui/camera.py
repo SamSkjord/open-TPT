@@ -241,17 +241,15 @@ class Camera:
             self.surface.blit(frame_surface, (0, 0))
 
             # Draw a simple border to indicate camera mode
-            pygame.draw.rect(
-                self.surface, (255, 0, 0), (0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT), 2
-            )
+            # pygame.draw.rect(
+            #    self.surface, (255, 0, 0), (0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT), 2
+            # )
 
             # Add a small indicator in the corner
             font = pygame.font.SysFont(None, 24)
             if MOCK_MODE or not CV2_AVAILABLE:
                 text = font.render("MOCK CAMERA VIEW", True, (255, 0, 0))
-            else:
-                text = font.render("CAMERA VIEW", True, (255, 0, 0))
-            self.surface.blit(text, (10, 10))
+                self.surface.blit(text, (10, 10))
 
             return True
 

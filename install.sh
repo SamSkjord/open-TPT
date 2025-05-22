@@ -70,6 +70,7 @@ sudo /usr/bin/python3 -m pip install \
   pytest>=7.0.0 \
   --break-system-packages
 
+sudo /usr/bin/python3 -m pip install opencv-python --break-system-packages
 
 # Rebuild pygame to link with system SDL, SDL_image, SDL_ttf
 echo -e "\n==== Rebuilding pygame from source ===="

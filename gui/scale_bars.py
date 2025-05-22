@@ -8,6 +8,10 @@ import numpy as np
 from utils.config import (
     DISPLAY_WIDTH,
     DISPLAY_HEIGHT,
+    REFERENCE_WIDTH,
+    REFERENCE_HEIGHT,
+    SCALE_X,
+    SCALE_Y,
     TYRE_TEMP_COLD,
     TYRE_TEMP_OPTIMAL,
     TYRE_TEMP_HOT,
@@ -47,10 +51,10 @@ class ScaleBars:
         self.brake_colormap = self._create_brake_colormap()
         self.tyre_colormap = self._create_tyre_colormap()
 
-        # Scale bars dimensions and positions
-        self.bar_width = 30
-        self.bar_height = 300
-        self.padding = 40
+        # Scale bars dimensions and positions - apply scaling
+        self.bar_width = int(30 * SCALE_X)
+        self.bar_height = int(300 * SCALE_Y)
+        self.padding = int(40 * SCALE_X)
 
         # Left scale bar position (brake temps)
         self.brake_bar_x = self.padding

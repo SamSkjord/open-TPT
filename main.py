@@ -29,6 +29,8 @@ from hardware.mlx_handler import MLXHandler
 from utils.config import (
     DISPLAY_WIDTH,
     DISPLAY_HEIGHT,
+    REFERENCE_WIDTH,
+    REFERENCE_HEIGHT,
     FPS_TARGET,
     DEFAULT_BRIGHTNESS,
     MOCK_MODE,
