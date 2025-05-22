@@ -111,6 +111,7 @@ class InputHandler:
             # Set camera toggle button (red when camera active)
             if self.camera and self.camera.is_active():
                 self.neokey.pixels[BUTTON_CAMERA_TOGGLE] = (255, 0, 0)
+                self.neokey.pixels[BUTTON_RESERVED] = (0, 0, 0)
             else:
                 self.neokey.pixels[BUTTON_CAMERA_TOGGLE] = (0, 0, 64)
 

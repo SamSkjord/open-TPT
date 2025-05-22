@@ -61,9 +61,10 @@ class Camera:
                 self.error_message = f"Failed to open camera at index {camera_index}"
                 return False
 
-            # Set camera resolution close to display size
-            self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, DISPLAY_WIDTH)
-            self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, DISPLAY_HEIGHT)
+            # Use the camera's native resolution (usually 1920x1080 for most webcams)
+            # Instead of forcing it to the display size
+            self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+            self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
 
             self.error_message = None
             return True
@@ -131,13 +132,17 @@ class Camera:
 
     def _generate_test_pattern(self):
         """Generate a test pattern frame for mock mode."""
-        # Create a simple test pattern
-        frame = np.zeros((DISPLAY_HEIGHT, DISPLAY_WIDTH, 3), dtype=np.uint8)
+        # Use 16:9 aspect ratio which is common for webcams (1920x1080)
+        mock_width = 1920
+        mock_height = 1080
+
+        # Create a simple test pattern at the native camera resolution
+        frame = np.zeros((mock_height, mock_width, 3), dtype=np.uint8)
 
         # Draw a grid pattern
-        grid_size = 50
-        for y in range(0, DISPLAY_HEIGHT, grid_size):
-            for x in range(0, DISPLAY_WIDTH, grid_size):
+        grid_size = 100  # Larger grid for higher resolution
+        for y in range(0, mock_height, grid_size):
+            for x in range(0, mock_width, grid_size):
                 if (x // grid_size + y // grid_size) % 2 == 0:
                     color = (0, 0, 128)  # Dark blue
                 else:
@@ -147,8 +152,8 @@ class Camera:
                 cv2_rect = (
                     x,
                     y,
-                    min(grid_size, DISPLAY_WIDTH - x),
-                    min(grid_size, DISPLAY_HEIGHT - y),
+                    min(grid_size, mock_width - x),
+                    min(grid_size, mock_height - y),
                 )
                 frame[
                     cv2_rect[1] : cv2_rect[1] + cv2_rect[3],
@@ -156,8 +161,8 @@ class Camera:
                 ] = color
 
         # Add a centered text "MOCK CAMERA"
-        font_scale = 1.5
-        thickness = 2
+        font_scale = 3.0  # Larger font for higher resolution
+        thickness = 3
         text = "MOCK CAMERA"
 
         # Calculate text size and position
@@ -166,8 +171,8 @@ class Camera:
             (text_width, text_height), _ = cv2.getTextSize(
                 text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness
             )
-            text_x = (DISPLAY_WIDTH - text_width) // 2
-            text_y = (DISPLAY_HEIGHT + text_height) // 2
+            text_x = (mock_width - text_width) // 2
+            text_y = (mock_height + text_height) // 2
             cv2.putText(
                 frame,
                 text,
@@ -179,11 +184,22 @@ class Camera:
                 cv2.LINE_AA,
             )
 
+        # Add aspect ratio markers at corners to verify correct scaling
+        corner_size = 100
+        # Top-left corner marker (red)
+        frame[:corner_size, :corner_size] = (0, 0, 255)
+        # Top-right corner marker (green)
+        frame[:corner_size, -corner_size:] = (0, 255, 0)
+        # Bottom-left corner marker (blue)
+        frame[-corner_size:, :corner_size] = (255, 0, 0)
+        # Bottom-right corner marker (yellow)
+        frame[-corner_size:, -corner_size:] = (0, 255, 255)
+
         # Add a moving element to show it's updating
-        t = int(time.time() * 2) % DISPLAY_WIDTH
-        cv2_line = (t, 0, t, DISPLAY_HEIGHT)
-        for y in range(DISPLAY_HEIGHT):
-            frame[y, cv2_line[0]] = (255, 0, 0)  # Red line
+        t = int(time.time() * 2) % mock_width
+        for y in range(mock_height):
+            if 0 <= t < mock_width:  # Ensure t is within bounds
+                frame[y, t] = (255, 255, 0)  # Yellow line
 
         self.frame = frame
 
@@ -217,22 +233,38 @@ class Camera:
                 rgb_frame = cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB)
                 rgb_frame = cv2.flip(rgb_frame, 1)  # Flip horizontally
 
-            # Resize to fit display if needed
-            if (
-                rgb_frame.shape[1] != DISPLAY_WIDTH
-                or rgb_frame.shape[0] != DISPLAY_HEIGHT
-            ):
-                if CV2_AVAILABLE:
-                    rgb_frame = cv2.resize(rgb_frame, (DISPLAY_WIDTH, DISPLAY_HEIGHT))
-                else:
-                    # Simple resize if OpenCV is not available
-                    rgb_frame = np.repeat(
-                        np.repeat(
-                            rgb_frame, DISPLAY_WIDTH // rgb_frame.shape[1], axis=1
-                        ),
-                        DISPLAY_HEIGHT // rgb_frame.shape[0],
-                        axis=0,
-                    )
+            # Resize frame to fit display while preserving aspect ratio
+            if CV2_AVAILABLE:
+                # Calculate the scaling factor to fit within the display
+                h, w = rgb_frame.shape[:2]
+                scale = min(DISPLAY_WIDTH / w, DISPLAY_HEIGHT / h)
+
+                # Calculate new dimensions while preserving aspect ratio
+                new_w = int(w * scale)
+                new_h = int(h * scale)
+
+                # Resize the frame while preserving aspect ratio
+                rgb_frame = cv2.resize(rgb_frame, (new_w, new_h))
+
+                # Create a black background of display size
+                black_bg = np.zeros((DISPLAY_HEIGHT, DISPLAY_WIDTH, 3), dtype=np.uint8)
+
+                # Calculate position to center the frame
+                x_offset = (DISPLAY_WIDTH - new_w) // 2
+                y_offset = (DISPLAY_HEIGHT - new_h) // 2
+
+                # Place the resized frame on the black background
+                black_bg[y_offset : y_offset + new_h, x_offset : x_offset + new_w] = (
+                    rgb_frame
+                )
+                rgb_frame = black_bg
+            else:
+                # Simple resize if OpenCV is not available
+                rgb_frame = np.repeat(
+                    np.repeat(rgb_frame, DISPLAY_WIDTH // rgb_frame.shape[1], axis=1),
+                    DISPLAY_HEIGHT // rgb_frame.shape[0],
+                    axis=0,
+                )
 
             # Create a PyGame surface from the frame
             frame_surface = pygame.surfarray.make_surface(rgb_frame.swapaxes(0, 1))
