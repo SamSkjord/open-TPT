@@ -8,11 +8,14 @@ import threading
 
 # Import for actual TPMS hardware
 try:
-    import tpms
+    from tpms_lib import TPMSDevice, TirePosition, TireState
 
     TPMS_AVAILABLE = True
-except ImportError:
+except ImportError as e:
+    print(f"Failed to import TPMS library: {e}")
     TPMS_AVAILABLE = False
+
+print(f"TPMS library available: {TPMS_AVAILABLE}")
 
 
 class TPMSHandler:
@@ -65,7 +68,17 @@ class TPMSHandler:
 
         try:
             # Initialize TPMS device
-            self.tpms_device = tpms.TPMS()
+            self.tpms_device = TPMSDevice()
+
+            # Register callbacks for tire state updates
+            self.tpms_device.register_tire_state_callback(self._on_tire_state_update)
+            self.tpms_device.register_pairing_callback(self._on_pairing_complete)
+
+            # Set thresholds
+            self.tpms_device.set_high_pressure_threshold(310)  # 310 kPa
+            self.tpms_device.set_low_pressure_threshold(180)  # 180 kPa
+            self.tpms_device.set_high_temp_threshold(75)  # 75°C
+
             print("TPMS device initialized successfully")
             return True
         except Exception as e:
@@ -74,96 +87,128 @@ class TPMSHandler:
             return False
 
     def start(self):
-        """Start the TPMS reading thread."""
-        if self.running:
-            return
-
-        self.running = True
-        self.thread = threading.Thread(target=self._read_tpms_loop)
-        self.thread.daemon = True
-        self.thread.start()
-        print("TPMS reading thread started")
-
-    def stop(self):
-        """Stop the TPMS reading thread."""
-        self.running = False
-        if self.thread:
-            self.thread.join(timeout=1.0)
-
-    def _read_tpms_loop(self):
-        """Background thread to continuously read TPMS data."""
-        read_interval = 0.5  # seconds between reads
-
-        while self.running:
-            self._read_tpms_data()
-            time.sleep(read_interval)
-
-    def _read_tpms_data(self):
-        """Read data from actual TPMS device."""
+        """Start the TPMS device connection."""
         if not self.tpms_device:
-            # Set all sensor data to None to indicate no data available
-            with self.lock:
-                for position in self.sensor_data:
-                    self.sensor_data[position]["pressure"] = None
-                    self.sensor_data[position]["temp"] = None
-                    self.sensor_data[position]["status"] = "NO_DEVICE"
-            return
+            print("TPMS device not initialized")
+            return False
+
+        if self.running:
+            return True
 
         try:
-            current_time = time.time()
-            self.last_read = current_time
+            # Try to connect to TPMS device
+            if self.tpms_device.connect():
+                self.running = True
+                print("TPMS device connected successfully")
 
-            # Read from TPMS device
-            tpms_data = self.tpms_device.read()
-
-            if tpms_data:
-                with self.lock:
-                    for sensor in tpms_data:
-                        # Map sensor ID to position (this would depend on your TPMS system)
-                        position = self._map_sensor_id_to_position(sensor.id)
-
-                        if position in self.sensor_data:
-                            # Store pressure and temperature from sensor
-                            self.sensor_data[position]["pressure"] = sensor.pressure
-                            self.sensor_data[position]["temp"] = sensor.temperature
-                            self.sensor_data[position]["status"] = "OK"
-                            self.sensor_data[position]["last_update"] = current_time
+                # Query sensor IDs to get initial data
+                self.tpms_device.query_sensor_ids()
+                return True
             else:
-                # No data received, set to None
-                with self.lock:
-                    for position in self.sensor_data:
-                        self.sensor_data[position]["pressure"] = None
-                        self.sensor_data[position]["temp"] = None
-                        self.sensor_data[position]["status"] = "NO_DATA"
-
+                print("Failed to connect to TPMS device")
+                return False
         except Exception as e:
-            print(f"Error reading TPMS data: {e}")
-            # Set all sensor data to None on error
-            with self.lock:
-                for position in self.sensor_data:
-                    self.sensor_data[position]["pressure"] = None
-                    self.sensor_data[position]["temp"] = None
-                    self.sensor_data[position]["status"] = "ERROR"
+            print(f"Error starting TPMS: {e}")
+            return False
 
-    def _map_sensor_id_to_position(self, sensor_id):
-        """
-        Map a sensor ID to a tyre position. This would need to be customized
-        for your specific TPMS sensors and vehicle configuration.
+    def stop(self):
+        """Stop the TPMS device connection."""
+        if self.tpms_device and self.running:
+            try:
+                self.tpms_device.disconnect()
+                self.running = False
+                print("TPMS device disconnected")
+            except Exception as e:
+                print(f"Error stopping TPMS: {e}")
+
+    def _on_tire_state_update(self, position: TirePosition, state: TireState):
+        """Callback for tire state updates from TPMS library."""
+        # Map TirePosition enum to our position codes
+        position_map = {
+            TirePosition.FRONT_LEFT: "FL",
+            TirePosition.FRONT_RIGHT: "FR",
+            TirePosition.REAR_LEFT: "RL",
+            TirePosition.REAR_RIGHT: "RR",
+        }
+
+        if position not in position_map:
+            return  # Skip spare tire or unknown positions
+
+        pos_code = position_map[position]
+        current_time = time.time()
+
+        with self.lock:
+            # Update our sensor data structure
+            self.sensor_data[pos_code]["pressure"] = state.air_pressure
+            self.sensor_data[pos_code]["temp"] = state.temperature
+            self.sensor_data[pos_code]["last_update"] = current_time
+
+            # Determine status based on tire state
+            if state.no_signal:
+                self.sensor_data[pos_code]["status"] = "NO_SIGNAL"
+            elif state.is_leaking:
+                self.sensor_data[pos_code]["status"] = "LEAKING"
+            elif state.is_low_power:
+                self.sensor_data[pos_code]["status"] = "LOW_BATTERY"
+            else:
+                self.sensor_data[pos_code]["status"] = "OK"
+
+        print(
+            f"TPMS data updated for {pos_code}: {state.air_pressure} kPa, {state.temperature}°C"
+        )
+
+    def _on_pairing_complete(self, position: TirePosition, tire_id: str):
+        """Callback for pairing completion from TPMS library."""
+        position_map = {
+            TirePosition.FRONT_LEFT: "FL",
+            TirePosition.FRONT_RIGHT: "FR",
+            TirePosition.REAR_LEFT: "RL",
+            TirePosition.REAR_RIGHT: "RR",
+        }
+
+        if position in position_map:
+            pos_code = position_map[position]
+            print(f"TPMS pairing complete for {pos_code}: ID {tire_id}")
+
+    def pair_sensor(self, position_code: str):
+        """Start pairing a sensor for the specified position.
 
         Args:
-            sensor_id: The ID of the sensor
-
-        Returns:
-            str: Position code ("FL", "FR", "RL", "RR") or None if unknown
+            position_code: Position code ("FL", "FR", "RL", "RR")
         """
-        # This is a placeholder implementation
-        # Real implementation would map actual sensor IDs to positions
-        # based on the TPMS system in use
+        if not self.tpms_device or not self.running:
+            print("TPMS device not connected")
+            return False
 
-        # Example mapping logic (using hash of ID for demo purposes)
-        hash_val = hash(str(sensor_id)) % 4
-        positions = ["FL", "FR", "RL", "RR"]
-        return positions[hash_val]
+        # Map position codes to TirePosition enum
+        position_map = {
+            "FL": TirePosition.FRONT_LEFT,
+            "FR": TirePosition.FRONT_RIGHT,
+            "RL": TirePosition.REAR_LEFT,
+            "RR": TirePosition.REAR_RIGHT,
+        }
+
+        if position_code not in position_map:
+            print(f"Invalid position code: {position_code}")
+            return False
+
+        try:
+            position = position_map[position_code]
+            return self.tpms_device.pair_sensor(position)
+        except Exception as e:
+            print(f"Error pairing sensor: {e}")
+            return False
+
+    def stop_pairing(self):
+        """Stop the pairing process."""
+        if not self.tpms_device or not self.running:
+            return False
+
+        try:
+            return self.tpms_device.stop_pairing()
+        except Exception as e:
+            print(f"Error stopping pairing: {e}")
+            return False
 
     def get_data(self):
         """

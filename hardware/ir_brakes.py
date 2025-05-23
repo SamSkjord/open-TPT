@@ -116,7 +116,7 @@ class BrakeTemperatureHandler:
     def _read_adc_temps(self):
         """Read brake temperatures from the ADC."""
         if not self.ads or not self.channels:
-            print("ADC not initialized or channels not available")
+            # print("ADC not initialized or channels not available")
             # Set all temperatures to None to indicate no data available
             current_time = time.time()
             with self.lock:

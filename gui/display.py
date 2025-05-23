@@ -284,11 +284,23 @@ class Display:
         # self.surface.blit(temp_text, temp_rect)
 
         # Render status if not OK
-        # if status != "OK":
-        #     status_pos = (pressure_pos[0], pressure_pos[1] - FONT_SIZE_SMALL)
-        #     status_text = self.font_small.render(status, True, RED)
-        #     status_rect = status_text.get_rect(center=(status_pos[0], status_pos[1]))
-        #     self.surface.blit(status_text, status_rect)
+        if status != "OK":
+            # Position status text above the pressure reading
+            status_pos = (pressure_pos[0], pressure_pos[1] - FONT_SIZE_LARGE // 2 - 5)
+
+            # Choose color based on status
+            if status in ["NO_SIGNAL", "NO_DEVICE", "TIMEOUT"]:
+                status_color = GREY
+            elif status in ["LEAKING", "ERROR"]:
+                status_color = RED
+            elif status == "LOW_BATTERY":
+                status_color = YELLOW
+            else:
+                status_color = RED  # Default for unknown statuses
+
+            status_text = self.font_small.render(status, True, status_color)
+            status_rect = status_text.get_rect(center=status_pos)
+            self.surface.blit(status_text, status_rect)
 
     def draw_brake_temp(self, position, temp):
         # print(position, temp)
@@ -596,10 +608,8 @@ class Display:
             mode: Current operation mode
         """
         # Draw in the top-left corner
-        debug_text = self.font_small.render(
-            f"FPS: {fps:.1f} | Mode: {mode}", True, WHITE
-        )
-        self.surface.blit(debug_text, (10, 10))
+        # debug_text = self.font_small.render(f"FPS: {fps:.1f}", True, WHITE)
+        # self.surface.blit(debug_text, (10, 10))
 
         # Units indicator is now drawn to the fadeable UI surface
 

@@ -299,12 +299,25 @@ class OpenTPT:
             # Get TPMS data
             tpms_data = self.tpms.get_data()
             for position, data in tpms_data.items():
+                # Convert pressure from kPa to the configured unit
+                pressure_display = None
+                if data["pressure"] is not None:
+                    if PRESSURE_UNIT == "PSI":
+                        pressure_display = kpa_to_psi(data["pressure"])
+                    elif PRESSURE_UNIT == "BAR":
+                        pressure_display = data["pressure"] / 100.0  # kPa to bar
+                    elif PRESSURE_UNIT == "KPA":
+                        pressure_display = data["pressure"]  # Already in kPa
+                    else:
+                        # Default to PSI if unknown unit
+                        pressure_display = kpa_to_psi(data["pressure"])
+
                 self.display.draw_pressure_temp(
-                    position, data["pressure"], data["temp"], data["status"]
+                    position, pressure_display, data["temp"], data["status"]
                 )
 
             # Render debug info (FPS only)
-            self.display.draw_debug_info(self.fps, "openTPT")
+            # self.display.draw_debug_info(self.fps)
 
             # Create separate surface for UI elements that can fade
             if self.input_handler.ui_visible or self.ui_fade_alpha > 0:
