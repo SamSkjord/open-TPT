@@ -40,12 +40,12 @@ class MLXHandler:
         self.thread = None
         self.lock = threading.Lock()
 
-        # Thermal data storage - one array per tire position
+        # Thermal data storage - None indicates no data available
         self.thermal_data = {
-            "FL": np.zeros((MLX_HEIGHT, MLX_WIDTH)),
-            "FR": np.zeros((MLX_HEIGHT, MLX_WIDTH)),
-            "RL": np.zeros((MLX_HEIGHT, MLX_WIDTH)),
-            "RR": np.zeros((MLX_HEIGHT, MLX_WIDTH)),
+            "FL": None,
+            "FR": None,
+            "RL": None,
+            "RR": None,
         }
 
         # Mapping of tire positions to I2C multiplexer channels
@@ -68,6 +68,10 @@ class MLXHandler:
 
         if not MLX_AVAILABLE:
             print("Warning: MLX90640 library not available")
+            # Set all thermal data to None to indicate no data available
+            with self.lock:
+                for position in self.thermal_data:
+                    self.thermal_data[position] = None
             return False
 
         try:
@@ -79,6 +83,10 @@ class MLXHandler:
                 print(
                     "Error: I2C multiplexer not available. Cannot initialize MLX90640 sensors."
                 )
+                # Set all thermal data to None to indicate no data available
+                with self.lock:
+                    for position in self.thermal_data:
+                        self.thermal_data[position] = None
                 return False
 
             # Scan for devices on each channel
@@ -113,8 +121,14 @@ class MLXHandler:
 
                     except Exception as e:
                         print(f"Error initializing MLX90640 for {position}: {e}")
+                        # Set this position's data to None
+                        with self.lock:
+                            self.thermal_data[position] = None
                 else:
                     print(f"No MLX90640 found for {position} on channel {channel}")
+                    # Set this position's data to None
+                    with self.lock:
+                        self.thermal_data[position] = None
 
             # Reset multiplexer
             self.mux.deselect_all()
@@ -127,6 +141,10 @@ class MLXHandler:
 
         except Exception as e:
             print(f"Error initializing MLX90640 cameras: {e}")
+            # Set all thermal data to None to indicate no data available
+            with self.lock:
+                for position in self.thermal_data:
+                    self.thermal_data[position] = None
             return False
 
     def start(self):
@@ -287,6 +305,10 @@ class MLXHandler:
     def _read_mlx_data(self):
         """Read real data from the MLX90640 sensors."""
         if not self.mlx_sensors:
+            # Set all thermal data to None to indicate no data available
+            with self.lock:
+                for position in self.thermal_data:
+                    self.thermal_data[position] = None
             return
 
         # Read each sensor one at a time through the multiplexer
@@ -312,6 +334,9 @@ class MLXHandler:
 
             except Exception as e:
                 print(f"Error reading MLX90640 for {position}: {e}")
+                # Set this position's data to None on error
+                with self.lock:
+                    self.thermal_data[position] = None
 
         # Deselect all channels when done
         self.mux.deselect_all()
@@ -324,15 +349,25 @@ class MLXHandler:
             position: Tire position ("FL", "FR", "RL", "RR") or None for all
 
         Returns:
-            numpy array: Thermal data array or dictionary of arrays
+            numpy array: Thermal data array or dictionary of arrays, None if no data available
         """
         with self.lock:
             if position is None:
                 # Return a copy of all data
-                return {pos: data.copy() for pos, data in self.thermal_data.items()}
+                result = {}
+                for pos, data in self.thermal_data.items():
+                    if data is not None:
+                        result[pos] = data.copy()
+                    else:
+                        result[pos] = None
+                return result
             elif position in self.thermal_data:
-                # Return a copy of the specific position's data
-                return self.thermal_data[position].copy()
+                # Return a copy of the specific position's data, or None if no data
+                data = self.thermal_data[position]
+                if data is not None:
+                    return data.copy()
+                else:
+                    return None
             else:
                 return None
 
@@ -344,11 +379,14 @@ class MLXHandler:
             position: Tire position ("FL", "FR", "RL", "RR")
 
         Returns:
-            tuple: (min_temp, max_temp) or (None, None) if position invalid
+            tuple: (min_temp, max_temp) or (None, None) if position invalid or no data
         """
         if position not in self.thermal_data:
             return (None, None)
 
         with self.lock:
             data = self.thermal_data[position]
-            return (np.min(data), np.max(data))
+            if data is not None:
+                return (np.min(data), np.max(data))
+            else:
+                return (None, None)

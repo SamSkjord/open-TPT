@@ -281,12 +281,13 @@ class Display:
         #     self.surface.blit(status_text, status_rect)
 
     def draw_brake_temp(self, position, temp):
+        print(position, temp)
         """
         Draw brake temperature visualization as a color scale.
 
         Args:
             position: String key for brake position (FL, FR, RL, RR)
-            temp: Temperature value in current unit
+            temp: Temperature value in current unit or None if no data available
         """
         if position not in BRAKE_POSITIONS:
             return
@@ -295,7 +296,10 @@ class Display:
         pos = BRAKE_POSITIONS[position]
 
         # Determine color based on temperature
-        if temp < BRAKE_TEMP_MIN:
+        if temp is None:
+            # Grey for no data available
+            color = GREY
+        elif temp < BRAKE_TEMP_MIN:
             # Blue for cold (below min)
             color = (0, 0, 255)
         elif temp < BRAKE_TEMP_OPTIMAL - BRAKE_TEMP_OPTIMAL_RANGE:
@@ -366,30 +370,13 @@ class Display:
 
         Args:
             position: String key for tyre position (FL, FR, RL, RR)
-            thermal_data: 2D numpy array of temperatures
+            thermal_data: 2D numpy array of temperatures or None if no data available
         """
-        if position not in MLX_POSITIONS or thermal_data is None:
+        if position not in MLX_POSITIONS:
             return
 
         # Get position
         pos = MLX_POSITIONS[position]
-
-        # Calculate temperatures for inner, middle and outer sections
-        # Divide the thermal data into three vertical sections
-        section_width = thermal_data.shape[1] // 3
-
-        # Extract each section
-        inner_section = thermal_data[:, :section_width]
-        middle_section = thermal_data[:, section_width : 2 * section_width]
-        outer_section = thermal_data[:, 2 * section_width :]
-
-        # Calculate average temperature for each section
-        inner_temp = np.mean(inner_section)
-        middle_temp = np.mean(middle_section)
-        outer_temp = np.mean(outer_section)
-
-        # Determine section layout based on position (left or right side)
-        is_right_side = position in ["FR", "RR"]
 
         # Size of each section
         section_width_px = MLX_DISPLAY_WIDTH // 3
@@ -398,22 +385,46 @@ class Display:
         # Create a surface for the thermal image
         thermal_surface = pygame.Surface((MLX_DISPLAY_WIDTH, MLX_DISPLAY_HEIGHT))
 
-        # Draw each section as a color block
-        sections = [
-            (inner_section, inner_temp, 0),
-            (middle_section, middle_temp, section_width_px),
-            (outer_section, outer_temp, 2 * section_width_px),
-        ]
+        if thermal_data is None:
+            # No data available - draw all sections as grey
+            for i in range(3):
+                x_offset = i * section_width_px
+                rect = pygame.Rect(x_offset, 0, section_width_px, section_height_px)
+                pygame.draw.rect(thermal_surface, GREY, rect)
+        else:
+            # Calculate temperatures for inner, middle and outer sections
+            # Divide the thermal data into three vertical sections
+            section_width = thermal_data.shape[1] // 3
 
-        # If right side, reverse the order to match the car orientation
-        if is_right_side:
-            sections = sections[::-1]
+            # Extract each section
+            inner_section = thermal_data[:, :section_width]
+            middle_section = thermal_data[:, section_width : 2 * section_width]
+            outer_section = thermal_data[:, 2 * section_width :]
 
-        # Draw each section
-        for section_data, avg_temp, x_offset in sections:
-            color = self._get_heat_color(avg_temp)
-            rect = pygame.Rect(x_offset, 0, section_width_px, section_height_px)
-            pygame.draw.rect(thermal_surface, color, rect)
+            # Calculate average temperature for each section
+            inner_temp = np.mean(inner_section)
+            middle_temp = np.mean(middle_section)
+            outer_temp = np.mean(outer_section)
+
+            # Determine section layout based on position (left or right side)
+            is_right_side = position in ["FR", "RR"]
+
+            # Draw each section as a color block
+            sections = [
+                (inner_section, inner_temp, 0),
+                (middle_section, middle_temp, section_width_px),
+                (outer_section, outer_temp, 2 * section_width_px),
+            ]
+
+            # If right side, reverse the order to match the car orientation
+            if is_right_side:
+                sections = sections[::-1]
+
+            # Draw each section
+            for section_data, avg_temp, x_offset in sections:
+                color = self._get_heat_color(avg_temp)
+                rect = pygame.Rect(x_offset, 0, section_width_px, section_height_px)
+                pygame.draw.rect(thermal_surface, color, rect)
 
         # Always draw vertical lines at fixed intervals
         pygame.draw.line(
@@ -431,49 +442,58 @@ class Display:
             5,
         )
 
-        # # Add a border around the entire image
-        # pygame.draw.rect(
-        #     thermal_surface,
-        #     BLACK,
-        #     (0, 0, MLX_DISPLAY_WIDTH, MLX_DISPLAY_HEIGHT),
-        #     1,
-        #     border_radius=25,
-        # )
-        # pygame.draw.rect(self.surface, WHITE, rect, width=1, border_radius=3)
-
         # Display the thermal image
         self.surface.blit(thermal_surface, pos)
 
-        # Create text labels for the temperatures
-        # Adjust positions based on whether it's left or right side
-        section_font = self.font_small
+        # Create text labels for the temperatures (only if we have data)
+        if thermal_data is not None:
+            # Calculate temperatures again for text labels
+            section_width = thermal_data.shape[1] // 3
+            inner_section = thermal_data[:, :section_width]
+            middle_section = thermal_data[:, section_width : 2 * section_width]
+            outer_section = thermal_data[:, 2 * section_width :]
+            inner_temp = np.mean(inner_section)
+            middle_temp = np.mean(middle_section)
+            outer_temp = np.mean(outer_section)
 
-        # Position text below the thermal image
-        text_y = pos[1] + MLX_DISPLAY_HEIGHT + 6
+            # Adjust positions based on whether it's left or right side
+            section_font = self.font_small
+            is_right_side = position in ["FR", "RR"]
 
-        # For text spacing
-        text_spacing = MLX_DISPLAY_WIDTH // 3
+            # Position text below the thermal image
+            text_y = pos[1] + MLX_DISPLAY_HEIGHT + 6
 
-        # Order of sections (left to right on display)
-        if is_right_side:
-            # Right side: Inner, Middle, Outer
-            sections_order = [(inner_temp, "I"), (middle_temp, "M"), (outer_temp, "O")]
-        else:
-            # Left side: Outer, Middle, Inner
-            sections_order = [(outer_temp, "O"), (middle_temp, "M"), (inner_temp, "I")]
+            # For text spacing
+            text_spacing = MLX_DISPLAY_WIDTH // 3
 
-        # Draw the temperature labels
-        for i, (temp, label) in enumerate(sections_order):
-            # Position text centered under each section
-            text_x = pos[0] + (i * text_spacing) + (text_spacing // 2)
+            # Order of sections (left to right on display)
+            if is_right_side:
+                # Right side: Inner, Middle, Outer
+                sections_order = [
+                    (inner_temp, "I"),
+                    (middle_temp, "M"),
+                    (outer_temp, "O"),
+                ]
+            else:
+                # Left side: Outer, Middle, Inner
+                sections_order = [
+                    (outer_temp, "O"),
+                    (middle_temp, "M"),
+                    (inner_temp, "I"),
+                ]
 
-            # Get color based on temperature
-            text_color = self.get_color_for_temp(temp)
+            # Draw the temperature labels
+            for i, (temp, label) in enumerate(sections_order):
+                # Position text centered under each section
+                text_x = pos[0] + (i * text_spacing) + (text_spacing // 2)
 
-            # Render text
-            text = section_font.render(f"{label}: {temp:.1f}", True, text_color)
-            text_rect = text.get_rect(center=(text_x, text_y))
-            # self.surface.blit(text, text_rect)
+                # Get color based on temperature
+                text_color = self.get_color_for_temp(temp)
+
+                # Render text
+                text = section_font.render(f"{label}: {temp:.1f}", True, text_color)
+                text_rect = text.get_rect(center=(text_x, text_y))
+                # self.surface.blit(text, text_rect)
 
     def _get_heat_color(self, temp):
         """

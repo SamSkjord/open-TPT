@@ -16,55 +16,20 @@ CONFIG_FILE = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "display_config.json"
 )
 
-try:
-    if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, "r") as f:
-            display_config = json.load(f)
-            DISPLAY_WIDTH = display_config.get("width", REFERENCE_WIDTH)
-            DISPLAY_HEIGHT = display_config.get("height", REFERENCE_HEIGHT)
-    else:
-        # Create default config file if it doesn't exist
-        default_config = {
-            "width": REFERENCE_WIDTH,
-            "height": REFERENCE_HEIGHT,
-            "notes": "Default resolution for Pimoroni Hyperpixel display. Change values to match your HDMI display resolution.",
-        }
-        with open(CONFIG_FILE, "w") as f:
-            json.dump(default_config, f, indent=4)
-        DISPLAY_WIDTH = REFERENCE_WIDTH
-        DISPLAY_HEIGHT = REFERENCE_HEIGHT
-        print(f"Created default display config at {CONFIG_FILE}")
-except Exception as e:
-    print(f"Error loading display config: {e}. Using reference values.")
-    DISPLAY_WIDTH = REFERENCE_WIDTH
-    DISPLAY_HEIGHT = REFERENCE_HEIGHT
-
-# Calculate scaling factors based on reference resolution
-SCALE_X = DISPLAY_WIDTH / REFERENCE_WIDTH
-SCALE_Y = DISPLAY_HEIGHT / REFERENCE_HEIGHT
-
-
-# Function to scale a position tuple
-def scale_position(pos):
-    """Scale a position tuple (x, y) according to the current display resolution."""
-    return (int(pos[0] * SCALE_X), int(pos[1] * SCALE_Y))
-
-
-# Function to scale a size tuple
-def scale_size(size):
-    """Scale a size tuple (width, height) according to the current display resolution."""
-    return (int(size[0] * SCALE_X), int(size[1] * SCALE_Y))
-
-
-FPS_TARGET = 60
+FPS_TARGET = 60  # Increased to allow higher camera FPS
 DEFAULT_BRIGHTNESS = 0.8  # 0.0 to 1.0
 ROTATION = 90  # Degrees: 0, 90, 180, 270
+
 
 # Unit settings
 # Temperature unit: 'C' for Celsius, 'F' for Fahrenheit
 TEMP_UNIT = "C"
 # Pressure unit: 'PSI', 'BAR', or 'KPA'
 PRESSURE_UNIT = "PSI"
+
+CAMERA_WIDTH = 1280
+CAMERA_HEIGHT = 720
+CAMERA_FPS = 30
 
 # Note: The thresholds below are set according to the chosen units above.
 # If you change the units, you should also adjust these thresholds appropriately.
@@ -109,6 +74,47 @@ MOCK_TEMP_VARIANCE = 5.0  # Random variance for mock temperature values
 I2C_BUS = 1  # Default I2C bus on Raspberry Pi 4
 I2C_MUX_ADDRESS = 0x70  # TCA9548A default address
 ADS_ADDRESS = 0x48  # ADS1115/ADS1015 default address
+
+
+try:
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, "r") as f:
+            display_config = json.load(f)
+            DISPLAY_WIDTH = display_config.get("width", REFERENCE_WIDTH)
+            DISPLAY_HEIGHT = display_config.get("height", REFERENCE_HEIGHT)
+    else:
+        # Create default config file if it doesn't exist
+        default_config = {
+            "width": REFERENCE_WIDTH,
+            "height": REFERENCE_HEIGHT,
+            "notes": "Default resolution for Pimoroni Hyperpixel display. Change values to match your HDMI display resolution.",
+        }
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(default_config, f, indent=4)
+        DISPLAY_WIDTH = REFERENCE_WIDTH
+        DISPLAY_HEIGHT = REFERENCE_HEIGHT
+        print(f"Created default display config at {CONFIG_FILE}")
+except Exception as e:
+    print(f"Error loading display config: {e}. Using reference values.")
+    DISPLAY_WIDTH = REFERENCE_WIDTH
+    DISPLAY_HEIGHT = REFERENCE_HEIGHT
+
+# Calculate scaling factors based on reference resolution
+SCALE_X = DISPLAY_WIDTH / REFERENCE_WIDTH
+SCALE_Y = DISPLAY_HEIGHT / REFERENCE_HEIGHT
+
+
+# Function to scale a position tuple
+def scale_position(pos):
+    """Scale a position tuple (x, y) according to the current display resolution."""
+    return (int(pos[0] * SCALE_X), int(pos[1] * SCALE_Y))
+
+
+# Function to scale a size tuple
+def scale_size(size):
+    """Scale a size tuple (width, height) according to the current display resolution."""
+    return (int(size[0] * SCALE_X), int(size[1] * SCALE_Y))
+
 
 # Font settings
 FONT_SIZE_LARGE = int(60 * min(SCALE_X, SCALE_Y))
@@ -160,6 +166,7 @@ MLX_DISPLAY_WIDTH = int(
     150 * SCALE_X
 )  # Width of displayed heatmap - to cover the complete tyre width
 MLX_DISPLAY_HEIGHT = int(172 * SCALE_Y)  # Height of displayed heatmap
+
 
 # TPMS positions dynamically calculated based on MLX positions
 # The pressure text is centered above each tyre's thermal display

@@ -124,6 +124,19 @@ class InputHandler:
         except Exception as e:
             print(f"Error updating NeoKey LEDs: {e}")
 
+    def set_shutdown_leds(self):
+        """Set all NeoKey LEDs to dim red when shutting down."""
+        if not self.neokey:
+            return
+
+        try:
+            # Set all keys to dim red
+            for i in range(4):
+                self.neokey.pixels[i] = (32, 0, 0)  # Dim red color
+            print("NeoKey LEDs set to shutdown state")
+        except Exception as e:
+            print(f"Error setting shutdown LEDs: {e}")
+
     def check_input(self):
         """Check for button presses from the NeoKey.
 

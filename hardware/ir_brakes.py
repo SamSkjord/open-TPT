@@ -116,6 +116,7 @@ class BrakeTemperatureHandler:
             self.thread.join(timeout=1.0)
 
     def _read_temperature_loop(self):
+        print("_read_temperature_loop")
         """Background thread to continuously read brake temperatures."""
         read_interval = 0.2  # seconds between reads
 
@@ -130,6 +131,7 @@ class BrakeTemperatureHandler:
             time.sleep(read_interval)
 
     def _update_mock_temps(self):
+        print("_update_mock_temps")
         """Generate mock brake temperature data."""
         current_time = time.time()
 
@@ -159,17 +161,29 @@ class BrakeTemperatureHandler:
                 self.temp_data[position]["last_update"] = current_time
 
     def _read_adc_temps(self):
+        print("_read_adc_temps")
         """Read brake temperatures from the ADC."""
         if not self.ads or not self.channels:
+            print("ADC not initialized or channels not available")
+            # Set all temperatures to None to indicate no data available
+            current_time = time.time()
+            with self.lock:
+                for position in self.temp_data:
+                    self.temp_data[position]["temp"] = None
+                    self.temp_data[position]["last_update"] = current_time
             return
 
         try:
+            print("Reading brake temperatures from ADC")
             current_time = time.time()
 
             with self.lock:
+                print("Lock acquired for reading temperatures")
                 for position, channel in self.channels.items():
                     # Read voltage from ADC
                     voltage = channel.voltage
+                    print(f"Read voltage {voltage} from {position}")
+                    # Simulate a small delay for reading
 
                     # Convert voltage to temperature using calibration
                     # This conversion would need to be adjusted for your specific IR sensors
@@ -177,6 +191,7 @@ class BrakeTemperatureHandler:
                     temp = self._voltage_to_temperature(
                         voltage, calibration["gain"], calibration["offset"]
                     )
+                    print(f"Converted voltage {voltage} to temperature {temp}")
 
                     # Update the data
                     self.temp_data[position]["temp"] = temp
@@ -186,6 +201,7 @@ class BrakeTemperatureHandler:
             print(f"Error reading brake temperatures: {e}")
 
     def _voltage_to_temperature(self, voltage, gain, offset):
+        print("_voltage_to_temperature", voltage, gain, offset)
         """
         Convert sensor voltage to temperature.
 

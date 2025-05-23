@@ -1,5 +1,5 @@
 {
-    "width": 800,
-    "height": 480,
+    "width": 1024,
+    "height": 768,
     "notes": "Default resolution for Pimoroni Hyperpixel display. Change values to match your HDMI display resolution."
 }

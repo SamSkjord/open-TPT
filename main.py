@@ -137,6 +137,9 @@ class OpenTPT:
         pygame.display.set_caption("openTPT")
         self.clock = pygame.time.Clock()
 
+        # Hide mouse cursor after display is initialized
+        pygame.mouse.set_visible(False)
+
         # Set up GUI components
         # self.Template = Template(self.screen)
         self.display = Display(self.screen)
@@ -178,6 +181,10 @@ class OpenTPT:
 
                 # Calculate FPS
                 self._calculate_fps()
+
+                # Ensure mouse cursor stays hidden (some systems may reset it)
+                if pygame.mouse.get_visible():
+                    pygame.mouse.set_visible(False)
 
         except KeyboardInterrupt:
             print("\nExiting gracefully...")
@@ -272,7 +279,7 @@ class OpenTPT:
             if self.input_handler.ui_visible:
                 self.ui_last_interaction_time = time.time()
 
-        # Update camera frame if active
+        # Update camera frame if active to ensure FPS counter is updated
         if self.camera.is_active():
             self.camera.update()
 
@@ -293,11 +300,10 @@ class OpenTPT:
             for position, data in brake_temps.items():
                 self.display.draw_brake_temp(position, data["temp"])
 
-            # Get thermal camera data
+            # Get thermal camera data - always draw, let display method handle None
             for position in ["FL", "FR", "RL", "RR"]:
                 thermal_data = self.thermal.get_thermal_data(position)
-                if thermal_data is not None:
-                    self.display.draw_thermal_image(position, thermal_data)
+                self.display.draw_thermal_image(position, thermal_data)
 
             self.display.surface.blit(self.display.overlay_mask, (0, 0))
 
@@ -364,6 +370,12 @@ class OpenTPT:
 
     def _cleanup(self):
         """Clean up resources before exiting."""
+        print("Shutting down openTPT...")
+
+        # Set NeoKey LEDs to dim red for shutdown state
+        if self.input_handler:
+            self.input_handler.set_shutdown_leds()
+
         # Stop hardware monitoring threads
         self.tpms.stop()
         self.brakes.stop()
@@ -374,6 +386,8 @@ class OpenTPT:
 
         # Quit pygame
         pygame.quit()
+
+        print("Shutdown complete")
 
 
 def parse_args():
