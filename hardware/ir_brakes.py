@@ -4,29 +4,23 @@ Handles reading brake rotor temperatures via IR sensors and ADS1115/ADS1015 ADC.
 """
 
 import time
-import random
 import threading
 from utils.config import (
-    BRAKE_TEMP_OPTIMAL,
-    MOCK_MODE,
     BRAKE_TEMP_MIN,
     BRAKE_TEMP_HOT,
     ADS_ADDRESS,
     I2C_BUS,
 )
 
-# Optional imports that will only be needed in non-mock mode
-if not MOCK_MODE:
-    try:
-        import board
-        import busio
-        import adafruit_ads1x15.ads1115 as ADS
-        from adafruit_ads1x15.analog_in import AnalogIn
+# Import for actual ADC hardware
+try:
+    import board
+    import busio
+    import adafruit_ads1x15.ads1115 as ADS
+    from adafruit_ads1x15.analog_in import AnalogIn
 
-        ADS_AVAILABLE = True
-    except ImportError:
-        ADS_AVAILABLE = False
-else:
+    ADS_AVAILABLE = True
+except ImportError:
     ADS_AVAILABLE = False
 
 
@@ -39,12 +33,12 @@ class BrakeTemperatureHandler:
         self.thread = None
         self.lock = threading.Lock()
 
-        # Temperature data structure
+        # Temperature data structure - start with None to indicate no data
         self.temp_data = {
-            "FL": {"temp": BRAKE_TEMP_OPTIMAL, "last_update": 0},
-            "FR": {"temp": BRAKE_TEMP_OPTIMAL, "last_update": 0},
-            "RL": {"temp": BRAKE_TEMP_OPTIMAL, "last_update": 0},
-            "RR": {"temp": BRAKE_TEMP_OPTIMAL, "last_update": 0},
+            "FL": {"temp": None, "last_update": 0},
+            "FR": {"temp": None, "last_update": 0},
+            "RL": {"temp": None, "last_update": 0},
+            "RR": {"temp": None, "last_update": 0},
         }
 
         # Channel mapping (ADS1115 has 4 channels, one for each brake)
@@ -69,10 +63,6 @@ class BrakeTemperatureHandler:
 
     def initialize(self):
         """Initialize the ADS1115/ADS1015 ADC."""
-        if MOCK_MODE:
-            print("Mock mode enabled - Brake temperatures will be simulated")
-            return True
-
         if not ADS_AVAILABLE:
             print(
                 "Warning: ADS1x15 library not available - brake temperature sensing disabled"
@@ -116,52 +106,14 @@ class BrakeTemperatureHandler:
             self.thread.join(timeout=1.0)
 
     def _read_temperature_loop(self):
-        print("_read_temperature_loop")
         """Background thread to continuously read brake temperatures."""
         read_interval = 0.2  # seconds between reads
 
         while self.running:
-            if MOCK_MODE:
-                # Update mock data
-                self._update_mock_temps()
-            else:
-                # Read real data
-                self._read_adc_temps()
-
+            self._read_adc_temps()
             time.sleep(read_interval)
 
-    def _update_mock_temps(self):
-        print("_update_mock_temps")
-        """Generate mock brake temperature data."""
-        current_time = time.time()
-
-        with self.lock:
-            for position in self.temp_data:
-                # Simulate temperature changes around optimal value
-                base_temp = BRAKE_TEMP_OPTIMAL
-
-                # Add some realistic variations
-                # Higher temps during braking, cooling when not braking
-                # This is very simplified for mock purposes
-                if random.random() > 0.7:  # Simulating braking
-                    temp_change = random.uniform(0, 100)  # Temperature increase
-                else:
-                    # Gradual cooling when not braking
-                    current_temp = self.temp_data[position]["temp"]
-                    temp_change = (BRAKE_TEMP_OPTIMAL - current_temp) * 0.1
-
-                # Apply the change
-                new_temp = self.temp_data[position]["temp"] + temp_change
-
-                # Ensure temperature stays within reasonable bounds
-                new_temp = max(BRAKE_TEMP_MIN, min(new_temp, BRAKE_TEMP_HOT))
-
-                # Update the data
-                self.temp_data[position]["temp"] = new_temp
-                self.temp_data[position]["last_update"] = current_time
-
     def _read_adc_temps(self):
-        print("_read_adc_temps")
         """Read brake temperatures from the ADC."""
         if not self.ads or not self.channels:
             print("ADC not initialized or channels not available")
@@ -174,16 +126,12 @@ class BrakeTemperatureHandler:
             return
 
         try:
-            print("Reading brake temperatures from ADC")
             current_time = time.time()
 
             with self.lock:
-                print("Lock acquired for reading temperatures")
                 for position, channel in self.channels.items():
                     # Read voltage from ADC
                     voltage = channel.voltage
-                    print(f"Read voltage {voltage} from {position}")
-                    # Simulate a small delay for reading
 
                     # Convert voltage to temperature using calibration
                     # This conversion would need to be adjusted for your specific IR sensors
@@ -191,7 +139,6 @@ class BrakeTemperatureHandler:
                     temp = self._voltage_to_temperature(
                         voltage, calibration["gain"], calibration["offset"]
                     )
-                    print(f"Converted voltage {voltage} to temperature {temp}")
 
                     # Update the data
                     self.temp_data[position]["temp"] = temp
@@ -199,9 +146,14 @@ class BrakeTemperatureHandler:
 
         except Exception as e:
             print(f"Error reading brake temperatures: {e}")
+            # Set all temperatures to None on error
+            current_time = time.time()
+            with self.lock:
+                for position in self.temp_data:
+                    self.temp_data[position]["temp"] = None
+                    self.temp_data[position]["last_update"] = current_time
 
     def _voltage_to_temperature(self, voltage, gain, offset):
-        print("_voltage_to_temperature", voltage, gain, offset)
         """
         Convert sensor voltage to temperature.
 
@@ -218,8 +170,6 @@ class BrakeTemperatureHandler:
         # Most IR temperature sensors have a linear or near-linear voltage-to-temp relationship
 
         # Example: Linear conversion with gain and offset
-        # temp = voltage * gain + offset
-        #
         # For MLX90614 or similar sensors, the formula might be more complex
         # and would need to be adjusted based on the datasheet
 

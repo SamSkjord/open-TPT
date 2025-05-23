@@ -65,11 +65,6 @@ BUTTON_BRIGHTNESS_DOWN = 1
 BUTTON_CAMERA_TOGGLE = 2
 BUTTON_RESERVED = 3
 
-# Mock mode settings
-MOCK_MODE = False  # Set to True to enable mock data without hardware
-MOCK_PRESSURE_VARIANCE = 2.0  # Random variance for mock pressure values
-MOCK_TEMP_VARIANCE = 5.0  # Random variance for mock temperature values
-
 # I2C settings
 I2C_BUS = 1  # Default I2C bus on Raspberry Pi 4
 I2C_MUX_ADDRESS = 0x70  # TCA9548A default address

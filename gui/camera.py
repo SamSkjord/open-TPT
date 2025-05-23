@@ -11,7 +11,6 @@ import queue
 from utils.config import (
     DISPLAY_WIDTH,
     DISPLAY_HEIGHT,
-    MOCK_MODE,
     CAMERA_WIDTH,
     CAMERA_HEIGHT,
     CAMERA_FPS,
@@ -112,16 +111,6 @@ class Camera:
                 if not ret:
                     continue
 
-                # Update FPS counter
-                # thread_frame_count += 1
-                # elapsed = time.time() - thread_start_time
-                # if elapsed >= 1.0:
-                #     thread_fps = thread_frame_count / elapsed
-                #     print(f"Camera thread FPS: {thread_fps:.1f}")
-                #     thread_frame_count = 0
-                #     thread_start_time = time.time()
-                #     self.fps = thread_fps
-
                 # Pre-process frame for direct rendering
                 try:
                     # Flip horizontally and convert to RGB in one step
@@ -187,7 +176,7 @@ class Camera:
         self.active = not self.active
 
         if self.active:
-            if not self.thread_running and not MOCK_MODE and CV2_AVAILABLE:
+            if not self.thread_running and CV2_AVAILABLE:
                 self.thread_running = True
                 self.capture_thread = threading.Thread(
                     target=self._capture_thread_function, daemon=True
@@ -226,7 +215,7 @@ class Camera:
 
         result = False
 
-        if MOCK_MODE or not CV2_AVAILABLE or not self.camera:
+        if not CV2_AVAILABLE or not self.camera:
             self._generate_test_pattern()
             result = True
         else:
@@ -255,7 +244,7 @@ class Camera:
         return result
 
     def _generate_test_pattern(self):
-        """Generate a test pattern frame for mock mode."""
+        """Generate a test pattern frame when camera is not available."""
         mock_width = 1280
         mock_height = 720
         frame = np.zeros((mock_height, mock_width, 3), dtype=np.uint8)
@@ -310,8 +299,8 @@ class Camera:
                 ] = frame_data.swapaxes(0, 1)
 
             else:
-                # Fallback for mock mode or direct frames
-                if MOCK_MODE or not CV2_AVAILABLE:
+                # Fallback for test pattern or direct frames
+                if not CV2_AVAILABLE:
                     rgb_frame = self.frame
                 else:
                     rgb_frame = cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB)
@@ -335,19 +324,6 @@ class Camera:
             # Release the pixel array to update the display
             del self.display_array
             self.display_array = None
-
-            # Draw status text using standard pygame methods (minimal overhead)
-            # font = pygame.font.SysFont(None, 24)
-            # fps_text = font.render(f"FPS: {self.fps:.1f}", True, (255, 255, 0))
-            # self.surface.blit(fps_text, (10, 10))
-
-            # thread_status = "THREADED" if self.thread_running else "DIRECT"
-            # thread_text = font.render(f"Mode: {thread_status}", True, (255, 255, 0))
-            # self.surface.blit(thread_text, (10, 40))
-
-            # if MOCK_MODE or not CV2_AVAILABLE:
-            #     mock_text = font.render("MOCK CAMERA VIEW", True, (255, 0, 0))
-            #     self.surface.blit(mock_text, (10, 70))
 
             return True
 

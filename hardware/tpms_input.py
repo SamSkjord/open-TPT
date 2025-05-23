@@ -4,29 +4,14 @@ Handles reading Tyre pressure and temperature from TPMS sensors.
 """
 
 import time
-import random
 import threading
-from utils.config import (
-    PRESSURE_FRONT_OPTIMAL,
-    PRESSURE_REAR_OPTIMAL,
-    PRESSURE_OFFSET,
-    TYRE_TEMP_OPTIMAL,
-    MOCK_PRESSURE_VARIANCE,
-    MOCK_TEMP_VARIANCE,
-    MOCK_MODE,
-    PRESSURE_UNIT,
-    TEMP_UNIT,
-)
 
-# Optional import that will only be needed in non-mock mode
-if not MOCK_MODE:
-    try:
-        import tpms
+# Import for actual TPMS hardware
+try:
+    import tpms
 
-        TPMS_AVAILABLE = True
-    except ImportError:
-        TPMS_AVAILABLE = False
-else:
+    TPMS_AVAILABLE = True
+except ImportError:
     TPMS_AVAILABLE = False
 
 
@@ -37,12 +22,35 @@ class TPMSHandler:
         self.running = False
         self.thread = None
         self.lock = threading.Lock()
+
+        # Initialize sensor data with None to indicate no data available
         self.sensor_data = {
-            "FL": {"pressure": 0.0, "temp": 0.0, "status": "N/A", "last_update": 0},
-            "FR": {"pressure": 0.0, "temp": 0.0, "status": "N/A", "last_update": 0},
-            "RL": {"pressure": 0.0, "temp": 0.0, "status": "N/A", "last_update": 0},
-            "RR": {"pressure": 0.0, "temp": 0.0, "status": "N/A", "last_update": 0},
+            "FL": {
+                "pressure": None,
+                "temp": None,
+                "status": "N/A",
+                "last_update": 0,
+            },
+            "FR": {
+                "pressure": None,
+                "temp": None,
+                "status": "N/A",
+                "last_update": 0,
+            },
+            "RL": {
+                "pressure": None,
+                "temp": None,
+                "status": "N/A",
+                "last_update": 0,
+            },
+            "RR": {
+                "pressure": None,
+                "temp": None,
+                "status": "N/A",
+                "last_update": 0,
+            },
         }
+
         self.last_read = 0
         self.timeout = 30  # Consider sensor data stale after 30 seconds
 
@@ -51,12 +59,6 @@ class TPMSHandler:
 
     def initialize(self):
         """Initialize the TPMS device."""
-        if MOCK_MODE:
-            print("Mock mode enabled - TPMS data will be simulated")
-            # Set initial mock values
-            self._update_mock_data()
-            return True
-
         if not TPMS_AVAILABLE:
             print("Warning: TPMS library not available")
             return False
@@ -93,52 +95,18 @@ class TPMSHandler:
         read_interval = 0.5  # seconds between reads
 
         while self.running:
-            if MOCK_MODE:
-                # Update mock data
-                self._update_mock_data()
-            else:
-                # Read real data
-                self._read_tpms_data()
-
+            self._read_tpms_data()
             time.sleep(read_interval)
-
-    def _update_mock_data(self):
-        """Update mock TPMS data with realistic variations."""
-        current_time = time.time()
-
-        # Only update every few seconds to simulate real sensors
-        if current_time - self.last_read < 2.0:
-            return
-
-        self.last_read = current_time
-
-        with self.lock:
-            for position in self.sensor_data:
-                # Random variations around optimal values depending on position
-                if position.startswith("F"):  # Front tire
-                    pressure = (
-                        PRESSURE_FRONT_OPTIMAL
-                        + (random.random() * 2 - 1) * MOCK_PRESSURE_VARIANCE
-                    )
-                else:  # Rear tire
-                    pressure = (
-                        PRESSURE_REAR_OPTIMAL
-                        + (random.random() * 2 - 1) * MOCK_PRESSURE_VARIANCE
-                    )
-                temp = (
-                    TYRE_TEMP_OPTIMAL + (random.random() * 2 - 1) * MOCK_TEMP_VARIANCE
-                )
-
-                # Add some variance in sensor update times
-                if random.random() > 0.8:  # 80% chance of update
-                    self.sensor_data[position]["pressure"] = pressure
-                    self.sensor_data[position]["temp"] = temp
-                    self.sensor_data[position]["status"] = "OK"
-                    self.sensor_data[position]["last_update"] = current_time
 
     def _read_tpms_data(self):
         """Read data from actual TPMS device."""
         if not self.tpms_device:
+            # Set all sensor data to None to indicate no data available
+            with self.lock:
+                for position in self.sensor_data:
+                    self.sensor_data[position]["pressure"] = None
+                    self.sensor_data[position]["temp"] = None
+                    self.sensor_data[position]["status"] = "NO_DEVICE"
             return
 
         try:
@@ -155,35 +123,27 @@ class TPMSHandler:
                         position = self._map_sensor_id_to_position(sensor.id)
 
                         if position in self.sensor_data:
-                            # TPMS library returns pressure in kPa, convert to the configured unit
-                            pressure_kpa = sensor.pressure
-
-                            # Convert from kPa to the configured unit
-                            if PRESSURE_UNIT == "PSI":
-                                # Convert kPa to PSI
-                                pressure = pressure_kpa * 0.145038
-                            elif PRESSURE_UNIT == "BAR":
-                                # Convert kPa to BAR
-                                pressure = pressure_kpa * 0.01
-                            else:
-                                # Keep as kPa
-                                pressure = pressure_kpa
-
-                            # Store in the configured unit
-                            self.sensor_data[position]["pressure"] = pressure
-
-                            # Temperature is in Celsius from TPMS library, convert if needed
-                            temp = sensor.temperature
-                            if TEMP_UNIT == "F":
-                                # Convert Celsius to Fahrenheit
-                                temp = (temp * 9 / 5) + 32
-
-                            self.sensor_data[position]["temp"] = temp
+                            # Store pressure and temperature from sensor
+                            self.sensor_data[position]["pressure"] = sensor.pressure
+                            self.sensor_data[position]["temp"] = sensor.temperature
                             self.sensor_data[position]["status"] = "OK"
                             self.sensor_data[position]["last_update"] = current_time
+            else:
+                # No data received, set to None
+                with self.lock:
+                    for position in self.sensor_data:
+                        self.sensor_data[position]["pressure"] = None
+                        self.sensor_data[position]["temp"] = None
+                        self.sensor_data[position]["status"] = "NO_DATA"
 
         except Exception as e:
             print(f"Error reading TPMS data: {e}")
+            # Set all sensor data to None on error
+            with self.lock:
+                for position in self.sensor_data:
+                    self.sensor_data[position]["pressure"] = None
+                    self.sensor_data[position]["temp"] = None
+                    self.sensor_data[position]["status"] = "ERROR"
 
     def _map_sensor_id_to_position(self, sensor_id):
         """
@@ -220,9 +180,11 @@ class TPMSHandler:
                 # Make a copy of the data
                 result[position] = data.copy()
 
-                # Check if data is stale
+                # Check if data is stale - if so, set pressure and temp to None
                 if current_time - data["last_update"] > self.timeout:
                     result[position]["status"] = "TIMEOUT"
+                    result[position]["pressure"] = None
+                    result[position]["temp"] = None
 
         return result
 
@@ -242,9 +204,11 @@ class TPMSHandler:
         with self.lock:
             data = self.sensor_data[position].copy()
 
-        # Check if data is stale
+        # Check if data is stale - if so, set pressure and temp to None
         current_time = time.time()
         if current_time - data["last_update"] > self.timeout:
             data["status"] = "TIMEOUT"
+            data["pressure"] = None
+            data["temp"] = None
 
         return data

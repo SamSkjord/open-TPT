@@ -19,7 +19,6 @@ from utils.config import (
     BUTTON_CAMERA_TOGGLE,
     BUTTON_RESERVED,
     DEFAULT_BRIGHTNESS,
-    MOCK_MODE,
 )
 
 # Only try to import NeoKey if board is available
@@ -69,10 +68,6 @@ class InputHandler:
 
     def initialize(self):
         """Initialize the NeoKey device."""
-        if MOCK_MODE:
-            print("Mock mode enabled - NeoKey input simulated")
-            return
-
         if not NEOKEY_AVAILABLE:
             print("Warning: NeoKey library not available - input disabled")
             return
@@ -148,10 +143,6 @@ class InputHandler:
             "camera_toggled": False,
             "ui_toggled": False,
         }
-
-        if MOCK_MODE:
-            # In mock mode, do nothing but return empty events
-            return events
 
         if not self.neokey:
             return events

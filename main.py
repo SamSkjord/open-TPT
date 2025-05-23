@@ -33,7 +33,6 @@ from utils.config import (
     REFERENCE_HEIGHT,
     FPS_TARGET,
     DEFAULT_BRIGHTNESS,
-    MOCK_MODE,
     TEMP_UNIT,
     PRESSURE_UNIT,
     TYRE_TEMP_COLD,
@@ -92,7 +91,6 @@ class OpenTPT:
         """
         self.args = args
         self.running = False
-        self.mock_mode = args.mock or MOCK_MODE
         self.fps = 0
         self.frame_count = 0
         self.last_time = time.time()
@@ -103,11 +101,7 @@ class OpenTPT:
         self.ui_fade_alpha = 255  # 255 = fully visible, 0 = invisible
         self.ui_fading = False
 
-        # Inform user about mode
-        if self.mock_mode:
-            print("Starting in MOCK mode (no hardware required)")
-        else:
-            print("Starting in NORMAL mode (hardware required)")
+        print("Starting openTPT...")
 
         # Initialize pygame and display
         self._init_display()
@@ -217,13 +211,8 @@ class OpenTPT:
                 elif event.key == pygame.K_DOWN:
                     self.input_handler.simulate_button_press(1)  # Brightness down
 
-                # Toggle mock mode with 'M' key
-                elif event.key == pygame.K_m:
-                    self.mock_mode = not self.mock_mode
-                    print(f"Mock mode {'enabled' if self.mock_mode else 'disabled'}")
-
-                # Add to _handle_events in main.py
-                elif event.key == pygame.K_t:  # 'T' key to toggle UI
+                # Toggle UI with 'T' key
+                elif event.key == pygame.K_t:
                     self.input_handler.simulate_button_press(BUTTON_RESERVED)
 
                 if event.type in (
@@ -314,11 +303,8 @@ class OpenTPT:
                     position, data["pressure"], data["temp"], data["status"]
                 )
 
-            # Render debug info (FPS and mode) - these don't fade
-            mode = "MOCK" if self.mock_mode else "NORMAL"
-            self.display.draw_debug_info(self.fps, mode)
-
-            # Remove direct draw of units indicator - it should only be on the fading UI surface
+            # Render debug info (FPS only)
+            self.display.draw_debug_info(self.fps, "openTPT")
 
             # Create separate surface for UI elements that can fade
             if self.input_handler.ui_visible or self.ui_fade_alpha > 0:
@@ -343,7 +329,7 @@ class OpenTPT:
         # Apply brightness adjustment
         brightness = self.input_handler.get_brightness()
         if brightness < 1.0:
-            # Create a semi-transparent black Template to dim the screen
+            # Create a semi-transparent black overlay to dim the screen
             dim_surface = pygame.Surface(
                 (DISPLAY_WIDTH, DISPLAY_HEIGHT), pygame.SRCALPHA
             )
@@ -365,8 +351,6 @@ class OpenTPT:
             self.fps = self.frame_count / elapsed
             self.frame_count = 0
             self.last_time = current_time
-
-    # Threshold update methods removed as units are now configured only in config.py
 
     def _cleanup(self):
         """Clean up resources before exiting."""
@@ -394,9 +378,6 @@ def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         description="openTPT - Open Tyre Pressure and Temperature Telemetry"
-    )
-    parser.add_argument(
-        "--mock", action="store_true", help="Run in mock mode (no hardware required)"
     )
     parser.add_argument(
         "--windowed",

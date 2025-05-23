@@ -246,8 +246,8 @@ class Display:
 
         Args:
             position: String key for tyre position (FL, FR, RL, RR)
-            pressure: Pressure value in current unit
-            temp: Temperature value in current unit
+            pressure: Pressure value in current unit or None if no data available
+            temp: Temperature value in current unit or None if no data available
             status: Status string (OK, LOW, etc.)
         """
         if position not in TPMS_POSITIONS:
@@ -259,7 +259,14 @@ class Display:
 
         # Render pressure with appropriate color (passing position to determine front/rear)
         pressure_color = self.get_color_for_pressure(pressure, position)
-        pressure_text = self.font_large.render(f"{pressure:.1f}", True, pressure_color)
+
+        # Handle None pressure value
+        if pressure is None:
+            pressure_text = self.font_large.render("--", True, pressure_color)
+        else:
+            pressure_text = self.font_large.render(
+                f"{pressure:.1f}", True, pressure_color
+            )
 
         # Create a rect for the text with center at pressure_pos
         pressure_rect = pressure_text.get_rect(center=pressure_pos)
@@ -269,7 +276,10 @@ class Display:
 
         # Render temperature with appropriate color (if you want to enable this)
         # temp_color = self.get_color_for_temp(temp)
-        # temp_text = self.font_large.render(f"{temp:.1f}", True, temp_color)
+        # if temp is None:
+        #     temp_text = self.font_large.render("--", True, temp_color)
+        # else:
+        #     temp_text = self.font_large.render(f"{temp:.1f}", True, temp_color)
         # temp_rect = temp_text.get_rect(center=temp_pos)
         # self.surface.blit(temp_text, temp_rect)
 
@@ -281,7 +291,7 @@ class Display:
         #     self.surface.blit(status_text, status_rect)
 
     def draw_brake_temp(self, position, temp):
-        print(position, temp)
+        # print(position, temp)
         """
         Draw brake temperature visualization as a color scale.
 
