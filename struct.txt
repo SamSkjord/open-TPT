@@ -1,4 +1,3 @@
-sam@MBP open-TPT % tree
 .
 ├── assets
 │   ├── icons
@@ -12,9 +11,12 @@ sam@MBP open-TPT % tree
 │   │   └── Untitled.xcf
 │   ├── overlay.png
 │   ├── overlay.xcf
+│   ├── splash.png
 │   ├── template.png
 │   └── template.xcf
 ├── Body3.stl
+├── configure_display.py
+├── display_config.json
 ├── gui
 │   ├── camera.py
 │   ├── display.py
@@ -27,13 +29,14 @@ sam@MBP open-TPT % tree
 │   ├── ir_brakes.py
 │   ├── mlx_handler.py
 │   └── tpms_input.py
+├── install.sh
 ├── LICENSE
 ├── main.py
+├── openTPT.service
 ├── overlay.png
 ├── overlay.psd
 ├── README.md
-├── requirements.txt
 ├── skjord.jpg
+├── struct.txt
 └── utils
     └── config.py
-
