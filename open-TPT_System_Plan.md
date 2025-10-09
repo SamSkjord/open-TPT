@@ -406,6 +406,25 @@ radar_alerts:
 - Safety: never inject simulator frames into a live vehicle bus; use a bench harness with proper termination
 - Cold start: warm up Numba-compiled functions at boot
 - https://github.com/commaai/laika/ for GPS
+- Ford Hybrid PIDs https://torque-bhp.com/community/main-forum/ford-and-lincoln-hybrid-vehicle-custom-pid/
+PID     LONG NAME                       SHORT NAME     MIN   MAX   SCALE  UNIT      EQUATION
+224801  HV Battery State of Charge      SoC            0     100   x1     %        ((((A*256)+B)*(1/5))/100)
+224800	HV Battery Temperature          HV Temp        0     150   x1     DegF     ((A*18)-580)/100
+22480b	HV Battery current in Amps      HV Amps        -200  200   x1     Amps     ((((Signed(A)*256)+B)/5)/10)*-1
+22480d	HV Battery Voltage              HV Volts       0     400   x1     Volts    (((A*256)+B)/100)
+22dd04	Temperature inside car          Inside Temp    0     160   x1     DegF     ((A*18)-400)/10
+224815	Maximum Discharge Power Limit   Mx Dis Lmt     0     500   x1     kW       (A*25)/10
+224816	Maximum Charge Power Limit      Mx Chg Lmt     0     500   x1     kW       (A*25)/10 
+224841	Average Battery Module Voltage  Avg Bat Vtg    0     500   x1     Volts    (((A*256)+B)*(1/10))/10
+224810	Battery Age                     Bat Age        0     999   x1     Months   (((A*256)+B)*(1/20))/10
+221E1C	Transmission Temp               Trans Temp     0     300   x1     DegF     (((A*256)+B)*(9/8)+320)/10
+224832	Motor Electronics Coolant Temp  Elec Clt Temp  0     300   x1     DegF     (A*18+320)/10
+22F41F 	Engine Run time                 Eng Run Tme    0     999   x1     Minutes  (((A*256)+B)*(25/16))/10
+22481E	Generator Inverter Temp         Gen Inv Tmp    0     300   x1     DegF     (((A*256)+B)*18+320)/10
+224824	Motor Inverter Temp             Mtr Inv Tmp    0     300   x1     DegF     (((A*256)+B)*18+320)/10 
+
+
+
 ---
 
 **Summary:** Modular, multi-bus open-TPT with swappable radar drivers and a built-in CAN-environment simulator. Each signal declares its bus, radar and OBD are isolated, and the HUD remains responsive under load. Configuration flips vehicle profiles without code changes.
