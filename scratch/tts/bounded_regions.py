@@ -24,11 +24,11 @@ MIDDLE_ROWS = 4  # Number of middle rows to display
 START_ROW = (SENSOR_HEIGHT - MIDDLE_ROWS) // 2  # Row 10 (0-indexed)
 
 # Tire detection parameters
-MIN_TIRE_WIDTH = 8  # Minimum expected tire width in pixels
+MIN_TIRE_WIDTH = 6  # Minimum expected tire width in pixels
 MAX_TIRE_WIDTH = 28  # Maximum expected tire width in pixels
 TEMP_THRESHOLD_OFFSET = 2.0  # Degrees above average to consider "hot"
 TIRE_THIRDS = 3  # Divide tire into 3 vertical sections
-HISTORY_SIZE = 10  # Number of frames to average for stability
+HISTORY_SIZE = 4  # Number of frames to average for stability
 EDGE_GRADIENT_THRESHOLD = 1.5  # Temperature gradient for edge detection
 MAX_VALID_TEMP = (
     150.0  # Maximum valid temperature - anything above this is ignored (brake rotors)
@@ -193,6 +193,52 @@ def detect_tire_boundaries_improved(middle_frame, threshold_offset):
             method += "+rotor_filtered"
         return fallback_start, fallback_start + fallback_width, False, method
 
+    def refine_tire_edges(start_col, end_col, method_tag):
+        """Trim cold columns at the edges while keeping minimum width"""
+        start_col = int(constrain(start_col, 0, SENSOR_WIDTH - 1))
+        end_col = int(constrain(end_col, start_col + 1, SENSOR_WIDTH))
+
+        min_hot_rows = max(1, MIDDLE_ROWS // 2)
+        refined_left = start_col
+        refined_right = end_col - 1
+
+        # Trim from the left
+        while refined_left <= refined_right:
+            hot_rows = sum(
+                1 for row in rows if row[refined_left] > threshold_temp
+            )
+            if hot_rows >= min_hot_rows:
+                break
+            refined_left += 1
+
+        # Trim from the right
+        while refined_right >= refined_left:
+            hot_rows = sum(
+                1 for row in rows if row[refined_right] > threshold_temp
+            )
+            if hot_rows >= min_hot_rows:
+                break
+            refined_right -= 1
+
+        if refined_right < refined_left:
+            # Unable to refine; return original bounds
+            return start_col, end_col, method_tag
+
+        width = refined_right - refined_left + 1
+        if width < MIN_TIRE_WIDTH:
+            # Expand around center to meet minimum width
+            center = (refined_left + refined_right) // 2
+            refined_left = max(0, center - MIN_TIRE_WIDTH // 2)
+            refined_right = min(SENSOR_WIDTH - 1, refined_left + MIN_TIRE_WIDTH - 1)
+            # Ensure right edge still >= left
+            refined_left = max(0, refined_right - MIN_TIRE_WIDTH + 1)
+
+        new_method = method_tag
+        if refined_left != start_col or refined_right + 1 != end_col:
+            new_method += "+refined"
+
+        return refined_left, refined_right + 1, new_method
+
     # Combine methods
     candidates = []
 
@@ -232,7 +278,10 @@ def detect_tire_boundaries_improved(middle_frame, threshold_offset):
         method = best_candidate[2]
         if rotor_detected:
             method += "+rotor_filtered"
-        return best_candidate[0], best_candidate[1], True, method
+        refined_left, refined_right, method = refine_tire_edges(
+            best_candidate[0], best_candidate[1], method
+        )
+        return refined_left, refined_right, True, method
 
     # If no good candidate, use the first one but adjust width
     if candidates:
@@ -248,7 +297,8 @@ def detect_tire_boundaries_improved(middle_frame, threshold_offset):
             right = min(SENSOR_WIDTH, left + MAX_TIRE_WIDTH)
         if rotor_detected:
             method += "+rotor_filtered"
-        return left, right, True, method + "_adjusted"
+        refined_left, refined_right, method = refine_tire_edges(left, right, method + "_adjusted")
+        return refined_left, refined_right, True, method
 
     # Ultimate fallback
     fallback_width = 16
@@ -379,7 +429,29 @@ def draw_enhanced_visualization(
 
     region_left = min(x_left, x_right)
     region_right = max(x_left, x_right)
-    region_width = region_right - region_left
+
+    screen_min_x = x_offset
+    screen_max_x = x_offset + box_width
+
+    region_left = max(screen_min_x, min(region_left, screen_max_x))
+    region_right = max(screen_min_x, min(region_right, screen_max_x))
+
+    if region_right < region_left:
+        region_left, region_right = region_right, region_left
+
+    region_left_px = int(round(region_left))
+    region_right_px = int(round(region_right))
+
+    region_left_px = max(screen_min_x, min(region_left_px, screen_max_x))
+    region_right_px = max(screen_min_x, min(region_right_px, screen_max_x))
+
+    if region_right_px <= region_left_px:
+        if region_right_px < screen_max_x:
+            region_right_px = region_left_px + 1
+        else:
+            region_left_px = max(screen_min_x, region_right_px - 1)
+
+    region_width_px = max(1, region_right_px - region_left_px)
 
     # Draw detection method indicator
     if debug_mode:
@@ -394,44 +466,58 @@ def draw_enhanced_visualization(
         pygame.draw.line(
             screen,
             (255, 255, 0),
-            (region_left, y_offset),
-            (region_left, y_offset + box_height),
+            (region_left_px, y_offset),
+            (region_left_px, y_offset + box_height),
             2,
         )
         pygame.draw.line(
             screen,
             (255, 255, 0),
-            (region_right, y_offset),
-            (region_right, y_offset + box_height),
+            (region_right_px, y_offset),
+            (region_right_px, y_offset + box_height),
             2,
         )
 
     # Draw section boundaries and temperature info
     # The sections are ONLY within the detected tire region
-    section_width = region_width / 3
+    base_section_width = region_width_px // 3
+    extra_pixels = region_width_px % 3
+    section_widths = [base_section_width] * 3
+
+    # Prefer to keep the center section widest when pixels don't divide evenly
+    remainder_order = [1, 0, 2]
+    for i in range(extra_pixels):
+        section_widths[remainder_order[i]] += 1
+
+    section_edges = [region_left_px]
+    cursor = region_left_px
+    for width in section_widths:
+        cursor += width
+        section_edges.append(cursor)
+    section_edges[-1] = region_right_px
 
     for i, section_name in enumerate(section_names):
-        box_start = region_left + i * section_width
-        box_end = region_left + (i + 1) * section_width
+        box_start = section_edges[i]
+        box_end = section_edges[i + 1]
         box_w = box_end - box_start
 
-        if box_w <= 0:
+        if box_w <= 0 or box_start >= screen_max_x or box_end <= screen_min_x:
             continue
 
         # Semi-transparent overlay
-        box_surface = pygame.Surface((box_w, box_height), pygame.SRCALPHA)
+        box_surface = pygame.Surface((int(box_w), box_height), pygame.SRCALPHA)
         box_surface.set_alpha(50)
         box_surface.fill(colors[section_name])
-        screen.blit(box_surface, (box_start, y_offset))
+        screen.blit(box_surface, (int(box_start), y_offset))
 
         # Border
-        rect = pygame.Rect(box_start, y_offset, box_w, box_height)
+        rect = pygame.Rect(int(box_start), y_offset, int(box_w), box_height)
         pygame.draw.rect(screen, colors[section_name], rect, 3)
 
         # Section label
         label_text = section_name.upper()
         label = small_font.render(label_text, True, colors[section_name])
-        label_x = box_start + (box_w - label.get_width()) / 2
+        label_x = int(round(box_start + (box_w - label.get_width()) / 2))
         label_y = y_offset + 10
 
         # Label background
@@ -446,8 +532,10 @@ def draw_enhanced_visualization(
         if temps.get("count", 0) > 0:
             temp_text = f"{temps['avg']:.1f}°C"
             temp_label = font.render(temp_text, True, (255, 255, 255))
-            temp_x = box_start + (box_w - temp_label.get_width()) / 2
-            temp_y = y_offset + box_height / 2 - temp_label.get_height() / 2
+            temp_x = int(round(box_start + (box_w - temp_label.get_width()) / 2))
+            temp_y = int(
+                round(y_offset + box_height / 2 - temp_label.get_height() / 2)
+            )
 
             # Temperature background
             temp_bg = pygame.Surface(
@@ -462,7 +550,7 @@ def draw_enhanced_visualization(
             if debug_mode:
                 minmax_text = f"({temps['min']:.1f}-{temps['max']:.1f})"
                 minmax_label = tiny_font.render(minmax_text, True, (200, 200, 200))
-                minmax_x = box_start + (box_w - minmax_label.get_width()) / 2
+                minmax_x = int(round(box_start + (box_w - minmax_label.get_width()) / 2))
                 minmax_y = temp_y + temp_label.get_height() + 5
 
                 # Only draw if there's enough space
@@ -475,16 +563,20 @@ def draw_enhanced_visualization(
         gradient_height = 80
 
         # Background for gradient - only for the tire region
-        gradient_bg = pygame.Surface((region_width, gradient_height))
+        gradient_bg = pygame.Surface((region_width_px, gradient_height))
         gradient_bg.fill((30, 30, 30))
         gradient_bg.set_alpha(200)
-        screen.blit(gradient_bg, (region_left, gradient_y))
+        screen.blit(gradient_bg, (region_left_px, gradient_y))
 
         # Draw temperature profile
         profile_points = []
-        for i in range(int(region_width)):
+        for i in range(region_width_px):
             # Map display position back to sensor column
-            sensor_col = tire_start + int((i / region_width) * tire_width)
+            if region_width_px == 0 or tire_width <= 0:
+                continue
+            sensor_ratio = (i + 0.5) / region_width_px
+            sensor_col = tire_start + int(sensor_ratio * tire_width)
+            sensor_col = min(tire_end - 1, max(tire_start, sensor_col))
             if 0 <= sensor_col < SENSOR_WIDTH:
                 # Average temperature across the middle rows for this column
                 col_temps = []
@@ -498,7 +590,7 @@ def draw_enhanced_visualization(
                     norm_temp = (avg_col_temp - MINTEMP) / (MAXTEMP - MINTEMP)
                     norm_temp = constrain(norm_temp, 0, 1)
                     y = gradient_y + gradient_height - (norm_temp * gradient_height)
-                    profile_points.append((region_left + i, y))
+                    profile_points.append((region_left_px + i, int(round(y))))
 
         if len(profile_points) > 1:
             pygame.draw.lines(screen, (255, 255, 0), False, profile_points, 2)
@@ -507,7 +599,7 @@ def draw_enhanced_visualization(
         if "rotor" in detection_method:
             rotor_text = "HOT SPOT FILTERED (>150°C)"
             rotor_label = small_font.render(rotor_text, True, (255, 100, 0))
-            screen.blit(rotor_label, (region_left, gradient_y - 30))
+            screen.blit(rotor_label, (region_left_px, gradient_y - 30))
 
 
 # Main loop
