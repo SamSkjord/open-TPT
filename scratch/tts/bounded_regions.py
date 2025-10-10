@@ -28,7 +28,7 @@ MIN_TIRE_WIDTH = 6  # Minimum expected tire width in pixels
 MAX_TIRE_WIDTH = 28  # Maximum expected tire width in pixels
 TEMP_THRESHOLD_OFFSET = 2.0  # Degrees above average to consider "hot"
 TIRE_THIRDS = 3  # Divide tire into 3 vertical sections
-HISTORY_SIZE = 4  # Number of frames to average for stability
+HISTORY_SIZE = 3  # Number of frames to average for stability
 EDGE_GRADIENT_THRESHOLD = 1.5  # Temperature gradient for edge detection
 MAX_VALID_TEMP = (
     150.0  # Maximum valid temperature - anything above this is ignored (brake rotors)
@@ -88,7 +88,7 @@ tiny_font = pygame.font.Font(None, 30)
 # ---- Init MLX90640 ----
 i2c = busio.I2C(board.SCL, board.SDA)
 mlx = adafruit_mlx90640.MLX90640(i2c)
-mlx.refresh_rate = adafruit_mlx90640.RefreshRate.REFRESH_2_HZ
+mlx.refresh_rate = adafruit_mlx90640.RefreshRate.REFRESH_4_HZ
 print("MLX90640 serial:", [hex(i) for i in mlx.serial_number])
 mlx90614 = adafruit_mlx90614.MLX90614(i2c)
 
@@ -131,60 +131,44 @@ def detect_tire_boundaries_improved(middle_frame, threshold_offset):
         end_idx = start_idx + SENSOR_WIDTH
         rows.append(middle_frame[start_idx:end_idx])
 
-    # Filter out extremely hot pixels (brake rotors)
-    filtered_rows = []
-    rotor_detected = False
-    for row in rows:
-        filtered_row = []
-        for temp in row:
-            if temp > MAX_VALID_TEMP:
-                filtered_row.append(MINTEMP)  # Replace with cold temp
-                rotor_detected = True
-            else:
-                filtered_row.append(temp)
-        filtered_rows.append(filtered_row)
+    rows_np = np.array(rows, dtype=np.float32)
 
-    # Use filtered data for detection
-    rows = filtered_rows
+    # Filter out extremely hot pixels (brake rotors)
+    rotor_mask = rows_np > MAX_VALID_TEMP
+    rotor_detected = bool(np.any(rotor_mask))
+    if rotor_detected:
+        rows_np = np.where(rotor_mask, MINTEMP, rows_np)
 
     # Method 1: Temperature threshold detection
-    avg_temp = sum(sum(row) for row in rows) / (len(rows) * SENSOR_WIDTH)
+    avg_temp = float(rows_np.mean())
     threshold_temp = avg_temp + threshold_offset
+
+    hot_mask = rows_np > threshold_temp
+    col_hot_counts = hot_mask.sum(axis=0)
 
     # Method 2: Temperature gradient detection
     gradient_boundaries = []
-    for row in rows:
-        gradients = compute_temperature_gradient(row)
-        if gradients:
-            max_gradient = max(gradients)
-            if max_gradient > EDGE_GRADIENT_THRESHOLD:
-                # Find steepest rising and falling edges
-                left_edge = None
-                right_edge = None
-                for i, g in enumerate(gradients):
-                    if g > EDGE_GRADIENT_THRESHOLD * 0.7:
-                        if left_edge is None and row[i + 1] > row[i]:
-                            left_edge = i
-                        elif left_edge is not None and row[i + 1] < row[i]:
-                            right_edge = i + 1
-                if left_edge is not None and right_edge is not None:
-                    gradient_boundaries.append((left_edge, right_edge))
+    for row in rows_np:
+        gradients = np.abs(np.diff(row))
+        if gradients.size == 0:
+            continue
+        max_gradient = float(np.max(gradients))
+        if max_gradient > EDGE_GRADIENT_THRESHOLD:
+            left_edge = None
+            right_edge = None
+            for i, g in enumerate(gradients):
+                if g > EDGE_GRADIENT_THRESHOLD * 0.7:
+                    if left_edge is None and row[i + 1] > row[i]:
+                        left_edge = i
+                    elif left_edge is not None and row[i + 1] < row[i]:
+                        right_edge = i + 1
+            if left_edge is not None and right_edge is not None:
+                gradient_boundaries.append((left_edge, right_edge))
 
     # Simple threshold-based detection with filtered data
-    hot_pixels_per_row = []
-    for row in rows:
-        hot_pixels = []
-        for col, temp in enumerate(row):
-            if temp > threshold_temp:
-                hot_pixels.append(col)
-        hot_pixels_per_row.append(hot_pixels)
+    hot_columns = np.where(col_hot_counts > 0)[0].tolist()
 
-    # Find continuous regions
-    all_hot_pixels = []
-    for hot_pixels in hot_pixels_per_row:
-        all_hot_pixels.extend(hot_pixels)
-
-    if not all_hot_pixels and not gradient_boundaries:
+    if not hot_columns and not gradient_boundaries:
         # Fallback to center position
         fallback_width = 16
         fallback_start = (SENSOR_WIDTH - fallback_width) // 2
@@ -204,19 +188,13 @@ def detect_tire_boundaries_improved(middle_frame, threshold_offset):
 
         # Trim from the left
         while refined_left <= refined_right:
-            hot_rows = sum(
-                1 for row in rows if row[refined_left] > threshold_temp
-            )
-            if hot_rows >= min_hot_rows:
+            if col_hot_counts[refined_left] >= min_hot_rows:
                 break
             refined_left += 1
 
         # Trim from the right
         while refined_right >= refined_left:
-            hot_rows = sum(
-                1 for row in rows if row[refined_right] > threshold_temp
-            )
-            if hot_rows >= min_hot_rows:
+            if col_hot_counts[refined_right] >= min_hot_rows:
                 break
             refined_right -= 1
 
@@ -243,9 +221,9 @@ def detect_tire_boundaries_improved(middle_frame, threshold_offset):
     candidates = []
 
     # From threshold method
-    if all_hot_pixels:
-        left_boundary = min(all_hot_pixels)
-        right_boundary = max(all_hot_pixels)
+    if hot_columns:
+        left_boundary = hot_columns[0]
+        right_boundary = hot_columns[-1]
         candidates.append((left_boundary, right_boundary + 1, "threshold"))
 
     # From gradient method
@@ -297,7 +275,9 @@ def detect_tire_boundaries_improved(middle_frame, threshold_offset):
             right = min(SENSOR_WIDTH, left + MAX_TIRE_WIDTH)
         if rotor_detected:
             method += "+rotor_filtered"
-        refined_left, refined_right, method = refine_tire_edges(left, right, method + "_adjusted")
+        refined_left, refined_right, method = refine_tire_edges(
+            left, right, method + "_adjusted"
+        )
         return refined_left, refined_right, True, method
 
     # Ultimate fallback
@@ -533,9 +513,7 @@ def draw_enhanced_visualization(
             temp_text = f"{temps['avg']:.1f}°C"
             temp_label = font.render(temp_text, True, (255, 255, 255))
             temp_x = int(round(box_start + (box_w - temp_label.get_width()) / 2))
-            temp_y = int(
-                round(y_offset + box_height / 2 - temp_label.get_height() / 2)
-            )
+            temp_y = int(round(y_offset + box_height / 2 - temp_label.get_height() / 2))
 
             # Temperature background
             temp_bg = pygame.Surface(
@@ -550,7 +528,9 @@ def draw_enhanced_visualization(
             if debug_mode:
                 minmax_text = f"({temps['min']:.1f}-{temps['max']:.1f})"
                 minmax_label = tiny_font.render(minmax_text, True, (200, 200, 200))
-                minmax_x = int(round(box_start + (box_w - minmax_label.get_width()) / 2))
+                minmax_x = int(
+                    round(box_start + (box_w - minmax_label.get_width()) / 2)
+                )
                 minmax_y = temp_y + temp_label.get_height() + 5
 
                 # Only draw if there's enough space
