@@ -5,7 +5,6 @@ from PIL import Image
 import board
 import busio
 import adafruit_mlx90640
-import adafruit_mlx90614
 import numpy as np
 from collections import deque
 
@@ -90,7 +89,6 @@ i2c = busio.I2C(board.SCL, board.SDA)
 mlx = adafruit_mlx90640.MLX90640(i2c)
 mlx.refresh_rate = adafruit_mlx90640.RefreshRate.REFRESH_4_HZ
 print("MLX90640 serial:", [hex(i) for i in mlx.serial_number])
-mlx90614 = adafruit_mlx90614.MLX90614(i2c)
 
 frame = [0] * 768
 debug_mode = False
