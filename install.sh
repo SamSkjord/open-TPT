@@ -74,7 +74,7 @@ echo -e "\n==== Installing Python dependencies ===="
 PYTHON_DEPS=(
   "numpy>=1.22.0,<2.3.0"
   "pillow>=9.0.0"
-  "adafruit-circuitpython-neokey>=1.2.0"
+  "adafruit-circuitpython-neokey>=1.1.7"
   "adafruit-circuitpython-tca9548a>=1.3.0"
   "adafruit-circuitpython-ads1x15>=2.2.0"
   "adafruit-circuitpython-mlx90640>=1.2.0"
