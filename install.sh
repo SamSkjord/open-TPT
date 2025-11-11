@@ -30,7 +30,9 @@ sudo apt install -y \
   libgl1-mesa-dev libglu1-mesa-dev libgles2-mesa-dev libegl1-mesa-dev libglvnd-dev
 
 echo -e "\n==== Upgrading pip tooling ===="
-"${PIP_CMD[@]}" install --break-system-packages --upgrade pip setuptools wheel
+if ! "${PIP_CMD[@]}" install --break-system-packages --upgrade pip setuptools wheel; then
+  echo "pip upgrade failed (likely due to Debian-managed pip). Continuing with system pip..."
+fi
 
 # Build SDL2 from release-2.28.5 with KMSDRM
 echo -e "\n==== Building SDL2 from source ===="
