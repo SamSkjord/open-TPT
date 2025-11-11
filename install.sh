@@ -5,6 +5,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 PYTHON_BIN="/usr/bin/python3"
 PIP_CMD=(sudo "$PYTHON_BIN" -m pip)
+# Allow pip to bypass Debian-managed guards when we really want system installs
+export PIP_BREAK_SYSTEM_PACKAGES=1
+export PIP_ROOT_USER_ACTION=ignore
+
+TARGET_USER=${SUDO_USER:-$(whoami)}
+TARGET_HOME=$(eval echo "~$TARGET_USER")
 
 echo "==== openTPT Installation Script ===="
 echo "This script will install all dependencies and set up openTPT to run on boot"
@@ -71,11 +77,20 @@ sudo make install
 sudo ldconfig
 
 echo -e "\n==== Installing Python dependencies ===="
+# Ensure no user-local pygame copies shadow the system install
+echo -e "\n==== Removing user-local pygame builds ===="
+if [[ -d "$TARGET_HOME/.local/lib" ]]; then
+  sudo -u "$TARGET_USER" "$PYTHON_BIN" -m pip uninstall -y pygame pygame-ce >/dev/null 2>&1 || true
+  while IFS= read -r sp_dir; do
+    sudo -u "$TARGET_USER" rm -rf "$sp_dir"/pygame "$sp_dir"/pygame-* "$sp_dir"/pygame_ce "$sp_dir"/pygame_ce-*
+  done < <(find "$TARGET_HOME/.local/lib" -maxdepth 3 -type d -name 'site-packages' 2>/dev/null)
+fi
+
 PYTHON_DEPS=(
   "numpy>=1.22.0,<2.3.0"
   "pillow>=9.0.0"
   "adafruit-circuitpython-neokey>=1.1.7"
-  "adafruit-circuitpython-tca9548a>=1.3.0"
+  "adafruit-circuitpython-tca9548a>=0.8.3"
   "adafruit-circuitpython-ads1x15>=2.2.0"
   "adafruit-circuitpython-mlx90640>=1.2.0"
   "tpms==2.0.1"
