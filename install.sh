@@ -1,5 +1,10 @@
 #!/bin/bash
-set -e
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+PYTHON_BIN="/usr/bin/python3"
+PIP_CMD=(sudo "$PYTHON_BIN" -m pip)
 
 echo "==== openTPT Installation Script ===="
 echo "This script will install all dependencies and set up openTPT to run on boot"
@@ -10,13 +15,22 @@ echo -e "\n==== Updating system packages ===="
 sudo apt update
 sudo apt upgrade -y
 
-# Install dependencies for SDL2, SDL_ttf, SDL_image
+# Install dependencies for SDL2, SDL_ttf, SDL_image, pygame
 echo -e "\n==== Installing build dependencies ===="
 sudo apt install -y \
-  libdrm-dev libgbm-dev libudev-dev libevdev-dev libasound2-dev libpulse-dev \
-  libwayland-dev libxkbcommon-dev libfreetype6-dev libharfbuzz-dev \
+  build-essential cmake ninja-build git pkg-config \
+  python3-dev python3-pip python3-venv \
+  libdrm-dev libgbm-dev libudev-dev libevdev-dev \
+  libasound2-dev libpulse-dev \
+  libwayland-dev libxkbcommon-dev \
+  libfreetype6-dev libharfbuzz-dev \
   libpng-dev libjpeg-dev libtiff-dev libwebp-dev zlib1g-dev \
-  cmake ninja-build build-essential python3-dev git
+  libx11-dev libxext-dev libxi-dev libxrandr-dev libxcursor-dev libxinerama-dev \
+  libxrender-dev libxfixes-dev libsm-dev libice-dev \
+  libgl1-mesa-dev libglu1-mesa-dev libgles2-mesa-dev libegl1-mesa-dev libglvnd-dev
+
+echo -e "\n==== Upgrading pip tooling ===="
+"${PIP_CMD[@]}" install --break-system-packages --upgrade pip setuptools wheel
 
 # Build SDL2 from release-2.28.5 with KMSDRM
 echo -e "\n==== Building SDL2 from source ===="
@@ -54,37 +68,35 @@ make -j$(nproc)
 sudo make install
 sudo ldconfig
 
-# Install numpy
-#echo -e "\n==== Installing Python dependencies ===="
-#sudo /usr/bin/python3 -m pip install numpy --break-system-packages
-
 echo -e "\n==== Installing Python dependencies ===="
-sudo /usr/bin/python3 -m pip install \
-  numpy>=1.22.0 \
-  pillow>=9.0.0 \
-  adafruit-circuitpython-neokey>=1.2.0 \
-  adafruit-circuitpython-tca9548a>=1.3.0 \
-  adafruit-circuitpython-ads1x15>=2.2.0 \
-  adafruit-circuitpython-mlx90640>=1.2.0 \
-  tpms==2.0.1 \
-  pytest>=7.0.0 \
-  --break-system-packages
-
-sudo /usr/bin/python3 -m pip install opencv-python --break-system-packages
+PYTHON_DEPS=(
+  "numpy>=1.22.0,<2.3.0"
+  "pillow>=9.0.0"
+  "adafruit-circuitpython-neokey>=1.2.0"
+  "adafruit-circuitpython-tca9548a>=1.3.0"
+  "adafruit-circuitpython-ads1x15>=2.2.0"
+  "adafruit-circuitpython-mlx90640>=1.2.0"
+  "tpms==2.0.1"
+  "pytest>=7.0.0"
+  "opencv-python"
+  "matplotlib>=3.8.0"
+  "pandas-stubs>=2.1.0"
+)
+"${PIP_CMD[@]}" install --break-system-packages "${PYTHON_DEPS[@]}"
 
 # Rebuild pygame to link with system SDL, SDL_image, SDL_ttf
 echo -e "\n==== Rebuilding pygame from source ===="
-sudo /usr/bin/python3 -m pip uninstall -y pygame || true
-sudo /usr/bin/python3 -m pip install pygame --no-binary :all: --break-system-packages
+"${PIP_CMD[@]}" uninstall -y pygame || true
+"${PIP_CMD[@]}" install --break-system-packages --no-binary :all: pygame
 
 # Verify SDL version from pygame
 echo -e "\n==== Verifying pygame SDL linkage ===="
-python3 -c "import pygame; print('Pygame SDL version:', pygame.get_sdl_version())"
+"$PYTHON_BIN" -c "import pygame; print('Pygame SDL version:', pygame.get_sdl_version())"
 
 # Copy systemd service file and enable
 echo -e "\n==== Enabling openTPT systemd service ===="
-CURRENT_DIR=$(pwd)
-sudo cp $CURRENT_DIR/openTPT.service /etc/systemd/system/
+cd "$SCRIPT_DIR"
+sudo cp "$SCRIPT_DIR/openTPT.service" /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable openTPT.service
 
