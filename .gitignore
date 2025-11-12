@@ -3,3 +3,4 @@
 /gui/__pycache__
 /hardware/__pycache__
 /utils/__pycache__
+*.pyc
