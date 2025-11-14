@@ -20,10 +20,25 @@ from gui.input import InputHandler
 from gui.scale_bars import ScaleBars
 from gui.icon_handler import IconHandler
 
-# Import hardware modules
-from hardware.tpms_input import TPMSHandler
-from hardware.ir_brakes import BrakeTemperatureHandler
-from hardware.mlx_handler import MLXHandler
+# Import optimised hardware modules (with fallback to original)
+try:
+    from hardware.tpms_input_optimized import TPMSHandler
+    from hardware.ir_brakes_optimized import BrakeTemperatureHandler
+    from hardware.mlx_handler_optimized import MLXHandler
+    print("Using optimised hardware handlers with bounded queues")
+except ImportError as e:
+    print(f"Warning: Could not load optimised handlers ({e}), using original")
+    from hardware.tpms_input import TPMSHandler
+    from hardware.ir_brakes import BrakeTemperatureHandler
+    from hardware.mlx_handler import MLXHandler
+
+# Import radar handler (optional)
+try:
+    from hardware.radar_handler import RadarHandler
+    RADAR_AVAILABLE = True
+except ImportError:
+    RADAR_AVAILABLE = False
+    RadarHandler = None
 
 # Import configuration
 from utils.config import (
@@ -47,7 +62,24 @@ from utils.config import (
     BRAKE_TEMP_OPTIMAL_RANGE,
     BRAKE_TEMP_HOT,
     BUTTON_RESERVED,
+    # Radar configuration
+    RADAR_ENABLED,
+    RADAR_CHANNEL,
+    CAR_CHANNEL,
+    RADAR_INTERFACE,
+    RADAR_BITRATE,
+    RADAR_DBC,
+    CONTROL_DBC,
+    RADAR_TRACK_TIMEOUT,
 )
+
+# Import performance monitoring
+try:
+    from utils.performance import get_global_monitor
+    PERFORMANCE_MONITORING = True
+except ImportError:
+    PERFORMANCE_MONITORING = False
+    print("Warning: Performance monitoring not available")
 
 
 # Unit conversion functions
@@ -101,6 +133,11 @@ class OpenTPT:
         self.ui_fade_alpha = 255  # 255 = fully visible, 0 = invisible
         self.ui_fading = False
 
+        # Performance monitoring
+        self.perf_monitor = get_global_monitor() if PERFORMANCE_MONITORING else None
+        self.perf_summary_interval = 10.0  # Print summary every 10 seconds
+        self.last_perf_summary = time.time()
+
         print("Starting openTPT...")
 
         # Initialize pygame and display
@@ -137,14 +174,43 @@ class OpenTPT:
         # Set up GUI components
         # self.Template = Template(self.screen)
         self.display = Display(self.screen)
-        self.camera = Camera(self.screen)
-        self.input_handler = InputHandler(self.camera)
+
+        # Note: Camera and radar will be initialised in _init_subsystems
+        # to ensure proper ordering
+        self.camera = None
+        self.radar = None
+        self.input_handler = None
 
         self.scale_bars = ScaleBars(self.screen)
         self.icon_handler = IconHandler(self.screen)
 
     def _init_subsystems(self):
-        """Initialize the hardware subsystems."""
+        """Initialise the hardware subsystems."""
+        # Initialise radar handler (optional)
+        if RADAR_ENABLED and RADAR_AVAILABLE and RadarHandler:
+            try:
+                self.radar = RadarHandler(
+                    radar_channel=RADAR_CHANNEL,
+                    car_channel=CAR_CHANNEL,
+                    interface=RADAR_INTERFACE,
+                    bitrate=RADAR_BITRATE,
+                    radar_dbc=RADAR_DBC,
+                    control_dbc=CONTROL_DBC,
+                    track_timeout=RADAR_TRACK_TIMEOUT,
+                    enabled=True,
+                )
+                self.radar.start()
+                print("Radar overlay enabled")
+            except Exception as e:
+                print(f"Warning: Could not initialise radar: {e}")
+                self.radar = None
+
+        # Initialise camera (with optional radar)
+        self.camera = Camera(self.screen, radar_handler=self.radar)
+
+        # Initialise input handler
+        self.input_handler = InputHandler(self.camera)
+
         # Create hardware handlers
         self.tpms = TPMSHandler()
         self.brakes = BrakeTemperatureHandler()
@@ -167,14 +233,23 @@ class OpenTPT:
                 # Update hardware (camera frame, input states, etc.)
                 self._update_hardware()
 
-                # Render the screen
+                # Render the screen (with performance monitoring)
+                if self.perf_monitor:
+                    self.perf_monitor.start_render()
+
                 self._render()
+
+                if self.perf_monitor:
+                    self.perf_monitor.end_render()
 
                 # Maintain frame rate
                 self.clock.tick(FPS_TARGET)
 
                 # Calculate FPS
                 self._calculate_fps()
+
+                # Update performance metrics
+                self._update_performance_metrics()
 
                 # Ensure mouse cursor stays hidden (some systems may reset it)
                 if pygame.mouse.get_visible():
@@ -273,7 +348,13 @@ class OpenTPT:
             self.camera.update()
 
     def _render(self):
-        """Render the display."""
+        """
+        Render the display.
+
+        PERFORMANCE CRITICAL PATH - NO BLOCKING OPERATIONS.
+        All data access is lock-free via bounded queue snapshots.
+        Target: ≤ 12 ms/frame (from system plan)
+        """
         # Clear the screen
         self.screen.fill((0, 0, 0))
 
@@ -284,36 +365,42 @@ class OpenTPT:
             # Otherwise render the normal view
             self._update_ui_visibility()
 
-            # Get brake temperatures
+            # Get brake temperatures (LOCK-FREE snapshot access)
             brake_temps = self.brakes.get_temps()
             for position, data in brake_temps.items():
-                self.display.draw_brake_temp(position, data["temp"])
+                temp = data.get("temp", None) if isinstance(data, dict) else data
+                self.display.draw_brake_temp(position, temp)
 
-            # Get thermal camera data - always draw, let display method handle None
+            # Get thermal camera data (LOCK-FREE snapshot access)
+            # Always draw, let display method handle None
             for position in ["FL", "FR", "RL", "RR"]:
                 thermal_data = self.thermal.get_thermal_data(position)
                 self.display.draw_thermal_image(position, thermal_data)
 
             self.display.surface.blit(self.display.overlay_mask, (0, 0))
 
-            # Get TPMS data
+            # Get TPMS data (LOCK-FREE snapshot access)
             tpms_data = self.tpms.get_data()
             for position, data in tpms_data.items():
                 # Convert pressure from kPa to the configured unit
                 pressure_display = None
-                if data["pressure"] is not None:
+                if data.get("pressure") is not None:
+                    pressure = data["pressure"]
                     if PRESSURE_UNIT == "PSI":
-                        pressure_display = kpa_to_psi(data["pressure"])
+                        pressure_display = kpa_to_psi(pressure)
                     elif PRESSURE_UNIT == "BAR":
-                        pressure_display = data["pressure"] / 100.0  # kPa to bar
+                        pressure_display = pressure / 100.0  # kPa to bar
                     elif PRESSURE_UNIT == "KPA":
-                        pressure_display = data["pressure"]  # Already in kPa
+                        pressure_display = pressure  # Already in kPa
                     else:
                         # Default to PSI if unknown unit
-                        pressure_display = kpa_to_psi(data["pressure"])
+                        pressure_display = kpa_to_psi(pressure)
 
                 self.display.draw_pressure_temp(
-                    position, pressure_display, data["temp"], data["status"]
+                    position,
+                    pressure_display,
+                    data.get("temp"),
+                    data.get("status", "N/A")
                 )
 
             # Render debug info (FPS only)
@@ -365,6 +452,23 @@ class OpenTPT:
             self.frame_count = 0
             self.last_time = current_time
 
+    def _update_performance_metrics(self):
+        """Update and optionally print performance metrics."""
+        if not self.perf_monitor:
+            return
+
+        current_time = time.time()
+
+        # Update hardware update rates
+        self.perf_monitor.update_hardware_rate("TPMS", self.tpms.get_update_rate())
+        self.perf_monitor.update_hardware_rate("Brakes", self.brakes.get_update_rate())
+        self.perf_monitor.update_hardware_rate("Thermal", self.thermal.get_update_rate())
+
+        # Print performance summary periodically
+        if current_time - self.last_perf_summary >= self.perf_summary_interval:
+            self.last_perf_summary = current_time
+            print("\n" + self.perf_monitor.get_performance_summary())
+
     def _cleanup(self):
         """Clean up resources before exiting."""
         print("Shutting down openTPT...")
@@ -378,8 +482,14 @@ class OpenTPT:
         self.brakes.stop()
         self.thermal.stop()
 
+        # Stop radar if enabled
+        if self.radar:
+            print("Stopping radar...")
+            self.radar.stop()
+
         # Close camera
-        self.camera.close()
+        if self.camera:
+            self.camera.close()
 
         # Quit pygame
         pygame.quit()

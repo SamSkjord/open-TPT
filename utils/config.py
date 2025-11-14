@@ -196,3 +196,39 @@ TPMS_POSITIONS = {
         "temp": (MLX_POSITIONS["RR"][0], MLX_POSITIONS["RR"][1] - int(10 * SCALE_Y)),
     },
 }
+
+# ==============================================================================
+# Radar Configuration (Optional)
+# ==============================================================================
+
+# Enable/disable radar overlay
+RADAR_ENABLED = False  # Set to True to enable radar overlay on camera
+
+# Toyota radar CAN configuration
+RADAR_CHANNEL = "can0"  # CAN channel for radar data
+CAR_CHANNEL = "can1"    # CAN channel for car keep-alive
+RADAR_INTERFACE = "socketcan"  # python-can interface
+RADAR_BITRATE = 500000  # CAN bitrate
+
+# DBC files for radar decoding
+RADAR_DBC = "opendbc/toyota_prius_2017_adas.dbc"
+CONTROL_DBC = "opendbc/toyota_prius_2017_pt_generated.dbc"
+
+# Radar tracking parameters
+RADAR_TRACK_TIMEOUT = 0.5  # Seconds before removing stale tracks
+RADAR_MAX_DISTANCE = 120.0  # Maximum distance to display (metres)
+
+# Radar overlay display settings
+RADAR_CAMERA_FOV = 106.0  # Camera horizontal field of view (degrees)
+RADAR_TRACK_COUNT = 3  # Number of nearest tracks to display
+RADAR_MERGE_RADIUS = 1.0  # Merge tracks within this radius (metres)
+
+# Warning thresholds
+RADAR_WARN_YELLOW_KPH = 10.0  # Speed delta for yellow warning
+RADAR_WARN_RED_KPH = 20.0  # Speed delta for red warning
+
+# Overtake warning settings
+RADAR_OVERTAKE_TIME_THRESHOLD = 1.0  # Time-to-overtake threshold (seconds)
+RADAR_OVERTAKE_MIN_CLOSING_KPH = 5.0  # Minimum closing speed (km/h)
+RADAR_OVERTAKE_MIN_LATERAL = 0.5  # Minimum lateral offset (metres)
+RADAR_OVERTAKE_ARROW_DURATION = 1.0  # Duration to show arrow (seconds)

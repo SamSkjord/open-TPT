@@ -1,0 +1,36 @@
+# openTPT Requirements
+# Core dependencies for Raspberry Pi operation
+
+# Display and GUI
+pygame>=2.0.0
+
+# Hardware interfaces
+adafruit-blinka>=8.0.0
+adafruit-circuitpython-mlx90640>=1.2.0
+adafruit-circuitpython-ads1x15>=2.2.0
+adafruit-circuitpython-tca9548a>=0.7.0
+adafruit-circuitpython-seesaw>=1.12.0
+adafruit-circuitpython-neopixel>=6.3.0
+
+# Numerical computing
+numpy>=1.19.0
+
+# Performance optimizations (optional but recommended)
+numba>=0.56.0  # JIT compiler for thermal zone processing
+
+# Computer vision (for camera)
+opencv-python>=4.5.0
+
+# CAN bus support (for future radar/OBD modules)
+python-can>=4.0.0
+
+# GPS support (for future lap timing)
+# pynmea2>=1.18.0
+# pyserial>=3.5
+
+# Data logging (for future telemetry logging)
+# pyarrow>=10.0.0  # For Parquet export
+
+# Testing and development
+# pytest>=7.0.0
+# pytest-cov>=4.0.0
