@@ -148,7 +148,12 @@ BRAKE_POSITIONS = {
     "RR": scale_position((420, 344)),
 }
 
-# MLX90640 thermal camera settings
+# Tyre Temperature Sensor Configuration
+# Choose between Pico I2C slaves (with MLX90640) or simple MLX90614 sensors
+USE_MLX90614_SENSORS = False  # Set to True to use MLX90614 instead of Pico slaves
+
+# MLX90640 thermal camera settings (24x32 pixels)
+# Used by Pico I2C slaves for full thermal imaging
 MLX_WIDTH = 32
 MLX_HEIGHT = 24
 MLX_POSITIONS = {
@@ -161,6 +166,16 @@ MLX_DISPLAY_WIDTH = int(
     150 * SCALE_X
 )  # Width of displayed heatmap - to cover the complete tyre width
 MLX_DISPLAY_HEIGHT = int(172 * SCALE_Y)  # Height of displayed heatmap
+
+# MLX90614 single-point IR sensor settings (alternative to Pico slaves)
+# Maps tyre corner positions to I2C multiplexer channels
+# Only used when USE_MLX90614_SENSORS = True
+MLX90614_MUX_CHANNELS = {
+    "FL": 0,  # Front Left on channel 0
+    "FR": 1,  # Front Right on channel 1
+    "RL": 2,  # Rear Left on channel 2
+    "RR": 3,  # Rear Right on channel 3
+}
 
 
 # TPMS positions dynamically calculated based on MLX positions

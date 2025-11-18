@@ -24,13 +24,11 @@ from gui.icon_handler import IconHandler
 try:
     from hardware.tpms_input_optimized import TPMSHandler
     from hardware.ir_brakes_optimized import BrakeTemperatureHandler
-    from hardware.mlx_handler_optimized import MLXHandler
-    print("Using optimised hardware handlers with bounded queues")
+    print("Using optimised TPMS and brake handlers with bounded queues")
 except ImportError as e:
     print(f"Warning: Could not load optimised handlers ({e}), using original")
     from hardware.tpms_input import TPMSHandler
     from hardware.ir_brakes import BrakeTemperatureHandler
-    from hardware.mlx_handler import MLXHandler
 
 # Import radar handler (optional)
 try:
@@ -71,7 +69,24 @@ from utils.config import (
     RADAR_DBC,
     CONTROL_DBC,
     RADAR_TRACK_TIMEOUT,
+    # Tyre sensor configuration
+    USE_MLX90614_SENSORS,
 )
+
+# Import tyre temperature handler based on config
+if USE_MLX90614_SENSORS:
+    # Use simple MLX90614 single-point IR sensors
+    from hardware.mlx90614_handler import MLX90614Handler as TyreHandler
+    print("Using MLX90614 single-point IR temperature sensors (config: USE_MLX90614_SENSORS=True)")
+else:
+    # Use Pico I2C slaves with MLX90640 thermal imaging (default)
+    try:
+        from hardware.pico_tyre_handler_optimized import PicoTyreHandlerOptimised as TyreHandler
+        print("Using optimised Pico I2C slave tyre handler with bounded queues")
+    except ImportError as e:
+        print(f"Warning: Could not load optimised Pico handler ({e}), trying standard version")
+        from hardware.pico_tyre_handler import PicoTyreHandler as TyreHandler
+        print("Using standard Pico I2C slave tyre handler")
 
 # Import performance monitoring
 try:
@@ -214,7 +229,7 @@ class OpenTPT:
         # Create hardware handlers
         self.tpms = TPMSHandler()
         self.brakes = BrakeTemperatureHandler()
-        self.thermal = MLXHandler()
+        self.thermal = TyreHandler()  # Reads from Pico I2C slaves instead of direct MLX90640
 
         # Start monitoring threads
         self.tpms.start()
