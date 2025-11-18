@@ -1,0 +1,15 @@
+# Persistent CAN interface naming for dual Waveshare 2-CH CAN HAT+ stack
+#
+# This ensures CAN interfaces always have consistent names regardless of
+# kernel probe order, based on their physical SPI bus and chip select.
+#
+# Physical mapping:
+#   can_b1_0 = Board 1 (bottom), CAN_0 connector (spi1.1, GPIO22 interrupt)
+#   can_b1_1 = Board 1 (bottom), CAN_1 connector (spi1.2, GPIO13 interrupt)
+#   can_b2_0 = Board 2 (top),    CAN_0 connector (spi0.0, GPIO23 interrupt)
+#   can_b2_1 = Board 2 (top),    CAN_1 connector (spi0.1, GPIO25 interrupt) <- OBD-II
+
+SUBSYSTEM=="net", KERNELS=="spi1.1", NAME="can_b1_0"
+SUBSYSTEM=="net", KERNELS=="spi1.2", NAME="can_b1_1"
+SUBSYSTEM=="net", KERNELS=="spi0.0", NAME="can_b2_0"
+SUBSYSTEM=="net", KERNELS=="spi0.1", NAME="can_b2_1"

@@ -92,7 +92,9 @@ PYTHON_DEPS=(
   "adafruit-circuitpython-neokey>=1.1.7"
   "adafruit-circuitpython-tca9548a>=0.8.3"
   "adafruit-circuitpython-ads1x15>=2.2.0"
+  # Thermal sensors: MLX90640 for Pico slaves, MLX90614 for direct Pi reading
   "adafruit-circuitpython-mlx90640>=1.2.0"
+  "adafruit-circuitpython-mlx90614>=1.3.0"
   "tpms==2.0.1"
   "pytest>=7.0.0"
   "opencv-python"
@@ -109,6 +111,59 @@ echo -e "\n==== Rebuilding pygame from source ===="
 # Verify SDL version from pygame
 echo -e "\n==== Verifying pygame SDL linkage ===="
 "$PYTHON_BIN" -c "import pygame; print('Pygame SDL version:', pygame.get_sdl_version())"
+
+# Configure Dual CAN hardware overlays
+echo -e "\n==== Configuring Waveshare Dual CAN HAT overlays ===="
+BOOT_CONFIG=""
+if [[ -f /boot/firmware/config.txt ]]; then
+  BOOT_CONFIG="/boot/firmware/config.txt"
+elif [[ -f /boot/config.txt ]]; then
+  BOOT_CONFIG="/boot/config.txt"
+fi
+
+if [[ -z "$BOOT_CONFIG" ]]; then
+  echo "WARNING: Could not locate config.txt; skipping CAN overlay configuration."
+else
+  echo "Boot config file: $BOOT_CONFIG"
+  CAN_BLOCK_HEADER="# ==== openTPT Dual Waveshare 2-CH CAN HAT+ ===="
+  if sudo grep -Fq "$CAN_BLOCK_HEADER" "$BOOT_CONFIG"; then
+    echo "Dual Waveshare CAN block already present."
+  else
+    sudo tee -a "$BOOT_CONFIG" >/dev/null <<'EOF'
+
+# ==== openTPT Dual Waveshare 2-CH CAN HAT+ ====
+dtparam=i2c_arm=on
+dtparam=i2s=off        # Disabled to free GPIO19 for SPI1_MISO
+dtparam=spi=on
+dtoverlay=spi1-3cs
+dtoverlay=mcp2515,spi1-1,oscillator=16000000,interrupt=22  # Board 1, CAN_0 (GPIO22 IRQ)
+dtoverlay=mcp2515,spi1-2,oscillator=16000000,interrupt=13  # Board 1, CAN_1 (GPIO13 IRQ)
+dtoverlay=spi0-2cs
+dtoverlay=mcp2515,spi0-0,oscillator=16000000,interrupt=23  # Board 2, CAN_0 (GPIO23 IRQ)
+dtoverlay=mcp2515,spi0-1,oscillator=16000000,interrupt=25  # Board 2, CAN_1 (GPIO25 IRQ / OBD-II)
+# ==== end openTPT Dual Waveshare 2-CH CAN HAT+ ====
+EOF
+    echo "Appended Dual CAN block to $BOOT_CONFIG (reboot required)."
+  fi
+fi
+
+# Install persistent CAN naming rule
+echo -e "\n==== Installing persistent CAN interface naming rule ===="
+UDEV_RULE_SRC="$SCRIPT_DIR/config/can/80-can-persistent-names.rules"
+UDEV_RULE_DST="/etc/udev/rules.d/80-can-persistent-names.rules"
+
+if [[ -f "$UDEV_RULE_SRC" ]]; then
+  if sudo test -f "$UDEV_RULE_DST" && sudo cmp -s "$UDEV_RULE_SRC" "$UDEV_RULE_DST"; then
+    echo "Persistent CAN naming rule already up to date."
+  else
+    sudo install -m 0644 "$UDEV_RULE_SRC" "$UDEV_RULE_DST"
+    sudo udevadm control --reload-rules
+    sudo udevadm trigger -s net || true
+    echo "Installed persistent CAN naming rule (reboot recommended)."
+  fi
+else
+  echo "WARNING: Missing $UDEV_RULE_SRC; skipping persistent naming rule."
+fi
 
 # Copy systemd service file and enable
 echo -e "\n==== Enabling openTPT systemd service ===="

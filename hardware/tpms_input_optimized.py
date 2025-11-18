@@ -1,0 +1,303 @@
+"""
+Optimised TPMS Input Handler for openTPT.
+Uses bounded queues and lock-free snapshots per system plan.
+"""
+
+import time
+import sys
+import os
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from utils.hardware_base import BoundedQueueHardwareHandler
+
+# Import for actual TPMS hardware
+try:
+    from tpms_lib import TPMSDevice, TirePosition, TireState
+    TPMS_AVAILABLE = True
+except ImportError:
+    TPMS_AVAILABLE = False
+    print("Warning: TPMS library not available")
+
+
+class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
+    """
+    Optimised TPMS handler using bounded queues and callbacks.
+
+    Key optimisations:
+    - Lock-free data access for render path
+    - Bounded queue (depth=2) for double-buffering
+    - Callback-based updates (no polling)
+    - Pre-processed data ready for render
+    - No blocking in consumer path
+    """
+
+    def __init__(self, timeout_s: float = 30.0):
+        """
+        Initialise the optimised TPMS handler.
+
+        Args:
+            timeout_s: Data timeout in seconds
+        """
+        super().__init__(queue_depth=2)
+
+        self.timeout_s = timeout_s
+
+        # Hardware
+        self.tpms_device = None
+
+        # Position mapping (only set if TPMS available)
+        self.position_map = {}
+        if TPMS_AVAILABLE:
+            self.position_map = {
+                TirePosition.FRONT_LEFT: "FL",
+                TirePosition.FRONT_RIGHT: "FR",
+                TirePosition.REAR_LEFT: "RL",
+                TirePosition.REAR_RIGHT: "RR",
+            }
+
+        # Sensor data cache (used by callbacks)
+        self._sensor_cache = {
+            "FL": {
+                "pressure": None,
+                "temp": None,
+                "status": "N/A",
+                "last_update": 0,
+            },
+            "FR": {
+                "pressure": None,
+                "temp": None,
+                "status": "N/A",
+                "last_update": 0,
+            },
+            "RL": {
+                "pressure": None,
+                "temp": None,
+                "status": "N/A",
+                "last_update": 0,
+            },
+            "RR": {
+                "pressure": None,
+                "temp": None,
+                "status": "N/A",
+                "last_update": 0,
+            },
+        }
+
+        # Initialise TPMS device
+        self._initialise_device()
+
+    def _initialise_device(self) -> bool:
+        """Initialise the TPMS device and register callbacks."""
+        if not TPMS_AVAILABLE:
+            print("Warning: TPMS library not available")
+            return False
+
+        try:
+            # Initialise device
+            self.tpms_device = TPMSDevice()
+
+            # Register callbacks
+            self.tpms_device.register_tire_state_callback(self._on_tyre_state_update)
+            self.tpms_device.register_pairing_callback(self._on_pairing_complete)
+
+            # Set thresholds
+            self.tpms_device.set_high_pressure_threshold(310)  # 310 kPa
+            self.tpms_device.set_low_pressure_threshold(180)  # 180 kPa
+            self.tpms_device.set_high_temp_threshold(75)      # 75°C
+
+            # Connect to device
+            if self.tpms_device.connect():
+                print("TPMS device initialised and connected")
+                self.tpms_device.query_sensor_ids()
+                return True
+            else:
+                print("Failed to connect to TPMS device")
+                return False
+
+        except Exception as e:
+            print(f"Error initialising TPMS: {e}")
+            self.tpms_device = None
+            return False
+
+    def _on_tyre_state_update(self, position: 'TirePosition', state: 'TireState'):
+        """
+        Callback for tyre state updates (called by TPMS library).
+
+        Args:
+            position: TirePosition enum
+            state: TireState object
+        """
+        if not TPMS_AVAILABLE or position not in self.position_map:
+            return
+
+        pos_code = self.position_map[position]
+        current_time = time.time()
+
+        # Update cache (this is safe because callbacks are serialized by the library)
+        self._sensor_cache[pos_code]["pressure"] = state.air_pressure
+        self._sensor_cache[pos_code]["temp"] = state.temperature
+        self._sensor_cache[pos_code]["last_update"] = current_time
+
+        # Determine status
+        if state.no_signal:
+            self._sensor_cache[pos_code]["status"] = "NO_SIGNAL"
+        elif state.is_leaking:
+            self._sensor_cache[pos_code]["status"] = "LEAKING"
+        elif state.is_low_power:
+            self._sensor_cache[pos_code]["status"] = "LOW_BATTERY"
+        else:
+            self._sensor_cache[pos_code]["status"] = "OK"
+
+        # Trigger immediate snapshot publish
+        self._publish_current_state()
+
+    def _on_pairing_complete(self, position: 'TirePosition', tyre_id: str):
+        """Callback for pairing completion."""
+        if not TPMS_AVAILABLE or position not in self.position_map:
+            return
+
+        pos_code = self.position_map[position]
+        print(f"TPMS pairing complete for {pos_code}: ID {tyre_id}")
+
+    def _worker_loop(self):
+        """
+        Worker thread loop - monitors timeouts and publishes snapshots.
+        Actual data updates come via callbacks.
+        """
+        check_interval = 1.0  # Check for timeouts every second
+        last_check = 0
+
+        print("TPMS worker thread running")
+
+        while self.running:
+            current_time = time.time()
+
+            if current_time - last_check >= check_interval:
+                last_check = current_time
+                self._check_timeouts_and_publish()
+
+            time.sleep(0.1)
+
+    def _check_timeouts_and_publish(self):
+        """Check for stale data and publish current state."""
+        current_time = time.time()
+
+        # Check for timeouts
+        for position, data in self._sensor_cache.items():
+            if current_time - data["last_update"] > self.timeout_s:
+                if data["status"] != "TIMEOUT":
+                    data["status"] = "TIMEOUT"
+                    data["pressure"] = None
+                    data["temp"] = None
+
+        # Publish current state
+        self._publish_current_state()
+
+    def _publish_current_state(self):
+        """Publish current sensor data to queue."""
+        # Create immutable copy of data
+        data = {}
+        metadata = {
+            "timestamp": time.time(),
+            "sensors_ok": 0
+        }
+
+        for position, cache_data in self._sensor_cache.items():
+            data[position] = {
+                "pressure": cache_data["pressure"],
+                "temp": cache_data["temp"],
+                "status": cache_data["status"],
+            }
+            if cache_data["status"] == "OK":
+                metadata["sensors_ok"] += 1
+
+        # Publish to queue (lock-free)
+        self._publish_snapshot(data, metadata)
+
+    def get_data(self) -> dict:
+        """
+        Get TPMS data for all tyres (lock-free).
+
+        Returns:
+            Dictionary with tyre data for all positions
+        """
+        snapshot = self.get_snapshot()
+        if not snapshot:
+            return {
+                pos: {"pressure": None, "temp": None, "status": "N/A"}
+                for pos in ["FL", "FR", "RL", "RR"]
+            }
+
+        return snapshot.data
+
+    def get_tyre_data(self, position: str) -> dict:
+        """
+        Get TPMS data for a specific tyre (lock-free).
+
+        Args:
+            position: Tyre position
+
+        Returns:
+            Dictionary with tyre data or None
+        """
+        all_data = self.get_data()
+        return all_data.get(position, None)
+
+    def stop(self):
+        """Stop the handler and disconnect TPMS device."""
+        super().stop()
+        if self.tpms_device:
+            try:
+                self.tpms_device.disconnect()
+                print("TPMS device disconnected")
+            except Exception as e:
+                print(f"Error disconnecting TPMS: {e}")
+
+    # Pairing methods (passthrough to device)
+    def pair_sensor(self, position_code: str) -> bool:
+        """
+        Start pairing a sensor.
+
+        Args:
+            position_code: Position code ("FL", "FR", "RL", "RR")
+
+        Returns:
+            True if pairing started
+        """
+        if not TPMS_AVAILABLE or not self.tpms_device or not self.running:
+            return False
+
+        try:
+            reverse_map = {
+                "FL": TirePosition.FRONT_LEFT,
+                "FR": TirePosition.FRONT_RIGHT,
+                "RL": TirePosition.REAR_LEFT,
+                "RR": TirePosition.REAR_RIGHT,
+            }
+
+            if position_code not in reverse_map:
+                return False
+
+            return self.tpms_device.pair_sensor(reverse_map[position_code])
+        except Exception as e:
+            print(f"Error pairing sensor: {e}")
+            return False
+
+    def stop_pairing(self) -> bool:
+        """Stop the pairing process."""
+        if not self.tpms_device or not self.running:
+            return False
+
+        try:
+            return self.tpms_device.stop_pairing()
+        except Exception as e:
+            print(f"Error stopping pairing: {e}")
+            return False
+
+
+# Backwards compatibility wrapper
+class TPMSHandler(TPMSHandlerOptimised):
+    """Backwards compatible wrapper for TPMSHandlerOptimised."""
+    pass

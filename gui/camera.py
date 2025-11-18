@@ -26,20 +26,37 @@ except ImportError:
 
 
 class Camera:
-    """Camera handler for rear-view display."""
+    """Camera handler for rear-view display with optional radar overlay."""
 
-    def __init__(self, surface):
+    def __init__(self, surface, radar_handler=None):
         """
-        Initialize the camera handler.
+        Initialise the camera handler.
 
         Args:
             surface: The pygame surface to draw on
+            radar_handler: Optional radar handler for overlay
         """
         self.surface = surface
         self.camera = None
         self.active = False
         self.error_message = None
         self.frame = None
+
+        # Radar integration
+        self.radar_handler = radar_handler
+        self.radar_overlay = None
+        if radar_handler and radar_handler.is_enabled():
+            try:
+                from gui.radar_overlay import RadarOverlayRenderer
+                self.radar_overlay = RadarOverlayRenderer(
+                    display_width=DISPLAY_WIDTH,
+                    display_height=DISPLAY_HEIGHT,
+                    camera_fov=106.0,  # Adjust based on your camera
+                    mirror_output=True,  # Match camera mirroring
+                )
+                print("Radar overlay enabled")
+            except ImportError as e:
+                print(f"Warning: Could not load radar overlay: {e}")
 
         # Threading related attributes
         self.frame_queue = queue.Queue(maxsize=2)  # Small queue for maximum performance
@@ -51,7 +68,7 @@ class Camera:
         self.camera_height = CAMERA_HEIGHT
         self.camera_fps = CAMERA_FPS
 
-        # Direct rendering optimization
+        # Direct rendering optimisation
         self.direct_buffer = None
         self.display_array = None
 
@@ -266,7 +283,7 @@ class Camera:
         self.frame = frame
 
     def render(self):
-        """Render the camera feed using direct pixel manipulation for maximum speed."""
+        """Render the camera feed with optional radar overlay."""
         if not self.active or self.frame is None:
             if self.error_message:
                 font = pygame.font.SysFont(None, 24)
@@ -324,6 +341,12 @@ class Camera:
             # Release the pixel array to update the display
             del self.display_array
             self.display_array = None
+
+            # Render radar overlay if enabled
+            if self.radar_overlay and self.radar_handler:
+                tracks = self.radar_handler.get_tracks()
+                if tracks:
+                    self.radar_overlay.render(self.surface, tracks)
 
             return True
 

@@ -148,7 +148,12 @@ BRAKE_POSITIONS = {
     "RR": scale_position((420, 344)),
 }
 
-# MLX90640 thermal camera settings
+# Tyre Temperature Sensor Configuration
+# Choose between Pico I2C slaves (with MLX90640) or simple MLX90614 sensors
+USE_MLX90614_SENSORS = False  # Set to True to use MLX90614 instead of Pico slaves
+
+# MLX90640 thermal camera settings (24x32 pixels)
+# Used by Pico I2C slaves for full thermal imaging
 MLX_WIDTH = 32
 MLX_HEIGHT = 24
 MLX_POSITIONS = {
@@ -161,6 +166,16 @@ MLX_DISPLAY_WIDTH = int(
     150 * SCALE_X
 )  # Width of displayed heatmap - to cover the complete tyre width
 MLX_DISPLAY_HEIGHT = int(172 * SCALE_Y)  # Height of displayed heatmap
+
+# MLX90614 single-point IR sensor settings (alternative to Pico slaves)
+# Maps tyre corner positions to I2C multiplexer channels
+# Only used when USE_MLX90614_SENSORS = True
+MLX90614_MUX_CHANNELS = {
+    "FL": 0,  # Front Left on channel 0
+    "FR": 1,  # Front Right on channel 1
+    "RL": 2,  # Rear Left on channel 2
+    "RR": 3,  # Rear Right on channel 3
+}
 
 
 # TPMS positions dynamically calculated based on MLX positions
@@ -196,3 +211,39 @@ TPMS_POSITIONS = {
         "temp": (MLX_POSITIONS["RR"][0], MLX_POSITIONS["RR"][1] - int(10 * SCALE_Y)),
     },
 }
+
+# ==============================================================================
+# Radar Configuration (Optional)
+# ==============================================================================
+
+# Enable/disable radar overlay
+RADAR_ENABLED = False  # Set to True to enable radar overlay on camera
+
+# Toyota radar CAN configuration
+RADAR_CHANNEL = "can0"  # CAN channel for radar data
+CAR_CHANNEL = "can1"    # CAN channel for car keep-alive
+RADAR_INTERFACE = "socketcan"  # python-can interface
+RADAR_BITRATE = 500000  # CAN bitrate
+
+# DBC files for radar decoding
+RADAR_DBC = "opendbc/toyota_prius_2017_adas.dbc"
+CONTROL_DBC = "opendbc/toyota_prius_2017_pt_generated.dbc"
+
+# Radar tracking parameters
+RADAR_TRACK_TIMEOUT = 0.5  # Seconds before removing stale tracks
+RADAR_MAX_DISTANCE = 120.0  # Maximum distance to display (metres)
+
+# Radar overlay display settings
+RADAR_CAMERA_FOV = 106.0  # Camera horizontal field of view (degrees)
+RADAR_TRACK_COUNT = 3  # Number of nearest tracks to display
+RADAR_MERGE_RADIUS = 1.0  # Merge tracks within this radius (metres)
+
+# Warning thresholds
+RADAR_WARN_YELLOW_KPH = 10.0  # Speed delta for yellow warning
+RADAR_WARN_RED_KPH = 20.0  # Speed delta for red warning
+
+# Overtake warning settings
+RADAR_OVERTAKE_TIME_THRESHOLD = 1.0  # Time-to-overtake threshold (seconds)
+RADAR_OVERTAKE_MIN_CLOSING_KPH = 5.0  # Minimum closing speed (km/h)
+RADAR_OVERTAKE_MIN_LATERAL = 0.5  # Minimum lateral offset (metres)
+RADAR_OVERTAKE_ARROW_DURATION = 1.0  # Duration to show arrow (seconds)
