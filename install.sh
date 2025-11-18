@@ -172,6 +172,15 @@ sudo cp "$SCRIPT_DIR/openTPT.service" /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable openTPT.service
 
+# Disable cloud-init to prevent boot delays and network configuration issues
+echo -e "\n==== Disabling cloud-init ===="
+if [ -d /etc/cloud ]; then
+  sudo touch /etc/cloud/cloud-init.disabled
+  echo "cloud-init disabled"
+else
+  echo "cloud-init not found (already removed or not installed)"
+fi
+
 echo -e "\n==== Installation complete! ===="
 echo "To start openTPT now:         sudo systemctl start openTPT.service"
 echo "To check service status:      sudo systemctl status openTPT.service"
