@@ -17,7 +17,7 @@ adafruit-circuitpython-ads1x15>=2.2.0
 # Note: MLX90640 used by Pico I2C slaves (not directly by Pi)
 # Pi reads processed data from Picos via I2C slave interface
 adafruit-circuitpython-mlx90640>=1.2.0  # Optional: for setup/diagnostic tools
-adafruit-circuitpython-mlx90614>=1.3.0  # Single-point IR sensors (when USE_MLX90614_SENSORS=True)
+adafruit-circuitpython-mlx90614>=1.2.0  # Single-point IR sensors (when USE_MLX90614_SENSORS=True)
 
 # NeoPixel buttons
 adafruit-circuitpython-seesaw>=1.12.0

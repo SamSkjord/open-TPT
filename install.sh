@@ -94,7 +94,7 @@ PYTHON_DEPS=(
   "adafruit-circuitpython-ads1x15>=2.2.0"
   # Thermal sensors: MLX90640 for Pico slaves, MLX90614 for direct Pi reading
   "adafruit-circuitpython-mlx90640>=1.2.0"
-  "adafruit-circuitpython-mlx90614>=1.3.0"
+  "adafruit-circuitpython-mlx90614>=1.2.0"
   "tpms==2.0.1"
   "pytest>=7.0.0"
   "opencv-python"
