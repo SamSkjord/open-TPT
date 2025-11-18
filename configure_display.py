@@ -29,11 +29,11 @@ def main():
     # Path to config file
     config_path = Path(__file__).parent.absolute() / "display_config.json"
 
-    # Default configuration (for Pimoroni Hyperpixel)
+    # Default configuration
     default_config = {
         "width": 800,
         "height": 480,
-        "notes": "Default resolution for Pimoroni Hyperpixel display. Change values to match your HDMI display resolution.",
+        "notes": "Default resolution. Change values to match your HDMI display resolution.",
     }
 
     # Load current configuration if exists

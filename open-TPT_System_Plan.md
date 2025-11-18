@@ -17,12 +17,12 @@ Raspberry Pi-based motorsport HUD/logger that:
 | Subsystem | Baseline |
 |---|---|
 | Compute | Raspberry Pi 4 / 5 (4–8 GB) |
-| Display | Sunlight-readable TFT (e.g., HyperPixel), KMS/DRM |
+| Display | Waveshare 1024x600 HDMI (UI scales from 800x480 reference), KMS/DRM |
 | Power | OBD pin 16 → DC-DC 12→5 V; return to pin 4; single-point tie to pin 5 |
 | Storage | 64–128 GB microSD; read-only root; `/data` writable |
 | I/O Buses | SPI, I²C, USB, GPIO |
 | CAN | Waveshare Dual-CAN HAT+ (MCP2517FD) × 1–N; CANable 2.0 USB |
-| Sensors | MLX90640 (tyre), IR brake (I²C/ADC), GPS ≥ 10 Hz (USB/UART), rear camera (USB UVC), radar (Tesla/Bosch/Denso) |
+| Sensors | Pico I2C slaves w/ MLX90640 or MLX90614 (tyre), IR brake (I²C/ADC), GPS ≥ 10 Hz (USB/UART), rear camera (USB UVC), radar (Tesla/Bosch/Denso) |
 | Inputs | NeoKey 1×4 (I²C seesaw + NeoPixel) |
 
 ### OBD-II Connector Pins

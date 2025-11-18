@@ -179,15 +179,15 @@ This document summarizes the major development achievements for the openTPT (Ope
 
 **Test Environment**:
 - Raspberry Pi 4 (IP: 192.168.199.247)
-- HyperPixel 800x480 display
+- Waveshare 1024x600 HDMI display
 - Real TPMS sensors and receivers
-- MLX90640 thermal camera
+- Pico I2C slave modules with MLX90640 thermal cameras
 - NeoKey 1x4 control pad
 
 **Hardware Status**:
 - ✅ TPMS: 4/4 sensors auto-paired and working (FL, FR, RL, RR)
 - ✅ NeoKey 1x4: All buttons functional
-- ✅ MLX90640: 1/4 cameras operational (FL)
+- ✅ Pico thermal modules: 1/4 operational (FL)
 - ⚠️ ADS1115: Not currently connected
 - ⚠️ Radar: Not yet configured
 

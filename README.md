@@ -1,6 +1,6 @@
 # openTPT - Open Tyre Pressure and Temperature Telemetry
 
-A modular GUI system for live racecar telemetry using a Raspberry Pi 4 and HyperPixel display.
+A modular GUI system for live racecar telemetry using a Raspberry Pi 4 with HDMI display support.
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/SamSkjord/open-TPT)
 
 ## Overview
@@ -8,7 +8,7 @@ A modular GUI system for live racecar telemetry using a Raspberry Pi 4 and Hyper
 openTPT provides real-time monitoring of:
 - 🛞 Tyre pressure & temperature (via TPMS)
 - 🔥 Brake rotor temperatures (via IR sensors + ADC)
-- 🌡️ Tyre surface heatmaps (via MLX90640 thermal cameras)
+- 🌡️ Tyre surface thermal imaging (via Pico I2C slave modules with MLX90640, or MLX90614 sensors)
 - 🎥 Full-screen rear-view toggle (USB UVC camera)
 - 📡 Optional Toyota radar overlay (CAN bus radar with collision warnings)
 
@@ -27,13 +27,13 @@ openTPT features a high-performance architecture optimised for real-time telemet
 
 ### Core Components
 - Raspberry Pi 4 (2GB+ RAM recommended)
-- Display options:
-  - HyperPixel display (800x480 resolution), or
-  - Standard HDMI display of any resolution (system now supports dynamic scaling)
+- Waveshare 1024x600 HDMI display (or other HDMI displays - UI designed for 800x480, scales to fit)
 - TPMS receivers and sensors
 - ADS1115/ADS1015 ADC for IR brake temperature sensors
-- MLX90640 thermal cameras (one per tyre)
-- TCA9548A I2C multiplexer for thermal cameras
+- Tyre temperature sensors (one per tyre):
+  - Raspberry Pi Pico with MLX90640 thermal camera (pico-tyre-temp I2C slave modules), OR
+  - MLX90614 single-point IR sensors
+- TCA9548A I2C multiplexer for tyre temperature sensors
 - Adafruit NeoKey 1x4 for input control
 
 ### Optional Components
@@ -55,8 +55,7 @@ openTPT features a high-performance architecture optimised for real-time telemet
   - python-can (CAN bus interface, optional for radar)
   - cantools (DBC decoding, optional for radar)
   - tpms-python (TPMS sensor communication)
-  - thermal-tyre-driver (MLX90640 thermal cameras)
-  - Adafruit libraries (NeoKey, ADS1x15, TCA9548A)
+  - Adafruit libraries (NeoKey, ADS1x15, TCA9548A, MLX90614)
 
 See `requirements.txt` for the complete list.
 
@@ -124,7 +123,7 @@ Keyboard controls (for development):
 
 ### Display Configuration
 
-openTPT now supports any display resolution. To configure your display:
+openTPT is designed for 800x480 resolution and scales to other display sizes. To configure your display:
 
 1. Run the configuration utility:
    ```
@@ -200,7 +199,8 @@ openTPT/
 ├── hardware/
 │   ├── tpms_input_optimized.py          # TPMS with bounded queues
 │   ├── ir_brakes_optimized.py           # Brake temps with EMA smoothing
-│   ├── mlx_handler_optimized.py         # MLX90640 with zone processing
+│   ├── pico_tyre_handler_optimized.py   # Pico I2C slave tyre handlers
+│   ├── mlx90614_handler.py              # MLX90614 single-point IR sensors (alternative)
 │   ├── radar_handler.py                 # Toyota radar CAN handler (optional)
 │   └── i2c_mux.py                       # TCA9548A Mux control
 ├── perception/
@@ -212,7 +212,6 @@ openTPT/
 └── scratch/
     └── sources/                         # Source code for external libraries
         ├── TPMS/
-        ├── thermal-tyre-driver/
         ├── toyota-radar/
         └── uvc-radar-overlay/
 ```
@@ -222,7 +221,7 @@ openTPT/
 ### Completed ✓
 - ✅ Real-time TPMS monitoring (auto-pairing support)
 - ✅ Brake temperature monitoring with IR sensors
-- ✅ MLX90640 thermal camera heatmaps (I/C/O zone analysis)
+- ✅ Tyre thermal imaging via Pico I2C slaves (MLX90640) or MLX90614 sensors
 - ✅ USB camera rear-view with 60 FPS target
 - ✅ NeoKey 1x4 physical controls
 - ✅ Performance-optimised architecture with bounded queues

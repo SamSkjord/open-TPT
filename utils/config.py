@@ -7,7 +7,7 @@ import os
 import json
 
 # Display settings
-# Reference resolution for scaling (Pimoroni Hyperpixel)
+# Reference resolution for scaling (default 800x480)
 REFERENCE_WIDTH = 800
 REFERENCE_HEIGHT = 480
 
@@ -82,7 +82,7 @@ try:
         default_config = {
             "width": REFERENCE_WIDTH,
             "height": REFERENCE_HEIGHT,
-            "notes": "Default resolution for Pimoroni Hyperpixel display. Change values to match your HDMI display resolution.",
+            "notes": "Default resolution. Change values to match your HDMI display resolution.",
         }
         with open(CONFIG_FILE, "w") as f:
             json.dump(default_config, f, indent=4)
