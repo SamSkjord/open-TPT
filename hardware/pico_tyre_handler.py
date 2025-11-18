@@ -116,6 +116,12 @@ class PicoTyreHandler:
             "RR": 3,  # Rear Right on channel 3
         }
 
+        # Failure tracking and retry logic
+        self.sensor_status = {}  # "ok", "retrying", or "failed"
+        self.failure_count = {}  # Consecutive failure count per position
+        self.backoff_until = {}  # Timestamp when to retry next (for exponential backoff)
+        self.MAX_RETRIES = 10  # Drop sensor after this many consecutive failures
+
         # Initialize I2C and mux
         if I2C_AVAILABLE:
             try:
@@ -131,8 +137,40 @@ class PicoTyreHandler:
             except Exception as e:
                 print(f"Error setting up I2C for Pico sensors: {e}")
 
+    def try_detect_pico(self, position, channel):
+        """
+        Attempt to detect a single Pico on a specific channel.
+
+        Returns:
+            bool: True if Pico detected and responding, False otherwise
+        """
+        try:
+            if not self.mux.select_channel(channel):
+                return False
+
+            time.sleep(0.1)
+
+            # Read firmware version to verify Pico is present
+            version = self.i2c_read_byte(PicoRegisters.FIRMWARE_VERSION)
+
+            if version is not None:
+                # Read FPS to verify it's running
+                fps = self.i2c_read_byte(PicoRegisters.FPS)
+                print(f"  ✓ Pico found at 0x{self.PICO_I2C_ADDR:02X}, firmware v{version}", end="")
+                if fps is not None and fps > 0:
+                    print(f", running at {fps} fps")
+                else:
+                    print()
+                return True
+            else:
+                return False
+
+        except Exception as e:
+            print(f"  Exception during detection: {e}")
+            return False
+
     def initialize(self):
-        """Initialize and detect Pico I2C slaves on each multiplexer channel."""
+        """Initialize and detect Pico I2C slaves on each multiplexer channel with retry logic."""
         if not I2C_AVAILABLE:
             print("Warning: I2C libraries not available")
             return False
@@ -150,38 +188,35 @@ class PicoTyreHandler:
             print("\nDetecting Pico tyre sensors on multiplexer channels...")
 
             successful_inits = 0
+            MAX_INIT_ATTEMPTS = 3
+            RETRY_DELAY = 2.0  # seconds
 
             for position, channel in self.position_to_channel.items():
-                print(f"\nChecking {position} on channel {channel}...")
+                detected = False
 
-                # Select the channel
-                if not self.mux.select_channel(channel):
-                    print(f"  Failed to select channel {channel}")
-                    continue
-
-                # Give time for channel to stabilize
-                time.sleep(0.1)
-
-                # Try to detect Pico slave at 0x08
-                try:
-                    # Read firmware version register to verify Pico is present
-                    version = self.i2c_read_byte(PicoRegisters.FIRMWARE_VERSION)
-
-                    if version is not None:
-                        print(f"  ✓ Pico found at 0x{self.PICO_I2C_ADDR:02X}, firmware v{version}")
-
-                        # Read FPS to verify it's running
-                        fps = self.i2c_read_byte(PicoRegisters.FPS)
-                        if fps is not None and fps > 0:
-                            print(f"    Running at {fps} fps")
-
-                        self.pico_sensors[position] = True
-                        successful_inits += 1
+                # Try up to 3 times to detect this Pico
+                for attempt in range(1, MAX_INIT_ATTEMPTS + 1):
+                    if attempt == 1:
+                        print(f"Checking {position} on channel {channel}...")
                     else:
-                        print(f"  ✗ No Pico found on channel {channel}")
+                        print(f"  Retry {attempt - 1}/{MAX_INIT_ATTEMPTS - 1} for {position}...")
 
-                except Exception as e:
-                    print(f"  ✗ Error checking channel {channel}: {e}")
+                    if self.try_detect_pico(position, channel):
+                        detected = True
+                        break
+
+                    # Wait before retrying (but not after last attempt)
+                    if attempt < MAX_INIT_ATTEMPTS:
+                        time.sleep(RETRY_DELAY)
+
+                if detected:
+                    self.pico_sensors[position] = True
+                    self.sensor_status[position] = "ok"
+                    self.failure_count[position] = 0
+                    self.backoff_until[position] = 0
+                    successful_inits += 1
+                else:
+                    print(f"  ✗ No Pico found on channel {channel} after {MAX_INIT_ATTEMPTS} attempts")
 
             # Reset multiplexer
             self.mux.deselect_all()
@@ -348,8 +383,22 @@ class PicoTyreHandler:
 
             time.sleep(0.05)  # Small sleep to prevent CPU hogging
 
+    def _calculate_backoff_delay(self, failure_count):
+        """
+        Calculate exponential backoff delay.
+
+        Args:
+            failure_count: Number of consecutive failures (0-indexed)
+
+        Returns:
+            float: Delay in seconds (0.5s, 1s, 2s, 4s, 8s, 16s, 32s, 64s, 128s, 256s)
+        """
+        # Exponential backoff: 0.5 * (2 ^ failure_count)
+        # Max delay capped at 256 seconds
+        return min(0.5 * (2 ** failure_count), 256.0)
+
     def _read_pico_data(self):
-        """Read processed zone data from the Pico I2C slaves (not full frames)."""
+        """Read processed zone data from the Pico I2C slaves with exponential backoff retry logic."""
         if not self.pico_sensors:
             # Set all data to None to indicate no data available
             with self.lock:
@@ -358,16 +407,32 @@ class PicoTyreHandler:
                     self.zone_data[position] = None
             return
 
+        current_time = time.time()
+
         # Read each Pico individually
         for position, present in self.pico_sensors.items():
             if not present:
+                continue
+
+            # Check if sensor is permanently failed
+            status = self.sensor_status.get(position, "ok")
+            if status == "failed":
+                with self.lock:
+                    self.thermal_data[position] = None
+                    self.zone_data[position] = None
+                continue
+
+            # Check if we should skip due to exponential backoff
+            backoff_until = self.backoff_until.get(position, 0)
+            if current_time < backoff_until:
+                # Still in backoff period, skip this read
                 continue
 
             try:
                 # Select the correct channel on the multiplexer
                 channel = self.position_to_channel[position]
                 if not self.mux.select_channel(channel):
-                    continue
+                    raise Exception("Failed to select mux channel")
 
                 # Allow time for the channel to switch
                 time.sleep(0.05)
@@ -375,6 +440,14 @@ class PicoTyreHandler:
                 # Read processed zone data ONLY (not full 1536-byte frame)
                 # This is much faster - only ~20 bytes vs 1536 bytes
                 zones = self.i2c_read_zone_data()
+
+                if zones is None:
+                    raise Exception("Failed to read zone data")
+
+                # Success! Reset failure counter
+                self.failure_count[position] = 0
+                self.sensor_status[position] = "ok"
+                self.backoff_until[position] = 0
 
                 # Store zone data
                 with self.lock:
@@ -384,7 +457,22 @@ class PicoTyreHandler:
                     self.thermal_data[position] = None
 
             except Exception as e:
-                print(f"Error reading Pico for {position}: {e}")
+                # Failure - increment counter and apply backoff
+                failures = self.failure_count.get(position, 0) + 1
+                self.failure_count[position] = failures
+
+                if failures >= self.MAX_RETRIES:
+                    # Permanently mark as failed after MAX_RETRIES consecutive failures
+                    self.sensor_status[position] = "failed"
+                    print(f"ERROR: {position} Pico has FAILED after {failures} consecutive failures")
+                else:
+                    # Calculate exponential backoff
+                    backoff_delay = self._calculate_backoff_delay(failures - 1)
+                    self.backoff_until[position] = current_time + backoff_delay
+                    self.sensor_status[position] = "retrying"
+                    print(f"Warning: {position} Pico read failed ({failures}/{self.MAX_RETRIES}): {e}. "
+                          f"Backing off for {backoff_delay:.1f}s")
+
                 # Set this position's data to None on error
                 with self.lock:
                     self.thermal_data[position] = None
@@ -461,3 +549,29 @@ class PicoTyreHandler:
                 return (np.min(data), np.max(data))
             else:
                 return (None, None)
+
+    def get_sensor_status(self, position=None):
+        """
+        Get the sensor status for a specific position or all positions.
+
+        Args:
+            position: Tire position ("FL", "FR", "RL", "RR") or None for all
+
+        Returns:
+            str or dict: Status string ("ok", "retrying", "failed") or dict of all statuses
+        """
+        if position is None:
+            # Return all statuses
+            return {pos: self.sensor_status.get(pos, "unknown") for pos in self.position_to_channel.keys()}
+        elif position in self.sensor_status:
+            status = self.sensor_status[position]
+            failures = self.failure_count.get(position, 0)
+
+            if status == "failed":
+                return "FAILED"
+            elif status == "retrying" and failures > 0:
+                return f"retrying (attempt {failures}/{self.MAX_RETRIES})"
+            else:
+                return status
+        else:
+            return "unknown"

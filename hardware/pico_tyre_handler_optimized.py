@@ -116,6 +116,12 @@ class PicoTyreHandlerOptimised(BoundedQueueHardwareHandler):
             "RR": 3,  # Rear Right on channel 3
         }
 
+        # Failure tracking and retry logic
+        self.sensor_status = {}  # "ok", "retrying", or "failed"
+        self.failure_count = {}  # Consecutive failure count per position
+        self.backoff_until = {}  # Timestamp when to retry next (for exponential backoff)
+        self.MAX_RETRIES = 10  # Drop sensor after this many consecutive failures
+
         # Additional zone processors (optional - Pico already does this)
         self.zone_processors = {}
         if self.enable_additional_zones:
@@ -135,8 +141,40 @@ class PicoTyreHandlerOptimised(BoundedQueueHardwareHandler):
             except Exception as e:
                 print(f"Error setting up I2C for Pico sensors: {e}")
 
+    def _try_detect_pico(self, position: str, channel: int) -> bool:
+        """
+        Attempt to detect a single Pico on a specific channel.
+
+        Returns:
+            bool: True if Pico detected and responding, False otherwise
+        """
+        try:
+            if not self.mux.select_channel(channel):
+                return False
+
+            time.sleep(0.1)
+
+            # Read firmware version to verify Pico is present
+            version = self._i2c_read_byte(PicoRegisters.FIRMWARE_VERSION)
+
+            if version is not None:
+                # Read FPS to verify it's running
+                fps = self._i2c_read_byte(PicoRegisters.FPS)
+                print(f"  ✓ Pico found at 0x{self.PICO_I2C_ADDR:02X}, firmware v{version}", end="")
+                if fps is not None and fps > 0:
+                    print(f", running at {fps} fps")
+                else:
+                    print()
+                return True
+            else:
+                return False
+
+        except Exception as e:
+            print(f"  Exception during detection: {e}")
+            return False
+
     def _initialise_sensors(self) -> bool:
-        """Initialize and detect Pico I2C slaves on each multiplexer channel."""
+        """Initialize and detect Pico I2C slaves on each multiplexer channel with retry logic."""
         if not I2C_AVAILABLE or not self.i2c or not self.mux:
             print("Warning: I2C hardware not available")
             return False
@@ -149,35 +187,35 @@ class PicoTyreHandlerOptimised(BoundedQueueHardwareHandler):
             print("\nDetecting Pico tyre sensors on multiplexer channels...")
 
             successful_inits = 0
+            MAX_INIT_ATTEMPTS = 3
+            RETRY_DELAY = 2.0  # seconds
 
             for position, channel in self.position_to_channel.items():
-                print(f"Checking {position} on channel {channel}...")
+                detected = False
 
-                if not self.mux.select_channel(channel):
-                    print(f"  Failed to select channel {channel}")
-                    continue
-
-                time.sleep(0.1)
-
-                try:
-                    # Read firmware version to verify Pico is present
-                    version = self._i2c_read_byte(PicoRegisters.FIRMWARE_VERSION)
-
-                    if version is not None:
-                        print(f"  ✓ Pico found at 0x{self.PICO_I2C_ADDR:02X}, firmware v{version}")
-
-                        # Read FPS to verify it's running
-                        fps = self._i2c_read_byte(PicoRegisters.FPS)
-                        if fps is not None and fps > 0:
-                            print(f"    Running at {fps} fps")
-
-                        self.pico_sensors[position] = True
-                        successful_inits += 1
+                # Try up to 3 times to detect this Pico
+                for attempt in range(1, MAX_INIT_ATTEMPTS + 1):
+                    if attempt == 1:
+                        print(f"Checking {position} on channel {channel}...")
                     else:
-                        print(f"  ✗ No Pico found on channel {channel}")
+                        print(f"  Retry {attempt - 1}/{MAX_INIT_ATTEMPTS - 1} for {position}...")
 
-                except Exception as e:
-                    print(f"  ✗ Error checking channel {channel}: {e}")
+                    if self._try_detect_pico(position, channel):
+                        detected = True
+                        break
+
+                    # Wait before retrying (but not after last attempt)
+                    if attempt < MAX_INIT_ATTEMPTS:
+                        time.sleep(RETRY_DELAY)
+
+                if detected:
+                    self.pico_sensors[position] = True
+                    self.sensor_status[position] = "ok"
+                    self.failure_count[position] = 0
+                    self.backoff_until[position] = 0
+                    successful_inits += 1
+                else:
+                    print(f"  ✗ No Pico found on channel {channel} after {MAX_INIT_ATTEMPTS} attempts")
 
             self.mux.deselect_all()
 
@@ -285,6 +323,20 @@ class PicoTyreHandlerOptimised(BoundedQueueHardwareHandler):
 
             time.sleep(0.05)  # Small sleep to prevent CPU hogging
 
+    def _calculate_backoff_delay(self, failure_count: int) -> float:
+        """
+        Calculate exponential backoff delay.
+
+        Args:
+            failure_count: Number of consecutive failures (0-indexed)
+
+        Returns:
+            float: Delay in seconds (0.5s, 1s, 2s, 4s, 8s, 16s, 32s, 64s, 128s, 256s)
+        """
+        # Exponential backoff: 0.5 * (2 ^ failure_count)
+        # Max delay capped at 256 seconds
+        return min(0.5 * (2 ** failure_count), 256.0)
+
     def _read_all_picos(self):
         """Read processed zone data from all Pico I2C slaves and publish snapshot."""
         if not self.pico_sensors:
@@ -296,17 +348,34 @@ class PicoTyreHandlerOptimised(BoundedQueueHardwareHandler):
             return
 
         zone_data = {}
+        sensor_statuses = {}
+        current_time = time.time()
 
         # Read each Pico individually
         for position, present in self.pico_sensors.items():
             if not present:
                 continue
 
+            # Check if sensor is permanently failed
+            status = self.sensor_status.get(position, "ok")
+            if status == "failed":
+                zone_data[position] = None
+                sensor_statuses[position] = "FAILED"
+                continue
+
+            # Check if we should skip due to exponential backoff
+            backoff_until = self.backoff_until.get(position, 0)
+            if current_time < backoff_until:
+                # Still in backoff period, skip this read
+                zone_data[position] = None
+                sensor_statuses[position] = f"retrying (retry {self.failure_count.get(position, 0)}/{self.MAX_RETRIES})"
+                continue
+
             try:
                 # Select the correct channel on the multiplexer
                 channel = self.position_to_channel[position]
                 if not self.mux.select_channel(channel):
-                    continue
+                    raise Exception("Failed to select mux channel")
 
                 time.sleep(0.05)
 
@@ -315,11 +384,35 @@ class PicoTyreHandlerOptimised(BoundedQueueHardwareHandler):
                 # Picos already did all the thermal processing
                 zones = self._i2c_read_zone_data()
 
-                # Store zone data only
+                if zones is None:
+                    raise Exception("Failed to read zone data")
+
+                # Success! Reset failure counter
+                self.failure_count[position] = 0
+                self.sensor_status[position] = "ok"
+                self.backoff_until[position] = 0
                 zone_data[position] = zones
+                sensor_statuses[position] = "ok"
 
             except Exception as e:
-                print(f"Error reading Pico for {position}: {e}")
+                # Failure - increment counter and apply backoff
+                failures = self.failure_count.get(position, 0) + 1
+                self.failure_count[position] = failures
+
+                if failures >= self.MAX_RETRIES:
+                    # Permanently mark as failed after MAX_RETRIES consecutive failures
+                    self.sensor_status[position] = "failed"
+                    sensor_statuses[position] = "FAILED"
+                    print(f"ERROR: {position} Pico has FAILED after {failures} consecutive failures")
+                else:
+                    # Calculate exponential backoff
+                    backoff_delay = self._calculate_backoff_delay(failures - 1)
+                    self.backoff_until[position] = current_time + backoff_delay
+                    self.sensor_status[position] = "retrying"
+                    sensor_statuses[position] = f"retrying (attempt {failures}/{self.MAX_RETRIES})"
+                    print(f"Warning: {position} Pico read failed ({failures}/{self.MAX_RETRIES}): {e}. "
+                          f"Backing off for {backoff_delay:.1f}s")
+
                 zone_data[position] = None
 
         # Deselect all channels when done
@@ -332,6 +425,7 @@ class PicoTyreHandlerOptimised(BoundedQueueHardwareHandler):
             metadata={
                 "status": "ok",
                 "sensor_count": len([p for p, present in self.pico_sensors.items() if present]),
+                "sensor_statuses": sensor_statuses,  # Include detailed status for each sensor
             }
         )
 
@@ -407,6 +501,29 @@ class PicoTyreHandlerOptimised(BoundedQueueHardwareHandler):
                 return (None, None)
         else:
             return (None, None)
+
+    def get_sensor_status(self, position: Optional[str] = None):
+        """
+        Get the sensor status for a specific position or all positions (lock-free).
+
+        Args:
+            position: Tire position ("FL", "FR", "RL", "RR") or None for all
+
+        Returns:
+            str or dict: Status string ("ok", "retrying (X/10)", "FAILED") or dict of all statuses
+        """
+        snapshot = self.get_snapshot()
+        if not snapshot:
+            return "no_data" if position else {}
+
+        sensor_statuses = snapshot.metadata.get("sensor_statuses", {})
+
+        if position is None:
+            return sensor_statuses.copy()
+        elif position in sensor_statuses:
+            return sensor_statuses[position]
+        else:
+            return "unknown"
 
 
 # Alias for backward compatibility
