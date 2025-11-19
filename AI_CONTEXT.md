@@ -88,9 +88,8 @@ openTPT/
 │   ├── input.py             # NeoKey 1x4 controls
 │   └── scale_bars.py        # Temperature/pressure scales
 ├── hardware/
+│   ├── unified_corner_handler.py    # Unified handler for all tyre sensors
 │   ├── tpms_input_optimized.py      # TPMS with bounded queues
-│   ├── ir_brakes_optimized.py       # Brake temps (EMA smoothing)
-│   ├── pico_tyre_handler_optimized.py  # Pico MLX90640 handlers
 │   ├── mlx90614_handler.py          # MLX90614 single-point IR
 │   ├── radar_handler.py             # Toyota radar (optional)
 │   └── i2c_mux.py                   # TCA9548A control

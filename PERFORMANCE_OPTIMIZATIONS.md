@@ -1,5 +1,7 @@
 # Performance Optimizations - openTPT
 
+> **Note:** This document describes the v0.6 refactoring. As of v0.8, the architecture has evolved further with the `unified_corner_handler` replacing individual tyre handlers. See AI_CONTEXT.md for current architecture.
+
 ## Overview
 
 This document details the performance optimizations implemented for openTPT, based on the system plan targets. The refactoring focuses on achieving deterministic, real-time performance suitable for motorsport telemetry applications.

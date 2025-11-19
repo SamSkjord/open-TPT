@@ -331,10 +331,9 @@ openTPT/
 │   ├── icon_handler.py                  # Icon rendering
 │   └── scale_bars.py                    # Temperature/pressure scale bars
 ├── hardware/
+│   ├── unified_corner_handler.py        # Unified handler for all tyre sensors
 │   ├── tpms_input_optimized.py          # TPMS with bounded queues
-│   ├── ir_brakes_optimized.py           # Brake temps with EMA smoothing
-│   ├── pico_tyre_handler_optimized.py   # Pico I2C slave tyre handlers
-│   ├── mlx90614_handler.py              # MLX90614 single-point IR sensors (alternative)
+│   ├── mlx90614_handler.py              # MLX90614 single-point IR sensors
 │   ├── radar_handler.py                 # Toyota radar CAN handler (optional)
 │   └── i2c_mux.py                       # TCA9548A Mux control
 ├── perception/
