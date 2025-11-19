@@ -355,17 +355,9 @@ class Camera:
                 print(self.error_message)
                 return False
 
-            # For device paths, resolve symlink to actual device and keep as path
-            # OpenCV V4L2 backend seems to work better with device paths than indices on this system
-            if isinstance(camera_to_open, str) and camera_to_open.startswith('/dev/video'):
-                import os
-                # Resolve symlink to actual device (e.g., /dev/video-rear -> /dev/video3)
-                try:
-                    actual_device = os.path.realpath(camera_to_open)
-                    print(f"DEBUG: Resolved {camera_to_open} -> {actual_device}")
-                    camera_to_open = actual_device
-                except (ValueError, OSError) as e:
-                    print(f"DEBUG: Could not resolve device path: {e}")
+            # Use device path directly - udev symlinks provide deterministic identification
+            # OpenCV will handle the symlink resolution internally
+            print(f"DEBUG: Opening camera at {camera_to_open}")
 
             # Open camera without explicit backend specification, let OpenCV choose best one
             self.camera = cv2.VideoCapture(camera_to_open)
