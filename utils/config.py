@@ -262,3 +262,45 @@ RADAR_OVERTAKE_TIME_THRESHOLD = 1.0  # Time-to-overtake threshold (seconds)
 RADAR_OVERTAKE_MIN_CLOSING_KPH = 5.0  # Minimum closing speed (km/h)
 RADAR_OVERTAKE_MIN_LATERAL = 0.5  # Minimum lateral offset (metres)
 RADAR_OVERTAKE_ARROW_DURATION = 1.0  # Duration to show arrow (seconds)
+
+# ==============================================================================
+# Brake Temperature Sensor Configuration
+# ==============================================================================
+
+# Per-corner brake sensor type selection
+# Options: "adc" for IR sensors via ADS1115, "mlx90614" for single-point IR, "obd" for CAN/OBD-II
+BRAKE_SENSOR_TYPES = {
+    "FL": "mlx90614",  # Front Left - MLX90614 IR sensor
+    "FR": "adc",       # Front Right - ADC IR sensor
+    "RL": "adc",       # Rear Left - ADC IR sensor
+    "RR": "adc",       # Rear Right - ADC IR sensor
+}
+
+# ADC channel mapping for IR brake sensors (ADS1115)
+# Used when sensor type is "adc"
+ADC_BRAKE_CHANNELS = {
+    "FL": 0,  # A0
+    "FR": 1,  # A1
+    "RL": 2,  # A2
+    "RR": 3,  # A3
+}
+
+# MLX90614 I2C multiplexer channel mapping
+# Used when sensor type is "mlx90614"
+# Shares same mux channels as tyre sensors (one channel per corner)
+MLX90614_BRAKE_MUX_CHANNELS = {
+    "FL": 0,  # Channel 0 - shared with tyre sensor
+    "FR": 1,  # Channel 1 - shared with tyre sensor
+    "RL": 2,  # Channel 2 - shared with tyre sensor
+    "RR": 3,  # Channel 3 - shared with tyre sensor
+}
+
+# OBD/CAN brake temperature mapping
+# Used when sensor type is "obd"
+# Maps brake positions to CAN signal names (if available)
+OBD_BRAKE_SIGNALS = {
+    "FL": None,  # Not typically available via OBD-II
+    "FR": None,  # Most cars don't broadcast brake temps
+    "RL": None,  # Would need custom CAN implementation
+    "RR": None,  # or aftermarket ECU
+}

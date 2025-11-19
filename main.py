@@ -20,15 +20,13 @@ from gui.input import InputHandler
 from gui.scale_bars import ScaleBars
 from gui.icon_handler import IconHandler
 
-# Import optimised hardware modules (with fallback to original)
+# Import optimised TPMS handler (with fallback to original)
 try:
     from hardware.tpms_input_optimized import TPMSHandler
-    from hardware.ir_brakes_optimized import BrakeTemperatureHandler
-    print("Using optimised TPMS and brake handlers with bounded queues")
+    print("Using optimised TPMS handler with bounded queues")
 except ImportError as e:
-    print(f"Warning: Could not load optimised handlers ({e}), using original")
+    print(f"Warning: Could not load optimised TPMS handler ({e}), using original")
     from hardware.tpms_input import TPMSHandler
-    from hardware.ir_brakes import BrakeTemperatureHandler
 
 # Import radar handler (optional)
 try:
@@ -77,6 +75,11 @@ from utils.config import (
 # Supports per-tyre sensor type configuration (Pico + MLX90614)
 from hardware.mixed_tyre_handler import MixedTyreHandler as TyreHandler
 print("Using mixed tyre handler (supports per-tyre sensor configuration)")
+
+# Import mixed brake temperature handler
+# Supports per-corner sensor type configuration (ADC, MLX90614, OBD)
+from hardware.mixed_brake_handler import MixedBrakeHandler as BrakeHandler
+print("Using mixed brake handler (supports per-corner sensor configuration)")
 
 # Import performance monitoring
 try:
@@ -218,8 +221,8 @@ class OpenTPT:
 
         # Create hardware handlers
         self.tpms = TPMSHandler()
-        self.brakes = BrakeTemperatureHandler()
-        self.thermal = TyreHandler()  # Reads from Pico I2C slaves instead of direct MLX90640
+        self.brakes = BrakeHandler()  # Mixed brake handler (ADC, MLX90614, or OBD)
+        self.thermal = TyreHandler()  # Mixed tyre handler (Pico or MLX90614)
 
         # Start monitoring threads
         self.tpms.start()
