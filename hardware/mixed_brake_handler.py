@@ -299,7 +299,10 @@ class MixedBrakeHandler(BoundedQueueHardwareHandler):
 
             # Select mux channel
             if self.mux:
-                self.mux.select_channel(channel)
+                mux_bus = self.mux.select_channel(channel)
+                if not mux_bus:
+                    print(f"Failed to select mux channel {channel} for {position}")
+                    return None
                 time.sleep(0.01)  # Small delay for mux channel to settle
 
             # Read object temperature

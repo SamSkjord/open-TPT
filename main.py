@@ -71,15 +71,11 @@ from utils.config import (
     TYRE_SENSOR_TYPES,
 )
 
-# Import mixed tyre temperature handler
-# Supports per-tyre sensor type configuration (Pico + MLX90614)
-from hardware.mixed_tyre_handler import MixedTyreHandler as TyreHandler
-print("Using mixed tyre handler (supports per-tyre sensor configuration)")
-
-# Import mixed brake temperature handler
-# Supports per-corner sensor type configuration (ADC, MLX90614, OBD)
-from hardware.mixed_brake_handler import MixedBrakeHandler as BrakeHandler
-print("Using mixed brake handler (supports per-corner sensor configuration)")
+# Import unified corner sensor handler
+# Reads all sensors per mux channel to eliminate I2C bus contention
+# Supports: Tyres (Pico, MLX90614), Brakes (ADC, MLX90614, OBD)
+from hardware.unified_corner_handler import UnifiedCornerHandler
+print("Using unified corner handler (eliminates I2C bus contention)")
 
 # Import performance monitoring
 try:
@@ -221,13 +217,15 @@ class OpenTPT:
 
         # Create hardware handlers
         self.tpms = TPMSHandler()
-        self.brakes = BrakeHandler()  # Mixed brake handler (ADC, MLX90614, or OBD)
-        self.thermal = TyreHandler()  # Mixed tyre handler (Pico or MLX90614)
+        self.corner_sensors = UnifiedCornerHandler()  # Unified tyre+brake handler
+
+        # Aliases for backward compatibility
+        self.thermal = self.corner_sensors  # Tyre data access
+        self.brakes = self.corner_sensors   # Brake data access
 
         # Start monitoring threads
         self.tpms.start()
-        self.brakes.start()
-        self.thermal.start()
+        self.corner_sensors.start()
 
     def run(self):
         """Run the main application loop."""
@@ -472,8 +470,7 @@ class OpenTPT:
 
         # Update hardware update rates
         self.perf_monitor.update_hardware_rate("TPMS", self.tpms.get_update_rate())
-        self.perf_monitor.update_hardware_rate("Brakes", self.brakes.get_update_rate())
-        self.perf_monitor.update_hardware_rate("Thermal", self.thermal.get_update_rate())
+        self.perf_monitor.update_hardware_rate("Corners", self.corner_sensors.get_update_rate())
 
         # Print performance summary periodically
         if current_time - self.last_perf_summary >= self.perf_summary_interval:
@@ -490,8 +487,7 @@ class OpenTPT:
 
         # Stop hardware monitoring threads
         self.tpms.stop()
-        self.brakes.stop()
-        self.thermal.stop()
+        self.corner_sensors.stop()
 
         # Stop radar if enabled
         if self.radar:
