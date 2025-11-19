@@ -115,19 +115,12 @@ fswatch -o . | xargs -n1 -I{} ./tools/quick_sync.sh pi@192.168.199.243
 # SSH to Pi
 ssh pi@192.168.199.243
 
-# Run performance tests
+# Test the application
 cd /home/pi/open-TPT
-python3 tools/performance_test.py
+sudo ./main.py --windowed
 ```
 
-Expected output:
-```
-Test 1: Thermal Zone Processor
-  ✓ PASS: Average time < 1.0ms target
-
-Test 2: Bounded Queue Handler
-  ✓ PASS: Average read < 100µs target
-```
+The application will display performance metrics in real-time every 10 seconds.
 
 ### 2. Run Main Application
 
@@ -263,9 +256,7 @@ Edit `deploy_to_pi.sh` to customize exclusions.
 Before deploying to production:
 
 - [ ] Test on Mac with mock mode: `./main.py --windowed`
-- [ ] Run performance tests locally: `python3 tools/performance_test.py`
 - [ ] Deploy to Pi: `./deploy_to_pi.sh pi@192.168.199.243`
-- [ ] Run performance tests on Pi
 - [ ] Test with actual hardware connected
 - [ ] Verify all sensors reporting correctly
 - [ ] Check performance summary meets targets

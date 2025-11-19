@@ -336,8 +336,6 @@ openTPT/
 │   ├── mlx90614_handler.py              # MLX90614 single-point IR sensors
 │   ├── radar_handler.py                 # Toyota radar CAN handler (optional)
 │   └── i2c_mux.py                       # TCA9548A Mux control
-├── perception/
-│   └── tyre_zones.py                    # Numba-optimised I/C/O zone processor
 ├── utils/
 │   ├── config.py                        # Constants: positions, colours, thresholds
 │   ├── hardware_base.py                 # Bounded queue base class
