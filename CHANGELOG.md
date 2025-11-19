@@ -1,5 +1,128 @@
 # Changelog - openTPT
 
+## [v0.8] - 2025-11-19
+
+### Multi-Camera Support 🎥
+
+#### ✅ New Features
+- **Dual USB camera support** - Seamless switching between rear and front cameras
+- **Deterministic camera identification** - Udev rules for consistent device naming across reboots
+- **Smooth camera transitions** - No checkerboard flash during switching, freeze-frame transition
+- **Proper resource management** - Only one camera initialized at a time to prevent conflicts
+- **Dual FPS counters** - Shows both camera feed FPS and overall system FPS
+- **Radar overlay on rear camera only** - Front camera displays clean video feed
+
+#### 📦 New Files
+
+```
+config/
+└── camera/
+    └── 99-camera-names.rules      # Udev rules for persistent camera naming
+```
+
+#### 🔄 Modified Files
+
+- `gui/camera.py` - Complete rewrite of camera switching logic
+  - Added proper camera release before switching
+  - Implemented freeze-frame transition to prevent checkerboard
+  - Fixed test pattern override during transitions
+  - Removed symlink resolution (use symlinks directly)
+- `utils/config.py` - Added multi-camera configuration settings
+- `README.md` - Added comprehensive multi-camera setup documentation
+- `install.sh` - Added automatic camera udev rules installation
+- `CHANGELOG.md` - This entry
+
+#### ⚙️ Configuration
+
+**Multi-Camera Settings** (in `utils/config.py`):
+```python
+# Multi-camera configuration
+CAMERA_REAR_ENABLED = True   # Rear camera (with radar overlay if radar enabled)
+CAMERA_FRONT_ENABLED = True  # Front camera (no radar overlay)
+
+# Camera device paths (if using udev rules for persistent naming)
+CAMERA_REAR_DEVICE = "/dev/video-rear"   # or None for auto-detect
+CAMERA_FRONT_DEVICE = "/dev/video-front"  # or None for auto-detect
+```
+
+**Udev Rules** (`config/camera/99-camera-names.rules`):
+```bash
+# Camera on USB port 1.1 = Rear camera
+SUBSYSTEM=="video4linux", KERNELS=="1-1.1", ATTR{index}=="0", SYMLINK+="video-rear"
+
+# Camera on USB port 1.2 = Front camera
+SUBSYSTEM=="video4linux", KERNELS=="1-1.2", ATTR{index}=="0", SYMLINK+="video-front"
+```
+
+#### 🔧 Installation
+
+The `install.sh` script now automatically installs camera udev rules:
+```bash
+sudo ./install.sh
+```
+
+For manual installation:
+```bash
+sudo cp config/camera/99-camera-names.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
+
+Verify symlinks:
+```bash
+ls -l /dev/video-*
+# Should show:
+# /dev/video-rear -> video0
+# /dev/video-front -> video3
+```
+
+#### 🐛 Bug Fixes
+
+- **Fixed checkerboard during camera switching** - Implemented freeze-frame transition
+- **Fixed resource conflicts** - Properly release old camera before initializing new one
+- **Fixed test pattern override** - Only generate test pattern if no frame exists
+- **Fixed deterministic identification** - Use udev symlinks directly without resolving to device paths
+
+#### 📊 Architecture
+
+**Camera Switching Flow**
+1. Save last frame for smooth transition
+2. Stop current camera capture thread
+3. Release old camera device
+4. Switch to new camera
+5. Restore saved frame (prevents checkerboard)
+6. Initialize new camera
+7. Start capture thread for new camera
+
+**USB Port Assignment**
+- Rear camera → USB port 1.1 (creates `/dev/video-rear`)
+- Front camera → USB port 1.2 (creates `/dev/video-front`)
+
+Common USB port mappings on Raspberry Pi 4:
+- `1-1.1` = Top-left USB 2.0 port
+- `1-1.2` = Bottom-left USB 2.0 port
+- `1-1.3` = Top-right USB 2.0 port
+- `1-1.4` = Bottom-right USB 2.0 port
+
+#### 🧪 Testing
+
+- ✅ Both cameras initialize correctly
+- ✅ Camera switching works in all directions (telemetry ↔ rear ↔ front)
+- ✅ No checkerboard flash during transitions
+- ✅ Deterministic identification survives reboots
+- ✅ Radar overlay only appears on rear camera
+- ✅ Dual FPS counters display correctly
+- ✅ Resource management prevents conflicts
+
+#### 🎯 Controls
+
+- **Button 2** (or **Spacebar**): Cycle through views
+  - Telemetry → Rear Camera → Front Camera → Telemetry
+- Camera switching is seamless with smooth freeze-frame transitions
+- FPS counters show camera feed performance
+
+---
+
 ## [v0.7] - 2025-11-13
 
 ### Radar Overlay Integration 📡

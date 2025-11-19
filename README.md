@@ -9,8 +9,8 @@ openTPT provides real-time monitoring of:
 - 🛞 Tyre pressure & temperature (via TPMS)
 - 🔥 Brake rotor temperatures (via IR sensors + ADC)
 - 🌡️ Tyre surface thermal imaging (via Pico I2C slave modules with MLX90640, or MLX90614 sensors)
-- 🎥 Full-screen rear-view toggle (USB UVC camera)
-- 📡 Optional Toyota radar overlay (CAN bus radar with collision warnings)
+- 🎥 Multi-camera support with seamless switching (dual USB UVC cameras)
+- 📡 Optional Toyota radar overlay on rear camera (CAN bus radar with collision warnings)
 
 The system is designed for racing applications where real-time monitoring of tyre and brake conditions is critical for optimal performance and safety.
 
@@ -38,8 +38,8 @@ openTPT features a high-performance architecture optimised for real-time telemet
 - Adafruit NeoKey 1x4 for input control
 
 ### Optional Components
-- USB UVC camera (for rear view)
-- Toyota radar with CAN interface (for radar overlay):
+- USB UVC cameras (up to 2 cameras for rear/front views with seamless switching)
+- Toyota radar with CAN interface (for radar overlay on rear camera):
   - Dual CAN bus support (radar data + car keepalive)
   - Compatible Toyota radar unit (e.g., Prius 2017)
   - CAN-to-USB adapters or SPI CAN controllers
@@ -111,12 +111,12 @@ sudo python3 ./main.py --windowed
 When using physical NeoKey 1x4:
 - Button 0: Increase brightness
 - Button 1: Decrease brightness
-- Button 2: Toggle rear-view camera
+- Button 2: Toggle camera view (telemetry ↔ rear camera ↔ front camera)
 - Button 3: Toggle UI overlay visibility
 
 Keyboard controls (for development):
 - Up/Down arrows: Increase/decrease brightness
-- Spacebar: Toggle rear-view camera
+- Spacebar: Toggle camera view (telemetry ↔ rear camera ↔ front camera)
 - 'T' key: Toggle UI overlay visibility
 - ESC: Exit application
 
@@ -197,6 +197,89 @@ MLX90614_MUX_CHANNELS = {
 
 **Note:** Both sensor types can share the same channel numbers if they're not used on the same positions. For example, if FL/FR use Pico modules on channels 0/1, and RL/RR use MLX90614 sensors, they can also use channels 0/1 (or 2/3).
 
+### Multi-Camera Configuration
+
+openTPT supports dual USB cameras for rear and front views with seamless switching. The system uses udev rules to provide deterministic camera identification based on USB port location.
+
+#### Hardware Setup
+
+1. Connect cameras to specific USB ports:
+   - **Rear camera** → USB port 1.1 (creates `/dev/video-rear`)
+   - **Front camera** → USB port 1.2 (creates `/dev/video-front`)
+
+2. Enable cameras in `utils/config.py`:
+   ```python
+   # Multi-camera configuration
+   CAMERA_REAR_ENABLED = True   # Rear camera (with radar overlay if radar enabled)
+   CAMERA_FRONT_ENABLED = True  # Front camera (no radar overlay)
+
+   # Camera device paths (if using udev rules for persistent naming)
+   CAMERA_REAR_DEVICE = "/dev/video-rear"   # or None for auto-detect
+   CAMERA_FRONT_DEVICE = "/dev/video-front"  # or None for auto-detect
+   ```
+
+#### Udev Rules Setup
+
+To ensure cameras are correctly identified regardless of boot order, create udev rules:
+
+1. Create `/etc/udev/rules.d/99-camera-names.rules` on your Raspberry Pi:
+   ```bash
+   # Camera on USB port 1.1 = Rear camera
+   SUBSYSTEM=="video4linux", KERNELS=="1-1.1", ATTR{index}=="0", SYMLINK+="video-rear"
+
+   # Camera on USB port 1.2 = Front camera
+   SUBSYSTEM=="video4linux", KERNELS=="1-1.2", ATTR{index}=="0", SYMLINK+="video-front"
+   ```
+
+2. Reload udev rules:
+   ```bash
+   sudo udevadm control --reload-rules
+   sudo udevadm trigger
+   ```
+
+3. Verify symlinks exist:
+   ```bash
+   ls -l /dev/video-*
+   ```
+
+   You should see:
+   ```
+   /dev/video-rear -> video0
+   /dev/video-front -> video3
+   ```
+   (Actual device numbers may vary, but symlinks will always be consistent)
+
+#### Finding USB Port Paths
+
+To identify which USB port corresponds to which kernel path:
+
+1. List USB devices with their kernel paths:
+   ```bash
+   for dev in /dev/video*; do
+     udevadm info --query=all --name=$dev | grep -E "DEVNAME|KERNELS"
+   done
+   ```
+
+2. Or use the system tree:
+   ```bash
+   ls -la /sys/bus/usb/devices/
+   ```
+
+Common USB port mappings on Raspberry Pi 4:
+- `1-1.1` = Top-left USB 2.0 port
+- `1-1.2` = Bottom-left USB 2.0 port
+- `1-1.3` = Top-right USB 2.0 port
+- `1-1.4` = Bottom-right USB 2.0 port
+
+**Note:** USB 3.0 ports use different kernel paths (e.g., `2-1`, `2-2`). Adjust the udev rules accordingly if using USB 3.0 ports.
+
+#### Camera Switching Behavior
+
+- Press Button 2 (or Spacebar) to cycle through views: Telemetry → Rear Camera → Front Camera → Telemetry
+- When radar is enabled, the overlay only appears on the rear camera view
+- Camera switching is seamless with smooth frame transitions (no checkerboard flash)
+- Dual FPS counters show both camera feed FPS and overall system FPS
+
 ### Radar Configuration
 
 To enable the optional radar overlay feature:
@@ -273,7 +356,8 @@ openTPT/
 - ✅ Real-time TPMS monitoring (auto-pairing support)
 - ✅ Brake temperature monitoring with IR sensors
 - ✅ Tyre thermal imaging via Pico I2C slaves (MLX90640) or MLX90614 sensors
-- ✅ USB camera rear-view with 60 FPS target
+- ✅ Dual USB camera support with seamless switching (60 FPS target)
+- ✅ Deterministic camera identification via udev rules
 - ✅ NeoKey 1x4 physical controls
 - ✅ Performance-optimised architecture with bounded queues
 - ✅ Lock-free rendering (≤12ms per frame target)

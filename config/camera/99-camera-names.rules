@@ -1,0 +1,33 @@
+# openTPT Camera Persistent Naming Rules
+#
+# This file creates persistent device names for USB cameras based on their
+# physical USB port location, ensuring deterministic identification across reboots.
+#
+# Installation:
+#   sudo cp config/camera/99-camera-names.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules
+#   sudo udevadm trigger
+#
+# USB Port Assignments:
+#   - Rear camera:  USB port 1.1 → /dev/video-rear
+#   - Front camera: USB port 1.2 → /dev/video-front
+#
+# Finding USB port paths:
+#   for dev in /dev/video*; do
+#     udevadm info --query=all --name=$dev | grep -E "DEVNAME|KERNELS"
+#   done
+#
+# Common USB port mappings on Raspberry Pi 4:
+#   1-1.1 = Top-left USB 2.0 port
+#   1-1.2 = Bottom-left USB 2.0 port
+#   1-1.3 = Top-right USB 2.0 port
+#   1-1.4 = Bottom-right USB 2.0 port
+#
+# Note: USB 3.0 ports use different paths (e.g., 2-1, 2-2)
+#       Adjust KERNELS value if using USB 3.0 ports
+
+# Camera on USB port 1.1 = Rear camera (with radar overlay if enabled)
+SUBSYSTEM=="video4linux", KERNELS=="1-1.1", ATTR{index}=="0", SYMLINK+="video-rear"
+
+# Camera on USB port 1.2 = Front camera (no radar overlay)
+SUBSYSTEM=="video4linux", KERNELS=="1-1.2", ATTR{index}=="0", SYMLINK+="video-front"

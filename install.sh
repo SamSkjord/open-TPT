@@ -168,6 +168,28 @@ else
   echo "WARNING: Missing $UDEV_RULE_SRC; skipping persistent naming rule."
 fi
 
+# Install camera persistent naming rule
+echo -e "\n==== Installing camera persistent naming rule ===="
+CAMERA_RULE_SRC="$SCRIPT_DIR/config/camera/99-camera-names.rules"
+CAMERA_RULE_DST="/etc/udev/rules.d/99-camera-names.rules"
+
+if [[ -f "$CAMERA_RULE_SRC" ]]; then
+  if sudo test -f "$CAMERA_RULE_DST" && sudo cmp -s "$CAMERA_RULE_SRC" "$CAMERA_RULE_DST"; then
+    echo "Camera naming rule already up to date."
+  else
+    sudo install -m 0644 "$CAMERA_RULE_SRC" "$CAMERA_RULE_DST"
+    sudo udevadm control --reload-rules
+    sudo udevadm trigger || true
+    echo "Installed camera naming rule."
+    echo "Connect cameras to USB ports:"
+    echo "  - Rear camera  → USB port 1.1 (creates /dev/video-rear)"
+    echo "  - Front camera → USB port 1.2 (creates /dev/video-front)"
+    echo "Verify with: ls -l /dev/video-*"
+  fi
+else
+  echo "WARNING: Missing $CAMERA_RULE_SRC; skipping camera naming rule."
+fi
+
 # Copy systemd service file and enable
 echo -e "\n==== Enabling openTPT systemd service ===="
 cd "$SCRIPT_DIR"
