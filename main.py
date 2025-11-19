@@ -16,7 +16,7 @@ import pygame.time as pgtime
 # from gui.template import Template
 from gui.display import Display
 from gui.camera import Camera
-from gui.input import InputHandler
+from gui.input_threaded import InputHandlerThreaded as InputHandler
 from gui.scale_bars import ScaleBars
 from gui.icon_handler import IconHandler
 
@@ -137,6 +137,12 @@ class OpenTPT:
         self.ui_fade_alpha = 255  # 255 = fully visible, 0 = invisible
         self.ui_fading = False
 
+        # Surface caching for performance optimization
+        self.cached_ui_surface = None
+        self.cached_brightness_surface = None
+        self.last_brightness = DEFAULT_BRIGHTNESS
+        self.last_ui_fade_alpha = 255
+
         # Performance monitoring
         self.perf_monitor = get_global_monitor() if PERFORMANCE_MONITORING else None
         self.perf_summary_interval = 10.0  # Print summary every 10 seconds
@@ -224,38 +230,59 @@ class OpenTPT:
         self.brakes = self.corner_sensors   # Brake data access
 
         # Start monitoring threads
+        self.input_handler.start()  # Start NeoKey polling thread
         self.tpms.start()
         self.corner_sensors.start()
 
     def run(self):
         """Run the main application loop."""
         self.running = True
+        loop_times = {}
 
         try:
             while self.running:
+                loop_start = time.time()
+
                 # Handle events
+                t0 = time.time()
                 self._handle_events()
+                loop_times['events'] = (time.time() - t0) * 1000
 
                 # Update hardware (camera frame, input states, etc.)
+                t0 = time.time()
                 self._update_hardware()
+                loop_times['hardware'] = (time.time() - t0) * 1000
 
                 # Render the screen (with performance monitoring)
                 if self.perf_monitor:
                     self.perf_monitor.start_render()
 
+                t0 = time.time()
                 self._render()
+                loop_times['render'] = (time.time() - t0) * 1000
 
                 if self.perf_monitor:
                     self.perf_monitor.end_render()
 
                 # Maintain frame rate
+                t0 = time.time()
                 self.clock.tick(FPS_TARGET)
+                loop_times['clock_tick'] = (time.time() - t0) * 1000
 
                 # Calculate FPS
                 self._calculate_fps()
 
                 # Update performance metrics
                 self._update_performance_metrics()
+
+                # Print loop profiling every 60 frames
+                loop_times['total'] = (time.time() - loop_start) * 1000
+                if self.frame_count % 60 == 1:
+                    print(f"\nLoop profile (ms): TOTAL={loop_times['total']:.1f}")
+                    for key in ['events', 'hardware', 'render', 'clock_tick']:
+                        val = loop_times.get(key, 0)
+                        pct = (val / loop_times['total'] * 100) if loop_times['total'] > 0 else 0
+                        print(f"  {key:15s}: {val:6.2f}ms ({pct:5.1f}%)")
 
                 # Ensure mouse cursor stays hidden (some systems may reset it)
                 if pygame.mouse.get_visible():
@@ -338,7 +365,7 @@ class OpenTPT:
 
     def _update_hardware(self):
         """Update hardware states."""
-        # Check for NeoKey inputs
+        # Check for NeoKey inputs (non-blocking, handled by background thread)
         input_events = self.input_handler.check_input()
 
         # When UI is toggled via button, reset the fade state and timer
@@ -361,34 +388,51 @@ class OpenTPT:
         All data access is lock-free via bounded queue snapshots.
         Target: ≤ 12 ms/frame (from system plan)
         """
+        # Profiling
+        render_times = {}
+        t_start = time.time()
+
         # Clear the screen
+        t0 = time.time()
         self.screen.fill((0, 0, 0))
+        render_times['clear'] = (time.time() - t0) * 1000
 
         # If camera is active, render it as the base layer
+        t0 = time.time()
         if self.camera.is_active():
             self.camera.render()
+            render_times['camera'] = (time.time() - t0) * 1000
         else:
             # Otherwise render the normal view
             self._update_ui_visibility()
 
             # Get brake temperatures (LOCK-FREE snapshot access)
+            t0 = time.time()
             brake_temps = self.brakes.get_temps()
             for position, data in brake_temps.items():
                 temp = data.get("temp", None) if isinstance(data, dict) else data
                 self.display.draw_brake_temp(position, temp)
+            render_times['brakes'] = (time.time() - t0) * 1000
 
             # Get thermal camera data (LOCK-FREE snapshot access)
             # Always draw, let display method handle None
+            t0 = time.time()
             for position in ["FL", "FR", "RL", "RR"]:
                 thermal_data = self.thermal.get_thermal_data(position)
                 self.display.draw_thermal_image(position, thermal_data)
+            render_times['thermal'] = (time.time() - t0) * 1000
 
+            t0 = time.time()
             self.display.surface.blit(self.display.overlay_mask, (0, 0))
+            render_times['overlay'] = (time.time() - t0) * 1000
 
             # Draw mirroring indicators AFTER overlay so they're visible
+            t0 = time.time()
             self.display.draw_mirroring_indicators(self.thermal)
+            render_times['chevrons'] = (time.time() - t0) * 1000
 
             # Get TPMS data (LOCK-FREE snapshot access)
+            t0 = time.time()
             tpms_data = self.tpms.get_data()
             for position, data in tpms_data.items():
                 # Convert pressure from kPa to the configured unit
@@ -411,43 +455,83 @@ class OpenTPT:
                     data.get("temp"),
                     data.get("status", "N/A")
                 )
+            render_times['tpms'] = (time.time() - t0) * 1000
 
-            # Render debug info (FPS only)
-            # self.display.draw_debug_info(self.fps)
-
-            # Create separate surface for UI elements that can fade
+            # Create separate surface for UI elements that can fade (with caching)
+            t0 = time.time()
             if self.input_handler.ui_visible or self.ui_fade_alpha > 0:
-                ui_surface = pygame.Surface(
-                    (DISPLAY_WIDTH, DISPLAY_HEIGHT), pygame.SRCALPHA
-                )
+                # Only recreate UI surface if it doesn't exist or fade alpha changed
+                if self.cached_ui_surface is None or self.last_ui_fade_alpha != self.ui_fade_alpha:
+                    ui_surface = pygame.Surface(
+                        (DISPLAY_WIDTH, DISPLAY_HEIGHT), pygame.SRCALPHA
+                    )
 
-                # Render icons and scale bars to this surface
-                if self.icon_handler:
-                    self.icon_handler.render_to_surface(ui_surface)
+                    # Render icons and scale bars to this surface
+                    if self.icon_handler:
+                        self.icon_handler.render_to_surface(ui_surface)
 
-                if self.scale_bars:
-                    self.scale_bars.render_to_surface(ui_surface)
+                    if self.scale_bars:
+                        self.scale_bars.render_to_surface(ui_surface)
 
-                # Draw the units indicator to the UI surface
-                self.display.draw_units_indicator_to_surface(ui_surface)
+                    # Draw the units indicator to the UI surface
+                    self.display.draw_units_indicator_to_surface(ui_surface)
 
-                # Apply fade alpha to all UI elements including the units indicator
-                ui_surface.set_alpha(self.ui_fade_alpha)
-                self.screen.blit(ui_surface, (0, 0))
+                    # Apply fade alpha to all UI elements including the units indicator
+                    ui_surface.set_alpha(self.ui_fade_alpha)
 
-        # Apply brightness adjustment
+                    # Cache the surface
+                    self.cached_ui_surface = ui_surface
+                    self.last_ui_fade_alpha = self.ui_fade_alpha
+
+                # Blit the cached surface
+                self.screen.blit(self.cached_ui_surface, (0, 0))
+            else:
+                # Clear cached UI surface when not visible
+                self.cached_ui_surface = None
+            render_times['ui'] = (time.time() - t0) * 1000
+
+        # Apply brightness adjustment (with caching)
+        t0 = time.time()
         brightness = self.input_handler.get_brightness()
         if brightness < 1.0:
-            # Create a semi-transparent black overlay to dim the screen
-            dim_surface = pygame.Surface(
-                (DISPLAY_WIDTH, DISPLAY_HEIGHT), pygame.SRCALPHA
-            )
-            alpha = int(255 * (1.0 - brightness))
-            dim_surface.fill((0, 0, 0, alpha))
-            self.screen.blit(dim_surface, (0, 0))
+            # Only recreate brightness surface if brightness value changed
+            if self.cached_brightness_surface is None or abs(self.last_brightness - brightness) > 0.001:
+                # Create a semi-transparent black overlay to dim the screen
+                dim_surface = pygame.Surface(
+                    (DISPLAY_WIDTH, DISPLAY_HEIGHT), pygame.SRCALPHA
+                )
+                alpha = int(255 * (1.0 - brightness))
+                dim_surface.fill((0, 0, 0, alpha))
+
+                # Cache the surface
+                self.cached_brightness_surface = dim_surface
+                self.last_brightness = brightness
+
+            # Blit the cached surface
+            self.screen.blit(self.cached_brightness_surface, (0, 0))
+        else:
+            # Clear cached brightness surface when at full brightness
+            self.cached_brightness_surface = None
+        render_times['brightness'] = (time.time() - t0) * 1000
+
+        # Draw FPS counter (always on top)
+        t0 = time.time()
+        camera_fps = self.camera.fps if self.camera.is_active() else None
+        self.display.draw_fps_counter(self.fps, camera_fps)
+        render_times['fps_counter'] = (time.time() - t0) * 1000
 
         # Update the display
+        t0 = time.time()
         pygame.display.flip()
+        render_times['flip'] = (time.time() - t0) * 1000
+
+        # Print profiling every 60 frames
+        total_render = (time.time() - t_start) * 1000
+        if self.frame_count % 60 == 0:
+            print(f"\nRender profile (ms): TOTAL={total_render:.1f}")
+            for key, val in sorted(render_times.items(), key=lambda x: -x[1]):
+                pct = (val / total_render * 100) if total_render > 0 else 0
+                print(f"  {key:15s}: {val:6.2f}ms ({pct:5.1f}%)")
 
     def _calculate_fps(self):
         """Calculate and update the FPS value."""
@@ -486,6 +570,8 @@ class OpenTPT:
             self.input_handler.set_shutdown_leds()
 
         # Stop hardware monitoring threads
+        if self.input_handler:
+            self.input_handler.stop()
         self.tpms.stop()
         self.corner_sensors.stop()
 

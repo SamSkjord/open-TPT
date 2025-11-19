@@ -1,0 +1,318 @@
+"""
+Threaded input module for openTPT.
+Handles NeoKey 1x4 keypad input in a background thread to prevent I2C blocking.
+"""
+
+import time
+import threading
+from collections import deque
+
+# Import board only if available
+try:
+    import board
+    BOARD_AVAILABLE = True
+except ImportError:
+    BOARD_AVAILABLE = False
+
+from utils.config import (
+    BUTTON_BRIGHTNESS_UP,
+    BUTTON_BRIGHTNESS_DOWN,
+    BUTTON_CAMERA_TOGGLE,
+    BUTTON_RESERVED,
+    DEFAULT_BRIGHTNESS,
+)
+
+# Only try to import NeoKey if board is available
+if BOARD_AVAILABLE:
+    try:
+        import adafruit_neokey
+        from adafruit_neokey.neokey1x4 import NeoKey1x4
+        NEOKEY_AVAILABLE = True
+    except ImportError:
+        NEOKEY_AVAILABLE = False
+else:
+    NEOKEY_AVAILABLE = False
+
+
+class InputHandlerThreaded:
+    def __init__(self, camera=None):
+        """
+        Initialize the threaded input handler.
+
+        Args:
+            camera: Optional camera handler to toggle
+        """
+        self.camera = camera
+        self.neokey = None
+        self.brightness = DEFAULT_BRIGHTNESS
+        self.button_states = {
+            BUTTON_BRIGHTNESS_UP: False,
+            BUTTON_BRIGHTNESS_DOWN: False,
+            BUTTON_CAMERA_TOGGLE: False,
+            BUTTON_RESERVED: False,
+        }
+        self.last_press_time = {
+            BUTTON_BRIGHTNESS_UP: 0,
+            BUTTON_BRIGHTNESS_DOWN: 0,
+            BUTTON_CAMERA_TOGGLE: 0,
+            BUTTON_RESERVED: 0,
+        }
+        self.debounce_time = 0.2  # seconds
+
+        # UI visibility state variables
+        self.ui_visible = True
+        self.ui_manually_toggled = False
+
+        # Thread-safe event queue (bounded to last 10 events)
+        self.event_queue = deque(maxlen=10)
+        self.event_lock = threading.Lock()
+
+        # Thread control
+        self.thread = None
+        self.running = False
+        self.poll_rate = 10  # Hz - check buttons 10 times per second
+
+        # LED update flags (set by main thread, read by NeoKey thread)
+        self.led_update_requested = False
+        self.led_lock = threading.Lock()
+
+        # Initialize the NeoKey if available
+        self.initialize()
+
+    def initialize(self):
+        """Initialize the NeoKey device."""
+        if not NEOKEY_AVAILABLE:
+            print("Warning: NeoKey library not available - input disabled")
+            return
+
+        try:
+            # Initialize I2C and NeoKey
+            i2c = board.I2C()
+            self.neokey = NeoKey1x4(i2c)
+
+            # Set initial LED brightness based on default
+            self._update_leds()
+            print("NeoKey 1x4 initialized successfully")
+
+        except Exception as e:
+            print(f"Error initializing NeoKey: {e}")
+            self.neokey = None
+
+    def start(self):
+        """Start the background polling thread."""
+        if self.thread and self.thread.is_alive():
+            print("Warning: NeoKey thread already running")
+            return
+
+        self.running = True
+        self.thread = threading.Thread(target=self._poll_loop, daemon=True)
+        self.thread.start()
+        print("NeoKey polling thread started")
+
+    def stop(self):
+        """Stop the background polling thread."""
+        self.running = False
+        if self.thread:
+            self.thread.join(timeout=2.0)
+        print("NeoKey polling thread stopped")
+
+    def _poll_loop(self):
+        """Background thread that polls the NeoKey."""
+        poll_interval = 1.0 / self.poll_rate
+
+        while self.running:
+            start_time = time.time()
+
+            try:
+                self._check_buttons()
+
+                # Check if LED update requested
+                with self.led_lock:
+                    if self.led_update_requested:
+                        self._update_leds()
+                        self.led_update_requested = False
+
+            except Exception as e:
+                print(f"Error in NeoKey poll loop: {e}")
+
+            # Sleep to maintain poll rate
+            elapsed = time.time() - start_time
+            sleep_time = max(0, poll_interval - elapsed)
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+
+    def _check_buttons(self):
+        """Check for button presses (called from background thread)."""
+        if not self.neokey:
+            return
+
+        try:
+            current_time = time.time()
+            events = {}
+
+            # Check each button
+            for i in range(4):
+                pressed = self.neokey[i]
+
+                # If button state changed and debounce time passed
+                if pressed != self.button_states[i] and (
+                    current_time - self.last_press_time[i] > self.debounce_time
+                ):
+                    # Update button state
+                    self.button_states[i] = pressed
+                    self.last_press_time[i] = current_time
+
+                    # Handle the button press
+                    if pressed:
+                        if i == BUTTON_BRIGHTNESS_UP:
+                            self.increase_brightness()
+                            events["brightness_changed"] = True
+                        elif i == BUTTON_BRIGHTNESS_DOWN:
+                            self.decrease_brightness()
+                            events["brightness_changed"] = True
+                        elif i == BUTTON_CAMERA_TOGGLE and self.camera:
+                            self.camera.toggle()
+                            events["camera_toggled"] = True
+                        elif i == BUTTON_RESERVED:
+                            # If camera is active, switch between cameras
+                            # Otherwise, toggle UI visibility
+                            if self.camera and self.camera.is_active():
+                                self.camera.switch_camera()
+                                events["camera_switched"] = True
+                            else:
+                                self.toggle_ui_visibility()
+                                events["ui_toggled"] = True
+
+            # Add events to queue if any occurred
+            if events:
+                with self.event_lock:
+                    self.event_queue.append({
+                        "events": events,
+                        "timestamp": current_time
+                    })
+
+                # Request LED update
+                with self.led_lock:
+                    self.led_update_requested = True
+
+        except Exception as e:
+            print(f"Error reading NeoKey input: {e}")
+
+    def _update_leds(self):
+        """Update the NeoKey LEDs based on current state (called from background thread)."""
+        if not self.neokey:
+            return
+
+        try:
+            # Set brightness for the brightness up button (white)
+            if self.button_states[BUTTON_BRIGHTNESS_UP]:
+                self.neokey.pixels[BUTTON_BRIGHTNESS_UP] = (255, 255, 255)
+            else:
+                self.neokey.pixels[BUTTON_BRIGHTNESS_UP] = (64, 64, 64)
+
+            # Set brightness for the brightness down button (dim white)
+            if self.button_states[BUTTON_BRIGHTNESS_DOWN]:
+                self.neokey.pixels[BUTTON_BRIGHTNESS_DOWN] = (255, 255, 255)
+            else:
+                self.neokey.pixels[BUTTON_BRIGHTNESS_DOWN] = (16, 16, 16)
+
+            # Set camera toggle button (red when camera active)
+            if self.camera and self.camera.is_active():
+                self.neokey.pixels[BUTTON_CAMERA_TOGGLE] = (255, 0, 0)
+                self.neokey.pixels[BUTTON_RESERVED] = (0, 0, 0)
+            else:
+                self.neokey.pixels[BUTTON_CAMERA_TOGGLE] = (0, 0, 64)
+
+            # Set reserved button (green when UI visible, dim green when hidden)
+            if self.ui_visible:
+                self.neokey.pixels[BUTTON_RESERVED] = (0, 128, 0)
+            else:
+                self.neokey.pixels[BUTTON_RESERVED] = (0, 16, 0)
+
+        except Exception as e:
+            print(f"Error updating NeoKey LEDs: {e}")
+
+    def request_led_update(self):
+        """Request LED update from main thread (thread-safe)."""
+        with self.led_lock:
+            self.led_update_requested = True
+
+    def check_input(self):
+        """
+        Check for button press events (called from main thread).
+        Returns the latest event or empty dict if none.
+
+        Returns:
+            dict: Dictionary with events that occurred
+        """
+        events = {
+            "brightness_changed": False,
+            "camera_toggled": False,
+            "ui_toggled": False,
+        }
+
+        # Get latest event from queue (non-blocking)
+        with self.event_lock:
+            if self.event_queue:
+                latest = self.event_queue[-1]
+                events.update(latest["events"])
+                self.event_queue.clear()  # Clear queue after reading
+
+        return events
+
+    def toggle_ui_visibility(self):
+        """Toggle the visibility of UI elements."""
+        if not self.ui_manually_toggled or not self.ui_visible:
+            # Switching from auto mode to manual ON, or turning ON
+            self.ui_visible = True
+            self.ui_manually_toggled = True
+        else:
+            # Manual ON -> Manual OFF
+            self.ui_visible = False
+            self.ui_manually_toggled = True
+
+    def increase_brightness(self):
+        """Increase the display brightness."""
+        self.brightness = min(1.0, self.brightness + 0.1)
+
+    def decrease_brightness(self):
+        """Decrease the display brightness."""
+        self.brightness = max(0.1, self.brightness - 0.1)
+
+    def get_brightness(self):
+        """Get the current brightness level."""
+        return self.brightness
+
+    def simulate_button_press(self, button_index):
+        """Simulate a button press (for keyboard input testing)."""
+        current_time = time.time()
+
+        if button_index == BUTTON_BRIGHTNESS_UP:
+            self.increase_brightness()
+        elif button_index == BUTTON_BRIGHTNESS_DOWN:
+            self.decrease_brightness()
+        elif button_index == BUTTON_CAMERA_TOGGLE and self.camera:
+            self.camera.toggle()
+        elif button_index == BUTTON_RESERVED:
+            # If camera is active, switch between cameras
+            # Otherwise, toggle UI visibility
+            if self.camera and self.camera.is_active():
+                self.camera.switch_camera()
+            else:
+                self.toggle_ui_visibility()
+
+        # Request LED update
+        self.request_led_update()
+
+    def set_shutdown_leds(self):
+        """Set all NeoKey LEDs to dim red when shutting down."""
+        if not self.neokey:
+            return
+
+        try:
+            # Set all keys to dim red
+            for i in range(4):
+                self.neokey.pixels[i] = (32, 0, 0)  # Dim red color
+            print("NeoKey LEDs set to shutdown state")
+        except Exception as e:
+            print(f"Error setting shutdown LEDs: {e}")

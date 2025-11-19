@@ -43,6 +43,9 @@ from utils.config import (
     REFERENCE_HEIGHT,
     SCALE_X,
     SCALE_Y,
+    FPS_COUNTER_ENABLED,
+    FPS_COUNTER_POSITION,
+    FPS_COUNTER_COLOR,
     # ROTATION,
 )
 
@@ -711,3 +714,40 @@ class Display:
 
         # Draw the text directly to the provided surface
         surface.blit(units_surface, units_pos)
+
+    def draw_fps_counter(self, fps: float, camera_fps: float = None):
+        """
+        Draw FPS counter on screen if enabled.
+
+        Args:
+            fps: Current UI/render frames per second
+            camera_fps: Optional camera capture frames per second
+        """
+        if not FPS_COUNTER_ENABLED:
+            return
+
+        # Format FPS text - show both UI and camera FPS if available
+        if camera_fps is not None:
+            fps_text = f"UI: {fps:.1f} | CAM: {camera_fps:.1f}"
+        else:
+            fps_text = f"FPS: {fps:.1f}"
+
+        fps_surface = self.font_small.render(fps_text, True, FPS_COUNTER_COLOR)
+
+        # Calculate position based on config
+        padding = 10
+        if FPS_COUNTER_POSITION == "top-left":
+            pos = (padding, padding)
+        elif FPS_COUNTER_POSITION == "top-right":
+            pos = (DISPLAY_WIDTH - fps_surface.get_width() - padding, padding)
+        elif FPS_COUNTER_POSITION == "bottom-left":
+            pos = (padding, DISPLAY_HEIGHT - fps_surface.get_height() - padding)
+        elif FPS_COUNTER_POSITION == "bottom-right":
+            pos = (DISPLAY_WIDTH - fps_surface.get_width() - padding,
+                   DISPLAY_HEIGHT - fps_surface.get_height() - padding)
+        else:
+            # Default to top-right
+            pos = (DISPLAY_WIDTH - fps_surface.get_width() - padding, padding)
+
+        # Draw the FPS counter
+        self.surface.blit(fps_surface, pos)

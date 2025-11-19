@@ -26,7 +26,7 @@ except ImportError:
 
 
 class Camera:
-    """Camera handler for rear-view display with optional radar overlay."""
+    """Camera handler for multi-camera display with optional radar overlay."""
 
     def __init__(self, surface, radar_handler=None):
         """
@@ -34,15 +34,21 @@ class Camera:
 
         Args:
             surface: The pygame surface to draw on
-            radar_handler: Optional radar handler for overlay
+            radar_handler: Optional radar handler for overlay (rear camera only)
         """
         self.surface = surface
-        self.camera = None
+
+        # Multi-camera support
+        self.cameras = {
+            'rear': None,
+            'front': None
+        }
+        self.current_camera = 'rear'  # Start with rear camera
         self.active = False
         self.error_message = None
         self.frame = None
 
-        # Radar integration
+        # Radar integration (rear camera only)
         self.radar_handler = radar_handler
         self.radar_overlay = None
         if radar_handler and radar_handler.is_enabled():
@@ -54,7 +60,7 @@ class Camera:
                     camera_fov=106.0,  # Adjust based on your camera
                     mirror_output=True,  # Match camera mirroring
                 )
-                print("Radar overlay enabled")
+                print("Radar overlay enabled for rear camera")
             except ImportError as e:
                 print(f"Warning: Could not load radar overlay: {e}")
 
@@ -78,9 +84,82 @@ class Camera:
         self.last_time = time.time()
         self.update_interval = 1.0  # Update FPS every 1 second
 
+    @property
+    def camera(self):
+        """Get the currently active camera object."""
+        return self.cameras[self.current_camera]
+
+    @camera.setter
+    def camera(self, value):
+        """Set the currently active camera object."""
+        self.cameras[self.current_camera] = value
+
+    def switch_camera(self):
+        """Switch between rear and front cameras."""
+        if not self.active:
+            return False  # Don't switch if camera view is not active
+
+        # Save the last frame to display during transition
+        last_frame = self.frame
+
+        # Stop current camera capture thread
+        was_active = self.active
+        if was_active:
+            self._stop_capture_thread()
+
+        # Release old camera to free up the device
+        old_camera = self.current_camera
+        if self.cameras[old_camera]:
+            print(f"Releasing {old_camera} camera")
+            self.cameras[old_camera].release()
+            self.cameras[old_camera] = None
+
+        # Switch camera
+        self.current_camera = 'front' if self.current_camera == 'rear' else 'rear'
+
+        # Restore last frame during initialization to avoid checkerboard
+        self.frame = last_frame
+
+        # Initialize new camera
+        camera_device = f"/dev/video-{self.current_camera}"
+        print(f"Initializing {self.current_camera} camera at {camera_device}")
+        if not self.initialize(camera_device=camera_device):
+            # Failed to initialize new camera, try to restore old one
+            print(f"Failed to initialize {self.current_camera} camera")
+            self.current_camera = old_camera
+            old_device = f"/dev/video-{old_camera}"
+            if self.initialize(camera_device=old_device):
+                print(f"Restored {old_camera} camera")
+                if was_active:
+                    self._start_capture_thread()
+            return False
+
+        # Start capture thread with new camera
+        if was_active:
+            self._start_capture_thread()
+
+        print(f"Switched to {self.current_camera} camera")
+        return True
+
+    def _start_capture_thread(self):
+        """Start the capture thread."""
+        if not self.thread_running and CV2_AVAILABLE and self.camera:
+            print(f"DEBUG: Starting capture thread for {self.current_camera} camera")
+            print(f"DEBUG: Camera object exists: {self.camera is not None}")
+            print(f"DEBUG: Camera is opened: {self.camera.isOpened() if self.camera else False}")
+            self.thread_running = True
+            self.capture_thread = threading.Thread(
+                target=self._capture_thread_function, daemon=True
+            )
+            self.capture_thread.start()
+        else:
+            print(f"DEBUG: Cannot start capture thread - thread_running={self.thread_running}, CV2={CV2_AVAILABLE}, camera={self.camera is not None}")
+
     def _capture_thread_function(self):
         """Thread function that continuously captures frames from the camera."""
-        print("Camera capture thread started")
+        print(f"Camera capture thread started for {self.current_camera} camera")
+        print(f"DEBUG: Thread running flag: {self.thread_running}")
+        print(f"DEBUG: Camera object: {self.camera}")
 
         # Set camera properties for maximum performance
         self.camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
@@ -101,7 +180,12 @@ class Camera:
         print(
             f"Camera configured: {self.camera_width}x{self.camera_height} @ {self.camera_fps}fps"
         )
-        print(f"Actual FPS: {self.camera.get(cv2.CAP_PROP_FPS)}")
+        actual_fps = self.camera.get(cv2.CAP_PROP_FPS)
+        actual_width = self.camera.get(cv2.CAP_PROP_FRAME_WIDTH)
+        actual_height = self.camera.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        actual_fourcc = int(self.camera.get(cv2.CAP_PROP_FOURCC))
+        fourcc_str = "".join([chr((actual_fourcc >> 8 * i) & 0xFF) for i in range(4)])
+        print(f"Actual settings: {actual_width:.0f}x{actual_height:.0f} @ {actual_fps}fps, codec: {fourcc_str}")
 
         # Pre-calculate scaling factors
         scale = min(
@@ -116,30 +200,57 @@ class Camera:
         thread_frame_count = 0
         thread_start_time = time.time()
 
+        # Profiling variables
+        profile_times = {'grab': 0, 'retrieve': 0, 'flip': 0, 'cvt': 0, 'resize': 0, 'queue': 0}
+        profile_count = 0
+
+        # Debug counters
+        grab_success_count = 0
+        grab_fail_count = 0
+        retrieve_fail_count = 0
+
         # Thread loop - continuously capture frames as fast as possible
+        print(f"DEBUG: Entering capture loop for {self.current_camera} camera")
         while self.thread_running:
             if not self.camera.isOpened():
                 self.error_message = "Camera disconnected"
                 break
 
             # Capture frame using grab/retrieve for maximum speed
+            t0 = time.time()
             if self.camera.grab():
+                grab_success_count += 1
+                t1 = time.time()
+                profile_times['grab'] += (t1 - t0) * 1000
+
                 ret, frame = self.camera.retrieve()
+                t2 = time.time()
+                profile_times['retrieve'] += (t2 - t1) * 1000
+
                 if not ret:
+                    retrieve_fail_count += 1
                     continue
 
                 # Pre-process frame for direct rendering
                 try:
                     # Flip horizontally and convert to RGB in one step
                     frame = cv2.flip(frame, 1)
+                    t3 = time.time()
+                    profile_times['flip'] += (t3 - t2) * 1000
+
                     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    t4 = time.time()
+                    profile_times['cvt'] += (t4 - t3) * 1000
 
                     # Resize using fastest interpolation
                     resized_frame = cv2.resize(
                         rgb_frame, (target_w, target_h), interpolation=cv2.INTER_NEAREST
                     )
+                    t5 = time.time()
+                    profile_times['resize'] += (t5 - t4) * 1000
 
                     # Create processed frame data for direct rendering
+                    # Note: swapaxes done in render thread to keep capture thread fast
                     processed_frame = {
                         "data": resized_frame,
                         "width": target_w,
@@ -155,29 +266,122 @@ class Camera:
                         except queue.Empty:
                             pass
                     self.frame_queue.put(processed_frame, block=False)
+                    t6 = time.time()
+                    profile_times['queue'] += (t6 - t5) * 1000
+
+                    # Track capture FPS and profiling
+                    thread_frame_count += 1
+                    profile_count += 1
+                    thread_elapsed = time.time() - thread_start_time
+                    if thread_elapsed >= 5.0:  # Print every 5 seconds
+                        capture_fps = thread_frame_count / thread_elapsed
+                        print(f"{self.current_camera.capitalize()} camera capture FPS: {capture_fps:.1f}")
+                        print(f"DEBUG: Grab stats - Success: {grab_success_count}, Fail: {grab_fail_count}, Retrieve fail: {retrieve_fail_count}")
+                        # Reset debug counters
+                        grab_success_count = 0
+                        grab_fail_count = 0
+                        retrieve_fail_count = 0
+                        # Print profiling info
+                        if profile_count > 0:
+                            print(f"  Capture profile (avg ms): grab={profile_times['grab']/profile_count:.1f}, "
+                                  f"retrieve={profile_times['retrieve']/profile_count:.1f}, "
+                                  f"flip={profile_times['flip']/profile_count:.1f}, "
+                                  f"cvt={profile_times['cvt']/profile_count:.1f}, "
+                                  f"resize={profile_times['resize']/profile_count:.1f}, "
+                                  f"queue={profile_times['queue']/profile_count:.1f}")
+                            # Reset profiling
+                            profile_times = {'grab': 0, 'retrieve': 0, 'flip': 0, 'cvt': 0, 'resize': 0, 'queue': 0}
+                            profile_count = 0
+                        thread_frame_count = 0
+                        thread_start_time = time.time()
 
                 except Exception as e:
                     print(f"Error processing frame: {e}")
                     continue
+            else:
+                grab_fail_count += 1
+                continue
 
-        print("Camera capture thread stopped")
+        print(f"Camera capture thread stopped for {self.current_camera} camera")
+        print(f"DEBUG: Final stats - Grab success: {grab_success_count}, Grab fail: {grab_fail_count}, Retrieve fail: {retrieve_fail_count}")
 
-    def initialize(self, camera_index=0):
-        """Initialize the camera with the specified device index."""
+    def initialize(self, camera_index=None, camera_device=None):
+        """
+        Initialize the camera with the specified device index or device path.
+        Args:
+            camera_index: Integer index (0-5) or None for auto-detect
+            camera_device: Device path (e.g., "/dev/video-rear") or None
+        """
         if not CV2_AVAILABLE:
             self.error_message = "OpenCV (cv2) not available - camera disabled"
             print(self.error_message)
             return False
 
         try:
-            self.close()
-            self.camera = cv2.VideoCapture(camera_index)
+            # Close existing camera for this slot
+            if self.cameras[self.current_camera]:
+                self.cameras[self.current_camera].release()
+                self.cameras[self.current_camera] = None
+
+            # Determine which camera to open
+            camera_to_open = None
+
+            if camera_device:
+                # Use specific device path (e.g., /dev/video-rear)
+                camera_to_open = camera_device
+                print(f"Trying camera device: {camera_device}")
+            elif camera_index is not None:
+                camera_to_open = camera_index
+            else:
+                # Auto-detect: try named devices first, then indices
+                named_device = f"/dev/video-{self.current_camera}"
+                test_camera = cv2.VideoCapture(named_device)
+                if test_camera.isOpened():
+                    test_camera.release()
+                    camera_to_open = named_device
+                    print(f"Found {self.current_camera} camera at {named_device}")
+                else:
+                    # Fall back to auto-detect by index
+                    for idx in range(6):  # Try indices 0-5
+                        test_camera = cv2.VideoCapture(idx)
+                        if test_camera.isOpened():
+                            test_camera.release()
+                            camera_to_open = idx
+                            print(f"Auto-detected camera at index {idx}")
+                            break
+
+            if camera_to_open is None:
+                self.error_message = f"No {self.current_camera} camera found"
+                print(self.error_message)
+                return False
+
+            # For device paths, resolve symlink to actual device and keep as path
+            # OpenCV V4L2 backend seems to work better with device paths than indices on this system
+            if isinstance(camera_to_open, str) and camera_to_open.startswith('/dev/video'):
+                import os
+                # Resolve symlink to actual device (e.g., /dev/video-rear -> /dev/video3)
+                try:
+                    actual_device = os.path.realpath(camera_to_open)
+                    print(f"DEBUG: Resolved {camera_to_open} -> {actual_device}")
+                    camera_to_open = actual_device
+                except (ValueError, OSError) as e:
+                    print(f"DEBUG: Could not resolve device path: {e}")
+
+            # Open camera without explicit backend specification, let OpenCV choose best one
+            self.camera = cv2.VideoCapture(camera_to_open)
 
             if not self.camera.isOpened():
                 self.error_message = f"Failed to open camera at index {camera_index}"
                 return False
 
+            # Configure camera resolution and FPS
+            self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
+            self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
+            self.camera.set(cv2.CAP_PROP_FPS, CAMERA_FPS)
+            self.camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+
             self.error_message = None
+            print(f"Camera initialized successfully at index {camera_index}")
             return True
 
         except Exception as e:
@@ -193,12 +397,7 @@ class Camera:
         self.active = not self.active
 
         if self.active:
-            if not self.thread_running and CV2_AVAILABLE:
-                self.thread_running = True
-                self.capture_thread = threading.Thread(
-                    target=self._capture_thread_function, daemon=True
-                )
-                self.capture_thread.start()
+            self._start_capture_thread()
         else:
             self._stop_capture_thread()
 
@@ -233,8 +432,11 @@ class Camera:
         result = False
 
         if not CV2_AVAILABLE or not self.camera:
-            self._generate_test_pattern()
-            result = True
+            # Only generate test pattern if we don't have a frame yet
+            # This allows smooth transitions by keeping the last frame visible
+            if self.frame is None:
+                self._generate_test_pattern()
+                result = True
         else:
             if (
                 self.thread_running
@@ -248,15 +450,16 @@ class Camera:
                 except queue.Empty:
                     pass
 
-        # Update FPS counter
-        self.frame_count += 1
-        current_time = time.time()
-        elapsed = current_time - self.last_time
+        # Update FPS counter - only count when we got a new frame
+        if result:
+            self.frame_count += 1
+            current_time = time.time()
+            elapsed = current_time - self.last_time
 
-        if elapsed >= self.update_interval:
-            self.fps = self.frame_count / elapsed
-            self.frame_count = 0
-            self.last_time = current_time
+            if elapsed >= self.update_interval:
+                self.fps = self.frame_count / elapsed
+                self.frame_count = 0
+                self.last_time = current_time
 
         return result
 
@@ -299,9 +502,6 @@ class Camera:
             if self.display_array is None:
                 self.display_array = pygame.surfarray.pixels3d(self.surface)
 
-            # Clear the display to black
-            self.display_array.fill(0)
-
             if isinstance(self.frame, dict):
                 # Direct rendering from processed frame data
                 frame_data = self.frame["data"]
@@ -310,7 +510,7 @@ class Camera:
                 x_offset = self.frame["x_offset"]
                 y_offset = self.frame["y_offset"]
 
-                # Direct pixel copy - fastest possible rendering
+                # Direct pixel copy with swapaxes for pygame format
                 self.display_array[
                     x_offset : x_offset + width, y_offset : y_offset + height
                 ] = frame_data.swapaxes(0, 1)
@@ -338,20 +538,28 @@ class Camera:
                     x_offset : x_offset + target_w, y_offset : y_offset + target_h
                 ] = resized.swapaxes(0, 1)
 
-            # Release the pixel array to update the display
-            del self.display_array
-            self.display_array = None
+            # Must unlock surface before blitting radar overlay
+            # Only show radar on rear camera
+            if self.radar_overlay and self.radar_handler and self.current_camera == 'rear':
+                # Release the pixel array to unlock the surface
+                del self.display_array
+                self.display_array = None
 
-            # Render radar overlay if enabled
-            if self.radar_overlay and self.radar_handler:
+            # Render radar overlay if enabled (rear camera only)
+            if self.radar_overlay and self.radar_handler and self.current_camera == 'rear':
                 tracks = self.radar_handler.get_tracks()
                 if tracks:
                     self.radar_overlay.render(self.surface, tracks)
+            else:
+                # No radar - unlock surface if still locked
+                if self.display_array is not None:
+                    del self.display_array
+                    self.display_array = None
 
             return True
 
         except Exception as e:
-            # Ensure we release the pixel array even on error
+            # Unlock surface on error
             if self.display_array is not None:
                 del self.display_array
                 self.display_array = None

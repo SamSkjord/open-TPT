@@ -27,9 +27,24 @@ TEMP_UNIT = "C"
 # Pressure unit: 'PSI', 'BAR', or 'KPA'
 PRESSURE_UNIT = "PSI"
 
-CAMERA_WIDTH = 1280
-CAMERA_HEIGHT = 720
+# FPS Counter settings
+FPS_COUNTER_ENABLED = True  # Show FPS counter on screen
+FPS_COUNTER_POSITION = "top-right"  # Options: "top-left", "top-right", "bottom-left", "bottom-right"
+FPS_COUNTER_COLOR = (0, 255, 0)  # RGB color (default: green)
+
+CAMERA_WIDTH = 800
+CAMERA_HEIGHT = 600
 CAMERA_FPS = 30
+
+# Multi-camera configuration
+# Set which cameras are available in your system
+CAMERA_REAR_ENABLED = True   # Rear camera (with radar overlay if radar enabled)
+CAMERA_FRONT_ENABLED = True  # Front camera (no radar overlay)
+
+# Camera device paths (if using udev rules for persistent naming)
+# Leave as None to auto-detect
+CAMERA_REAR_DEVICE = "/dev/video-rear"   # or None for auto-detect
+CAMERA_FRONT_DEVICE = "/dev/video-front"  # or None for auto-detect
 
 # Note: The thresholds below are set according to the chosen units above.
 # If you change the units, you should also adjust these thresholds appropriately.
