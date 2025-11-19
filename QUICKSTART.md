@@ -3,7 +3,7 @@
 ## Current Configuration
 - **Pi IP:** `192.168.199.243`
 - **User:** `pi`
-- **Path:** `/home/pi/openTPT`
+- **Path:** `/home/pi/open-TPT`
 - **Status:** ✅ Production Ready
 
 ## Quick Deploy & Run
@@ -23,7 +23,7 @@
 ssh pi@192.168.199.243
 
 # Navigate to app
-cd /home/pi/openTPT
+cd /home/pi/open-TPT
 
 # Run application (requires sudo for GPIO/hardware access)
 sudo ./main.py
@@ -122,7 +122,7 @@ ssh pi@192.168.199.243 "sudo systemctl restart openTPT.service"
 ```bash
 # SSH to Pi and re-run installation
 ssh pi@192.168.199.243
-cd /home/pi/openTPT
+cd /home/pi/open-TPT
 sudo ./install.sh
 ```
 
@@ -150,7 +150,7 @@ cd /Users/sam/git/open-TPT
 ```bash
 # SSH and run with real hardware
 ssh pi@192.168.199.243
-cd /home/pi/openTPT
+cd /home/pi/open-TPT
 sudo ./main.py
 ```
 

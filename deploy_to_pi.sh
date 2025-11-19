@@ -19,7 +19,7 @@ NC='\033[0m' # No Color
 
 # Default values
 PI_HOST=${1:-pi@raspberrypi.local}
-REMOTE_PATH=${2:-/home/pi/openTPT}
+REMOTE_PATH=${2:-/home/pi/open-TPT}
 
 echo -e "${GREEN}=== openTPT Deployment to Raspberry Pi ===${NC}"
 echo ""

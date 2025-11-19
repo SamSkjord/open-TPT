@@ -56,14 +56,14 @@ Deploy everything including assets:
 ```bash
 cd /Users/sam/git/open-TPT
 
-# Deploy to default location (/home/pi/openTPT)
+# Deploy to default location (/home/pi/open-TPT)
 ./deploy_to_pi.sh pi@192.168.199.243
 
 # Or use hostname (if mDNS configured)
 ./deploy_to_pi.sh pi@192.168.199.243
 
 # Or deploy to custom location
-./deploy_to_pi.sh pi@192.168.199.243 /opt/openTPT
+./deploy_to_pi.sh pi@192.168.199.243 /opt/open-TPT
 ```
 
 The script will:
@@ -89,10 +89,10 @@ For custom sync needs:
 
 ```bash
 # Sync specific directory
-rsync -avz ./hardware/ pi@192.168.199.243:/home/pi/openTPT/hardware/
+rsync -avz ./hardware/ pi@192.168.199.243:/home/pi/open-TPT/hardware/
 
 # Sync with delete (match source exactly)
-rsync -avz --delete ./ pi@192.168.199.243:/home/pi/openTPT/
+rsync -avz --delete ./ pi@192.168.199.243:/home/pi/open-TPT/
 ```
 
 ### Method 4: Watch and Auto-Deploy
@@ -116,7 +116,7 @@ fswatch -o . | xargs -n1 -I{} ./tools/quick_sync.sh pi@192.168.199.243
 ssh pi@192.168.199.243
 
 # Run performance tests
-cd /home/pi/openTPT
+cd /home/pi/open-TPT
 python3 tools/performance_test.py
 ```
 
@@ -189,7 +189,7 @@ ssh pi@192.168.199.243 "ls -la /home/pi/openTPT"
 ```bash
 # SSH to Pi and install manually
 ssh pi@192.168.199.243
-cd /home/pi/openTPT
+cd /home/pi/open-TPT
 pip3 install -r requirements.txt
 ```
 
@@ -218,7 +218,7 @@ pip3 install numba
 2. **Terminal 2** - SSH session on Pi:
    ```bash
    ssh pi@192.168.199.243
-   cd /home/pi/openTPT
+   cd /home/pi/open-TPT
    ./main.py --windowed
    ```
 
@@ -229,7 +229,7 @@ pip3 install numba
 Use VS Code Remote SSH extension:
 1. Install "Remote - SSH" extension
 2. Connect to Pi
-3. Open `/home/pi/openTPT`
+3. Open `/home/pi/open-TPT`
 4. Debug directly on Pi
 
 ### Performance Profiling on Pi
@@ -237,12 +237,12 @@ Use VS Code Remote SSH extension:
 ```bash
 # CPU profile
 ssh pi@192.168.199.243
-cd /home/pi/openTPT
+cd /home/pi/open-TPT
 python3 -m cProfile -o profile.stats main.py
 python3 -c "import pstats; p=pstats.Stats('profile.stats'); p.sort_stats('cumulative'); p.print_stats(20)"
 
 # Copy profile back to Mac for analysis
-scp pi@192.168.199.243:/home/pi/openTPT/profile.stats ./
+scp pi@192.168.199.243:/home/pi/open-TPT/profile.stats ./
 ```
 
 ## Files Excluded from Deployment
@@ -282,7 +282,7 @@ For production deployment, enable the systemd service:
 ssh pi@192.168.199.243
 
 # Copy service file
-sudo cp /home/pi/openTPT/openTPT.service /etc/systemd/system/
+sudo cp /home/pi/open-TPT/openTPT.service /etc/systemd/system/
 
 # Enable and start service
 sudo systemctl enable openTPT.service

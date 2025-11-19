@@ -374,6 +374,19 @@ openTPT/
 - Web-based remote monitoring
 - Additional radar compatibility (other manufacturers)
 
+## Documentation
+
+| Document | Purpose |
+|----------|---------|
+| `README.md` | Complete project documentation (this file) |
+| `QUICKSTART.md` | Quick reference for daily use |
+| `DEPLOYMENT.md` | Deployment workflow and troubleshooting |
+| `PERFORMANCE_OPTIMIZATIONS.md` | Technical implementation details |
+| `WAVESHARE_DUAL_CAN_HAT_SETUP.md` | CAN hardware configuration |
+| `CHANGELOG.md` | Version history and features |
+| `open-TPT_System_Plan.md` | Long-term architecture plan |
+| `AI_CONTEXT.md` | AI assistant onboarding guide |
+
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.

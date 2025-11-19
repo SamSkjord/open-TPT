@@ -7,7 +7,7 @@
 set -e
 
 PI_HOST=${1:-pi@raspberrypi.local}
-REMOTE_PATH=/home/pi/openTPT
+REMOTE_PATH=/home/pi/open-TPT
 
 # Quick sync only Python files and configs
 rsync -avz --progress \
