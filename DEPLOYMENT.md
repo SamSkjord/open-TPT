@@ -26,8 +26,8 @@ This avoids entering password every deployment:
 ssh-keygen -t ed25519
 
 # Copy key to Pi
-ssh-copy-id pi@raspberrypi.local
-# or with IP: ssh-copy-id pi@192.168.1.100
+ssh-copy-id pi@192.168.199.243
+# or with IP: ssh-copy-id pi@192.168.199.243
 ```
 
 ### 2. First-Time Pi Setup
@@ -36,7 +36,7 @@ SSH to the Pi and install dependencies:
 
 ```bash
 # SSH to Pi
-ssh pi@raspberrypi.local
+ssh pi@192.168.199.243
 
 # Update system
 sudo apt update && sudo apt upgrade -y
@@ -57,10 +57,13 @@ Deploy everything including assets:
 cd /Users/sam/git/open-TPT
 
 # Deploy to default location (/home/pi/openTPT)
-./deploy_to_pi.sh pi@raspberrypi.local
+./deploy_to_pi.sh pi@192.168.199.243
+
+# Or use hostname (if mDNS configured)
+./deploy_to_pi.sh pi@192.168.199.243
 
 # Or deploy to custom location
-./deploy_to_pi.sh pi@192.168.1.100 /opt/openTPT
+./deploy_to_pi.sh pi@192.168.199.243 /opt/openTPT
 ```
 
 The script will:
@@ -75,7 +78,7 @@ The script will:
 Only sync Python files and configs (much faster):
 
 ```bash
-./tools/quick_sync.sh pi@raspberrypi.local
+./tools/quick_sync.sh pi@192.168.199.243
 ```
 
 Use this when you've only changed code, not assets.
@@ -86,10 +89,10 @@ For custom sync needs:
 
 ```bash
 # Sync specific directory
-rsync -avz ./hardware/ pi@raspberrypi.local:/home/pi/openTPT/hardware/
+rsync -avz ./hardware/ pi@192.168.199.243:/home/pi/openTPT/hardware/
 
 # Sync with delete (match source exactly)
-rsync -avz --delete ./ pi@raspberrypi.local:/home/pi/openTPT/
+rsync -avz --delete ./ pi@192.168.199.243:/home/pi/openTPT/
 ```
 
 ### Method 4: Watch and Auto-Deploy
@@ -101,7 +104,7 @@ Automatically deploy on file changes (requires `fswatch`):
 brew install fswatch
 
 # Watch for changes and auto-deploy
-fswatch -o . | xargs -n1 -I{} ./tools/quick_sync.sh pi@raspberrypi.local
+fswatch -o . | xargs -n1 -I{} ./tools/quick_sync.sh pi@192.168.199.243
 ```
 
 ## Testing on Pi
@@ -110,7 +113,7 @@ fswatch -o . | xargs -n1 -I{} ./tools/quick_sync.sh pi@raspberrypi.local
 
 ```bash
 # SSH to Pi
-ssh pi@raspberrypi.local
+ssh pi@192.168.199.243
 
 # Run performance tests
 cd /home/pi/openTPT
@@ -160,13 +163,14 @@ Thermal Processing Times:
 
 ```bash
 # Test basic connectivity
-ping raspberrypi.local
+ping 192.168.199.243
 
 # Test SSH
-ssh pi@raspberrypi.local "echo 'Connection OK'"
+ssh pi@192.168.199.243 "echo 'Connection OK'"
 
-# Use IP instead of hostname
-./deploy_to_pi.sh pi@192.168.1.100
+# Or use hostname if mDNS configured
+ping raspberrypi.local
+./deploy_to_pi.sh pi@raspberrypi.local
 ```
 
 ### Permission Denied
@@ -177,14 +181,14 @@ chmod +x deploy_to_pi.sh
 chmod +x tools/quick_sync.sh
 
 # Check remote directory permissions
-ssh pi@raspberrypi.local "ls -la /home/pi/openTPT"
+ssh pi@192.168.199.243 "ls -la /home/pi/openTPT"
 ```
 
 ### Dependencies Not Installed
 
 ```bash
 # SSH to Pi and install manually
-ssh pi@raspberrypi.local
+ssh pi@192.168.199.243
 cd /home/pi/openTPT
 pip3 install -r requirements.txt
 ```
@@ -208,12 +212,12 @@ pip3 install numba
 1. **Terminal 1** - Watch and auto-deploy:
    ```bash
    cd /Users/sam/git/open-TPT
-   fswatch -o . | xargs -n1 -I{} ./tools/quick_sync.sh pi@raspberrypi.local
+   fswatch -o . | xargs -n1 -I{} ./tools/quick_sync.sh pi@192.168.199.243
    ```
 
 2. **Terminal 2** - SSH session on Pi:
    ```bash
-   ssh pi@raspberrypi.local
+   ssh pi@192.168.199.243
    cd /home/pi/openTPT
    ./main.py --windowed
    ```
@@ -232,13 +236,13 @@ Use VS Code Remote SSH extension:
 
 ```bash
 # CPU profile
-ssh pi@raspberrypi.local
+ssh pi@192.168.199.243
 cd /home/pi/openTPT
 python3 -m cProfile -o profile.stats main.py
 python3 -c "import pstats; p=pstats.Stats('profile.stats'); p.sort_stats('cumulative'); p.print_stats(20)"
 
 # Copy profile back to Mac for analysis
-scp pi@raspberrypi.local:/home/pi/openTPT/profile.stats ./
+scp pi@192.168.199.243:/home/pi/openTPT/profile.stats ./
 ```
 
 ## Files Excluded from Deployment
@@ -260,7 +264,7 @@ Before deploying to production:
 
 - [ ] Test on Mac with mock mode: `./main.py --windowed`
 - [ ] Run performance tests locally: `python3 tools/performance_test.py`
-- [ ] Deploy to Pi: `./deploy_to_pi.sh pi@raspberrypi.local`
+- [ ] Deploy to Pi: `./deploy_to_pi.sh pi@192.168.199.243`
 - [ ] Run performance tests on Pi
 - [ ] Test with actual hardware connected
 - [ ] Verify all sensors reporting correctly
@@ -275,7 +279,7 @@ For production deployment, enable the systemd service:
 
 ```bash
 # SSH to Pi
-ssh pi@raspberrypi.local
+ssh pi@192.168.199.243
 
 # Copy service file
 sudo cp /home/pi/openTPT/openTPT.service /etc/systemd/system/
@@ -294,11 +298,11 @@ sudo journalctl -u openTPT.service -f
 ## Update Workflow
 
 1. Develop and test on Mac
-2. Deploy to Pi: `./deploy_to_pi.sh pi@raspberrypi.local`
+2. Deploy to Pi: `./deploy_to_pi.sh pi@192.168.199.243`
 3. Test on Pi
 4. If production, restart service:
    ```bash
-   ssh pi@raspberrypi.local "sudo systemctl restart openTPT.service"
+   ssh pi@192.168.199.243 "sudo systemctl restart openTPT.service"
    ```
 
 ---

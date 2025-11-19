@@ -1,68 +1,137 @@
-# Quick Start Guide - openTPT Development
+# Quick Start Guide - openTPT
 
-## Your Pi Configuration
-- **IP Address**: `192.168.199.247`
-- **User**: `pi`
-- **Path**: `/home/pi/openTPT`
-- **Status**: ✅ Deployed and tested
+## Current Configuration
+- **Pi IP:** `192.168.199.243`
+- **User:** `pi`
+- **Path:** `/home/pi/openTPT`
+- **Status:** ✅ Production Ready
 
-## Quick Commands
+## Quick Deploy & Run
 
-### Deploy from Mac to Pi
+### Deploy from Mac
 ```bash
-# Full deployment (first time or big changes)
-./deploy_to_pi.sh pi@192.168.199.247
+# Full deployment (first time or major changes)
+./deploy_to_pi.sh pi@192.168.199.243
 
-# Quick sync (only code changes)
-./tools/quick_sync.sh pi@192.168.199.247
-
-# Auto-deploy on file changes (requires fswatch)
-brew install fswatch
-fswatch -o . | xargs -n1 -I{} ./tools/quick_sync.sh pi@192.168.199.247
+# Quick sync (code changes only - faster)
+./tools/quick_sync.sh pi@192.168.199.243
 ```
 
 ### Run on Pi
 ```bash
 # SSH to Pi
-ssh pi@192.168.199.247
+ssh pi@192.168.199.243
 
 # Navigate to app
 cd /home/pi/openTPT
 
-# Run performance tests
-python3 tools/performance_test.py
-
-# Run application (needs sudo for GPIO)
+# Run application (requires sudo for GPIO/hardware access)
 sudo ./main.py
 
-# Or windowed mode for testing
+# Or run in windowed mode for testing
 sudo ./main.py --windowed
 ```
 
-### View Pi Logs Remotely
+### View Service Logs
 ```bash
-# Real-time performance monitoring
-ssh pi@192.168.199.247 "cd /home/pi/openTPT && sudo ./main.py 2>&1" | grep "Performance Summary" -A 20
+# Real-time system service logs
+ssh pi@192.168.199.243 "sudo journalctl -u openTPT.service -f"
+
+# Check service status
+ssh pi@192.168.199.243 "sudo systemctl status openTPT.service"
 ```
 
-## Performance Results (Tested on Your Pi)
+## Hardware Controls
 
-| Test | Target | Result | Status |
-|------|--------|--------|--------|
-| Render Loop | ≤ 12 ms | 8.07 ms | ✅ PASS |
-| Lock-Free Access | < 100 µs | 6.11 µs | ✅ PASS |
-| Thermal Processing | < 1 ms | 1.46 ms | ⚠️ Close |
-| FPS | 30-60 | 62.5 | ✅ PASS |
+### NeoKey 1x4 Buttons
+- **Button 0:** Increase brightness
+- **Button 1:** Decrease brightness
+- **Button 2:** Cycle camera views (telemetry ↔ rear ↔ front)
+- **Button 3:** Toggle UI overlay visibility
+
+### Keyboard (Development)
+- **Up/Down:** Brightness control
+- **Spacebar:** Cycle camera views
+- **T:** Toggle UI overlay
+- **ESC:** Exit application
+
+## Key Configuration Files
+
+| File | Purpose |
+|------|---------|
+| `utils/config.py` | All system constants, positions, thresholds |
+| `display_config.json` | Display resolution settings |
+| `/etc/udev/rules.d/99-camera-names.rules` | Camera device naming (auto-installed) |
+| `/etc/udev/rules.d/80-can-persistent-names.rules` | CAN bus naming (auto-installed) |
+
+## Hardware Status
+
+### Current Setup (v0.8)
+- ✅ **TPMS:** 4/4 sensors auto-paired (FL, FR, RL, RR)
+- ✅ **Multi-Camera:** Dual USB cameras with seamless switching
+- ✅ **NeoKey 1x4:** All buttons functional
+- ✅ **Pico Thermal:** 1/4 operational (FL connected)
+- ⚠️ **ADS1115:** Not connected (brake temps unavailable)
+- ⚠️ **Radar:** Optional (disabled by default)
+
+## Camera Setup
+
+### USB Port Assignment
+Connect cameras to specific USB ports for deterministic identification:
+- **Rear camera** → USB port 1.1 (creates `/dev/video-rear`)
+- **Front camera** → USB port 1.2 (creates `/dev/video-front`)
+
+Verify symlinks:
+```bash
+ssh pi@192.168.199.243 "ls -l /dev/video-*"
+```
+
+## Quick Troubleshooting
+
+### Can't Connect to Pi
+```bash
+# Test network connectivity
+ping 192.168.199.243
+
+# Verify SSH access
+ssh pi@192.168.199.243 "echo 'Connection OK'"
+```
+
+### Camera Issues
+```bash
+# Check camera devices
+ssh pi@192.168.199.243 "ls -l /dev/video-*"
+
+# Test camera with v4l2
+ssh pi@192.168.199.243 "v4l2-ctl --list-devices"
+```
+
+### Service Not Starting
+```bash
+# Check service status
+ssh pi@192.168.199.243 "sudo systemctl status openTPT.service"
+
+# View recent logs
+ssh pi@192.168.199.243 "sudo journalctl -u openTPT.service -n 50"
+
+# Restart service
+ssh pi@192.168.199.243 "sudo systemctl restart openTPT.service"
+```
+
+### Dependencies Missing
+```bash
+# SSH to Pi and re-run installation
+ssh pi@192.168.199.243
+cd /home/pi/openTPT
+sudo ./install.sh
+```
 
 ## Development Workflow
 
-### 1. Edit on Mac
+### 1. Edit Code on Mac
 ```bash
-# Open your editor
+# Open project in your editor
 code /Users/sam/git/open-TPT
-
-# Or vim, etc.
-vim hardware/mlx_handler_optimized.py
 ```
 
 ### 2. Test Locally (Mock Mode)
@@ -73,124 +142,79 @@ cd /Users/sam/git/open-TPT
 
 ### 3. Deploy to Pi
 ```bash
-# In another terminal, auto-deploy on save
-fswatch -o . | xargs -n1 -I{} ./tools/quick_sync.sh pi@192.168.199.247
+# Quick sync for rapid iteration
+./tools/quick_sync.sh pi@192.168.199.243
 ```
 
 ### 4. Test on Pi
 ```bash
-# SSH to Pi
-ssh pi@192.168.199.247
-
-# Run with actual hardware
+# SSH and run with real hardware
+ssh pi@192.168.199.243
 cd /home/pi/openTPT
 sudo ./main.py
 ```
 
-## Key Files You'll Edit
+## Auto-Deploy on Save
+```bash
+# Install fswatch on Mac
+brew install fswatch
 
-### Hardware Handlers
-- `hardware/mlx_handler_optimized.py` - Thermal cameras
-- `hardware/ir_brakes_optimized.py` - Brake temp sensors
-- `hardware/tpms_input_optimized.py` - TPMS sensors
+# Auto-deploy when files change
+fswatch -o . | xargs -n1 -I{} ./tools/quick_sync.sh pi@192.168.199.243
+```
 
-### Processing
-- `perception/tyre_zones.py` - Thermal zone analysis (I/C/O)
+## Production Deployment
 
-### GUI
-- `gui/display.py` - Rendering logic
-- `main.py` - Main application loop
+### Enable Systemd Service
+```bash
+# Service is auto-enabled by install.sh
+# To manually control:
+ssh pi@192.168.199.243
 
-### Configuration
-- `utils/config.py` - All constants and positions
+# Enable auto-start on boot
+sudo systemctl enable openTPT.service
+
+# Start service now
+sudo systemctl start openTPT.service
+
+# Check status
+sudo systemctl status openTPT.service
+```
+
+## Documentation References
+
+| Document | Purpose |
+|----------|---------|
+| `README.md` | Complete project documentation |
+| `QUICKSTART.md` | This file - quick reference |
+| `DEPLOYMENT.md` | Detailed deployment workflow |
+| `PERFORMANCE_OPTIMIZATIONS.md` | Technical implementation details |
+| `WAVESHARE_DUAL_CAN_HAT_SETUP.md` | CAN hardware configuration |
+| `CHANGELOG.md` | Version history and features |
+| `open-TPT_System_Plan.md` | Long-term architecture plan |
+
+## Key Features (v0.8)
+
+- ✅ Real-time TPMS monitoring with auto-pairing
+- ✅ Dual USB camera support with seamless switching
+- ✅ Tyre thermal imaging (MLX90640 or MLX90614)
+- ✅ Brake temperature monitoring (IR sensors + ADC)
+- ✅ Lock-free rendering (60 FPS target)
+- ✅ Numba-optimised thermal processing
+- ✅ Optional Toyota radar overlay
+- ✅ Deterministic hardware identification (udev rules)
+- ✅ Performance monitoring and validation
 
 ## British English Reminders
 
-Remember to use British spelling:
+Use British spelling throughout:
 - ✅ **Tyre** (not Tire)
 - ✅ **Optimised** (not Optimized)
 - ✅ **Initialise** (not Initialize)
 - ✅ **Colour** (not Color)
 - ✅ **Centre** (not Center)
 
-## Troubleshooting
-
-### Can't Connect to Pi
-```bash
-# Check Pi is on network
-ping 192.168.199.247
-
-# Test SSH
-ssh pi@192.168.199.247 "echo 'Connection OK'"
-```
-
-### GPIO Errors
-```bash
-# Always use sudo for hardware access
-sudo ./main.py
-```
-
-### Performance Issues
-```bash
-# Check performance summary in logs
-ssh pi@192.168.199.247 "cd /home/pi/openTPT && sudo ./main.py 2>&1 | grep -A 20 'Performance Summary'"
-```
-
-### Dependencies Missing
-```bash
-# Re-run install script on Pi
-ssh pi@192.168.199.247
-cd /home/pi/openTPT
-./install.sh
-```
-
-## What's Optimised
-
-✅ **Bounded Queue Architecture**
-- No blocking in render path
-- Lock-free data snapshots
-- Queue depth = 2 (double-buffering)
-
-✅ **Numba JIT Compilation**
-- Thermal zone processor
-- 10x faster on x86, 2x on ARM
-
-✅ **Pre-Processing**
-- I/C/O thermal zones calculated in background
-- EMA smoothing
-- Slew-rate limiting
-
-✅ **Performance Monitoring**
-- Real-time metrics
-- Automatic warnings
-- Printed every 10 seconds
-
-## Next Steps
-
-1. **Test with Real Hardware**
-   - Connect sensors
-   - Run `sudo ./main.py` on Pi
-   - Verify thermal zones (I/C/O split)
-
-2. **Monitor Performance**
-   - Check performance summary
-   - Look for warnings
-   - Validate FPS stays above 30
-
-3. **Continue Development**
-   - Follow system plan for radar, CAN, OBD
-   - Use auto-deploy for fast iteration
-   - Test on Pi frequently
-
-## Quick Links
-
-- **System Plan**: `open-TPT_System_Plan.md`
-- **Performance Details**: `PERFORMANCE_OPTIMISATIONS.md`
-- **Deployment Guide**: `DEPLOYMENT.md`
-- **Test Results**: On Pi at `/home/pi/openTPT/TEST_RESULTS.md`
-
 ---
 
-**Status**: ✅ All optimisations deployed and tested on your Pi!
-
-Happy coding! 🚀
+**Status:** ✅ System operational with multi-camera support
+**Last Updated:** 2025-11-19 (v0.8)
