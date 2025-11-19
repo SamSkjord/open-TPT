@@ -20,13 +20,9 @@ from gui.input_threaded import InputHandlerThreaded as InputHandler
 from gui.scale_bars import ScaleBars
 from gui.icon_handler import IconHandler
 
-# Import optimised TPMS handler (with fallback to original)
-try:
-    from hardware.tpms_input_optimized import TPMSHandler
-    print("Using optimised TPMS handler with bounded queues")
-except ImportError as e:
-    print(f"Warning: Could not load optimised TPMS handler ({e}), using original")
-    from hardware.tpms_input import TPMSHandler
+# Import optimised TPMS handler
+from hardware.tpms_input_optimized import TPMSHandler
+print("Using optimised TPMS handler with bounded queues")
 
 # Import radar handler (optional)
 try:
