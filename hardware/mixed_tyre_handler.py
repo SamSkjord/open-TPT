@@ -30,11 +30,18 @@ from hardware.i2c_mux import I2CMux
 
 # Try to import hardware dependencies
 try:
-    import board
-    import busio
+    from smbus2 import SMBus
     I2C_AVAILABLE = True
 except ImportError:
     I2C_AVAILABLE = False
+
+# Also try busio for MLX90614 (which needs it)
+try:
+    import board
+    import busio
+    BUSIO_AVAILABLE = True
+except ImportError:
+    BUSIO_AVAILABLE = False
 
 # Try to import MLX90614
 try:
@@ -85,7 +92,7 @@ class MixedTyreHandler(BoundedQueueHardwareHandler):
 
     def __init__(self):
         """Initialise the mixed tyre handler."""
-        super().__init__(update_interval=0.5)
+        super().__init__()
 
         # Parse sensor configuration (handle backwards compatibility)
         self.sensor_types = self._parse_sensor_config()
@@ -109,17 +116,24 @@ class MixedTyreHandler(BoundedQueueHardwareHandler):
         # Initialise hardware
         if I2C_AVAILABLE:
             try:
-                self.i2c = busio.I2C(board.SCL, board.SDA)
-                print("I2C bus initialised for mixed tyre handler")
+                # Use smbus2 for Pico communication (busio has issues with Pico I2C slave)
+                self.i2c = SMBus(1)  # I2C bus 1
+                print("I2C bus initialised for mixed tyre handler (using smbus2)")
 
                 self.mux = I2CMux()
+
+                # Also init busio for MLX90614 if available
+                if BUSIO_AVAILABLE:
+                    self.i2c_busio = busio.I2C(board.SCL, board.SDA)
+                else:
+                    self.i2c_busio = None
 
                 # Initialise sensors
                 self._initialise_sensors()
             except Exception as e:
                 print(f"Error setting up I2C for mixed tyre handler: {e}")
         else:
-            print("Warning: I2C not available (adafruit-blinka not installed)")
+            print("Warning: I2C not available (smbus2 not installed)")
 
     def _parse_sensor_config(self) -> Dict[str, str]:
         """
@@ -179,12 +193,9 @@ class MixedTyreHandler(BoundedQueueHardwareHandler):
 
             time.sleep(0.1)  # Channel stabilisation
 
-            # Try to read firmware version
+            # Try to read firmware version using smbus2
             try:
-                self.i2c.writeto(self.PICO_I2C_ADDR, bytes([PicoRegisters.FIRMWARE_VERSION]))
-                result = bytearray(1)
-                self.i2c.readfrom_into(self.PICO_I2C_ADDR, result)
-                fw_version = result[0]
+                fw_version = self.i2c.read_byte_data(self.PICO_I2C_ADDR, PicoRegisters.FIRMWARE_VERSION)
 
                 print(f"    ✓ Pico found at 0x{self.PICO_I2C_ADDR:02X}")
                 print(f"      Firmware version: {fw_version}")
@@ -209,6 +220,10 @@ class MixedTyreHandler(BoundedQueueHardwareHandler):
             print(f"  {position}: MLX90614 library not available, skipping")
             return
 
+        if not self.i2c_busio:
+            print(f"  {position}: busio not available for MLX90614, skipping")
+            return
+
         channel = MLX90614_MUX_CHANNELS.get(position)
         if channel is None:
             print(f"  {position}: No mux channel configured for MLX90614, skipping")
@@ -224,8 +239,8 @@ class MixedTyreHandler(BoundedQueueHardwareHandler):
 
             time.sleep(0.1)  # Channel stabilisation
 
-            # Try to initialise MLX90614
-            sensor = adafruit_mlx90614.MLX90614(self.i2c)
+            # Try to initialise MLX90614 using busio
+            sensor = adafruit_mlx90614.MLX90614(self.i2c_busio)
 
             # Test read
             test_temp = sensor.object_temperature
@@ -247,23 +262,26 @@ class MixedTyreHandler(BoundedQueueHardwareHandler):
             self.mux.deselect_all()
 
     def _i2c_read_byte(self, reg: int) -> Optional[int]:
-        """Read a single byte from current I2C device."""
+        """Read a single byte from Pico I2C slave using smbus2."""
         try:
-            self.i2c.writeto(self.PICO_I2C_ADDR, bytes([reg]))
-            result = bytearray(1)
-            self.i2c.readfrom_into(self.PICO_I2C_ADDR, result)
-            return result[0]
+            return self.i2c.read_byte_data(self.PICO_I2C_ADDR, reg)
         except Exception:
             return None
 
     def _i2c_read_int16(self, reg: int) -> Optional[int]:
-        """Read a signed int16 from current I2C device (little-endian)."""
+        """Read a signed int16 from Pico I2C slave (little-endian) using smbus2."""
         try:
-            self.i2c.writeto(self.PICO_I2C_ADDR, bytes([reg]))
-            result = bytearray(2)
-            self.i2c.readfrom_into(self.PICO_I2C_ADDR, result)
-            # Unpack as little-endian signed int16
-            value = int.from_bytes(result, byteorder='little', signed=True)
+            # Read two bytes (low byte at reg, high byte at reg+1)
+            low_byte = self.i2c.read_byte_data(self.PICO_I2C_ADDR, reg)
+            high_byte = self.i2c.read_byte_data(self.PICO_I2C_ADDR, reg + 1)
+
+            # Combine into int16 little-endian
+            value = (high_byte << 8) | low_byte
+
+            # Handle signed int16 (convert from unsigned to signed)
+            if value & 0x8000:
+                value -= 0x10000
+
             return value
         except Exception:
             return None
@@ -301,6 +319,17 @@ class MixedTyreHandler(BoundedQueueHardwareHandler):
             # Check if critical reads succeeded
             if None in [left_median, centre_median, right_median, detected]:
                 return None
+
+            # Validate temperatures are in reasonable range (-40°C to 200°C)
+            # Note: We don't check fps/detected status as some Pico firmware versions
+            # may not update these fields properly while still returning valid temps
+            temps_to_check = [left_median, centre_median, right_median]
+            for temp_raw in temps_to_check:
+                if temp_raw is not None:
+                    temp_c = temp_raw / 10.0
+                    # Check for unreasonable temps
+                    if temp_c < -40 or temp_c > 200:
+                        return None
 
             # Convert temperatures from tenths to °C
             return {
@@ -412,6 +441,17 @@ class MixedTyreHandler(BoundedQueueHardwareHandler):
 
             # Update sensor status and failure tracking
             if data is not None:
+                # Check if data should be marked as mirrored from centre
+                # This happens when no tyre detected and left/right are 0.0
+                if sensor_type == "pico":
+                    left_temp = data.get("left_median", 0)
+                    right_temp = data.get("right_median", 0)
+                    centre_temp = data.get("centre_median", 0)
+                    detected = data.get("detected", False)
+
+                    if not detected and abs(left_temp) < 0.1 and abs(right_temp) < 0.1 and centre_temp > 0:
+                        data['_mirrored_from_centre'] = True
+
                 sensor_data[position] = data
                 self.failure_count[position] = 0
                 self.last_update_time[position] = current_time
@@ -483,9 +523,18 @@ class MixedTyreHandler(BoundedQueueHardwareHandler):
             left_temp = sensor_data.get("left_median")
             centre_temp = sensor_data.get("centre_median")
             right_temp = sensor_data.get("right_median")
+            detected = sensor_data.get("detected", False)
 
             if None in [left_temp, centre_temp, right_temp]:
                 return None
+
+            # If no tyre detected and left/right are 0.0, mirror centre temperature
+            # This happens when sensor sees only ambient background
+            if not detected and abs(left_temp) < 0.1 and abs(right_temp) < 0.1 and centre_temp > 0:
+                left_temp = centre_temp
+                right_temp = centre_temp
+                # Mark this data as mirrored for display indicator
+                sensor_data['_mirrored_from_centre'] = True
 
             # Create 3-column synthetic array
             # Each column represents one zone

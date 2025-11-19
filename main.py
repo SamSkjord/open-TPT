@@ -384,6 +384,9 @@ class OpenTPT:
 
             self.display.surface.blit(self.display.overlay_mask, (0, 0))
 
+            # Draw mirroring indicators AFTER overlay so they're visible
+            self.display.draw_mirroring_indicators(self.thermal)
+
             # Get TPMS data (LOCK-FREE snapshot access)
             tpms_data = self.tpms.get_data()
             for position, data in tpms_data.items():

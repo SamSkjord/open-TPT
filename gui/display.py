@@ -517,6 +517,49 @@ class Display:
                 text_rect = text.get_rect(center=(text_x, text_y))
                 # self.surface.blit(text, text_rect)
 
+    def draw_mirroring_indicators(self, thermal_handler):
+        """
+        Draw red chevron indicators for tyres where temperature is mirrored from centre channel.
+        This should be called AFTER the overlay mask is applied so indicators are visible.
+
+        Args:
+            thermal_handler: The MixedTyreHandler instance to get zone data from
+        """
+        for position in ["FL", "FR", "RL", "RR"]:
+            if position not in MLX_POSITIONS:
+                continue
+
+            # Get zone data to check if mirrored
+            zone_data = thermal_handler.get_zone_data(position)
+            if zone_data and zone_data.get('_mirrored_from_centre', False):
+                # Get position for this tyre
+                pos = MLX_POSITIONS[position]
+                chevron_center_x = pos[0] + MLX_DISPLAY_WIDTH // 2
+                chevron_size = 6
+
+                # Rear tyres: down-pointing chevron above the thermal image
+                # Front tyres: up-pointing chevron below the thermal image
+                is_rear = position in ["RL", "RR"]
+
+                if is_rear:
+                    # Down-pointing chevron above the thermal image
+                    chevron_y = pos[1] - chevron_size - 2
+                    chevron_points = [
+                        (chevron_center_x, chevron_y + chevron_size),  # Bottom point
+                        (chevron_center_x - chevron_size, chevron_y),  # Top left
+                        (chevron_center_x + chevron_size, chevron_y),  # Top right
+                    ]
+                else:
+                    # Up-pointing chevron below the thermal image
+                    chevron_y = pos[1] + MLX_DISPLAY_HEIGHT + 2
+                    chevron_points = [
+                        (chevron_center_x, chevron_y),  # Top point
+                        (chevron_center_x - chevron_size, chevron_y + chevron_size),  # Bottom left
+                        (chevron_center_x + chevron_size, chevron_y + chevron_size),  # Bottom right
+                    ]
+
+                pygame.draw.polygon(self.surface, RED, chevron_points)
+
     def _get_heat_color(self, temp):
         """
         Get a color on a heat scale from blue (cold) to red (hot) based on temperature.
