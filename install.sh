@@ -105,8 +105,11 @@ PYTHON_DEPS=(
 
 # Rebuild pygame to link with system SDL, SDL_image, SDL_ttf
 echo -e "\n==== Rebuilding pygame from source ===="
-"${PIP_CMD[@]}" uninstall -y pygame || true
-"${PIP_CMD[@]}" install --break-system-packages --no-binary :all: pygame
+"${PIP_CMD[@]}" uninstall --break-system-packages -y pygame || true
+if ! "${PIP_CMD[@]}" install --break-system-packages --no-binary :all: pygame; then
+  echo "Warning: pygame rebuild from source failed. Using existing pygame installation."
+  echo "If pygame is already installed and working, this is not a problem."
+fi
 
 # Verify SDL version from pygame
 echo -e "\n==== Verifying pygame SDL linkage ===="

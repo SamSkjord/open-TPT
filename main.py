@@ -70,23 +70,13 @@ from utils.config import (
     CONTROL_DBC,
     RADAR_TRACK_TIMEOUT,
     # Tyre sensor configuration
-    USE_MLX90614_SENSORS,
+    TYRE_SENSOR_TYPES,
 )
 
-# Import tyre temperature handler based on config
-if USE_MLX90614_SENSORS:
-    # Use simple MLX90614 single-point IR sensors
-    from hardware.mlx90614_handler import MLX90614Handler as TyreHandler
-    print("Using MLX90614 single-point IR temperature sensors (config: USE_MLX90614_SENSORS=True)")
-else:
-    # Use Pico I2C slaves with MLX90640 thermal imaging (default)
-    try:
-        from hardware.pico_tyre_handler_optimized import PicoTyreHandlerOptimised as TyreHandler
-        print("Using optimised Pico I2C slave tyre handler with bounded queues")
-    except ImportError as e:
-        print(f"Warning: Could not load optimised Pico handler ({e}), trying standard version")
-        from hardware.pico_tyre_handler import PicoTyreHandler as TyreHandler
-        print("Using standard Pico I2C slave tyre handler")
+# Import mixed tyre temperature handler
+# Supports per-tyre sensor type configuration (Pico + MLX90614)
+from hardware.mixed_tyre_handler import MixedTyreHandler as TyreHandler
+print("Using mixed tyre handler (supports per-tyre sensor configuration)")
 
 # Import performance monitoring
 try:

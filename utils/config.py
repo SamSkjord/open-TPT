@@ -149,8 +149,14 @@ BRAKE_POSITIONS = {
 }
 
 # Tyre Temperature Sensor Configuration
-# Choose between Pico I2C slaves (with MLX90640) or simple MLX90614 sensors
-USE_MLX90614_SENSORS = False  # Set to True to use MLX90614 instead of Pico slaves
+# Per-tyre sensor type selection
+# Options: "pico" for Pico I2C slave with MLX90640, "mlx90614" for single-point IR sensor
+TYRE_SENSOR_TYPES = {
+    "FL": "pico",      # Front Left
+    "FR": "pico",      # Front Right
+    "RL": "pico",      # Rear Left
+    "RR": "pico",      # Rear Right
+}
 
 # MLX90640 thermal camera settings (24x32 pixels)
 # Used by Pico I2C slaves for full thermal imaging
@@ -167,9 +173,18 @@ MLX_DISPLAY_WIDTH = int(
 )  # Width of displayed heatmap - to cover the complete tyre width
 MLX_DISPLAY_HEIGHT = int(172 * SCALE_Y)  # Height of displayed heatmap
 
-# MLX90614 single-point IR sensor settings (alternative to Pico slaves)
-# Maps tyre corner positions to I2C multiplexer channels
-# Only used when USE_MLX90614_SENSORS = True
+# I2C Multiplexer Channel Assignments
+# Maps tyre positions to I2C multiplexer channels for each sensor type
+
+# Pico I2C slave modules (MLX90640 thermal cameras)
+PICO_MUX_CHANNELS = {
+    "FL": 0,  # Front Left on channel 0
+    "FR": 1,  # Front Right on channel 1
+    "RL": 2,  # Rear Left on channel 2
+    "RR": 3,  # Rear Right on channel 3
+}
+
+# MLX90614 single-point IR sensors
 MLX90614_MUX_CHANNELS = {
     "FL": 0,  # Front Left on channel 0
     "FR": 1,  # Front Right on channel 1

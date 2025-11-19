@@ -30,10 +30,11 @@ openTPT features a high-performance architecture optimised for real-time telemet
 - Waveshare 1024x600 HDMI display (or other HDMI displays - UI designed for 800x480, scales to fit)
 - TPMS receivers and sensors
 - ADS1115/ADS1015 ADC for IR brake temperature sensors
-- Tyre temperature sensors (one per tyre):
+- Tyre temperature sensors (configurable per tyre):
   - Raspberry Pi Pico with MLX90640 thermal camera (pico-tyre-temp I2C slave modules), OR
   - MLX90614 single-point IR sensors
-- TCA9548A I2C multiplexer for tyre temperature sensors
+  - **Mix and match**: Use Pico modules on front tyres and MLX90614 on rear tyres (or any combination)
+- TCA9548A I2C multiplexer for tyre temperature sensors (channels 0-3)
 - Adafruit NeoKey 1x4 for input control
 
 ### Optional Components
@@ -145,6 +146,56 @@ Other system settings can be configured by editing the `utils/config.py` file, w
 - Colour thresholds for temperature and pressure
 - I2C addresses and bus settings
 - Unit preferences (Celsius/Fahrenheit, PSI/BAR/kPa)
+
+### Tyre Sensor Configuration
+
+openTPT supports per-tyre sensor type configuration, allowing you to mix Pico I2C slave modules (with MLX90640 thermal cameras) and MLX90614 single-point IR sensors.
+
+Edit `utils/config.py` and configure the `TYRE_SENSOR_TYPES` dictionary:
+
+```python
+TYRE_SENSOR_TYPES = {
+    "FL": "pico",      # Front Left - Pico module with MLX90640
+    "FR": "pico",      # Front Right - Pico module with MLX90640
+    "RL": "mlx90614",  # Rear Left - MLX90614 single-point IR
+    "RR": "mlx90614",  # Rear Right - MLX90614 single-point IR
+}
+```
+
+**Sensor type options:**
+- `"pico"` - Raspberry Pi Pico I2C slave module with MLX90640 thermal camera
+  - Provides detailed thermal imaging with left/centre/right zone data
+  - Requires pico-tyre-temp firmware on the Pico
+  - Connected via I2C multiplexer (TCA9548A)
+
+- `"mlx90614"` - MLX90614 single-point IR temperature sensor
+  - Simpler, lower-cost alternative
+  - Single temperature reading per tyre
+  - Connected via I2C multiplexer (TCA9548A)
+
+**I2C multiplexer channel assignments:**
+
+Configure channels for each sensor type in `utils/config.py`:
+
+```python
+# Pico I2C slave modules (MLX90640 thermal cameras)
+PICO_MUX_CHANNELS = {
+    "FL": 0,  # Front Left on channel 0
+    "FR": 1,  # Front Right on channel 1
+    "RL": 2,  # Rear Left on channel 2
+    "RR": 3,  # Rear Right on channel 3
+}
+
+# MLX90614 single-point IR sensors
+MLX90614_MUX_CHANNELS = {
+    "FL": 0,  # Front Left on channel 0
+    "FR": 1,  # Front Right on channel 1
+    "RL": 2,  # Rear Left on channel 2
+    "RR": 3,  # Rear Right on channel 3
+}
+```
+
+**Note:** Both sensor types can share the same channel numbers if they're not used on the same positions. For example, if FL/FR use Pico modules on channels 0/1, and RL/RR use MLX90614 sensors, they can also use channels 0/1 (or 2/3).
 
 ### Radar Configuration
 
