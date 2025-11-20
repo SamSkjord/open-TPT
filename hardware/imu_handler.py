@@ -101,10 +101,17 @@ class IMUHandler(BoundedQueueHardwareHandler):
         self.accel_y_offset = 0.0
         self.accel_z_offset = 0.0  # Should be -1.0g when stationary (gravity)
 
+        # Error tracking for reconnection logic
+        self.consecutive_errors = 0
+        self.max_consecutive_errors = 5  # Report disconnection after 5 errors
+        self.reconnect_interval = 5.0  # Try to reconnect every 5 seconds
+        self.last_reconnect_attempt = 0.0
+        self.hardware_available = False
+        self.last_successful_read = time.time()
+
         if self.enabled:
             self._initialise()
-            if self.imu:
-                self.start()
+            self.start()  # Always start thread, will use mock data if hardware unavailable
         else:
             print("IMU disabled in config")
 
@@ -113,6 +120,7 @@ class IMUHandler(BoundedQueueHardwareHandler):
         if not BOARD_AVAILABLE:
             print("IMU: Running in mock mode (no hardware)")
             self.imu = None
+            self.hardware_available = False
             return
 
         try:
@@ -122,23 +130,31 @@ class IMUHandler(BoundedQueueHardwareHandler):
                 self.imu = adafruit_icm20x.ICM20649(i2c, address=IMU_I2C_ADDRESS)
                 # Configure for high-G racing (±30g accelerometer range)
                 self.imu.accelerometer_range = adafruit_icm20x.AccelRange.RANGE_30G
+                self.hardware_available = True
+                self.consecutive_errors = 0
                 print(f"IMU: Initialised ICM-20649 at 0x{IMU_I2C_ADDRESS:02x} (±30g range)")
 
             elif self.imu_type == "MPU6050" and MPU6050_AVAILABLE:
                 self.imu = MPU6050(i2c, address=IMU_I2C_ADDRESS)
                 # MPU6050 max range is ±16g
+                self.hardware_available = True
+                self.consecutive_errors = 0
                 print(f"IMU: Initialised MPU-6050 at 0x{IMU_I2C_ADDRESS:02x} (±16g range)")
 
             elif self.imu_type == "LSM6DS3" and LSM6DS3_AVAILABLE:
                 self.imu = adafruit_lsm6ds.LSM6DS3(i2c, address=IMU_I2C_ADDRESS)
                 # Configure for ±16g
                 self.imu.accelerometer_range = adafruit_lsm6ds.AccelRange.RANGE_16G
+                self.hardware_available = True
+                self.consecutive_errors = 0
                 print(f"IMU: Initialised LSM6DS3 at 0x{IMU_I2C_ADDRESS:02x} (±16g range)")
 
             elif self.imu_type == "ADXL345" and ADXL345_AVAILABLE:
                 self.imu = adafruit_adxl34x.ADXL345(i2c, address=IMU_I2C_ADDRESS)
                 # Configure for ±16g
                 self.imu.range = adafruit_adxl34x.Range.RANGE_16_G
+                self.hardware_available = True
+                self.consecutive_errors = 0
                 print(f"IMU: Initialised ADXL345 at 0x{IMU_I2C_ADDRESS:02x} (±16g range)")
 
             else:
@@ -146,10 +162,12 @@ class IMUHandler(BoundedQueueHardwareHandler):
                 print(f"Available: ICM20649={ICM20649_AVAILABLE}, MPU6050={MPU6050_AVAILABLE}, "
                       f"LSM6DS3={LSM6DS3_AVAILABLE}, ADXL345={ADXL345_AVAILABLE}")
                 self.imu = None
+                self.hardware_available = False
 
         except Exception as e:
             print(f"IMU: Failed to initialise {self.imu_type}: {e}")
             self.imu = None
+            self.hardware_available = False
 
     def _worker_loop(self):
         """Background thread that polls the IMU (required by BoundedQueueHardwareHandler)."""
@@ -158,8 +176,20 @@ class IMUHandler(BoundedQueueHardwareHandler):
         while self.running:
             start_time = time.time()
 
+            # Attempt reconnection if we've had too many consecutive errors
+            if self.consecutive_errors >= self.max_consecutive_errors:
+                current_time = time.time()
+                if current_time - self.last_reconnect_attempt >= self.reconnect_interval:
+                    print("IMU: Attempting to reconnect...")
+                    self._initialise()
+                    self.last_reconnect_attempt = current_time
+                    # If reconnection failed, continue to next iteration
+                    if not self.hardware_available:
+                        time.sleep(poll_interval)
+                        continue
+
             try:
-                if self.imu:
+                if self.imu and self.hardware_available:
                     # Read accelerometer (in m/s²)
                     accel = self.imu.acceleration
                     # Convert to G-force (1g = 9.81 m/s²)
@@ -183,56 +213,45 @@ class IMUHandler(BoundedQueueHardwareHandler):
                     self.peak_longitudinal = max(self.peak_longitudinal, longitudinal)
                     self.peak_combined = max(self.peak_combined, combined)
 
+                    # Reset error counter on successful read
+                    self.consecutive_errors = 0
+                    self.last_successful_read = time.time()
+
+                    # Create data dictionary for base class
+                    data = {
+                        'accel_x': accel_x,
+                        'accel_y': accel_y,
+                        'accel_z': accel_z,
+                        'gyro_x': gyro_x,
+                        'gyro_y': gyro_y,
+                        'gyro_z': gyro_z,
+                        'peak_lateral': self.peak_lateral,
+                        'peak_longitudinal': self.peak_longitudinal,
+                        'peak_combined': self.peak_combined,
+                    }
+
+                    # Publish snapshot using base class method
+                    self._publish_snapshot(data)
+
                 else:
-                    # Mock data for testing without hardware
-                    t = time.time()
-                    accel_x = 0.3 * np.sin(t * 0.5)  # Simulate gentle cornering
-                    accel_y = 0.2 * np.sin(t * 0.3)  # Simulate gentle braking/accel
-                    accel_z = 1.0  # Gravity
-                    gyro_x = 5.0 * np.sin(t * 0.4)
-                    gyro_y = 5.0 * np.sin(t * 0.3)
-                    gyro_z = 10.0 * np.sin(t * 0.5)
-
-                    self.peak_lateral = 0.5
-                    self.peak_longitudinal = 0.4
-                    self.peak_combined = 0.6
-
-                # Create snapshot
-                snapshot = IMUSnapshot(
-                    accel_x=accel_x,
-                    accel_y=accel_y,
-                    accel_z=accel_z,
-                    gyro_x=gyro_x,
-                    gyro_y=gyro_y,
-                    gyro_z=gyro_z,
-                    timestamp=time.time(),
-                    peak_lateral=self.peak_lateral,
-                    peak_longitudinal=self.peak_longitudinal,
-                    peak_combined=self.peak_combined,
-                )
-
-                # Publish snapshot using queue (dataclass is immutable)
-                try:
-                    if self.data_queue.full():
-                        try:
-                            self.data_queue.get_nowait()
-                        except queue.Empty:
-                            pass
-                    self.data_queue.put_nowait(snapshot)
-
-                    # Update performance metrics
-                    self.frame_count += 1
-                    current_time = time.time()
-                    elapsed = current_time - self.last_perf_time
-                    if elapsed >= 1.0:
-                        self.update_hz = self.frame_count / elapsed
-                        self.frame_count = 0
-                        self.last_perf_time = current_time
-                except queue.Full:
+                    # Hardware not available or initialising failed
+                    # Don't publish anything - UI will show last valid data or nothing
                     pass
 
             except Exception as e:
-                print(f"IMU: Error reading sensor: {e}")
+                self.consecutive_errors += 1
+
+                # Only print error message occasionally to avoid log spam
+                if self.consecutive_errors == 1:
+                    print(f"IMU: Error reading sensor: {e}")
+                elif self.consecutive_errors == self.max_consecutive_errors:
+                    print(f"IMU: {self.max_consecutive_errors} consecutive errors - hardware may be disconnected")
+                elif self.consecutive_errors % 100 == 0:
+                    print(f"IMU: Still experiencing errors ({self.consecutive_errors} total)")
+
+                # Skip this read - don't publish anything on error
+                # This prevents stale/invalid data from being displayed
+                # The UI will continue showing the last valid reading
 
             # Sleep to maintain sample rate
             elapsed = time.time() - start_time
@@ -240,20 +259,8 @@ class IMUHandler(BoundedQueueHardwareHandler):
             if sleep_time > 0:
                 time.sleep(sleep_time)
 
-    def get_snapshot(self) -> Optional[IMUSnapshot]:
-        """Get the latest IMU snapshot (lock-free)."""
-        # Update current snapshot from queue (non-blocking)
-        try:
-            while not self.data_queue.empty():
-                self.current_snapshot = self.data_queue.get_nowait()
-        except queue.Empty:
-            pass
-
-        return self.current_snapshot
-
-    def get_data(self) -> Optional[IMUSnapshot]:
-        """Get the latest IMU data (returns IMUSnapshot, not dict)."""
-        return self.get_snapshot()
+    # Use base class get_snapshot() and get_data() methods
+    # These return HardwareSnapshot and dict respectively
 
     def calibrate(self, samples=100):
         """

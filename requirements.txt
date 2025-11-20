@@ -23,6 +23,12 @@ adafruit-circuitpython-mlx90614>=1.2.0  # Single-point IR sensors (per-tyre conf
 adafruit-circuitpython-seesaw>=1.12.0
 adafruit-circuitpython-neopixel>=6.3.0
 
+# IMU sensors (for G-meter)
+adafruit-circuitpython-icm20x>=2.0.0  # ICM20649/ICM20948 6-axis IMU
+adafruit-circuitpython-mpu6050>=1.1.0  # MPU6050 6-axis IMU (alternative)
+adafruit-circuitpython-lsm6ds>=4.0.0  # LSM6DS3 6-axis IMU (alternative)
+adafruit-circuitpython-adxl34x>=1.12.0  # ADXL345 3-axis accelerometer (alternative)
+
 # Numerical computing
 numpy>=1.19.0
 

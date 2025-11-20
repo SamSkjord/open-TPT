@@ -95,7 +95,7 @@ I2C_MUX_ADDRESS = 0x70  # TCA9548A default address
 # - "LSM6DS3" - LSM6DS3 6-axis IMU (±16g accelerometer)
 # - "ADXL345" - ADXL345 3-axis accelerometer (±16g)
 IMU_TYPE = "ICM20649"
-IMU_ENABLED = False  # Temporarily disabled until IMU hardware is connected
+IMU_ENABLED = True  # Enable IMU for G-meter functionality
 IMU_I2C_ADDRESS = 0x68  # Default I2C address (ICM20649: 0x68 or 0x69)
 IMU_SAMPLE_RATE = 50  # Hz - how often to read IMU data
 

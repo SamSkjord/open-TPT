@@ -44,11 +44,23 @@ class GMeterDisplay:
 
         # Fonts
         try:
+            self.font_xxlarge = pygame.font.Font(
+                None, int(FONT_SIZE_LARGE * 2.5)
+            )  # Extra extra large for speed display
+            self.font_xlarge = pygame.font.Font(
+                None, int(FONT_SIZE_LARGE * 1.5)
+            )  # Extra large for main G reading
             self.font_large = pygame.font.Font(None, FONT_SIZE_LARGE)
             self.font_medium = pygame.font.Font(None, FONT_SIZE_MEDIUM)
             self.font_small = pygame.font.Font(None, FONT_SIZE_SMALL)
         except Exception as e:
             print(f"Error loading fonts: {e}")
+            self.font_xxlarge = pygame.font.SysFont(
+                "monospace", int(FONT_SIZE_LARGE * 2.5)
+            )
+            self.font_xlarge = pygame.font.SysFont(
+                "monospace", int(FONT_SIZE_LARGE * 1.5)
+            )
             self.font_large = pygame.font.SysFont("monospace", FONT_SIZE_LARGE)
             self.font_medium = pygame.font.SysFont("monospace", FONT_SIZE_MEDIUM)
             self.font_small = pygame.font.SysFont("monospace", FONT_SIZE_SMALL)
@@ -61,6 +73,18 @@ class GMeterDisplay:
         self.current_longitudinal = 0.0
         self.current_speed = 0  # km/h (placeholder for future OBD2/GPS)
 
+        # Connection tracking
+        self.last_update_time = 0.0
+        self.connection_timeout = (
+            1.0  # Consider disconnected after 1 second without updates
+        )
+
+        # Trail history for visual persistence
+        self.trail_history = []  # List of (x, y, timestamp) tuples
+        self.trail_duration = (
+            3.0  # Keep trail visible for 3 seconds (was effectively instant)
+        )
+
     def reset_peaks(self):
         """Reset peak G-force values."""
         self.peak_lateral_left = 0.0
@@ -69,19 +93,29 @@ class GMeterDisplay:
         self.peak_longitudinal_backward = 0.0
         self.peak_combined = 0.0
 
-    def update(self, imu_snapshot):
+    def update(self, imu_data):
         """
         Update G-meter with new IMU data.
 
         Args:
-            imu_snapshot: IMUSnapshot object with acceleration data
+            imu_data: Dictionary with acceleration data from IMU handler
         """
-        if imu_snapshot is None:
+        if not imu_data:
             return
 
-        # Update current values
-        self.current_lateral = imu_snapshot.accel_x
-        self.current_longitudinal = imu_snapshot.accel_y
+        # Track last update time for connection status
+        import time
+
+        self.last_update_time = time.time()
+
+        # Update current values (handle both dict and object for compatibility)
+        if isinstance(imu_data, dict):
+            self.current_lateral = imu_data.get("accel_x", 0.0)
+            self.current_longitudinal = imu_data.get("accel_y", 0.0)
+        else:
+            # Legacy support for IMUSnapshot objects
+            self.current_lateral = imu_data.accel_x
+            self.current_longitudinal = imu_data.accel_y
 
         # Update peaks (directional)
         if self.current_lateral > 0:  # Right
@@ -99,9 +133,7 @@ class GMeterDisplay:
             )
 
         # Update combined peak
-        combined = math.sqrt(
-            self.current_lateral**2 + self.current_longitudinal**2
-        )
+        combined = math.sqrt(self.current_lateral**2 + self.current_longitudinal**2)
         self.peak_combined = max(self.peak_combined, combined)
 
     def draw(self, screen):
@@ -144,9 +176,7 @@ class GMeterDisplay:
             g_value = i * 0.5
             radius = int(self.radius * (g_value / self.max_g))
             color = GREY if i % 2 == 0 else (64, 64, 64)  # Alternate shading
-            pygame.draw.circle(
-                screen, color, (self.center_x, self.center_y), radius, 1
-            )
+            pygame.draw.circle(screen, color, (self.center_x, self.center_y), radius, 1)
 
         # Draw outer circle (boundary)
         pygame.draw.circle(
@@ -192,26 +222,26 @@ class GMeterDisplay:
             ),
         )
 
-        # Forward/Back for longitudinal
+        # Forward/Back for longitudinal (centered horizontally)
         text_forward = self.font_small.render("F", True, WHITE)
         text_back = self.font_small.render("B", True, WHITE)
-        screen.blit(
-            text_forward,
-            (
-                self.center_x - int(10 * SCALE_X),
-                self.center_y - self.radius - int(25 * SCALE_Y),
-            ),
+
+        # Center F above top of circle
+        text_forward_rect = text_forward.get_rect(
+            center=(self.center_x, self.center_y - self.radius - int(15 * SCALE_Y))
         )
-        screen.blit(
-            text_back,
-            (
-                self.center_x - int(10 * SCALE_X),
-                self.center_y + self.radius + int(10 * SCALE_Y),
-            ),
+        screen.blit(text_forward, text_forward_rect)
+
+        # Center B below bottom of circle
+        text_back_rect = text_back.get_rect(
+            center=(self.center_x, self.center_y + self.radius + int(20 * SCALE_Y))
         )
+        screen.blit(text_back, text_back_rect)
 
     def _draw_current_g_indicator(self, screen):
-        """Draw the current G-force position indicator."""
+        """Draw the current G-force position indicator with trailing history."""
+        import time
+
         # Convert G values to pixel coordinates
         # Clamp to max_g to keep within circle
         lateral_clamped = max(-self.max_g, min(self.max_g, self.current_lateral))
@@ -226,46 +256,90 @@ class GMeterDisplay:
         indicator_x = self.center_x + x_offset
         indicator_y = self.center_y + y_offset
 
-        # Draw indicator as filled circle with outline
+        # Add current position to trail history
+        current_time = time.time()
+        self.trail_history.append((indicator_x, indicator_y, current_time))
+
+        # Remove old trail points
+        self.trail_history = [
+            (x, y, t)
+            for x, y, t in self.trail_history
+            if current_time - t < self.trail_duration
+        ]
+
+        # Draw trail with fading effect
+        for i, (x, y, timestamp) in enumerate(self.trail_history):
+            age = current_time - timestamp
+            # Calculate alpha based on age (newer = brighter)
+            alpha = int(255 * (1.0 - age / self.trail_duration))
+            # Fade from red to dark red
+            color = (alpha, 0, 0)
+            # Draw trail point
+            if i < len(self.trail_history) - 1:
+                # Draw line to next point
+                next_x, next_y, _ = self.trail_history[i + 1]
+                pygame.draw.line(screen, color, (x, y), (next_x, next_y), 2)
+
+        # Draw current indicator as filled circle with outline (always bright)
         pygame.draw.circle(screen, RED, (indicator_x, indicator_y), int(8 * SCALE_X))
         pygame.draw.circle(
             screen, WHITE, (indicator_x, indicator_y), int(8 * SCALE_X), 2
         )
 
-        # Draw trail line from center to indicator
-        pygame.draw.line(
-            screen, RED, (self.center_x, self.center_y), (indicator_x, indicator_y), 2
-        )
-
     def _draw_g_readings(self, screen):
         """Draw current G-force readings as numbers."""
+        import time
+
+        # Check if IMU is connected (received data recently)
+        time_since_update = time.time() - self.last_update_time
+        imu_connected = time_since_update < self.connection_timeout
+
         # Calculate combined G
-        combined_g = math.sqrt(
-            self.current_lateral**2 + self.current_longitudinal**2
-        )
+        combined_g = math.sqrt(self.current_lateral**2 + self.current_longitudinal**2)
 
         # Position for readings (top center)
-        y_pos = int(20 * SCALE_Y)
+        y_pos = int(40 * SCALE_Y)
 
-        # Combined G (large, centered)
-        text_combined = self.font_large.render(f"{combined_g:.2f}g", True, WHITE)
-        text_rect = text_combined.get_rect(center=(self.center_x, y_pos))
-        screen.blit(text_combined, text_rect)
+        # Combined G (extra large, centered on decimal point, 1 decimal) - RED if disconnected, WHITE if connected
+        combined_color = WHITE if imu_connected else RED
 
-        # Lateral and Longitudinal (smaller, below combined)
-        y_pos += int(60 * SCALE_Y)
+        # Render the parts we need to measure
+        integer_part = int(combined_g)
+
+        # Measure just the integer part (without decimal point)
+        integer_text = self.font_xlarge.render(f"{integer_part}", True, combined_color)
+        integer_width = integer_text.get_width()
+
+        # Measure the decimal point
+        decimal_point_text = self.font_xlarge.render(".", True, combined_color)
+        decimal_point_width = decimal_point_text.get_width()
+
+        # Render the full string
+        full_text = self.font_xlarge.render(f"{combined_g:.1f}g", True, combined_color)
+        full_height = full_text.get_height()
+
+        # Position so that the middle of the decimal point is at horizontal screen center
+        # Decimal point center = integer_width + (decimal_point_width / 2)
+        decimal_center_offset = integer_width + (decimal_point_width / 2)
+        x_start = self.center_x - decimal_center_offset
+        y_start = y_pos - (full_height // 2)
+
+        screen.blit(full_text, (x_start, y_start))
+
+        # Lateral and Longitudinal (smaller, left side of screen)
+        x_pos = int(20 * SCALE_X)  # Left margin
+        y_pos = int(120 * SCALE_Y)  # Below title
+
         text_lateral = self.font_medium.render(
-            f"Lateral: {self.current_lateral:+.2f}g", True, GREEN
+            f"Lat: {self.current_lateral:+.2f}g", True, GREEN
         )
-        text_rect = text_lateral.get_rect(center=(self.center_x, y_pos))
-        screen.blit(text_lateral, text_rect)
+        screen.blit(text_lateral, (x_pos, y_pos))
 
-        y_pos += int(30 * SCALE_Y)
+        y_pos += int(35 * SCALE_Y)
         text_longitudinal = self.font_medium.render(
             f"Long: {self.current_longitudinal:+.2f}g", True, GREEN
         )
-        text_rect = text_longitudinal.get_rect(center=(self.center_x, y_pos))
-        screen.blit(text_longitudinal, text_rect)
+        screen.blit(text_longitudinal, (x_pos, y_pos))
 
     def _draw_peak_values(self, screen):
         """Draw peak G-force values."""
@@ -301,17 +375,17 @@ class GMeterDisplay:
 
     def _draw_speed(self, screen):
         """Draw speed (placeholder for future OBD2/GPS integration)."""
-        # Position for speed (bottom right)
-        x_pos = self.width - int(150 * SCALE_X)
-        y_pos = self.height - int(80 * SCALE_Y)
+        # Position for speed (bottom right, moved slightly right)
+        x_pos = self.width - int(180 * SCALE_X)
+        y_pos = self.height - int(120 * SCALE_Y)
 
-        # Speed display
-        text_speed = self.font_medium.render(f"{self.current_speed} km/h", True, WHITE)
+        # Speed display (extra extra large font)
+        text_speed = self.font_xxlarge.render(f"{self.current_speed}", True, WHITE)
         screen.blit(text_speed, (x_pos, y_pos))
 
-        # Label
-        y_pos += int(30 * SCALE_Y)
-        text_label = self.font_small.render("Speed", True, GREY)
+        # Label (smaller, below speed)
+        y_pos += int(100 * SCALE_Y)
+        text_label = self.font_medium.render("km/h", True, GREY)
         screen.blit(text_label, (x_pos + int(10 * SCALE_X), y_pos))
 
     def _draw_labels(self, screen):
@@ -321,9 +395,7 @@ class GMeterDisplay:
         screen.blit(text_title, (int(20 * SCALE_X), int(20 * SCALE_Y)))
 
         # Instructions (bottom center) - for reset peaks action
-        text_instruction = self.font_small.render(
-            "Button 1: Reset Peaks", True, GREY
-        )
+        text_instruction = self.font_small.render("Button 1: Reset Peaks", True, GREY)
         text_rect = text_instruction.get_rect(
             center=(self.center_x, self.height - int(20 * SCALE_Y))
         )
