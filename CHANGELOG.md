@@ -1,5 +1,115 @@
 # Changelog - openTPT
 
+## [v0.9] - 2025-11-20
+
+### Status Bars & OBD2 Simulation 📊
+
+#### ✅ New Features
+- **Application-level status bars** - Top and bottom bars visible on all pages
+- **MAP-based SOC simulation** - Uses intake manifold pressure for desk testing without vehicle
+- **Dynamic color coding** - Real-time visual feedback for charge/discharge state
+- **Instant SOC updates** - Direct MAP-to-SOC mapping for responsive display
+- **Clean camera transitions** - Stale frames cleared when switching away from camera
+- **Correct front camera orientation** - Front camera shows normal view (not mirrored)
+
+#### 🔄 Modified Files
+
+- `main.py` - Moved status bars from gmeter to application level
+  - Status bars now update on ALL pages, not just G-meter
+  - Fixed status bar update logic (was only updating on gmeter page)
+  - Added OBD2 MAP-based SOC with dynamic color zones
+- `gui/gmeter.py` - Removed status bar code (moved to main.py)
+  - Removed status bar initialization and rendering
+  - Removed set_soc() and set_lap_delta() methods
+- `hardware/obd2_handler.py` - Enhanced for SOC simulation
+  - Added MAP (manifold absolute pressure) reading via PID 0x0B
+  - Implemented direct MAP-to-SOC conversion (instant updates)
+  - Reduced MAP history window from 10 to 3 samples for faster response
+  - Fixed state calculation (increasing MAP = discharging, decreasing MAP = charging)
+- `gui/camera.py` - Camera improvements
+  - Clear last frame when stopping camera (prevents stale frame flash)
+  - Conditional horizontal flip (rear camera only, not front)
+- `ui/widgets/horizontal_bar.py` - Status bar widgets (no changes, used by main.py)
+
+#### ⚙️ Configuration
+
+**OBD2 Settings** (in `utils/config.py`):
+```python
+OBD_ENABLED = True              # Enable OBD2 speed and MAP reading
+OBD_CHANNEL = "can_b2_1"        # CAN channel for OBD2 data
+OBD_BITRATE = 500000            # Standard OBD2 bitrate (500 kbps)
+```
+
+**Status Bar Settings** (in `utils/config.py`):
+```python
+STATUS_BAR_ENABLED = True       # Show status bars at top and bottom
+STATUS_BAR_HEIGHT = 20          # Height of status bars in pixels
+```
+
+#### 📊 Architecture
+
+**Status Bars**
+- **Top Bar**: Lap time delta (simulated for testing)
+  - 🟢 Green = faster than reference lap
+  - 🔴 Red = slower than reference lap
+  - ⚪ Grey = same pace
+- **Bottom Bar**: Battery State of Charge
+  - 🔵 Blue = idle (steady throttle)
+  - 🟢 Green = charging (throttle decreasing, MAP down, SOC up)
+  - 🔴 Red = discharging (throttle increasing, MAP up, SOC down)
+
+**MAP-to-SOC Mapping**
+```python
+# Direct mapping (instant updates)
+MAP 20 kPa  → 100% SOC (minimum throttle)
+MAP 30 kPa  → 87% SOC  (idle)
+MAP 60 kPa  → 50% SOC  (moderate throttle)
+MAP 100 kPa → 0% SOC   (wide open throttle)
+```
+
+**State Detection**
+- Uses 3-sample rolling window for rate-of-change
+- Threshold: ±0.3 kPa/reading for idle detection
+- At 5Hz polling (200ms), 3 samples = 600ms averaging window
+
+**Camera Behavior**
+- **Rear camera**: Horizontally flipped (mirrored) for backing up
+- **Front camera**: Normal view (not flipped) for road ahead
+- **Frame clearing**: Last frame cleared when switching away from camera
+
+#### 🐛 Bug Fixes
+
+- **Status bars only updating on gmeter page** - Fixed by moving update logic outside page conditional
+- **Slow SOC updates** - Changed from rate-of-change to direct mapping (instant response)
+- **Incorrect SOC color states** - Fixed state calculation (MAP increasing = discharging = red)
+- **Stale camera frame on reactivation** - Clear frame buffer when stopping camera
+- **Front camera mirrored** - Only flip rear camera, not front
+
+#### 🧪 Testing
+
+- ✅ Status bars visible on all pages (telemetry, gmeter, camera)
+- ✅ SOC updates instantly when MAP changes
+- ✅ Colors correct (green=charging, red=discharging, blue=idle)
+- ✅ Camera doesn't show stale frame after switching back
+- ✅ Front camera shows normal view (not mirrored)
+- ✅ Rear camera remains mirrored for backing up
+
+#### 🎯 Use Cases
+
+**Desk Testing**
+- Connect to vehicle OBD2 port without driving
+- Rev engine to see SOC bar change color instantly
+- Idle: Blue bar at ~87% SOC
+- Throttle up: Red bar, SOC decreases
+- Throttle down: Green bar, SOC increases
+
+**In-Vehicle Use** (future)
+- Ford Hybrid SOC will replace simulated MAP-based SOC
+- Same status bar interface, different data source
+- Seamless transition from development to production
+
+---
+
 ## [v0.8] - 2025-11-19
 
 ### Multi-Camera Support 🎥

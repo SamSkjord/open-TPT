@@ -233,10 +233,14 @@ class Camera:
 
                 # Pre-process frame for direct rendering
                 try:
-                    # Flip horizontally and convert to RGB in one step
-                    frame = cv2.flip(frame, 1)
                     t3 = time.time()
-                    profile_times['flip'] += (t3 - t2) * 1000
+                    # Only flip rear camera (front camera should show normal view)
+                    if self.current_camera == 'rear':
+                        frame = cv2.flip(frame, 1)
+                        profile_times['flip'] += (t3 - t2) * 1000
+                    else:
+                        # No flip for front camera
+                        profile_times['flip'] += 0  # Track as 0ms for profiling
 
                     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     t4 = time.time()
@@ -407,6 +411,8 @@ class Camera:
                 except queue.Empty:
                     break
             self.capture_thread = None
+            # Clear the last frame to avoid showing stale image on next activation
+            self.frame = None
 
     def close(self):
         """Close the camera and release resources."""
