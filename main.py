@@ -21,6 +21,7 @@ from gui.input_threaded import InputHandlerThreaded as InputHandler
 from gui.scale_bars import ScaleBars
 from gui.icon_handler import IconHandler
 from gui.gmeter import GMeterDisplay
+from ui.widgets.horizontal_bar import HorizontalBar, DualDirectionBar
 
 # Import optimised TPMS handler
 from hardware.tpms_input_optimized import TPMSHandler
@@ -69,6 +70,12 @@ from utils.config import (
     RADAR_TRACK_TIMEOUT,
     # Tyre sensor configuration
     TYRE_SENSOR_TYPES,
+    # Status bar configuration
+    STATUS_BAR_ENABLED,
+    STATUS_BAR_HEIGHT,
+    SCALE_X,
+    SCALE_Y,
+    FONT_SIZE_SMALL,
 )
 
 # Import unified corner sensor handler
@@ -222,6 +229,42 @@ class OpenTPT:
         self.input_handler = None
         self.imu = None
         self.gmeter = GMeterDisplay()
+
+        # Status bars (top and bottom) - used across all pages
+        self.status_bar_enabled = STATUS_BAR_ENABLED
+        self.top_bar = None
+        self.bottom_bar = None
+
+        if self.status_bar_enabled:
+            bar_height = int(STATUS_BAR_HEIGHT * SCALE_Y)
+            font_small = pygame.font.Font(None, FONT_SIZE_SMALL)
+
+            # Top bar: Lap time delta
+            self.top_bar = DualDirectionBar(
+                x=0, y=0, width=DISPLAY_WIDTH, height=bar_height, font=font_small
+            )
+            self.top_bar.set_label("Lap Δ")
+            self.top_bar.set_unit("s")
+            self.top_bar.set_range(-10, 10)
+            self.top_bar.set_colours(
+                positive=(255, 0, 0),    # Red = slower
+                negative=(0, 255, 0),    # Green = faster
+                neutral=(128, 128, 128)  # Grey = same pace
+            )
+
+            # Bottom bar: Battery State of Charge
+            self.bottom_bar = HorizontalBar(
+                x=0, y=DISPLAY_HEIGHT - bar_height, width=DISPLAY_WIDTH, height=bar_height, font=font_small
+            )
+            self.bottom_bar.set_label("SOC")
+            self.bottom_bar.set_unit("%")
+            self.bottom_bar.set_range(0, 100)
+            # Default to idle state (blue)
+            self.bottom_bar.set_colour_zones([
+                (0, (0, 0, 255)),      # Blue
+                (50, (64, 64, 255)),   # Lighter blue
+                (100, (0, 0, 255)),    # Blue
+            ])
 
         self.scale_bars = ScaleBars(self.screen)
         self.icon_handler = IconHandler(self.screen)
@@ -533,17 +576,43 @@ class OpenTPT:
                 if obd_snapshot and 'speed_kmh' in obd_snapshot:
                     self.gmeter.set_speed(obd_snapshot['speed_kmh'])
 
-            # Update Ford Hybrid SOC if available
+        # Update status bars (if enabled) - on ALL pages
+        if self.status_bar_enabled:
+            # Update SOC - prefer Ford Hybrid if available, otherwise use OBD2 simulated SOC
             if self.ford_hybrid:
                 hybrid_snapshot = self.ford_hybrid.get_data()
                 if hybrid_snapshot and 'soc_percent' in hybrid_snapshot:
-                    self.gmeter.set_soc(hybrid_snapshot['soc_percent'])
+                    soc = hybrid_snapshot['soc_percent']
+                    self.bottom_bar.set_value(soc)
+                    # Ford Hybrid defaults to idle state
+                    self.bottom_bar.set_colour_zones([
+                        (0, (0, 0, 255)), (50, (64, 64, 255)), (100, (0, 0, 255))
+                    ])
+            elif self.obd2:
+                # Use OBD2 MAP-based simulated SOC for desk testing
+                obd_snapshot = self.obd2.get_data()
+                if obd_snapshot and 'simulated_soc' in obd_snapshot:
+                    soc = obd_snapshot['simulated_soc']
+                    state = obd_snapshot.get('soc_state', 'idle')
+                    self.bottom_bar.set_value(soc)
 
-            # Update lap delta (placeholder - simulate for desk testing)
-            import time
-            # Simulate sinusoidal lap delta for testing
-            test_delta = 5.0 * math.sin(time.time() * 0.1)  # +/- 5 seconds, slow oscillation
-            self.gmeter.set_lap_delta(test_delta)
+                    # Update color zones based on state
+                    if state == 'idle':
+                        self.bottom_bar.set_colour_zones([
+                            (0, (0, 0, 255)), (50, (64, 64, 255)), (100, (0, 0, 255))
+                        ])
+                    elif state == 'increasing':  # Charging - GREEN
+                        self.bottom_bar.set_colour_zones([
+                            (0, (0, 128, 0)), (50, (0, 255, 0)), (100, (0, 255, 0))
+                        ])
+                    elif state == 'decreasing':  # Discharging - RED
+                        self.bottom_bar.set_colour_zones([
+                            (0, (255, 0, 0)), (50, (255, 100, 100)), (100, (255, 0, 0))
+                        ])
+
+            # Update lap delta (simulated for testing)
+            test_delta = 5.0 * math.sin(time.time() * 0.1)
+            self.top_bar.set_value(test_delta)
 
     def _render(self):
         """
@@ -685,23 +754,11 @@ class OpenTPT:
             self.cached_brightness_surface = None
         render_times['brightness'] = (time.time() - t0) * 1000
 
-        # Draw status bars on all pages (except gmeter which draws its own)
+        # Draw status bars on all pages
         t0 = time.time()
-        if not (self.current_category == "ui" and self.current_ui_page == "gmeter"):
-            # Update status bar data
-            if self.ford_hybrid:
-                hybrid_snapshot = self.ford_hybrid.get_data()
-                if hybrid_snapshot and 'soc_percent' in hybrid_snapshot:
-                    self.gmeter.set_soc(hybrid_snapshot['soc_percent'])
-
-            # Update lap delta (simulated for now)
-            test_delta = 5.0 * math.sin(time.time() * 0.1)
-            self.gmeter.set_lap_delta(test_delta)
-
-            # Draw the status bars
-            if self.gmeter.status_bar_enabled:
-                self.gmeter.top_bar.draw(self.screen)
-                self.gmeter.bottom_bar.draw(self.screen)
+        if self.status_bar_enabled:
+            self.top_bar.draw(self.screen)
+            self.bottom_bar.draw(self.screen)
         render_times['status_bars'] = (time.time() - t0) * 1000
 
         # Draw FPS counter (always on top)

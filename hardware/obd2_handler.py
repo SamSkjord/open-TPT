@@ -22,6 +22,7 @@ OBD_REQUEST_ID = 0x7DF
 OBD_RESPONSE_MIN = 0x7E8
 OBD_RESPONSE_MAX = 0x7EF
 PID_VEHICLE_SPEED = 0x0D  # Vehicle speed in km/h
+PID_INTAKE_MAP = 0x0B  # Intake manifold absolute pressure (kPa)
 
 
 class OBD2Handler(BoundedQueueHardwareHandler):
@@ -49,6 +50,12 @@ class OBD2Handler(BoundedQueueHardwareHandler):
         self.current_speed_kmh = 0
         self.speed_history = []  # Rolling window for smoothing
         self.speed_history_size = 5  # Average over last 5 readings
+
+        # MAP (manifold absolute pressure) for simulating SOC
+        self.current_map_kpa = 0
+        self.map_history = []  # Rolling window for smoothing and rate calculation
+        self.map_history_size = 3  # Small window for responsive rate-of-change detection
+        self.simulated_soc = 0.0  # Calculated directly from MAP (will be set on first reading)
 
         if self.enabled:
             self._initialise()
@@ -90,6 +97,16 @@ class OBD2Handler(BoundedQueueHardwareHandler):
             data=data
         )
 
+    def _build_map_request(self):
+        """Build OBD2 request for intake manifold absolute pressure (PID 0x0B)."""
+        # Service 0x01 (show current data), PID 0x0B (MAP)
+        data = [0x02, 0x01, PID_INTAKE_MAP] + [0x00] * 5
+        return can.Message(
+            arbitration_id=OBD_REQUEST_ID,
+            is_extended_id=False,
+            data=data
+        )
+
     def _wait_for_speed_response(self, timeout_s=0.2):
         """
         Wait for a speed response from the vehicle.
@@ -124,6 +141,97 @@ class OBD2Handler(BoundedQueueHardwareHandler):
                 return None
 
         return None
+
+    def _wait_for_map_response(self, timeout_s=0.2):
+        """
+        Wait for a MAP response from the vehicle.
+
+        Returns:
+            MAP in kPa, or None if no response
+        """
+        if not self.bus:
+            return None
+
+        deadline = time.time() + timeout_s
+        while time.time() < deadline:
+            remaining = max(0.0, deadline - time.time())
+            try:
+                msg = self.bus.recv(timeout=remaining)
+                if msg is None:
+                    continue
+
+                # Check if this is a valid response to our MAP request
+                # Response format: [length, 0x41, PID, data_byte, ...]
+                if (OBD_RESPONSE_MIN <= msg.arbitration_id <= OBD_RESPONSE_MAX
+                        and not msg.is_extended_id
+                        and len(msg.data) >= 4
+                        and msg.data[1] == 0x41  # Response to service 0x01
+                        and msg.data[2] == PID_INTAKE_MAP):
+                    # MAP is in byte 3, directly in kPa
+                    map_kpa = msg.data[3]
+                    return map_kpa
+
+            except Exception as e:
+                # Timeout or read error
+                return None
+
+        return None
+
+    def _calculate_map_state(self):
+        """
+        Calculate state (idle/increasing/decreasing) based on MAP rate of change.
+
+        Returns:
+            'idle', 'increasing', or 'decreasing'
+        """
+        if len(self.map_history) < 3:
+            return 'idle'
+
+        # Calculate rate of change (kPa per reading)
+        # Use linear regression or simple first-to-last difference
+        first_val = self.map_history[0]
+        last_val = self.map_history[-1]
+        rate = (last_val - first_val) / len(self.map_history)
+
+        # Thresholds for state detection (kPa per reading)
+        # At 5Hz polling, 0.5 kPa/reading = 2.5 kPa/s
+        idle_threshold = 0.3  # Small changes are considered idle
+
+        if abs(rate) < idle_threshold:
+            return 'idle'
+        elif rate > 0:
+            # MAP increasing = more throttle = discharging
+            return 'decreasing'
+        else:
+            # MAP decreasing = less throttle = charging
+            return 'increasing'
+
+    def _map_to_soc(self, map_kpa):
+        """
+        Map intake manifold pressure to simulated SOC percentage.
+
+        Higher MAP (more throttle) = discharging (lower SOC displayed)
+        Lower MAP (idle/decel) = charging (higher SOC displayed)
+
+        Args:
+            map_kpa: Manifold absolute pressure in kPa
+
+        Returns:
+            Simulated SOC percentage (0-100)
+        """
+        # Typical MAP range: 20-100 kPa
+        # At idle: ~30-40 kPa (low load, high SOC display)
+        # At WOT: ~90-100 kPa (high load, low SOC display)
+
+        # Directly map MAP to SOC (inverted - high MAP = low SOC)
+        # Normalize MAP to 0-1 range
+        map_normalized = (map_kpa - 20) / 80  # 20 kPa -> 0, 100 kPa -> 1
+        map_normalized = max(0, min(1, map_normalized))  # Clamp
+
+        # Invert and convert to SOC percentage (100% at idle, 0% at WOT)
+        self.simulated_soc = 100 * (1.0 - map_normalized)
+
+        return self.simulated_soc
 
     def _worker_loop(self):
         """Background thread that polls OBD2 for vehicle speed."""
@@ -162,18 +270,41 @@ class OBD2Handler(BoundedQueueHardwareHandler):
                         smoothed_speed = sum(self.speed_history) / len(self.speed_history)
                         self.current_speed_kmh = int(round(smoothed_speed))
 
-                        # Publish smoothed speed data
-                        data = {
-                            'speed_kmh': self.current_speed_kmh,
-                        }
-                        self._publish_snapshot(data)
-
                         # Reset error counter on successful read
                         self.consecutive_errors = 0
                     else:
                         # No response (possibly idling or ECU not responding)
                         # Don't treat as error, just keep last known speed
                         pass
+
+                    # Send MAP request (for simulating SOC)
+                    map_request = self._build_map_request()
+                    self.bus.send(map_request, timeout=0.1)
+
+                    # Wait for MAP response
+                    map_kpa = self._wait_for_map_response(timeout_s=0.15)
+
+                    if map_kpa is not None:
+                        # Add to history for rate-of-change calculation
+                        self.map_history.append(map_kpa)
+                        if len(self.map_history) > self.map_history_size:
+                            self.map_history.pop(0)
+
+                        # Update simulated SOC based on MAP
+                        self.current_map_kpa = map_kpa
+                        soc = self._map_to_soc(map_kpa)
+
+                        # Calculate state (idle/increasing/decreasing)
+                        state = self._calculate_map_state()
+
+                    # Publish combined data (speed and SOC)
+                    data = {
+                        'speed_kmh': self.current_speed_kmh,
+                        'map_kpa': self.current_map_kpa,
+                        'simulated_soc': self.simulated_soc,
+                        'soc_state': state if map_kpa is not None else 'idle',
+                    }
+                    self._publish_snapshot(data)
 
             except Exception as e:
                 self.consecutive_errors += 1
