@@ -10,12 +10,12 @@ import math
 from typing import Dict, List, Tuple, Optional
 import time
 
-# Overlay styling constants
-ARROW_HEIGHT = 40
-ARROW_HALF_WIDTH = 18
+# Overlay styling constants (3x larger, solid fill)
+ARROW_HEIGHT = 120  # 3x larger (was 40)
+ARROW_HALF_WIDTH = 54  # 3x larger (was 18)
 ARROW_MARGIN_TOP = 12
-CHEVRON_INNER_OFFSET = 12
-CHEVRON_TIP_INSET = 8
+CHEVRON_INNER_OFFSET = 12  # Not used for solid fill
+CHEVRON_TIP_INSET = 8  # Not used for solid fill
 
 # Colours
 MARKER_COLOUR_GREEN = (0, 200, 0)
@@ -197,29 +197,19 @@ class RadarOverlayRenderer:
         surface.blit(chevron, (centre_x - chevron.get_width() // 2, top_y))
 
     def _build_chevron_surface(self, colour: Tuple[int, int, int]) -> pygame.Surface:
-        """Build chevron arrow surface."""
+        """Build chevron arrow surface (solid filled triangle)."""
         width = ARROW_HALF_WIDTH * 2
         height = ARROW_HEIGHT
         surf = pygame.Surface((width, height), pygame.SRCALPHA).convert_alpha()
 
-        # Outer triangle
-        outer_points = [
-            (width // 2, height),
-            (0, 0),
-            (width, 0),
+        # Solid filled triangle (no inner cutout)
+        points = [
+            (width // 2, height),  # Bottom tip
+            (0, 0),                # Top left
+            (width, 0),            # Top right
         ]
-        pygame.draw.polygon(surf, (*colour, 255), outer_points)
+        pygame.draw.polygon(surf, (*colour, 255), points)
 
-        # Inner cutout
-        inner_margin_x = max(min(width // 4, width // 2 - 1), 1)
-        inner_top_y = min(max(CHEVRON_INNER_OFFSET, 0), height - CHEVRON_TIP_INSET - 1)
-        inner_tip_y = min(max(height - CHEVRON_TIP_INSET, inner_top_y + 1), height - 1)
-        inner_points = [
-            (width // 2, inner_tip_y),
-            (inner_margin_x, inner_top_y),
-            (width - inner_margin_x, inner_top_y),
-        ]
-        pygame.draw.polygon(surf, (0, 0, 0, 0), inner_points)
         return surf
 
     def _compute_marker_colour(self, track: Dict) -> Tuple[int, int, int]:
