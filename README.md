@@ -350,7 +350,7 @@ Chevrons are **3x larger (120×108px) and solid-filled** for high visibility.
 openTPT/
 ├── main.py                              # App entrypoint
 ├── requirements.txt
-├── deploy_to_pi.sh                      # Deployment script for Raspberry Pi
+├── install.sh                           # Installation script for Raspberry Pi
 ├── assets/
 │   ├── overlay.png                      # Fullscreen static GUI overlay
 │   └── icons/                           # Status, brake, tyre symbols

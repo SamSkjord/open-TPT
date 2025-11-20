@@ -10,10 +10,19 @@
 
 ### Deploy from Mac
 ```bash
-# Full deployment (first time or major changes)
-./deploy_to_pi.sh pi@192.168.199.247
+# Initial setup: SSH to Pi and clone repository
+ssh pi@192.168.199.247
+git clone https://github.com/SamSkjord/open-TPT.git
+cd open-TPT
+sudo ./install.sh
 
-# Quick sync (code changes only - faster)
+# Update: SSH to Pi and pull latest changes
+ssh pi@192.168.199.247
+cd /home/pi/open-TPT
+git pull
+sudo ./install.sh  # If dependencies changed
+
+# Quick sync (code changes only - faster for development)
 ./tools/quick_sync.sh pi@192.168.199.247
 ```
 

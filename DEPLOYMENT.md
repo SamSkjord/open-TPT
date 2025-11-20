@@ -32,7 +32,7 @@ ssh-copy-id pi@192.168.199.247
 
 ### 2. First-Time Pi Setup
 
-SSH to the Pi and install dependencies:
+SSH to the Pi and clone the repository:
 
 ```bash
 # SSH to Pi
@@ -41,39 +41,41 @@ ssh pi@192.168.199.247
 # Update system
 sudo apt update && sudo apt upgrade -y
 
-# Run the install script (when you first deploy)
-cd /home/pi/openTPT
-chmod +x install.sh
-./install.sh
+# Clone repository
+cd /home/pi
+git clone https://github.com/SamSkjord/open-TPT.git
+cd open-TPT
+
+# Run the install script
+sudo ./install.sh
 ```
+
+The install script will:
+- ✓ Install Python dependencies
+- ✓ Set up udev rules for cameras and CAN
+- ✓ Configure systemd service
+- ✓ Set up CAN interfaces
+- ✓ Enable auto-start on boot
 
 ## Deployment Methods
 
-### Method 1: Full Deployment (Recommended)
+### Method 1: Git Pull (Recommended for Updates)
 
-Deploy everything including assets:
+Update to latest version:
 
 ```bash
-cd /Users/sam/git/open-TPT
+# SSH to Pi
+ssh pi@192.168.199.247
+cd /home/pi/open-TPT
 
-# Deploy to default location (/home/pi/open-TPT)
-./deploy_to_pi.sh pi@192.168.199.247
+# Pull latest changes
+git pull
 
-# Or use hostname (if mDNS configured)
-./deploy_to_pi.sh pi@192.168.199.247
-
-# Or deploy to custom location
-./deploy_to_pi.sh pi@192.168.199.247 /opt/open-TPT
+# Re-run installer if dependencies changed
+sudo ./install.sh
 ```
 
-The script will:
-- ✓ Test connection
-- ✓ Create directories
-- ✓ Sync all files (excluding .git, scratch/, etc.)
-- ✓ Set permissions
-- ✓ Check dependencies
-
-### Method 2: Quick Sync (Fast Updates)
+### Method 2: Quick Sync (Fast Updates for Development)
 
 Only sync Python files and configs (much faster):
 
@@ -163,18 +165,16 @@ ssh pi@192.168.199.247 "echo 'Connection OK'"
 
 # Or use hostname if mDNS configured
 ping raspberrypi.local
-./deploy_to_pi.sh pi@raspberrypi.local
 ```
 
 ### Permission Denied
 
 ```bash
-# Ensure deploy script is executable
-chmod +x deploy_to_pi.sh
+# Ensure quick sync script is executable
 chmod +x tools/quick_sync.sh
 
 # Check remote directory permissions
-ssh pi@192.168.199.247 "ls -la /home/pi/openTPT"
+ssh pi@192.168.199.247 "ls -la /home/pi/open-TPT"
 ```
 
 ### Dependencies Not Installed

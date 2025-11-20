@@ -484,8 +484,8 @@ tools/
 ├── performance_test.py        # Validation tests
 └── quick_sync.sh              # Fast Mac→Pi deployment
 
-# Deployment scripts
-deploy_to_pi.sh                # Full deployment
+# Installation and requirements
+install.sh                     # Raspberry Pi installation script
 requirements.txt               # Python dependencies
 
 # Documentation
@@ -532,7 +532,11 @@ python3 tools/performance_test.py
 
 **Deploy to Pi**
 ```bash
-./deploy_to_pi.sh pi@raspberrypi.local
+# SSH to Pi and pull latest changes
+ssh pi@raspberrypi.local
+cd /home/pi/open-TPT
+git pull
+sudo ./install.sh  # If dependencies changed
 ```
 
 #### 🎯 Deployment Workflow (Mac → Pi)

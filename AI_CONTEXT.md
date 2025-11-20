@@ -144,9 +144,14 @@ openTPT/
 
 ### Deploying Changes
 ```bash
-# From Mac to Pi
-./deploy_to_pi.sh pi@192.168.199.243           # Full deployment
-./tools/quick_sync.sh pi@192.168.199.243       # Quick sync (code only)
+# SSH to Pi and update via git
+ssh pi@192.168.199.243
+cd /home/pi/open-TPT
+git pull
+sudo ./install.sh  # If dependencies changed
+
+# Quick sync (code only, for development)
+./tools/quick_sync.sh pi@192.168.199.243
 
 # Auto-deploy on save (requires fswatch)
 fswatch -o . | xargs -n1 -I{} ./tools/quick_sync.sh pi@192.168.199.243
@@ -610,7 +615,7 @@ Quick reference for finding information:
 → Create handler extending `BoundedQueueHardwareHandler`, add config to `utils/config.py`
 
 ### "Deploy to Pi"
-→ `./deploy_to_pi.sh pi@192.168.199.243` or `./tools/quick_sync.sh`
+→ SSH to Pi, `git pull`, optionally `sudo ./install.sh`, or use `./tools/quick_sync.sh`
 
 ### "Performance issue"
 → Check logs for performance summary, verify targets met, check for blocking
