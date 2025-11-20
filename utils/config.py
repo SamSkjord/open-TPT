@@ -29,8 +29,10 @@ TEMP_UNIT = "C"
 PRESSURE_UNIT = "PSI"
 
 # FPS Counter settings
-FPS_COUNTER_ENABLED = True  # Show FPS counter on screen
-FPS_COUNTER_POSITION = "top-right"  # Options: "top-left", "top-right", "bottom-left", "bottom-right"
+FPS_COUNTER_ENABLED = False  # Show FPS counter on screen
+FPS_COUNTER_POSITION = (
+    "top-right"  # Options: "top-left", "top-right", "bottom-left", "bottom-right"
+)
 FPS_COUNTER_COLOR = (0, 255, 0)  # RGB color (default: green)
 
 CAMERA_WIDTH = 800
@@ -39,12 +41,12 @@ CAMERA_FPS = 30
 
 # Multi-camera configuration
 # Set which cameras are available in your system
-CAMERA_REAR_ENABLED = True   # Rear camera (with radar overlay if radar enabled)
+CAMERA_REAR_ENABLED = True  # Rear camera (with radar overlay if radar enabled)
 CAMERA_FRONT_ENABLED = True  # Front camera (no radar overlay)
 
 # Camera device paths (if using udev rules for persistent naming)
 # Leave as None to auto-detect
-CAMERA_REAR_DEVICE = "/dev/video-rear"   # or None for auto-detect
+CAMERA_REAR_DEVICE = "/dev/video-rear"  # or None for auto-detect
 CAMERA_FRONT_DEVICE = "/dev/video-front"  # or None for auto-detect
 
 # Note: The thresholds below are set according to the chosen units above.
@@ -77,9 +79,9 @@ BRAKE_TEMP_HOT_TO_BLACK = 100.0  # Range over which red fades to black after HOT
 
 # NeoKey 1x4 button mappings
 BUTTON_BRIGHTNESS_CYCLE = 0  # Cycle through brightness presets
-BUTTON_PAGE_SETTINGS = 1      # Toggle page-specific settings (context-sensitive per page)
-BUTTON_CATEGORY_SWITCH = 2    # Switch within category (camera↔camera OR UI page↔UI page)
-BUTTON_VIEW_MODE = 3          # Switch between categories (camera pages ↔ UI pages)
+BUTTON_PAGE_SETTINGS = 1  # Toggle page-specific settings (context-sensitive per page)
+BUTTON_CATEGORY_SWITCH = 2  # Switch within category (camera↔camera OR UI page↔UI page)
+BUTTON_VIEW_MODE = 3  # Switch between categories (camera pages ↔ UI pages)
 
 # I2C settings
 I2C_BUS = 1  # Default I2C bus on Raspberry Pi 4
@@ -147,6 +149,7 @@ def scale_size(size):
 
 # Font settings
 FONT_SIZE_LARGE = int(60 * min(SCALE_X, SCALE_Y))
+FONT_SIZE_MEDARGE = int(45 * min(SCALE_X, SCALE_Y))
 FONT_SIZE_MEDIUM = int(24 * min(SCALE_X, SCALE_Y))
 FONT_SIZE_SMALL = int(18 * min(SCALE_X, SCALE_Y))
 
@@ -186,10 +189,10 @@ BRAKE_POSITIONS = {
 # Per-tyre sensor type selection
 # Options: "pico" for Pico I2C slave with MLX90640, "mlx90614" for single-point IR sensor
 TYRE_SENSOR_TYPES = {
-    "FL": "pico",      # Front Left
-    "FR": "pico",      # Front Right
-    "RL": "pico",      # Rear Left
-    "RR": "pico",      # Rear Right
+    "FL": "pico",  # Front Left
+    "FR": "pico",  # Front Right
+    "RL": "pico",  # Rear Left
+    "RR": "pico",  # Rear Right
 }
 
 # MLX90640 thermal camera settings (24x32 pixels)
@@ -234,28 +237,28 @@ TPMS_POSITIONS = {
     "FL": {
         "pressure": (
             MLX_POSITIONS["FL"][0] + MLX_DISPLAY_WIDTH // 2,
-            MLX_POSITIONS["FL"][1] - int(18 * SCALE_Y),
+            MLX_POSITIONS["FL"][1] - int(12 * SCALE_Y),
         ),
         "temp": (MLX_POSITIONS["FL"][0], MLX_POSITIONS["FL"][1] - int(10 * SCALE_Y)),
     },
     "FR": {
         "pressure": (
             MLX_POSITIONS["FR"][0] + MLX_DISPLAY_WIDTH // 2,
-            MLX_POSITIONS["FR"][1] - int(18 * SCALE_Y),
+            MLX_POSITIONS["FR"][1] - int(12 * SCALE_Y),
         ),
         "temp": (MLX_POSITIONS["FR"][0], MLX_POSITIONS["FR"][1] - int(10 * SCALE_Y)),
     },
     "RL": {
         "pressure": (
             MLX_POSITIONS["RL"][0] + MLX_DISPLAY_WIDTH // 2,
-            MLX_POSITIONS["RL"][1] + int(195 * SCALE_Y),
+            MLX_POSITIONS["RL"][1] + int(189 * SCALE_Y),
         ),
         "temp": (MLX_POSITIONS["RL"][0], MLX_POSITIONS["RL"][1] - int(10 * SCALE_Y)),
     },
     "RR": {
         "pressure": (
             MLX_POSITIONS["RR"][0] + MLX_DISPLAY_WIDTH // 2,
-            MLX_POSITIONS["RR"][1] + int(195 * SCALE_Y),
+            MLX_POSITIONS["RR"][1] + int(189 * SCALE_Y),
         ),
         "temp": (MLX_POSITIONS["RR"][0], MLX_POSITIONS["RR"][1] - int(10 * SCALE_Y)),
     },
@@ -275,6 +278,25 @@ OBD_CHANNEL = "can_b2_1"  # CAN channel for OBD2 data
 OBD_BITRATE = 500000  # Standard OBD2 bitrate (500 kbps)
 
 # ==============================================================================
+# Ford Hybrid Configuration (for battery state of charge)
+# ==============================================================================
+
+# Enable/disable Ford Hybrid battery monitoring
+FORD_HYBRID_ENABLED = (
+    False  # Set to True to enable Ford hybrid SOC and power monitoring
+)
+
+# Ford Hybrid CAN configuration
+# Available interfaces: can_b1_0, can_b1_1, can_b2_0, can_b2_1
+# Ford Hybrid module is on can_b2_0 (Board 2, CAN_0 connector)
+FORD_HYBRID_CHANNEL = "can_b2_0"  # CAN channel for Ford hybrid data
+FORD_HYBRID_BITRATE = 500000  # Standard CAN bitrate (500 kbps)
+
+# Status bar configuration
+STATUS_BAR_HEIGHT = 20  # Height of status bars in pixels (scaled)
+STATUS_BAR_ENABLED = True  # Show status bars at top and bottom
+
+# ==============================================================================
 # Radar Configuration (Optional)
 # ==============================================================================
 
@@ -283,7 +305,7 @@ RADAR_ENABLED = False  # Set to True to enable radar overlay on camera
 
 # Toyota radar CAN configuration
 RADAR_CHANNEL = "can0"  # CAN channel for radar data
-CAR_CHANNEL = "can1"    # CAN channel for car keep-alive
+CAR_CHANNEL = "can1"  # CAN channel for car keep-alive
 RADAR_INTERFACE = "socketcan"  # python-can interface
 RADAR_BITRATE = 500000  # CAN bitrate
 
@@ -318,9 +340,9 @@ RADAR_OVERTAKE_ARROW_DURATION = 1.0  # Duration to show arrow (seconds)
 # Options: "adc" for IR sensors via ADS1115, "mlx90614" for single-point IR, "obd" for CAN/OBD-II
 BRAKE_SENSOR_TYPES = {
     "FL": "mlx90614",  # Front Left - MLX90614 IR sensor
-    "FR": "adc",       # Front Right - ADC IR sensor
-    "RL": "adc",       # Rear Left - ADC IR sensor
-    "RR": "adc",       # Rear Right - ADC IR sensor
+    "FR": "adc",  # Front Right - ADC IR sensor
+    "RL": "adc",  # Rear Left - ADC IR sensor
+    "RR": "adc",  # Rear Right - ADC IR sensor
 }
 
 # ADC channel mapping for IR brake sensors (ADS1115)

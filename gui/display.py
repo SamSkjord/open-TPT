@@ -10,6 +10,7 @@ from utils.config import (
     FONT_SIZE_LARGE,
     FONT_SIZE_MEDIUM,
     FONT_SIZE_SMALL,
+    FONT_SIZE_MEDARGE,
     WHITE,
     BLACK,
     RED,
@@ -96,6 +97,7 @@ class Display:
         self.font_large = pygame.font.SysFont(None, FONT_SIZE_LARGE)
         self.font_medium = pygame.font.SysFont(None, FONT_SIZE_MEDIUM)
         self.font_small = pygame.font.SysFont(None, FONT_SIZE_SMALL)
+        self.font_medarge = pygame.font.SysFont(None, FONT_SIZE_MEDARGE)
 
         # Initialize color maps for thermal display
         self.colormap = self._create_thermal_colormap()
@@ -265,9 +267,9 @@ class Display:
 
         # Handle None pressure value
         if pressure is None:
-            pressure_text = self.font_large.render("--", True, pressure_color)
+            pressure_text = self.font_medarge.render("--", True, pressure_color)
         else:
-            pressure_text = self.font_large.render(
+            pressure_text = self.font_medarge.render(
                 f"{pressure:.1f}", True, pressure_color
             )
 
@@ -534,7 +536,7 @@ class Display:
 
             # Get zone data to check if mirrored
             zone_data = thermal_handler.get_zone_data(position)
-            if zone_data and zone_data.get('_mirrored_from_centre', False):
+            if zone_data and zone_data.get("_mirrored_from_centre", False):
                 # Get position for this tyre
                 pos = MLX_POSITIONS[position]
                 chevron_center_x = pos[0] + MLX_DISPLAY_WIDTH // 2
@@ -557,8 +559,14 @@ class Display:
                     chevron_y = pos[1] + MLX_DISPLAY_HEIGHT + 2
                     chevron_points = [
                         (chevron_center_x, chevron_y),  # Top point
-                        (chevron_center_x - chevron_size, chevron_y + chevron_size),  # Bottom left
-                        (chevron_center_x + chevron_size, chevron_y + chevron_size),  # Bottom right
+                        (
+                            chevron_center_x - chevron_size,
+                            chevron_y + chevron_size,
+                        ),  # Bottom left
+                        (
+                            chevron_center_x + chevron_size,
+                            chevron_y + chevron_size,
+                        ),  # Bottom right
                     ]
 
                 pygame.draw.polygon(self.surface, RED, chevron_points)
@@ -706,10 +714,10 @@ class Display:
         # Render the text
         units_surface = self.font_medium.render(units_text, True, WHITE)
 
-        # Position in lower right corner
+        # Position in lower right corner (moved up to clear bottom status bar)
         units_pos = (
             DISPLAY_WIDTH - units_surface.get_width() - 10,
-            DISPLAY_HEIGHT - units_surface.get_height() - 10,
+            DISPLAY_HEIGHT - units_surface.get_height() - 35,
         )
 
         # Draw the text directly to the provided surface
@@ -743,8 +751,10 @@ class Display:
         elif FPS_COUNTER_POSITION == "bottom-left":
             pos = (padding, DISPLAY_HEIGHT - fps_surface.get_height() - padding)
         elif FPS_COUNTER_POSITION == "bottom-right":
-            pos = (DISPLAY_WIDTH - fps_surface.get_width() - padding,
-                   DISPLAY_HEIGHT - fps_surface.get_height() - padding)
+            pos = (
+                DISPLAY_WIDTH - fps_surface.get_width() - padding,
+                DISPLAY_HEIGHT - fps_surface.get_height() - padding,
+            )
         else:
             # Default to top-right
             pos = (DISPLAY_WIDTH - fps_surface.get_width() - padding, padding)

@@ -20,7 +20,10 @@ from utils.config import (
     FONT_SIZE_SMALL,
     SCALE_X,
     SCALE_Y,
+    STATUS_BAR_HEIGHT,
+    STATUS_BAR_ENABLED,
 )
+from ui.widgets.horizontal_bar import HorizontalBar, DualDirectionBar
 
 
 class GMeterDisplay:
@@ -32,9 +35,9 @@ class GMeterDisplay:
         self.width = DISPLAY_WIDTH
         self.height = DISPLAY_HEIGHT
 
-        # Center of the circular plot
+        # Center of the circular plot (true center of screen)
         self.center_x = self.width // 2
-        self.center_y = int(self.height * 0.55)  # Slightly below center
+        self.center_y = self.height // 2
 
         # Radius of the main circle
         self.radius = int(min(self.width, self.height) * 0.35)
@@ -84,6 +87,55 @@ class GMeterDisplay:
         self.trail_duration = (
             3.0  # Keep trail visible for 3 seconds (was effectively instant)
         )
+
+        # Status bars (top and bottom)
+        self.status_bar_enabled = STATUS_BAR_ENABLED
+        bar_height = int(STATUS_BAR_HEIGHT * SCALE_Y)
+
+        # Top bar: Lap time delta (placeholder for now)
+        # Pinned to very top of screen (no margin)
+        self.top_bar = DualDirectionBar(
+            x=0, y=0, width=self.width, height=bar_height, font=self.font_small
+        )
+        self.top_bar.set_label("Lap Δ")
+        self.top_bar.set_unit("s")
+        self.top_bar.set_range(-10, 10)  # +/- 10 seconds
+        self.top_bar.set_colours(
+            positive=(255, 0, 0),  # Red = slower (positive delta)
+            negative=(0, 255, 0),  # Green = faster (negative delta)
+            neutral=(128, 128, 128),  # Grey = same pace
+        )
+
+        # Bottom bar: Battery State of Charge
+        # Pinned to very bottom of screen (no margin)
+        self.bottom_bar = HorizontalBar(
+            x=0,
+            y=self.height - bar_height,
+            width=self.width,
+            height=bar_height,
+            font=self.font_small,
+        )
+        self.bottom_bar.set_label("SOC")
+        self.bottom_bar.set_unit("%")
+        self.bottom_bar.set_range(0, 100)
+
+        # SOC colour zones (red at extremes, green in middle)
+        self.bottom_bar.set_colour_zones(
+            [
+                (0, (255, 0, 0)),  # Red at 0%
+                (20, (255, 165, 0)),  # Orange at 20%
+                (40, (255, 255, 0)),  # Yellow at 40%
+                (50, (0, 255, 0)),  # Green at 50%
+                (60, (0, 255, 0)),  # Green at 60%
+                (80, (255, 255, 0)),  # Yellow at 80%
+                (90, (255, 165, 0)),  # Orange at 90%
+                (95, (255, 0, 0)),  # Red at 95%
+            ]
+        )
+
+        # Status bar data
+        self.lap_delta_seconds = 0.0
+        self.soc_percent = 50  # Start at 50%
 
     def reset_peaks(self):
         """Reset peak G-force values."""
@@ -166,6 +218,11 @@ class GMeterDisplay:
 
         # Draw labels
         self._draw_labels(screen)
+
+        # Draw status bars
+        if self.status_bar_enabled:
+            self.top_bar.draw(screen)
+            self.bottom_bar.draw(screen)
 
     def _draw_circular_plot(self, screen):
         """Draw the circular G-force plot with concentric circles."""
@@ -297,34 +354,19 @@ class GMeterDisplay:
         # Calculate combined G
         combined_g = math.sqrt(self.current_lateral**2 + self.current_longitudinal**2)
 
-        # Position for readings (top center)
-        y_pos = int(40 * SCALE_Y)
+        # Position for combined G reading (bottom, left of center)
+        # Horizontally aligned with speed display (same Y position)
+        x_pos = int(580 * SCALE_X)  # Left side, between peak values and center
+        y_pos = self.height - int(450 * SCALE_Y)  # Same Y as speed
 
-        # Combined G (extra large, centered on decimal point, 1 decimal) - RED if disconnected, WHITE if connected
+        # Combined G (extra large, 1 decimal) - RED if disconnected, WHITE if connected
         combined_color = WHITE if imu_connected else RED
 
-        # Render the parts we need to measure
-        integer_part = int(combined_g)
+        # Render the combined G reading
+        full_text = self.font_xxlarge.render(f"{combined_g:.1f}g", True, combined_color)
 
-        # Measure just the integer part (without decimal point)
-        integer_text = self.font_xlarge.render(f"{integer_part}", True, combined_color)
-        integer_width = integer_text.get_width()
-
-        # Measure the decimal point
-        decimal_point_text = self.font_xlarge.render(".", True, combined_color)
-        decimal_point_width = decimal_point_text.get_width()
-
-        # Render the full string
-        full_text = self.font_xlarge.render(f"{combined_g:.1f}g", True, combined_color)
-        full_height = full_text.get_height()
-
-        # Position so that the middle of the decimal point is at horizontal screen center
-        # Decimal point center = integer_width + (decimal_point_width / 2)
-        decimal_center_offset = integer_width + (decimal_point_width / 2)
-        x_start = self.center_x - decimal_center_offset
-        y_start = y_pos - (full_height // 2)
-
-        screen.blit(full_text, (x_start, y_start))
+        # Draw at specified position
+        screen.blit(full_text, (x_pos, y_pos))
 
         # Lateral and Longitudinal (smaller, left side of screen)
         x_pos = int(20 * SCALE_X)  # Left margin
@@ -343,9 +385,10 @@ class GMeterDisplay:
 
     def _draw_peak_values(self, screen):
         """Draw peak G-force values."""
-        # Position for peak values (bottom left)
+        # Position for peak values (bottom left, aligned with speed display)
+        # Moved down to avoid overlap with bottom status bar
         x_pos = int(20 * SCALE_X)
-        y_pos = self.height - int(120 * SCALE_Y)
+        y_pos = self.height - int(155 * SCALE_Y)
 
         # Peak combined
         text_peak_combined = self.font_small.render(
@@ -375,9 +418,9 @@ class GMeterDisplay:
 
     def _draw_speed(self, screen):
         """Draw speed (placeholder for future OBD2/GPS integration)."""
-        # Position for speed (bottom right, moved slightly right)
+        # Position for speed (bottom right, moved up to show km/h label above bottom bar)
         x_pos = self.width - int(180 * SCALE_X)
-        y_pos = self.height - int(120 * SCALE_Y)
+        y_pos = self.height - int(155 * SCALE_Y)  # Moved up from 120 to 155
 
         # Speed display (extra extra large font)
         text_speed = self.font_xxlarge.render(f"{self.current_speed}", True, WHITE)
@@ -390,16 +433,9 @@ class GMeterDisplay:
 
     def _draw_labels(self, screen):
         """Draw additional labels and information."""
-        # Title (top left)
+        # Title (top left, moved down to avoid top status bar)
         text_title = self.font_medium.render("G-METER", True, WHITE)
-        screen.blit(text_title, (int(20 * SCALE_X), int(20 * SCALE_Y)))
-
-        # Instructions (bottom center) - for reset peaks action
-        text_instruction = self.font_small.render("Button 1: Reset Peaks", True, GREY)
-        text_rect = text_instruction.get_rect(
-            center=(self.center_x, self.height - int(20 * SCALE_Y))
-        )
-        screen.blit(text_instruction, text_rect)
+        screen.blit(text_title, (int(20 * SCALE_X), int(35 * SCALE_Y)))
 
     def set_speed(self, speed_kmh):
         """
@@ -409,3 +445,23 @@ class GMeterDisplay:
             speed_kmh: Speed in km/h
         """
         self.current_speed = speed_kmh
+
+    def set_soc(self, soc_percent):
+        """
+        Set the battery state of charge.
+
+        Args:
+            soc_percent: State of charge (0-100%)
+        """
+        self.soc_percent = max(0, min(100, soc_percent))
+        self.bottom_bar.set_value(self.soc_percent)
+
+    def set_lap_delta(self, delta_seconds):
+        """
+        Set the lap time delta.
+
+        Args:
+            delta_seconds: Lap time delta in seconds (+ve = slower, -ve = faster)
+        """
+        self.lap_delta_seconds = delta_seconds
+        self.top_bar.set_value(delta_seconds)

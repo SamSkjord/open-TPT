@@ -7,6 +7,7 @@ A modular GUI system for live racecar telemetry using Raspberry Pi 4
 import os
 import sys
 import time
+import math
 import argparse
 import pygame
 import numpy as np
@@ -95,6 +96,16 @@ except ImportError:
     OBD2_AVAILABLE = False
     OBD2Handler = None
     OBD_ENABLED = False
+
+# Import Ford Hybrid handler (optional, for battery SOC)
+try:
+    from hardware.ford_hybrid_handler import FordHybridHandler
+    from utils.config import FORD_HYBRID_ENABLED
+    FORD_HYBRID_AVAILABLE = True
+except ImportError:
+    FORD_HYBRID_AVAILABLE = False
+    FordHybridHandler = None
+    FORD_HYBRID_ENABLED = False
 
 # Import performance monitoring
 try:
@@ -276,6 +287,18 @@ class OpenTPT:
                 self.obd2 = None
         else:
             self.obd2 = None
+
+        # Initialise Ford Hybrid handler (optional, for battery SOC)
+        if FORD_HYBRID_ENABLED and FORD_HYBRID_AVAILABLE and FordHybridHandler:
+            try:
+                self.ford_hybrid = FordHybridHandler()
+                self.ford_hybrid.initialize()
+                print("Ford Hybrid handler initialised for battery SOC")
+            except Exception as e:
+                print(f"Warning: Could not initialise Ford Hybrid: {e}")
+                self.ford_hybrid = None
+        else:
+            self.ford_hybrid = None
 
         # Start monitoring threads
         self.input_handler.start()  # Start NeoKey polling thread
@@ -510,6 +533,18 @@ class OpenTPT:
                 if obd_snapshot and 'speed_kmh' in obd_snapshot:
                     self.gmeter.set_speed(obd_snapshot['speed_kmh'])
 
+            # Update Ford Hybrid SOC if available
+            if self.ford_hybrid:
+                hybrid_snapshot = self.ford_hybrid.get_data()
+                if hybrid_snapshot and 'soc_percent' in hybrid_snapshot:
+                    self.gmeter.set_soc(hybrid_snapshot['soc_percent'])
+
+            # Update lap delta (placeholder - simulate for desk testing)
+            import time
+            # Simulate sinusoidal lap delta for testing
+            test_delta = 5.0 * math.sin(time.time() * 0.1)  # +/- 5 seconds, slow oscillation
+            self.gmeter.set_lap_delta(test_delta)
+
     def _render(self):
         """
         Render the display.
@@ -650,6 +685,25 @@ class OpenTPT:
             self.cached_brightness_surface = None
         render_times['brightness'] = (time.time() - t0) * 1000
 
+        # Draw status bars on all pages (except gmeter which draws its own)
+        t0 = time.time()
+        if not (self.current_category == "ui" and self.current_ui_page == "gmeter"):
+            # Update status bar data
+            if self.ford_hybrid:
+                hybrid_snapshot = self.ford_hybrid.get_data()
+                if hybrid_snapshot and 'soc_percent' in hybrid_snapshot:
+                    self.gmeter.set_soc(hybrid_snapshot['soc_percent'])
+
+            # Update lap delta (simulated for now)
+            test_delta = 5.0 * math.sin(time.time() * 0.1)
+            self.gmeter.set_lap_delta(test_delta)
+
+            # Draw the status bars
+            if self.gmeter.status_bar_enabled:
+                self.gmeter.top_bar.draw(self.screen)
+                self.gmeter.bottom_bar.draw(self.screen)
+        render_times['status_bars'] = (time.time() - t0) * 1000
+
         # Draw FPS counter (always on top)
         t0 = time.time()
         camera_fps = self.camera.fps if self.camera.is_active() else None
@@ -720,6 +774,11 @@ class OpenTPT:
         if self.obd2:
             print("Stopping OBD2...")
             self.obd2.cleanup()
+
+        # Stop Ford Hybrid if enabled
+        if self.ford_hybrid:
+            print("Stopping Ford Hybrid...")
+            self.ford_hybrid.cleanup()
 
         # Stop radar if enabled
         if self.radar:
