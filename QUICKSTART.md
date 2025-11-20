@@ -67,10 +67,13 @@ ssh pi@192.168.199.247 "sudo systemctl status openTPT.service"
 
 ## Hardware Status
 
-### Current Setup (v0.8)
+### Current Setup (v0.9)
 - ✅ **TPMS:** 4/4 sensors auto-paired (FL, FR, RL, RR)
 - ✅ **Multi-Camera:** Dual USB cameras with seamless switching
 - ✅ **NeoKey 1x4:** All buttons functional
+- ✅ **G-Meter:** ICM-20649 IMU with real-time acceleration tracking
+- ✅ **OBD2 Speed:** Vehicle speed via CAN bus (can_b2_1)
+- ✅ **CAN Auto-Start:** All 4 CAN interfaces automatically configured on boot
 - ✅ **Pico Thermal:** 1/4 operational (FL connected)
 - ⚠️ **ADS1115:** Not connected (brake temps unavailable)
 - ⚠️ **Radar:** Optional (disabled by default)
@@ -85,6 +88,34 @@ Connect cameras to specific USB ports for deterministic identification:
 Verify symlinks:
 ```bash
 ssh pi@192.168.199.247 "ls -l /dev/video-*"
+```
+
+## CAN Bus Setup
+
+### OBD2 Speed Reading
+The system automatically brings up all CAN interfaces on boot via the `can-setup.service`. OBD-II is connected to `can_b2_1` (Board 2, CAN_1 connector).
+
+Enable/disable OBD2 speed in `utils/config.py`:
+```python
+OBD_ENABLED = True  # Set to False to disable
+OBD_CHANNEL = "can_b2_1"  # OBD-II interface
+```
+
+Verify CAN interfaces:
+```bash
+ssh pi@192.168.199.247 "ip link show | grep can"
+```
+
+Manual CAN control (if needed):
+```bash
+# Bring down interface
+sudo ip link set can_b2_1 down
+
+# Bring up interface
+sudo ip link set can_b2_1 up type can bitrate 500000
+
+# Check CAN setup service status
+sudo systemctl status can-setup.service
 ```
 
 ## Quick Troubleshooting
@@ -194,10 +225,13 @@ sudo systemctl status openTPT.service
 | `CHANGELOG.md` | Version history and features |
 | `open-TPT_System_Plan.md` | Long-term architecture plan |
 
-## Key Features (v0.8)
+## Key Features (v0.9)
 
 - ✅ Real-time TPMS monitoring with auto-pairing
 - ✅ Dual USB camera support with seamless switching
+- ✅ G-meter with IMU acceleration tracking
+- ✅ OBD2 vehicle speed via CAN bus (smoothed 5 Hz updates)
+- ✅ Automatic CAN interface setup on boot
 - ✅ Tyre thermal imaging (MLX90640 or MLX90614)
 - ✅ Brake temperature monitoring (IR sensors + ADC)
 - ✅ Lock-free rendering (60 FPS target)
@@ -217,5 +251,5 @@ Use British spelling throughout:
 
 ---
 
-**Status:** ✅ System operational with multi-camera support
-**Last Updated:** 2025-11-19 (v0.8)
+**Status:** ✅ System operational with G-meter and OBD2 speed
+**Last Updated:** 2025-11-20 (v0.9)

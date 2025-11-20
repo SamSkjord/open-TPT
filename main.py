@@ -86,6 +86,16 @@ except ImportError:
     IMUHandler = None
     IMU_ENABLED = False
 
+# Import OBD2 handler (optional, for vehicle speed)
+try:
+    from hardware.obd2_handler import OBD2Handler
+    from utils.config import OBD_ENABLED
+    OBD2_AVAILABLE = True
+except ImportError:
+    OBD2_AVAILABLE = False
+    OBD2Handler = None
+    OBD_ENABLED = False
+
 # Import performance monitoring
 try:
     from utils.performance import get_global_monitor
@@ -255,6 +265,17 @@ class OpenTPT:
             except Exception as e:
                 print(f"Warning: Could not initialise IMU: {e}")
                 self.imu = None
+
+        # Initialise OBD2 handler (optional, for vehicle speed)
+        if OBD_ENABLED and OBD2_AVAILABLE and OBD2Handler:
+            try:
+                self.obd2 = OBD2Handler()
+                print("OBD2 handler initialised for vehicle speed")
+            except Exception as e:
+                print(f"Warning: Could not initialise OBD2: {e}")
+                self.obd2 = None
+        else:
+            self.obd2 = None
 
         # Start monitoring threads
         self.input_handler.start()  # Start NeoKey polling thread
@@ -477,10 +498,17 @@ class OpenTPT:
             self.camera.update()
 
         # Update IMU data if G-meter is active
-        if self.current_category == "ui" and self.current_ui_page == "gmeter" and self.imu:
-            imu_snapshot = self.imu.get_data()
-            if imu_snapshot:
-                self.gmeter.update(imu_snapshot)
+        if self.current_category == "ui" and self.current_ui_page == "gmeter":
+            if self.imu:
+                imu_snapshot = self.imu.get_data()
+                if imu_snapshot:
+                    self.gmeter.update(imu_snapshot)
+
+            # Update OBD2 speed if available
+            if self.obd2:
+                obd_snapshot = self.obd2.get_data()
+                if obd_snapshot and 'speed_kmh' in obd_snapshot:
+                    self.gmeter.set_speed(obd_snapshot['speed_kmh'])
 
     def _render(self):
         """
@@ -687,6 +715,11 @@ class OpenTPT:
         if self.imu:
             print("Stopping IMU...")
             self.imu.stop()
+
+        # Stop OBD2 if enabled
+        if self.obd2:
+            print("Stopping OBD2...")
+            self.obd2.cleanup()
 
         # Stop radar if enabled
         if self.radar:

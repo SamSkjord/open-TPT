@@ -190,12 +190,20 @@ else
   echo "WARNING: Missing $CAMERA_RULE_SRC; skipping camera naming rule."
 fi
 
-# Copy systemd service file and enable
-echo -e "\n==== Enabling openTPT systemd service ===="
+# Copy systemd service files and enable
+echo -e "\n==== Setting up CAN interface auto-start ===="
+sudo cp "$SCRIPT_DIR/config/systemd/can-setup.sh" /usr/local/bin/
+sudo chmod +x /usr/local/bin/can-setup.sh
+sudo cp "$SCRIPT_DIR/config/systemd/can-setup.service" /etc/systemd/system/
+echo "CAN interface service installed"
+
+echo -e "\n==== Enabling systemd services ===="
 cd "$SCRIPT_DIR"
 sudo cp "$SCRIPT_DIR/openTPT.service" /etc/systemd/system/
 sudo systemctl daemon-reload
+sudo systemctl enable can-setup.service
 sudo systemctl enable openTPT.service
+echo "Services enabled"
 
 # Disable cloud-init to prevent boot delays and network configuration issues
 echo -e "\n==== Disabling cloud-init ===="

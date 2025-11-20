@@ -262,6 +262,19 @@ TPMS_POSITIONS = {
 }
 
 # ==============================================================================
+# OBD2 Configuration (for vehicle speed)
+# ==============================================================================
+
+# Enable/disable OBD2 speed reading
+OBD_ENABLED = True  # Set to False to disable OBD2 speed
+
+# OBD2 CAN configuration
+# Available interfaces: can_b1_0, can_b1_1, can_b2_0, can_b2_1
+# OBD-II is connected to can_b2_1 (Board 2, CAN_1 connector)
+OBD_CHANNEL = "can_b2_1"  # CAN channel for OBD2 data
+OBD_BITRATE = 500000  # Standard OBD2 bitrate (500 kbps)
+
+# ==============================================================================
 # Radar Configuration (Optional)
 # ==============================================================================
 
