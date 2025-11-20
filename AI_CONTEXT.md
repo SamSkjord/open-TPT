@@ -2,7 +2,7 @@
 
 **Purpose:** This document provides essential context for AI assistants working on the openTPT project, enabling quick onboarding and effective collaboration.
 
-**Last Updated:** 2025-11-19 (v0.8)
+**Last Updated:** 2025-11-20 (v0.10)
 
 ---
 
@@ -29,15 +29,17 @@
 - **Project Path:** `/home/pi/open-TPT`
 - **Service:** `openTPT.service` (systemd, auto-start on boot)
 
-### Hardware Status (v0.8)
+### Hardware Status (v0.10)
 - ✅ **TPMS:** 4/4 sensors auto-paired (FL, FR, RL, RR)
 - ✅ **Multi-Camera:** Dual USB cameras with seamless switching
   - Rear camera: `/dev/video-rear` (USB port 1.1)
   - Front camera: `/dev/video-front` (USB port 1.2)
 - ✅ **NeoKey 1x4:** Physical control buttons working
 - ✅ **Pico Thermal:** 1/4 MLX90640 connected (FL)
+- ✅ **Toyota Radar:** Enabled by default, receives 1-3 tracks
+  - CAN channels: can_b1_0 (keep-alive), can_b1_1 (tracks)
+- ✅ **OBD2:** MAP-based SOC simulation for desk testing
 - ⚠️ **ADS1115:** Not connected (brake temps unavailable)
-- ⚠️ **Radar:** Optional, disabled by default
 
 ---
 
@@ -91,7 +93,9 @@ openTPT/
 │   ├── unified_corner_handler.py    # Unified handler for all tyre sensors
 │   ├── tpms_input_optimized.py      # TPMS with bounded queues
 │   ├── mlx90614_handler.py          # MLX90614 single-point IR
-│   ├── radar_handler.py             # Toyota radar (optional)
+│   ├── radar_handler.py             # Toyota radar handler (bounded queues)
+│   ├── toyota_radar_driver.py       # Toyota radar CAN driver
+│   ├── obd2_handler.py              # OBD2 speed and MAP-based SOC
 │   └── i2c_mux.py                   # TCA9548A control
 ├── utils/
 │   ├── config.py            # ALL configuration constants
@@ -102,6 +106,9 @@ openTPT/
 │   │   └── 99-camera-names.rules    # Camera udev rules
 │   └── can/
 │       └── 80-can-persistent-names.rules  # CAN udev rules
+├── opendbc/
+│   ├── toyota_prius_2017_adas.dbc          # Toyota radar DBC
+│   └── toyota_prius_2017_pt_generated.dbc  # Powertrain DBC
 └── assets/
     ├── overlay.png          # UI overlay
     └── icons/               # Status icons
@@ -192,10 +199,16 @@ TYRE_SENSOR_TYPES = {
     "RR": "mlx90614",
 }
 
-# Radar (optional)
-RADAR_ENABLED = False  # Disabled by default
-RADAR_CHANNEL = "can0"
+# Radar (enabled by default)
+RADAR_ENABLED = True
+RADAR_CHANNEL = "can_b1_1"  # Radar track output
+CAR_CHANNEL = "can_b1_0"    # Keep-alive messages
 RADAR_DBC = "opendbc/toyota_prius_2017_adas.dbc"
+CONTROL_DBC = "opendbc/toyota_prius_2017_pt_generated.dbc"
+
+# OBD2 (for speed and MAP-based SOC)
+OBD_ENABLED = True
+OBD_CHANNEL = "can_b2_1"
 ```
 
 ### Display Config: `display_config.json`
@@ -239,6 +252,79 @@ RADAR_DBC = "opendbc/toyota_prius_2017_adas.dbc"
 ### USB Port Mapping (Raspberry Pi 4)
 - `1-1.1` = Top-left USB 2.0 port → `/dev/video-rear`
 - `1-1.2` = Bottom-left USB 2.0 port → `/dev/video-front`
+
+---
+
+## Toyota Radar Overlay System (v0.10)
+
+### Architecture
+- **Toyota radar CAN integration** for collision warnings on rear camera
+- **Bounded queue architecture** for lock-free render access (depth=2)
+- **Track detection** displays 1-3 nearest vehicles within 120m
+- **Color-coded chevrons** (3x larger, solid-filled for visibility)
+- **Overtake warnings** with blue side arrows
+
+### CAN Bus Configuration
+- **can_b1_0**: Car keep-alive messages (TX from Pi to radar)
+- **can_b1_1**: Radar track output (RX from radar to Pi, ~320 Hz)
+- **Waveshare Dual CAN HAT** (Board 1) for dual-bus communication
+- **DBC files** for message decoding (opendbc/ directory)
+
+### Chevron Color Coding
+- 🟢 **Green**: Vehicle detected, safe distance (<10 km/h closing)
+- 🟡 **Yellow**: Moderate closing speed (10-20 km/h)
+- 🔴 **Red**: Rapid approach (>20 km/h closing speed)
+- 🔵 **Blue side arrows**: Overtaking vehicle warning
+
+### Track Processing
+- **Track merging**: Combines nearby tracks within 1m radius
+- **Timeout**: 0.5s for stale track removal
+- **Display**: 3 nearest tracks within 120m range
+- **FOV**: 106° horizontal field of view
+
+### Key Files
+- `hardware/toyota_radar_driver.py` - CAN driver with keep-alive (lines 1-500+)
+- `hardware/radar_handler.py` - Bounded queue handler (lines 1-250+)
+- `gui/radar_overlay.py` - Chevron rendering (lines 1-358)
+- `utils/config.py` - Radar configuration (lines 300-337)
+- `opendbc/*.dbc` - Message definitions
+
+### Critical Configuration Notes
+- **auto_setup=False**: CAN interfaces managed by systemd, not application
+- **Radar enabled by default**: RADAR_ENABLED = True in config
+- **Correct channel assignment**: can_b1_1 for tracks (RX), can_b1_0 for keep-alive (TX)
+- **3x larger chevrons**: 120×108px (was 40×36px), solid-filled
+
+### Dependencies
+```bash
+pip3 install --break-system-packages cantools  # DBC parsing
+```
+
+---
+
+## OBD2 & Status Bar System (v0.9)
+
+### Architecture
+- **Application-level status bars** visible on all pages (top/bottom)
+- **MAP-based SOC simulation** for desk testing without vehicle
+- **Direct MAP-to-SOC conversion** for instant updates
+- **Dynamic color coding** for charge/discharge state
+
+### Status Bar Features
+- **Top bar**: Battery SOC with color zones (green/yellow/red)
+- **Bottom bar**: Lap delta time display (future feature)
+- **Always visible**: Rendered on ALL pages, not just G-meter
+
+### OBD2 Configuration
+- **CAN channel**: can_b2_1 (Board 2, CAN_1 connector)
+- **PIDs**: 0x0D (speed), 0x0B (manifold absolute pressure)
+- **MAP history**: 3 samples for fast response
+- **SOC calculation**: Increasing MAP = discharging, decreasing MAP = charging
+
+### Key Files
+- `main.py` - Application-level status bar management (lines 1-1000+)
+- `hardware/obd2_handler.py` - OBD2 handler with MAP reading (lines 1-300+)
+- `ui/widgets/horizontal_bar.py` - Status bar widget (lines 1-150+)
 
 ---
 
@@ -373,6 +459,28 @@ sudo ./main.py
 - Look for blocking operations in render path
 - Check thermal processing times
 
+### Issue: Radar Not Receiving Tracks
+**Solution:**
+- Check CAN channels: can_b1_1 for tracks (RX), can_b1_0 for keep-alive (TX)
+- Verify cantools installed: `pip3 install --break-system-packages cantools`
+- Check DBC files exist in opendbc/ directory
+- Ensure auto_setup=False (systemd manages CAN interfaces)
+- Test CAN activity: `ssh pi@IP 'timeout 3 candump can_b1_1 | wc -l'`
+- Look for "Radar: Receiving N tracks" in logs
+
+### Issue: Radar Import Errors
+**Solution:**
+- Import path should be: `from hardware.toyota_radar_driver import ...`
+- Not: `from toyota_radar_driver import ...`
+- Check radar_handler.py:20 for correct import statement
+
+### Issue: Status Bars Not Visible
+**Solution:**
+- Check STATUS_BAR_ENABLED = True in utils/config.py
+- Status bars managed in main.py (not gmeter.py anymore)
+- Verify OBD2 handler initialized if using MAP-based SOC
+- Check logs for OBD2 connection status
+
 ---
 
 ## Git Workflow
@@ -404,6 +512,24 @@ git commit -m "Camera stuff"  # ❌
 
 ## Version History Quick Reference
 
+### v0.10 (2025-11-20) - Toyota Radar Integration
+- Toyota radar overlay enabled by default
+- Real-time collision warnings on rear camera
+- 3x larger solid-filled chevrons (120×108px)
+- Track detection (1-3 vehicles within 120m)
+- CAN channel configuration (can_b1_0/can_b1_1)
+- DBC files for Toyota Prius 2017
+- Overtake warnings with blue arrows
+- Added cantools dependency
+
+### v0.9 (2025-11-20) - Status Bars & OBD2
+- Application-level status bars (visible on all pages)
+- MAP-based SOC simulation for desk testing
+- Direct MAP-to-SOC conversion (instant updates)
+- Dynamic color coding for charge/discharge state
+- Clean camera transitions (no stale frames)
+- Correct front camera orientation (not mirrored)
+
 ### v0.8 (2025-11-19) - Multi-Camera Support
 - Dual USB camera support with seamless switching
 - Deterministic camera identification (udev rules)
@@ -411,7 +537,7 @@ git commit -m "Camera stuff"  # ❌
 - Dual FPS counters
 - Automated camera udev rules installation
 
-### v0.7 (2025-11-13) - Radar Overlay
+### v0.7 (2025-11-13) - Radar Overlay (Initial)
 - Optional Toyota radar CAN integration
 - Collision warning visualization
 - Overtake detection
@@ -489,6 +615,15 @@ Quick reference for finding information:
 ### "Performance issue"
 → Check logs for performance summary, verify targets met, check for blocking
 
+### "Radar not working"
+→ Check CAN channels (can_b1_1 for tracks), verify cantools installed, check DBC files
+
+### "Chevrons too small/hard to see"
+→ Already fixed in v0.10: 3x larger (120×108px) and solid-filled
+
+### "Status bars not showing"
+→ Check STATUS_BAR_ENABLED in config, status bars now in main.py (v0.9+)
+
 ---
 
 ## Testing Checklist
@@ -548,6 +683,6 @@ Before marking work complete:
 
 **This document should be read at the start of every new session to maintain context and coding standards.**
 
-**Version:** 0.8 (Multi-Camera)
-**Last Updated:** 2025-11-19
+**Version:** 0.10 (Toyota Radar Integration)
+**Last Updated:** 2025-11-20
 **Maintained by:** AI assistants working on openTPT
