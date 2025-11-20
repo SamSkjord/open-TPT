@@ -419,6 +419,18 @@ class Display:
                 rect = pygame.Rect(x_offset, 0, section_width_px, section_height_px)
                 pygame.draw.rect(thermal_surface, GREY, rect)
         else:
+            # Validate thermal data shape (MLX90640 is 24x32)
+            if thermal_data.shape != (24, 32):
+                print(f"Warning: Invalid thermal data shape {thermal_data.shape} for {position}, expected (24, 32)")
+                # Draw grey sections if data is invalid
+                for i in range(3):
+                    x_offset = i * section_width_px
+                    rect = pygame.Rect(x_offset, 0, section_width_px, section_height_px)
+                    pygame.draw.rect(thermal_surface, GREY, rect)
+                # Skip rendering and return early
+                self.surface.blit(thermal_surface, pos)
+                return
+
             # Calculate temperatures for inner, middle and outer sections
             # Divide the thermal data into three vertical sections
             section_width = thermal_data.shape[1] // 3

@@ -107,25 +107,72 @@ GMETER_HISTORY_SECONDS = 5.0  # How many seconds of history to show on trace
 ADS_ADDRESS = 0x48  # ADS1115/ADS1015 default address
 
 
+def validate_display_dimensions(width, height):
+    """
+    Validate display dimensions for security and sanity.
+
+    Args:
+        width: Display width in pixels
+        height: Display height in pixels
+
+    Returns:
+        tuple: (validated_width, validated_height)
+
+    Raises:
+        ValueError: If dimensions are invalid
+    """
+    # Check types
+    if not isinstance(width, (int, float)):
+        raise ValueError(f"Display width must be numeric, got {type(width).__name__}")
+    if not isinstance(height, (int, float)):
+        raise ValueError(f"Display height must be numeric, got {type(height).__name__}")
+
+    # Convert to int
+    width = int(width)
+    height = int(height)
+
+    # Validate ranges (reasonable display sizes)
+    # Min: QVGA (320x240), Max: 8K (7680x4320)
+    if not (320 <= width <= 7680):
+        raise ValueError(f"Display width {width} out of valid range (320-7680)")
+    if not (240 <= height <= 4320):
+        raise ValueError(f"Display height {height} out of valid range (240-4320)")
+
+    # Check for potential division by zero
+    if width == 0 or height == 0:
+        raise ValueError("Display dimensions cannot be zero")
+
+    return width, height
+
+
 try:
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, "r") as f:
             display_config = json.load(f)
-            DISPLAY_WIDTH = display_config.get("width", REFERENCE_WIDTH)
-            DISPLAY_HEIGHT = display_config.get("height", REFERENCE_HEIGHT)
+            raw_width = display_config.get("width", REFERENCE_WIDTH)
+            raw_height = display_config.get("height", REFERENCE_HEIGHT)
+
+            # Validate dimensions
+            DISPLAY_WIDTH, DISPLAY_HEIGHT = validate_display_dimensions(raw_width, raw_height)
+            print(f"Loaded display config: {DISPLAY_WIDTH}x{DISPLAY_HEIGHT}")
     else:
         # Create default config file if it doesn't exist
+        DISPLAY_WIDTH, DISPLAY_HEIGHT = validate_display_dimensions(REFERENCE_WIDTH, REFERENCE_HEIGHT)
         default_config = {
-            "width": REFERENCE_WIDTH,
-            "height": REFERENCE_HEIGHT,
+            "width": DISPLAY_WIDTH,
+            "height": DISPLAY_HEIGHT,
             "notes": "Default resolution. Change values to match your HDMI display resolution.",
         }
         with open(CONFIG_FILE, "w") as f:
             json.dump(default_config, f, indent=4)
-        DISPLAY_WIDTH = REFERENCE_WIDTH
-        DISPLAY_HEIGHT = REFERENCE_HEIGHT
-        print(f"Created default display config at {CONFIG_FILE}")
+        print(f"Created default display config at {CONFIG_FILE}: {DISPLAY_WIDTH}x{DISPLAY_HEIGHT}")
+except ValueError as e:
+    # Validation error - use safe defaults
+    print(f"Invalid display config: {e}. Using safe defaults.")
+    DISPLAY_WIDTH = REFERENCE_WIDTH
+    DISPLAY_HEIGHT = REFERENCE_HEIGHT
 except Exception as e:
+    # Other errors (file I/O, JSON parsing, etc.)
     print(f"Error loading display config: {e}. Using reference values.")
     DISPLAY_WIDTH = REFERENCE_WIDTH
     DISPLAY_HEIGHT = REFERENCE_HEIGHT

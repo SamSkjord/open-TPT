@@ -172,7 +172,8 @@ class I2CMux:
                                 self.i2c.writeto(addr, b"")
                                 if addr not in channel_devices:
                                     channel_devices.append(addr)
-                            except:
+                            except (ValueError, OSError):
+                                # Device not present or not responding
                                 pass
 
                     # Method 2: Specifically check for MLX90640 at known address
@@ -235,7 +236,8 @@ class I2CMux:
                 # This will fail if the device isn't present
                 test_mlx = adafruit_mlx90640.MLX90640(self.i2c)
                 return True
-            except:
+            except (ValueError, OSError, RuntimeError):
+                # Device not present or initialization failed
                 return False
 
     def debug_channel_status(self):

@@ -371,7 +371,8 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             if value & 0x8000:
                 value -= 0x10000
             return value
-        except:
+        except (IOError, OSError) as e:
+            # I2C read error (sensor not responding, bus error, etc.)
             return None
 
     def _read_tyre_mlx90614(self, position: str) -> Optional[Dict]:
