@@ -17,18 +17,23 @@ from utils.hardware_base import BoundedQueueHardwareHandler
 
 # Try to import Toyota radar driver
 try:
-    from toyota_radar_driver import ToyotaRadarDriver, ToyotaRadarConfig, RadarTrack
+    from hardware.toyota_radar_driver import ToyotaRadarDriver, ToyotaRadarConfig, RadarTrack
     RADAR_AVAILABLE = True
 except ImportError:
-    RADAR_AVAILABLE = False
-    print("Warning: toyota_radar_driver not available")
-    # Create mock classes for type hints
-    class RadarTrack:
-        pass
-    class ToyotaRadarDriver:
-        pass
-    class ToyotaRadarConfig:
-        pass
+    try:
+        # Try relative import if running from hardware directory
+        from .toyota_radar_driver import ToyotaRadarDriver, ToyotaRadarConfig, RadarTrack
+        RADAR_AVAILABLE = True
+    except ImportError:
+        RADAR_AVAILABLE = False
+        print("Warning: toyota_radar_driver not available")
+        # Create mock classes for type hints
+        class RadarTrack:
+            pass
+        class ToyotaRadarDriver:
+            pass
+        class ToyotaRadarConfig:
+            pass
 
 
 class RadarHandlerOptimised(BoundedQueueHardwareHandler):
@@ -107,7 +112,7 @@ class RadarHandlerOptimised(BoundedQueueHardwareHandler):
                 track_timeout=self.track_timeout,
                 keepalive_rate_hz=100.0,
                 notifier_timeout=0.1,
-                auto_setup=True,
+                auto_setup=False,  # CAN interfaces managed by systemd
                 use_sudo=False,
                 setup_extra_args=[],
                 keepalive_enabled=True,
@@ -137,6 +142,7 @@ class RadarHandlerOptimised(BoundedQueueHardwareHandler):
 
             # Start worker thread
             super().start()
+            print("Radar worker thread started")
             return True
 
         except Exception as e:
@@ -193,6 +199,13 @@ class RadarHandlerOptimised(BoundedQueueHardwareHandler):
                 "timestamp": time.time(),
                 "track_count": len(tracks)
             }
+
+            # Debug: Log when tracks are received
+            if len(tracks) > 0 and not hasattr(self, '_last_track_log'):
+                self._last_track_log = 0
+            if len(tracks) > 0 and time.time() - getattr(self, '_last_track_log', 0) > 5.0:
+                print(f"Radar: Receiving {len(tracks)} tracks")
+                self._last_track_log = time.time()
 
             for track_id, track in tracks.items():
                 data[track_id] = {

@@ -301,11 +301,14 @@ STATUS_BAR_ENABLED = True  # Show status bars at top and bottom
 # ==============================================================================
 
 # Enable/disable radar overlay
-RADAR_ENABLED = False  # Set to True to enable radar overlay on camera
+RADAR_ENABLED = True  # Set to True to enable radar overlay on camera
 
 # Toyota radar CAN configuration
-RADAR_CHANNEL = "can0"  # CAN channel for radar data
-CAR_CHANNEL = "can1"  # CAN channel for car keep-alive
+# Available interfaces: can_b1_0, can_b1_1, can_b2_0, can_b2_1
+# Radar outputs tracks on Board 1, CAN_1 connector (can_b1_1)
+# Car keep-alive sent on Board 1, CAN_0 connector (can_b1_0)
+RADAR_CHANNEL = "can_b1_1"  # CAN channel for radar data (tracks come FROM radar)
+CAR_CHANNEL = "can_b1_0"  # CAN channel for car keep-alive (we send TO radar)
 RADAR_INTERFACE = "socketcan"  # python-can interface
 RADAR_BITRATE = 500000  # CAN bitrate
 
