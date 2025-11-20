@@ -38,8 +38,9 @@ numba>=0.56.0  # JIT compiler for thermal zone processing
 # Computer vision (for camera)
 opencv-python>=4.5.0
 
-# CAN bus support (for future radar/OBD modules)
+# CAN bus support (for radar and OBD2 modules)
 python-can>=4.0.0
+cantools>=41.0.0  # DBC file parsing for Toyota radar
 
 # GPS support (for future lap timing)
 # pynmea2>=1.18.0

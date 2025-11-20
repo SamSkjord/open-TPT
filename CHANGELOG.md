@@ -1,5 +1,114 @@
 # Changelog - openTPT
 
+## [v0.10] - 2025-11-20
+
+### Toyota Radar Overlay Integration 📡
+
+#### ✅ New Features
+- **Toyota radar overlay** - Real-time collision warning on rear camera
+- **Radar track detection** - Displays 1-3 nearest vehicles with green/yellow/red chevrons
+- **Solid-filled chevrons** - 3x larger (120×108px), highly visible markers
+- **Distance and speed display** - Shows range in metres and relative speed
+- **Overtake warnings** - Blue side arrows for rapidly approaching vehicles
+- **Automatic track merging** - Combines nearby tracks within 1m radius
+
+#### 📦 New Files
+
+```
+hardware/
+└── toyota_radar_driver.py        # Toyota radar CAN driver with keep-alive
+
+opendbc/
+├── toyota_prius_2017_adas.dbc    # Radar message definitions
+├── toyota_prius_2017_pt_generated.dbc  # Powertrain messages
+└── toyota_corolla_2017_pt_generated.dbc
+```
+
+#### 🔄 Modified Files
+
+- `hardware/radar_handler.py` - Fixed radar driver import and configuration
+  - Changed import to `from hardware.toyota_radar_driver import ...`
+  - Disabled auto_setup (CAN interfaces managed by systemd)
+  - Added debug logging for track reception
+  - Corrected CAN channel assignment
+- `gui/radar_overlay.py` - Enlarged chevrons and made solid-filled
+  - Increased chevron size from 40×36px to 120×108px (3x larger)
+  - Removed hollow center cutout for better visibility
+  - Solid-filled triangles for clear visibility
+- `utils/config.py` - Enabled radar and configured CAN channels
+  - `RADAR_ENABLED = True`
+  - `RADAR_CHANNEL = "can_b1_1"` (radar outputs tracks here)
+  - `CAR_CHANNEL = "can_b1_0"` (keep-alive sent here)
+
+#### ⚙️ Configuration
+
+**Radar Settings** (in `utils/config.py`):
+```python
+RADAR_ENABLED = True                    # Enable radar overlay on camera
+RADAR_CHANNEL = "can_b1_1"              # CAN channel for radar data
+CAR_CHANNEL = "can_b1_0"                # CAN channel for car keep-alive
+RADAR_INTERFACE = "socketcan"           # python-can interface
+RADAR_BITRATE = 500000                  # CAN bitrate
+
+# Display settings
+RADAR_CAMERA_FOV = 106.0                # Camera horizontal field of view
+RADAR_TRACK_COUNT = 3                   # Number of nearest tracks to display
+RADAR_MAX_DISTANCE = 120.0              # Maximum distance (metres)
+RADAR_WARN_YELLOW_KPH = 10.0            # Yellow warning threshold
+RADAR_WARN_RED_KPH = 20.0               # Red warning threshold
+```
+
+#### 📊 Architecture
+
+**CAN Channel Assignment**
+- **can_b1_0**: Car keep-alive messages (TX from Pi to radar)
+- **can_b1_1**: Radar track output (RX from radar to Pi)
+- Radar outputs ~960 track messages in 3 seconds (~320 Hz)
+
+**Chevron Color Coding**
+- 🟢 **Green**: Vehicle detected, safe distance (<10 km/h closing)
+- 🟡 **Yellow**: Moderate closing speed (10-20 km/h)
+- 🔴 **Red**: Rapid approach (>20 km/h closing speed)
+- 🔵 **Blue side arrows**: Overtaking vehicle warning
+
+**Track Processing**
+- Bounded queue (depth=2) for lock-free render access
+- Automatic merging of tracks within 1m radius
+- 0.5s timeout for stale tracks
+- Displays 3 nearest tracks within 120m range
+
+#### 🐛 Bug Fixes
+
+- Fixed radar driver import path (was looking for global module)
+- Disabled CAN interface auto-setup (conflicts with systemd management)
+- Corrected radar/car channel swap (tracks now received correctly)
+- Copied missing DBC files from scratch/sources
+
+#### 🧪 Testing
+
+- ✅ Radar successfully receives 1-3 tracks
+- ✅ CAN bus confirmed active (960 track messages in 3 seconds)
+- ✅ Chevrons render on rear camera view (not on front camera)
+- ✅ 3x larger solid-filled chevrons highly visible
+- ✅ No CAN interface conflicts with systemd
+
+#### 📝 Dependencies (Raspberry Pi)
+
+```bash
+# Install cantools for DBC file parsing
+pip3 install --break-system-packages cantools
+```
+
+#### 🎯 Hardware Requirements
+
+- Waveshare Dual CAN HAT (Board 1)
+- Toyota radar module (Prius/Corolla 2017+)
+- CAN connections:
+  - Board 1, CAN_0 (can_b1_0): Car keep-alive
+  - Board 1, CAN_1 (can_b1_1): Radar track output
+
+---
+
 ## [v0.9] - 2025-11-20
 
 ### Status Bars & OBD2 Simulation 📊

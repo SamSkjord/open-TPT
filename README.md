@@ -283,36 +283,66 @@ Common USB port mappings on Raspberry Pi 4:
 
 ### Radar Configuration
 
-To enable the optional radar overlay feature:
+The Toyota radar overlay is now **enabled by default** and displays collision warnings on the rear camera.
 
-1. Edit `utils/config.py` and set:
-   ```python
-   RADAR_ENABLED = True
-   ```
+#### Hardware Setup
 
-2. Configure CAN channels and DBC files:
-   ```python
-   RADAR_CHANNEL = "can0"      # CAN channel for radar data
-   CAR_CHANNEL = "can1"        # CAN channel for car keepalive
-   RADAR_INTERFACE = "socketcan"
-   RADAR_BITRATE = 500000
-   RADAR_DBC = "opendbc/toyota_prius_2017_adas.dbc"
-   CONTROL_DBC = "opendbc/toyota_prius_2017_pt_generated.dbc"
-   ```
+1. **Waveshare Dual CAN HAT** (Board 1):
+   - CAN_0 connector (can_b1_0): Car keep-alive messages (TX to radar)
+   - CAN_1 connector (can_b1_1): Radar track output (RX from radar)
 
-3. Configure radar display parameters:
-   ```python
-   RADAR_CAMERA_FOV = 106.0           # Camera field of view (degrees)
-   RADAR_TRACK_COUNT = 3              # Number of tracks to display
-   RADAR_MAX_DISTANCE = 120.0         # Maximum distance (metres)
-   RADAR_WARN_YELLOW_KPH = 10.0       # Yellow warning threshold
-   RADAR_WARN_RED_KPH = 20.0          # Red warning threshold
-   ```
+2. **Toyota Radar Module** (Prius/Corolla 2017+):
+   - Connect to both CAN buses as per wiring diagram
+   - Radar will output ~320 Hz track messages
 
-When enabled, the radar overlay will display:
-- Green/yellow/red chevron arrows showing track positions
-- Distance and relative speed for each track
-- Overtake warning arrows when vehicles are rapidly approaching from the sides
+#### Software Configuration
+
+The radar is configured in `utils/config.py`:
+
+```python
+# Enable/disable radar overlay
+RADAR_ENABLED = True  # Now enabled by default
+
+# CAN channel configuration (for Waveshare Dual CAN HAT)
+RADAR_CHANNEL = "can_b1_1"  # Radar outputs tracks here
+CAR_CHANNEL = "can_b1_0"    # Keep-alive sent here
+RADAR_INTERFACE = "socketcan"
+RADAR_BITRATE = 500000
+
+# DBC files (included in opendbc/ directory)
+RADAR_DBC = "opendbc/toyota_prius_2017_adas.dbc"
+CONTROL_DBC = "opendbc/toyota_prius_2017_pt_generated.dbc"
+
+# Display parameters
+RADAR_CAMERA_FOV = 106.0           # Camera field of view (degrees)
+RADAR_TRACK_COUNT = 3              # Number of tracks to display
+RADAR_MAX_DISTANCE = 120.0         # Maximum distance (metres)
+RADAR_WARN_YELLOW_KPH = 10.0       # Yellow warning threshold
+RADAR_WARN_RED_KPH = 20.0          # Red warning threshold
+```
+
+#### Dependencies
+
+Install cantools for DBC file parsing:
+```bash
+pip3 install --break-system-packages cantools
+```
+
+Or install all dependencies from requirements.txt:
+```bash
+pip3 install --break-system-packages -r requirements.txt
+```
+
+#### Visual Display
+
+When enabled, the radar overlay shows on the **rear camera only**:
+- 🟢 **Green chevrons**: Vehicle detected, safe distance (<10 km/h closing)
+- 🟡 **Yellow chevrons**: Moderate closing speed (10-20 km/h)
+- 🔴 **Red chevrons**: Rapid approach (>20 km/h closing speed)
+- 🔵 **Blue side arrows**: Overtaking vehicle warning
+- **Distance and speed text**: Range in metres and relative velocity
+
+Chevrons are **3x larger (120×108px) and solid-filled** for high visibility.
 
 ## Project Structure
 
