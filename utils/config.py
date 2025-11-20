@@ -18,6 +18,7 @@ CONFIG_FILE = os.path.join(
 
 FPS_TARGET = 60  # Increased to allow higher camera FPS
 DEFAULT_BRIGHTNESS = 0.8  # 0.0 to 1.0
+BRIGHTNESS_PRESETS = [0.3, 0.5, 0.7, 0.9, 1.0]  # Cycle through these brightness levels
 ROTATION = 90  # Degrees: 0, 90, 180, 270
 
 
@@ -75,14 +76,32 @@ BRAKE_TEMP_HOT_TO_BLACK = 100.0  # Range over which red fades to black after HOT
 
 
 # NeoKey 1x4 button mappings
-BUTTON_BRIGHTNESS_UP = 0
-BUTTON_BRIGHTNESS_DOWN = 1
-BUTTON_CAMERA_TOGGLE = 2
-BUTTON_RESERVED = 3
+BUTTON_BRIGHTNESS_CYCLE = 0  # Cycle through brightness presets
+BUTTON_PAGE_SETTINGS = 1      # Toggle page-specific settings (context-sensitive per page)
+BUTTON_CATEGORY_SWITCH = 2    # Switch within category (camera↔camera OR UI page↔UI page)
+BUTTON_VIEW_MODE = 3          # Switch between categories (camera pages ↔ UI pages)
 
 # I2C settings
 I2C_BUS = 1  # Default I2C bus on Raspberry Pi 4
 I2C_MUX_ADDRESS = 0x70  # TCA9548A default address
+
+# ==============================================================================
+# IMU Configuration (for G-meter)
+# ==============================================================================
+
+# IMU sensor type - supported types:
+# - "ICM20649" - ICM-20649 6-axis IMU (±30g accelerometer)
+# - "MPU6050" - MPU-6050 6-axis IMU (±16g accelerometer)
+# - "LSM6DS3" - LSM6DS3 6-axis IMU (±16g accelerometer)
+# - "ADXL345" - ADXL345 3-axis accelerometer (±16g)
+IMU_TYPE = "ICM20649"
+IMU_ENABLED = False  # Temporarily disabled until IMU hardware is connected
+IMU_I2C_ADDRESS = 0x68  # Default I2C address (ICM20649: 0x68 or 0x69)
+IMU_SAMPLE_RATE = 50  # Hz - how often to read IMU data
+
+# G-meter display settings
+GMETER_MAX_G = 2.0  # Maximum G-force to display (±2g is typical for road cars)
+GMETER_HISTORY_SECONDS = 5.0  # How many seconds of history to show on trace
 ADS_ADDRESS = 0x48  # ADS1115/ADS1015 default address
 
 

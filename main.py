@@ -19,6 +19,7 @@ from gui.camera import Camera
 from gui.input_threaded import InputHandlerThreaded as InputHandler
 from gui.scale_bars import ScaleBars
 from gui.icon_handler import IconHandler
+from gui.gmeter import GMeterDisplay
 
 # Import optimised TPMS handler
 from hardware.tpms_input_optimized import TPMSHandler
@@ -53,7 +54,9 @@ from utils.config import (
     BRAKE_TEMP_OPTIMAL,
     BRAKE_TEMP_OPTIMAL_RANGE,
     BRAKE_TEMP_HOT,
-    BUTTON_RESERVED,
+    BUTTON_PAGE_SETTINGS,
+    BUTTON_CATEGORY_SWITCH,
+    BUTTON_VIEW_MODE,
     # Radar configuration
     RADAR_ENABLED,
     RADAR_CHANNEL,
@@ -72,6 +75,16 @@ from utils.config import (
 # Supports: Tyres (Pico, MLX90614), Brakes (ADC, MLX90614, OBD)
 from hardware.unified_corner_handler import UnifiedCornerHandler
 print("Using unified corner handler (eliminates I2C bus contention)")
+
+# Import IMU handler (optional, for G-meter)
+try:
+    from hardware.imu_handler import IMUHandler
+    from utils.config import IMU_ENABLED
+    IMU_AVAILABLE = True
+except ImportError:
+    IMU_AVAILABLE = False
+    IMUHandler = None
+    IMU_ENABLED = False
 
 # Import performance monitoring
 try:
@@ -186,9 +199,17 @@ class OpenTPT:
         self.camera = None
         self.radar = None
         self.input_handler = None
+        self.imu = None
+        self.gmeter = GMeterDisplay()
 
         self.scale_bars = ScaleBars(self.screen)
         self.icon_handler = IconHandler(self.screen)
+
+        # View mode management
+        # Categories: "camera" (rear/front cameras) or "ui" (telemetry/gmeter)
+        self.current_category = "ui"  # Start with UI pages
+        self.current_camera_page = "rear"  # Which camera view (rear/front)
+        self.current_ui_page = "telemetry"  # Which UI page (telemetry/gmeter)
 
     def _init_subsystems(self):
         """Initialise the hardware subsystems."""
@@ -224,6 +245,16 @@ class OpenTPT:
         # Aliases for backward compatibility
         self.thermal = self.corner_sensors  # Tyre data access
         self.brakes = self.corner_sensors   # Brake data access
+
+        # Initialise IMU handler (optional, for G-meter)
+        if IMU_ENABLED and IMU_AVAILABLE and IMUHandler:
+            try:
+                self.imu = IMUHandler()
+                self.imu.start()
+                print("IMU handler initialised for G-meter")
+            except Exception as e:
+                print(f"Warning: Could not initialise IMU: {e}")
+                self.imu = None
 
         # Start monitoring threads
         self.input_handler.start()  # Start NeoKey polling thread
@@ -305,19 +336,21 @@ class OpenTPT:
                 if event.key == pygame.K_ESCAPE:
                     self.running = False
 
-                # Toggle camera with spacebar (for testing without NeoKey)
-                elif event.key == pygame.K_SPACE:
-                    self.input_handler.simulate_button_press(2)  # Camera toggle button
-
-                # Brightness control with up/down arrow keys
+                # Cycle brightness with up arrow key
                 elif event.key == pygame.K_UP:
-                    self.input_handler.simulate_button_press(0)  # Brightness up
-                elif event.key == pygame.K_DOWN:
-                    self.input_handler.simulate_button_press(1)  # Brightness down
+                    self.input_handler.simulate_button_press(0)  # Brightness cycle
 
-                # Toggle UI with 'T' key
-                elif event.key == pygame.K_t:
-                    self.input_handler.simulate_button_press(BUTTON_RESERVED)
+                # Page settings with 'T' key or down arrow
+                elif event.key == pygame.K_t or event.key == pygame.K_DOWN:
+                    self.input_handler.simulate_button_press(BUTTON_PAGE_SETTINGS)
+
+                # Switch within category with spacebar
+                elif event.key == pygame.K_SPACE:
+                    self.input_handler.simulate_button_press(BUTTON_CATEGORY_SWITCH)
+
+                # Switch between camera/UI modes with right arrow
+                elif event.key == pygame.K_RIGHT:
+                    self.input_handler.simulate_button_press(BUTTON_VIEW_MODE)
 
                 if event.type in (
                     pygame.KEYDOWN,
@@ -359,10 +392,77 @@ class OpenTPT:
                 self.input_handler.ui_visible = False
                 self.ui_fading = False
 
+    def _handle_page_settings(self):
+        """Handle button 1: Context-sensitive page settings."""
+        if self.current_category == "camera":
+            # Camera page: Toggle radar overlay (if radar enabled)
+            if self.radar:
+                # Toggle radar overlay visibility
+                pass  # TODO: Add radar overlay toggle when implemented
+        elif self.current_category == "ui":
+            if self.current_ui_page == "telemetry":
+                # Telemetry page: Toggle UI overlay visibility
+                self.input_handler.toggle_ui_visibility()
+            elif self.current_ui_page == "gmeter":
+                # G-meter page: Reset peak values
+                self.gmeter.reset_peaks()
+                print("G-meter peaks reset")
+
+    def _switch_view_mode(self):
+        """Handle button 2: Switch between camera and UI categories."""
+        if self.current_category == "camera":
+            self.current_category = "ui"
+            # Deactivate camera
+            if self.camera.is_active():
+                self.camera.toggle()  # Turn off camera
+            print(f"Switched to UI pages (current: {self.current_ui_page})")
+        else:
+            self.current_category = "camera"
+            # Activate camera if not already active
+            if not self.camera.is_active():
+                self.camera.toggle()  # Turn on camera
+            print(f"Switched to camera pages (current: {self.current_camera_page})")
+
+        # Request LED update
+        self.input_handler.request_led_update()
+
+    def _switch_within_category(self):
+        """Handle button 3: Switch within current category."""
+        if self.current_category == "camera":
+            # Switch between rear and front cameras
+            if self.camera.is_active():
+                self.camera.switch_camera()
+                # Update tracking of which camera is active
+                self.current_camera_page = self.camera.current_camera
+                print(f"Switched to {self.current_camera_page} camera")
+        else:
+            # Switch between UI pages (telemetry ↔ gmeter)
+            if self.current_ui_page == "telemetry":
+                self.current_ui_page = "gmeter"
+                print("Switched to G-meter page")
+            else:
+                self.current_ui_page = "telemetry"
+                print("Switched to telemetry page")
+
+        # Request LED update
+        self.input_handler.request_led_update()
+
     def _update_hardware(self):
         """Update hardware states."""
         # Check for NeoKey inputs (non-blocking, handled by background thread)
         input_events = self.input_handler.check_input()
+
+        # Handle button 1: Page-specific settings
+        if input_events.get("page_settings", False):
+            self._handle_page_settings()
+
+        # Handle button 2: Switch within category
+        if input_events.get("category_switch", False):
+            self._switch_within_category()
+
+        # Handle button 3: Switch view mode (camera ↔ UI)
+        if input_events.get("view_mode", False):
+            self._switch_view_mode()
 
         # When UI is toggled via button, reset the fade state and timer
         if input_events.get("ui_toggled", False):
@@ -372,9 +472,15 @@ class OpenTPT:
             if self.input_handler.ui_visible:
                 self.ui_last_interaction_time = time.time()
 
-        # Update camera frame if active to ensure FPS counter is updated
-        if self.camera.is_active():
+        # Update camera frame if active
+        if self.current_category == "camera":
             self.camera.update()
+
+        # Update IMU data if G-meter is active
+        if self.current_category == "ui" and self.current_ui_page == "gmeter" and self.imu:
+            imu_snapshot = self.imu.get_data()
+            if imu_snapshot:
+                self.gmeter.update(imu_snapshot)
 
     def _render(self):
         """
@@ -393,13 +499,19 @@ class OpenTPT:
         self.screen.fill((0, 0, 0))
         render_times['clear'] = (time.time() - t0) * 1000
 
-        # If camera is active, render it as the base layer
-        t0 = time.time()
-        if self.camera.is_active():
+        # Render based on current category and page
+        if self.current_category == "camera":
+            # Render camera view
+            t0 = time.time()
             self.camera.render()
             render_times['camera'] = (time.time() - t0) * 1000
+        elif self.current_category == "ui" and self.current_ui_page == "gmeter":
+            # Render G-meter page
+            t0 = time.time()
+            self.gmeter.draw(self.screen)
+            render_times['gmeter'] = (time.time() - t0) * 1000
         else:
-            # Otherwise render the normal view
+            # Render the telemetry page (default UI view)
             self._update_ui_visibility()
 
             # Get brake temperatures (LOCK-FREE snapshot access)
@@ -570,6 +682,11 @@ class OpenTPT:
             self.input_handler.stop()
         self.tpms.stop()
         self.corner_sensors.stop()
+
+        # Stop IMU if enabled
+        if self.imu:
+            print("Stopping IMU...")
+            self.imu.stop()
 
         # Stop radar if enabled
         if self.radar:

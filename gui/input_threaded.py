@@ -15,11 +15,12 @@ except ImportError:
     BOARD_AVAILABLE = False
 
 from utils.config import (
-    BUTTON_BRIGHTNESS_UP,
-    BUTTON_BRIGHTNESS_DOWN,
-    BUTTON_CAMERA_TOGGLE,
-    BUTTON_RESERVED,
+    BUTTON_BRIGHTNESS_CYCLE,
+    BUTTON_PAGE_SETTINGS,
+    BUTTON_CATEGORY_SWITCH,
+    BUTTON_VIEW_MODE,
     DEFAULT_BRIGHTNESS,
+    BRIGHTNESS_PRESETS,
 )
 
 # Only try to import NeoKey if board is available
@@ -45,17 +46,19 @@ class InputHandlerThreaded:
         self.camera = camera
         self.neokey = None
         self.brightness = DEFAULT_BRIGHTNESS
+        self.brightness_presets = BRIGHTNESS_PRESETS
+        self.brightness_index = self._find_closest_brightness_index(DEFAULT_BRIGHTNESS)
         self.button_states = {
-            BUTTON_BRIGHTNESS_UP: False,
-            BUTTON_BRIGHTNESS_DOWN: False,
-            BUTTON_CAMERA_TOGGLE: False,
-            BUTTON_RESERVED: False,
+            BUTTON_BRIGHTNESS_CYCLE: False,
+            BUTTON_PAGE_SETTINGS: False,
+            BUTTON_CATEGORY_SWITCH: False,
+            BUTTON_VIEW_MODE: False,
         }
         self.last_press_time = {
-            BUTTON_BRIGHTNESS_UP: 0,
-            BUTTON_BRIGHTNESS_DOWN: 0,
-            BUTTON_CAMERA_TOGGLE: 0,
-            BUTTON_RESERVED: 0,
+            BUTTON_BRIGHTNESS_CYCLE: 0,
+            BUTTON_PAGE_SETTINGS: 0,
+            BUTTON_CATEGORY_SWITCH: 0,
+            BUTTON_VIEW_MODE: 0,
         }
         self.debounce_time = 0.2  # seconds
 
@@ -164,24 +167,18 @@ class InputHandlerThreaded:
 
                     # Handle the button press
                     if pressed:
-                        if i == BUTTON_BRIGHTNESS_UP:
-                            self.increase_brightness()
+                        if i == BUTTON_BRIGHTNESS_CYCLE:
+                            self.cycle_brightness()
                             events["brightness_changed"] = True
-                        elif i == BUTTON_BRIGHTNESS_DOWN:
-                            self.decrease_brightness()
-                            events["brightness_changed"] = True
-                        elif i == BUTTON_CAMERA_TOGGLE and self.camera:
-                            self.camera.toggle()
-                            events["camera_toggled"] = True
-                        elif i == BUTTON_RESERVED:
-                            # If camera is active, switch between cameras
-                            # Otherwise, toggle UI visibility
-                            if self.camera and self.camera.is_active():
-                                self.camera.switch_camera()
-                                events["camera_switched"] = True
-                            else:
-                                self.toggle_ui_visibility()
-                                events["ui_toggled"] = True
+                        elif i == BUTTON_PAGE_SETTINGS:
+                            # Page-specific settings (handled by main app based on current page)
+                            events["page_settings"] = True
+                        elif i == BUTTON_CATEGORY_SWITCH:
+                            # Switch within category (handled by main app)
+                            events["category_switch"] = True
+                        elif i == BUTTON_VIEW_MODE:
+                            # Switch between camera and UI categories (handled by main app)
+                            events["view_mode"] = True
 
             # Add events to queue if any occurred
             if events:
@@ -204,30 +201,33 @@ class InputHandlerThreaded:
             return
 
         try:
-            # Set brightness for the brightness up button (white)
-            if self.button_states[BUTTON_BRIGHTNESS_UP]:
-                self.neokey.pixels[BUTTON_BRIGHTNESS_UP] = (255, 255, 255)
+            # Button 0: Brightness cycle (white intensity matches current brightness)
+            intensity = int(self.brightness * 200) + 55  # Scale to 55-255
+            if self.button_states[BUTTON_BRIGHTNESS_CYCLE]:
+                self.neokey.pixels[BUTTON_BRIGHTNESS_CYCLE] = (255, 255, 255)
             else:
-                self.neokey.pixels[BUTTON_BRIGHTNESS_UP] = (64, 64, 64)
+                self.neokey.pixels[BUTTON_BRIGHTNESS_CYCLE] = (intensity, intensity, intensity)
 
-            # Set brightness for the brightness down button (dim white)
-            if self.button_states[BUTTON_BRIGHTNESS_DOWN]:
-                self.neokey.pixels[BUTTON_BRIGHTNESS_DOWN] = (255, 255, 255)
+            # Button 1: Page settings (yellow, brightness varies with state)
+            if self.button_states[BUTTON_PAGE_SETTINGS]:
+                self.neokey.pixels[BUTTON_PAGE_SETTINGS] = (255, 255, 0)
             else:
-                self.neokey.pixels[BUTTON_BRIGHTNESS_DOWN] = (16, 16, 16)
+                # Color set by main app based on current page settings
+                self.neokey.pixels[BUTTON_PAGE_SETTINGS] = (64, 64, 0)
 
-            # Set camera toggle button (red when camera active)
-            if self.camera and self.camera.is_active():
-                self.neokey.pixels[BUTTON_CAMERA_TOGGLE] = (255, 0, 0)
-                self.neokey.pixels[BUTTON_RESERVED] = (0, 0, 0)
+            # Button 2: Category switch (blue when pressed, color shows current item in category)
+            if self.button_states[BUTTON_CATEGORY_SWITCH]:
+                self.neokey.pixels[BUTTON_CATEGORY_SWITCH] = (255, 255, 255)
             else:
-                self.neokey.pixels[BUTTON_CAMERA_TOGGLE] = (0, 0, 64)
+                # Color set by main app based on current page in category
+                self.neokey.pixels[BUTTON_CATEGORY_SWITCH] = (0, 64, 128)
 
-            # Set reserved button (green when UI visible, dim green when hidden)
-            if self.ui_visible:
-                self.neokey.pixels[BUTTON_RESERVED] = (0, 128, 0)
+            # Button 3: View mode (red=camera, green=UI pages)
+            if self.button_states[BUTTON_VIEW_MODE]:
+                self.neokey.pixels[BUTTON_VIEW_MODE] = (255, 255, 255)
             else:
-                self.neokey.pixels[BUTTON_RESERVED] = (0, 16, 0)
+                # Color set by main app based on current mode
+                self.neokey.pixels[BUTTON_VIEW_MODE] = (128, 0, 128)  # Purple default
 
         except Exception as e:
             print(f"Error updating NeoKey LEDs: {e}")
@@ -247,8 +247,9 @@ class InputHandlerThreaded:
         """
         events = {
             "brightness_changed": False,
-            "camera_toggled": False,
-            "ui_toggled": False,
+            "page_settings": False,
+            "category_switch": False,
+            "view_mode": False,
         }
 
         # Get latest event from queue (non-blocking)
@@ -271,12 +272,28 @@ class InputHandlerThreaded:
             self.ui_visible = False
             self.ui_manually_toggled = True
 
+    def _find_closest_brightness_index(self, brightness_value):
+        """Find the index of the closest brightness preset to the given value."""
+        closest_idx = 0
+        min_diff = abs(self.brightness_presets[0] - brightness_value)
+        for i, preset in enumerate(self.brightness_presets):
+            diff = abs(preset - brightness_value)
+            if diff < min_diff:
+                min_diff = diff
+                closest_idx = i
+        return closest_idx
+
+    def cycle_brightness(self):
+        """Cycle to the next brightness preset."""
+        self.brightness_index = (self.brightness_index + 1) % len(self.brightness_presets)
+        self.brightness = self.brightness_presets[self.brightness_index]
+
     def increase_brightness(self):
-        """Increase the display brightness."""
-        self.brightness = min(1.0, self.brightness + 0.1)
+        """Increase the display brightness (legacy method - calls cycle)."""
+        self.cycle_brightness()
 
     def decrease_brightness(self):
-        """Decrease the display brightness."""
+        """Decrease the display brightness (legacy method - no-op)."""
         self.brightness = max(0.1, self.brightness - 0.1)
 
     def get_brightness(self):

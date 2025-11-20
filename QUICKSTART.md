@@ -1,7 +1,7 @@
 # Quick Start Guide - openTPT
 
 ## Current Configuration
-- **Pi IP:** `192.168.199.243`
+- **Pi IP:** `192.168.199.247`
 - **User:** `pi`
 - **Path:** `/home/pi/open-TPT`
 - **Status:** ✅ Production Ready
@@ -11,16 +11,16 @@
 ### Deploy from Mac
 ```bash
 # Full deployment (first time or major changes)
-./deploy_to_pi.sh pi@192.168.199.243
+./deploy_to_pi.sh pi@192.168.199.247
 
 # Quick sync (code changes only - faster)
-./tools/quick_sync.sh pi@192.168.199.243
+./tools/quick_sync.sh pi@192.168.199.247
 ```
 
 ### Run on Pi
 ```bash
 # SSH to Pi
-ssh pi@192.168.199.243
+ssh pi@192.168.199.247
 
 # Navigate to app
 cd /home/pi/open-TPT
@@ -35,24 +35,25 @@ sudo ./main.py --windowed
 ### View Service Logs
 ```bash
 # Real-time system service logs
-ssh pi@192.168.199.243 "sudo journalctl -u openTPT.service -f"
+ssh pi@192.168.199.247 "sudo journalctl -u openTPT.service -f"
 
 # Check service status
-ssh pi@192.168.199.243 "sudo systemctl status openTPT.service"
+ssh pi@192.168.199.247 "sudo systemctl status openTPT.service"
 ```
 
 ## Hardware Controls
 
 ### NeoKey 1x4 Buttons
-- **Button 0:** Increase brightness
-- **Button 1:** Decrease brightness
-- **Button 2:** Cycle camera views (telemetry ↔ rear ↔ front)
-- **Button 3:** Toggle UI overlay visibility
+- **Button 0:** Cycle brightness (30% → 50% → 70% → 90% → 100%)
+- **Button 1:** Page settings (hide overlay, reset peaks, etc.)
+- **Button 2:** Switch within category (camera: rear↔front | UI: pages)
+- **Button 3:** Switch view mode (camera ↔ UI)
 
 ### Keyboard (Development)
-- **Up/Down:** Brightness control
-- **Spacebar:** Cycle camera views
-- **T:** Toggle UI overlay
+- **Up:** Cycle brightness
+- **Down / T:** Page settings
+- **Spacebar:** Switch within category
+- **Right:** Switch view mode (camera ↔ UI)
 - **ESC:** Exit application
 
 ## Key Configuration Files
@@ -83,7 +84,7 @@ Connect cameras to specific USB ports for deterministic identification:
 
 Verify symlinks:
 ```bash
-ssh pi@192.168.199.243 "ls -l /dev/video-*"
+ssh pi@192.168.199.247 "ls -l /dev/video-*"
 ```
 
 ## Quick Troubleshooting
@@ -91,37 +92,37 @@ ssh pi@192.168.199.243 "ls -l /dev/video-*"
 ### Can't Connect to Pi
 ```bash
 # Test network connectivity
-ping 192.168.199.243
+ping 192.168.199.247
 
 # Verify SSH access
-ssh pi@192.168.199.243 "echo 'Connection OK'"
+ssh pi@192.168.199.247 "echo 'Connection OK'"
 ```
 
 ### Camera Issues
 ```bash
 # Check camera devices
-ssh pi@192.168.199.243 "ls -l /dev/video-*"
+ssh pi@192.168.199.247 "ls -l /dev/video-*"
 
 # Test camera with v4l2
-ssh pi@192.168.199.243 "v4l2-ctl --list-devices"
+ssh pi@192.168.199.247 "v4l2-ctl --list-devices"
 ```
 
 ### Service Not Starting
 ```bash
 # Check service status
-ssh pi@192.168.199.243 "sudo systemctl status openTPT.service"
+ssh pi@192.168.199.247 "sudo systemctl status openTPT.service"
 
 # View recent logs
-ssh pi@192.168.199.243 "sudo journalctl -u openTPT.service -n 50"
+ssh pi@192.168.199.247 "sudo journalctl -u openTPT.service -n 50"
 
 # Restart service
-ssh pi@192.168.199.243 "sudo systemctl restart openTPT.service"
+ssh pi@192.168.199.247 "sudo systemctl restart openTPT.service"
 ```
 
 ### Dependencies Missing
 ```bash
 # SSH to Pi and re-run installation
-ssh pi@192.168.199.243
+ssh pi@192.168.199.247
 cd /home/pi/open-TPT
 sudo ./install.sh
 ```
@@ -143,13 +144,13 @@ cd /Users/sam/git/open-TPT
 ### 3. Deploy to Pi
 ```bash
 # Quick sync for rapid iteration
-./tools/quick_sync.sh pi@192.168.199.243
+./tools/quick_sync.sh pi@192.168.199.247
 ```
 
 ### 4. Test on Pi
 ```bash
 # SSH and run with real hardware
-ssh pi@192.168.199.243
+ssh pi@192.168.199.247
 cd /home/pi/open-TPT
 sudo ./main.py
 ```
@@ -160,7 +161,7 @@ sudo ./main.py
 brew install fswatch
 
 # Auto-deploy when files change
-fswatch -o . | xargs -n1 -I{} ./tools/quick_sync.sh pi@192.168.199.243
+fswatch -o . | xargs -n1 -I{} ./tools/quick_sync.sh pi@192.168.199.247
 ```
 
 ## Production Deployment
@@ -169,7 +170,7 @@ fswatch -o . | xargs -n1 -I{} ./tools/quick_sync.sh pi@192.168.199.243
 ```bash
 # Service is auto-enabled by install.sh
 # To manually control:
-ssh pi@192.168.199.243
+ssh pi@192.168.199.247
 
 # Enable auto-start on boot
 sudo systemctl enable openTPT.service

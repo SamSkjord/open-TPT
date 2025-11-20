@@ -109,15 +109,16 @@ sudo python3 ./main.py --windowed
 ### Controls
 
 When using physical NeoKey 1x4:
-- Button 0: Increase brightness
-- Button 1: Decrease brightness
-- Button 2: Toggle camera view (telemetry ↔ rear camera ↔ front camera)
-- Button 3: Toggle UI overlay visibility
+- Button 0: Cycle brightness (30% → 50% → 70% → 90% → 100%)
+- Button 1: Page settings (context-sensitive: hide overlay, reset peaks, etc.)
+- Button 2: Switch within category (camera: rear↔front | UI: telemetry↔G-meter)
+- Button 3: Switch view mode (camera pages ↔ UI pages)
 
 Keyboard controls (for development):
-- Up/Down arrows: Increase/decrease brightness
-- Spacebar: Toggle camera view (telemetry ↔ rear camera ↔ front camera)
-- 'T' key: Toggle UI overlay visibility
+- Up arrow: Cycle brightness
+- Down arrow or 'T' key: Page settings
+- Spacebar: Switch within category
+- Right arrow: Switch view mode (camera ↔ UI)
 - ESC: Exit application
 
 ## Configuration
