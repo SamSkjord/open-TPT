@@ -377,7 +377,8 @@ class GMeterDisplay:
     def _draw_labels(self, screen):
         """Draw additional labels and information."""
         # Title (top left, moved down to avoid top status bar)
-        text_title = self.font_medium.render("G-METER", True, WHITE)
+        # text_title = self.font_medium.render("G-METER", True, WHITE)
+        text_title = self.font_medium.render("", True, WHITE)
         screen.blit(text_title, (int(20 * SCALE_X), int(35 * SCALE_Y)))
 
     def set_speed(self, speed_kmh):
@@ -388,4 +389,3 @@ class GMeterDisplay:
             speed_kmh: Speed in km/h
         """
         self.current_speed = speed_kmh
-
