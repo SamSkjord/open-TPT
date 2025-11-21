@@ -468,13 +468,31 @@ OBD_BRAKE_SIGNALS = {
 
 # Brake rotor emissivity values
 # Emissivity ranges from 0.0 to 1.0, where 1.0 is a perfect black body
-# Typical values:
+#
+# IMPORTANT: MLX90614 and other IR sensors have a factory default emissivity
+# setting of 1.0 (perfect black body). Since brake rotors have lower emissivity,
+# the sensor will read LOWER than the actual temperature. The software applies
+# correction using apply_emissivity_correction() to compensate.
+#
+# NOTE: This is different from tyre sensors (MLX90640 via Pico), where emissivity
+# is configured in the Pico firmware (default 0.95 for rubber tyres) and applied
+# during temperature calculation. Brake sensors use software correction because
+# MLX90614/ADC sensors operate at their factory default ε = 1.0.
+#
+# How it works:
+#   1. MLX90614 sensor assumes ε = 1.0 (factory default, not changed)
+#   2. Actual brake rotor has ε = 0.95 (oxidised cast iron)
+#   3. Sensor reads lower than actual (less radiation from non-black-body surface)
+#   4. Software correction adjusts reading upward: T_actual = T_measured / ε^0.25
+#
+# Typical rotor emissivity values:
 #   - Cast iron (rusty/oxidised): 0.95
 #   - Cast iron (machined/clean): 0.60-0.70
 #   - Steel (oxidised): 0.80
 #   - Steel (polished): 0.15-0.25
 #   - Ceramic composite: 0.90-0.95
-# MLX sensors assume emissivity of 1.0 by default, so correction is needed
+#
+# Adjust per-corner values below to match your specific rotor materials.
 BRAKE_ROTOR_EMISSIVITY = {
     "FL": 0.95,  # Front Left - typical oxidised cast iron
     "FR": 0.95,  # Front Right

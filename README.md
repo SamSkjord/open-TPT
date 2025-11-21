@@ -152,6 +152,8 @@ Other system settings can be configured by editing the `utils/config.py` file, w
 
 openTPT supports per-tyre sensor type configuration, allowing you to mix Pico I2C slave modules (with MLX90640 thermal cameras) and MLX90614 single-point IR sensors.
 
+**Emissivity Note:** Pico modules with MLX90640 sensors have emissivity pre-configured in the Pico firmware (default 0.95 for rubber tyres, configurable via I2C register). This is applied during temperature calculation on the Pico itself, not in openTPT.
+
 Edit `utils/config.py` and configure the `TYRE_SENSOR_TYPES` dictionary:
 
 ```python
@@ -197,6 +199,64 @@ MLX90614_MUX_CHANNELS = {
 ```
 
 **Note:** Both sensor types can share the same channel numbers if they're not used on the same positions. For example, if FL/FR use Pico modules on channels 0/1, and RL/RR use MLX90614 sensors, they can also use channels 0/1 (or 2/3).
+
+### Brake Temperature Sensor Configuration
+
+openTPT supports per-corner brake sensor type configuration with automatic emissivity correction for accurate temperature readings.
+
+#### Sensor Types
+
+Edit `utils/config.py` to configure the `BRAKE_SENSOR_TYPES` dictionary:
+
+```python
+BRAKE_SENSOR_TYPES = {
+    "FL": "mlx90614",  # Front Left - MLX90614 IR sensor
+    "FR": "adc",       # Front Right - ADC IR sensor
+    "RL": "adc",       # Rear Left - ADC IR sensor
+    "RR": "adc",       # Rear Right - ADC IR sensor
+}
+```
+
+**Sensor type options:**
+- `"mlx90614"` - MLX90614 single-point IR sensor via I2C multiplexer
+- `"adc"` - IR sensor via ADS1115 ADC (4 channels available)
+- `"obd"` - CAN/OBD-II (rarely available, most vehicles don't broadcast brake temps)
+
+#### Emissivity Correction
+
+**All IR sensors assume perfect black body emissivity (ε = 1.0) by default.** Since brake rotors have lower emissivity (typically 0.95 for oxidised cast iron), the sensors will read lower than actual temperature. openTPT automatically applies software emissivity correction to compensate.
+
+**Note on Tyre vs Brake Emissivity Handling:**
+- **Tyre sensors (MLX90640 via Pico):** Emissivity is configured in the Pico firmware (default 0.95 for rubber) and applied during temperature calculation by the MLX90640 API. No additional correction needed in openTPT.
+- **Brake sensors (MLX90614/ADC):** Sensors use factory default ε = 1.0, so openTPT applies software correction to compensate for actual rotor emissivity (typically 0.95 for cast iron).
+
+Both approaches achieve the same result - accurate temperature readings - using different implementation methods appropriate to each sensor type.
+
+**How it works:**
+1. MLX90614/IR sensor has factory default ε = 1.0 (not changed in hardware)
+2. Actual brake rotor has lower emissivity (e.g., ε = 0.95)
+3. Sensor reads lower than actual due to less radiation from non-black-body surface
+4. Software correction adjusts reading upward: `T_actual = T_measured / ε^0.25`
+
+Configure per-corner emissivity values in `utils/config.py`:
+
+```python
+BRAKE_ROTOR_EMISSIVITY = {
+    "FL": 0.95,  # Front Left - typical oxidised cast iron
+    "FR": 0.95,  # Front Right
+    "RL": 0.95,  # Rear Left
+    "RR": 0.95,  # Rear Right
+}
+```
+
+**Typical rotor emissivity values:**
+- Cast iron (rusty/oxidised): **0.95** (most common, recommended default)
+- Cast iron (machined/clean): 0.60-0.70
+- Steel (oxidised): 0.80
+- Steel (polished): 0.15-0.25
+- Ceramic composite: 0.90-0.95
+
+**Note:** Adjust the values to match your specific rotor materials. Using incorrect emissivity values can result in temperature errors of 5-20°C. The correction is applied automatically by the unified corner handler to all brake temperature readings.
 
 ### Multi-Camera Configuration
 

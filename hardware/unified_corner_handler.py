@@ -441,7 +441,11 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         return {"temp": temp}
 
     def _read_brake_adc(self, position: str) -> Optional[float]:
-        """Read brake temperature from ADC."""
+        """Read brake temperature from ADC.
+
+        Applies emissivity correction since IR sensors assume ε = 1.0 but
+        brake rotors typically have ε = 0.95 (oxidised cast iron).
+        """
         if position not in self.adc_channels:
             return None
 
@@ -453,7 +457,9 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             temp = voltage * calib["gain"] * 100.0 + calib["offset"]
             temp = max(BRAKE_TEMP_MIN, min(temp, BRAKE_TEMP_HOT + 100.0))
 
-            # Apply emissivity correction for brake rotors (if using IR sensors)
+            # Apply emissivity correction for brake rotors
+            # MLX sensors default to ε = 1.0, but brake rotors are typically ε = 0.95
+            # This correction compensates for the sensor reading low due to lower emissivity
             emissivity = BRAKE_ROTOR_EMISSIVITY.get(position, 1.0)
             corrected_temp = apply_emissivity_correction(temp, emissivity)
 
@@ -462,7 +468,13 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             return None
 
     def _read_brake_mlx90614(self, position: str) -> Optional[float]:
-        """Read brake MLX90614 sensor (shares channel with tyre)."""
+        """Read brake MLX90614 sensor (shares channel with tyre).
+
+        Applies software emissivity correction to compensate for the MLX90614's
+        factory default emissivity setting of 1.0. Since brake rotors typically
+        have emissivity of 0.95 (oxidised cast iron), the sensor reads lower
+        than actual temperature. The correction adjusts the reading upward.
+        """
         sensor = self.brake_mlx_sensors.get(position)
         if not sensor or not self.mux:
             return None
@@ -479,6 +491,9 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
 
             if temp is not None and -40 <= temp <= 380:
                 # Apply emissivity correction for brake rotors
+                # MLX90614 factory default: ε = 1.0 (not changed in hardware)
+                # Actual brake rotor: ε = 0.95 (configurable in config.py)
+                # Correction formula: T_actual = T_measured / ε^0.25
                 emissivity = BRAKE_ROTOR_EMISSIVITY.get(position, 1.0)
                 corrected_temp = apply_emissivity_correction(temp, emissivity)
                 return corrected_temp

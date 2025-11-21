@@ -1,5 +1,97 @@
 # Changelog - openTPT
 
+## [v0.11] - 2025-11-21
+
+### Brake Temperature Emissivity Correction 🌡️
+
+#### ✅ New Features
+- **Automatic emissivity correction** - Software compensation for IR sensor readings
+- **Per-corner emissivity configuration** - Adjust values to match rotor materials
+- **Stefan-Boltzmann correction** - Accurate temperature calculation: `T_actual = T_measured / ε^0.25`
+- **Material-specific defaults** - Pre-configured for oxidised cast iron (ε = 0.95)
+
+#### 📝 Overview
+
+All IR sensors (MLX90614 and ADC-based) have factory default emissivity of 1.0, assuming a perfect black body. Since brake rotors have lower emissivity (typically 0.95 for oxidised cast iron), sensors read lower than actual temperature. This update adds automatic software correction to compensate.
+
+**How it works:**
+1. MLX90614/IR sensor operates at factory default ε = 1.0 (not changed in hardware)
+2. Actual brake rotor has lower emissivity (configurable per corner)
+3. Sensor reads lower than actual due to less radiation from non-black-body surface
+4. Software correction adjusts reading upward using Stefan-Boltzmann law
+
+#### 🔄 Modified Files
+
+- `utils/config.py` - Added emissivity configuration and correction function
+  - New function: `apply_emissivity_correction()` (lines 148-187)
+  - New config: `BRAKE_ROTOR_EMISSIVITY` dictionary (lines 469-496)
+  - Comprehensive documentation of emissivity values for different materials
+- `hardware/unified_corner_handler.py` - Applied correction to brake sensors
+  - MLX90614 brake sensors: Lines 470-504 with emissivity correction
+  - ADC brake sensors: Lines 443-468 with emissivity correction
+  - Added detailed docstrings explaining correction process
+
+#### ⚙️ Configuration
+
+**Brake Rotor Emissivity** (in `utils/config.py`):
+```python
+BRAKE_ROTOR_EMISSIVITY = {
+    "FL": 0.95,  # Front Left - typical oxidised cast iron
+    "FR": 0.95,  # Front Right
+    "RL": 0.95,  # Rear Left
+    "RR": 0.95,  # Rear Right
+}
+```
+
+**Typical rotor emissivity values:**
+- Cast iron (rusty/oxidised): **0.95** (default, most common)
+- Cast iron (machined/clean): 0.60-0.70
+- Steel (oxidised): 0.80
+- Steel (polished): 0.15-0.25
+- Ceramic composite: 0.90-0.95
+
+#### 🔧 Technical Details
+
+**Correction Formula:**
+```
+T_actual (K) = T_measured (K) / ε^0.25
+```
+
+**Example:** If MLX90614 reads 295°C and rotor has ε = 0.95:
+- Sensor assumes ε = 1.0 (factory default)
+- Correction: 568.15 K / 0.95^0.25 = 575.17 K
+- Corrected: ~302°C (7°C higher than uncorrected reading)
+
+**Impact:**
+- Using incorrect emissivity can result in temperature errors of 5-20°C
+- Polished/clean rotors (ε = 0.60-0.70) may show significantly different readings
+- Correction applied automatically to ALL brake temperature readings
+
+#### 📖 Documentation Updates
+
+- Updated `README.md` with brake sensor configuration section
+- Updated `AI_CONTEXT.md` with emissivity correction details
+- Added troubleshooting section for incorrect brake temperatures
+- Enhanced inline code documentation in handler and config files
+- Documented difference between tyre (Pico firmware) and brake (software) emissivity handling
+- Clarified that MLX90640 tyre sensors apply emissivity via Pico firmware (0.95 for rubber)
+- Explained why brake sensors use software correction (MLX90614/ADC default to ε = 1.0)
+
+#### 🛡️ Security Fixes
+
+- **Division by zero prevention** - Added validation in brightness cycle handler
+- **Display dimension validation** - Enhanced security checks for config file parsing
+- **Emissivity bounds checking** - Validates emissivity values between 0.0 and 1.0
+
+#### 🧪 Testing
+
+- ✅ Emissivity correction applied to both ADC and MLX90614 brake sensors
+- ✅ Invalid emissivity values (≤0 or >1.0) safely handled
+- ✅ Default emissivity (1.0) returns uncorrected temperature
+- ✅ Configuration properly documented with typical material values
+
+---
+
 ## [v0.10] - 2025-11-20
 
 ### Toyota Radar Overlay Integration 📡
