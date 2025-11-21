@@ -35,6 +35,11 @@ FPS_COUNTER_POSITION = (
 )
 FPS_COUNTER_COLOR = (0, 255, 0)  # RGB color (default: green)
 
+# Memory Monitoring settings (for long runtime stability diagnostics)
+MEMORY_MONITORING_ENABLED = True  # Log detailed memory stats every 60 seconds
+# Logs: GPU memory (malloc/reloc), system RAM, Python process RSS/VMS, surface count
+# Useful for diagnosing memory fragmentation issues during extended operation
+
 CAMERA_WIDTH = 800
 CAMERA_HEIGHT = 600
 CAMERA_FPS = 30

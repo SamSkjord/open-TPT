@@ -78,6 +78,8 @@ from utils.config import (
     SCALE_X,
     SCALE_Y,
     FONT_SIZE_SMALL,
+    # Memory monitoring configuration
+    MEMORY_MONITORING_ENABLED,
 )
 
 # Import unified corner sensor handler
@@ -233,6 +235,119 @@ def check_power_status():
         return (None, False, "vcgencmd not available (not running on Pi?)")
     except Exception as e:
         return (None, False, f"Error checking power status: {e}")
+
+
+def collect_memory_stats():
+    """
+    Collect comprehensive memory statistics for long-runtime monitoring.
+
+    Returns GPU memory (malloc/reloc), system RAM, Python process memory,
+    and pygame surface count.
+
+    Returns:
+        dict: Memory statistics or None if collection fails
+    """
+    try:
+        stats = {}
+
+        # GPU memory allocation (vcgencmd)
+        try:
+            # GPU malloc heap
+            result = subprocess.run(
+                ['vcgencmd', 'get_mem', 'malloc'],
+                capture_output=True,
+                text=True,
+                timeout=1.0
+            )
+            if result.returncode == 0:
+                # Format: "malloc=14M\n"
+                stats['gpu_malloc'] = result.stdout.strip().split('=')[1]
+
+            # GPU reloc heap
+            result = subprocess.run(
+                ['vcgencmd', 'get_mem', 'reloc'],
+                capture_output=True,
+                text=True,
+                timeout=1.0
+            )
+            if result.returncode == 0:
+                stats['gpu_reloc'] = result.stdout.strip().split('=')[1]
+
+            # Total GPU
+            result = subprocess.run(
+                ['vcgencmd', 'get_mem', 'gpu'],
+                capture_output=True,
+                text=True,
+                timeout=1.0
+            )
+            if result.returncode == 0:
+                stats['gpu_total'] = result.stdout.strip().split('=')[1]
+
+        except Exception as e:
+            stats['gpu_error'] = str(e)
+
+        # System memory (free -m)
+        try:
+            result = subprocess.run(
+                ['free', '-m'],
+                capture_output=True,
+                text=True,
+                timeout=1.0
+            )
+            if result.returncode == 0:
+                # Parse second line (Mem:)
+                lines = result.stdout.strip().split('\n')
+                if len(lines) >= 2:
+                    mem_line = lines[1].split()
+                    stats['ram_total'] = f"{mem_line[1]}M"
+                    stats['ram_used'] = f"{mem_line[2]}M"
+                    stats['ram_free'] = f"{mem_line[3]}M"
+                    stats['ram_available'] = f"{mem_line[6]}M" if len(mem_line) > 6 else "N/A"
+        except Exception as e:
+            stats['ram_error'] = str(e)
+
+        # Python process memory (from /proc/self/status)
+        try:
+            with open('/proc/self/status', 'r') as f:
+                for line in f:
+                    if line.startswith('VmRSS:'):
+                        # Resident Set Size (physical RAM used)
+                        rss_kb = int(line.split()[1])
+                        stats['process_rss'] = f"{rss_kb // 1024}M"
+                    elif line.startswith('VmSize:'):
+                        # Virtual Memory Size
+                        vm_kb = int(line.split()[1])
+                        stats['process_vms'] = f"{vm_kb // 1024}M"
+        except Exception as e:
+            stats['process_error'] = str(e)
+
+        # Pygame surface count (if available)
+        try:
+            # Count active pygame surfaces using gc
+            surface_count = sum(1 for obj in gc.get_objects()
+                              if isinstance(obj, pygame.Surface))
+            stats['pygame_surfaces'] = surface_count
+        except Exception as e:
+            stats['surface_error'] = str(e)
+
+        # CPU temperature
+        try:
+            result = subprocess.run(
+                ['vcgencmd', 'measure_temp'],
+                capture_output=True,
+                text=True,
+                timeout=1.0
+            )
+            if result.returncode == 0:
+                # Format: "temp=51.1'C\n"
+                stats['cpu_temp'] = result.stdout.strip().split('=')[1]
+        except Exception as e:
+            stats['temp_error'] = str(e)
+
+        return stats
+
+    except Exception as e:
+        return {'error': str(e)}
 
 
 class OpenTPT:
@@ -674,6 +789,39 @@ class OpenTPT:
                 # Historical issues only - log once
                 print(message)
                 self.voltage_warning_shown = True
+
+            # Collect and log detailed memory statistics if enabled
+            if MEMORY_MONITORING_ENABLED:
+                stats = collect_memory_stats()
+                if stats and 'error' not in stats:
+                    # Format compact log message with key metrics
+                    mem_msg = f"MEMORY: frame={self.frame_count}"
+
+                    # GPU memory
+                    if 'gpu_malloc' in stats and 'gpu_reloc' in stats and 'gpu_total' in stats:
+                        mem_msg += f" | GPU: {stats['gpu_total']} (malloc={stats['gpu_malloc']} reloc={stats['gpu_reloc']})"
+
+                    # System RAM
+                    if 'ram_used' in stats and 'ram_available' in stats:
+                        mem_msg += f" | RAM: used={stats['ram_used']} avail={stats['ram_available']}"
+
+                    # Python process
+                    if 'process_rss' in stats:
+                        mem_msg += f" | Process: RSS={stats['process_rss']}"
+                        if 'process_vms' in stats:
+                            mem_msg += f" VMS={stats['process_vms']}"
+
+                    # Pygame surfaces
+                    if 'pygame_surfaces' in stats:
+                        mem_msg += f" | Surfaces={stats['pygame_surfaces']}"
+
+                    # CPU temperature
+                    if 'cpu_temp' in stats:
+                        mem_msg += f" | Temp={stats['cpu_temp']}"
+
+                    print(mem_msg)
+                elif stats and 'error' in stats:
+                    print(f"MEMORY: Collection error: {stats['error']}")
 
         # Check for NeoKey inputs (non-blocking, handled by background thread)
         input_events = self.input_handler.check_input()
