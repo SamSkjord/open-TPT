@@ -344,6 +344,20 @@ def collect_memory_stats():
         except Exception as e:
             stats['temp_error'] = str(e)
 
+        # Object type profiling (identify memory leaks)
+        try:
+            from collections import Counter
+            all_objects = gc.get_objects()
+            stats['total_objects'] = len(all_objects)
+
+            # Count objects by type
+            type_counts = Counter(type(obj).__name__ for obj in all_objects)
+
+            # Get top 10 object types
+            stats['top_object_types'] = type_counts.most_common(10)
+        except Exception as e:
+            stats['profiling_error'] = str(e)
+
         return stats
 
     except Exception as e:
@@ -391,6 +405,10 @@ class OpenTPT:
         self.gc_interval = 60.0  # Run garbage collection every 60 seconds
         self.surface_clear_interval = 600.0  # Clear cached surfaces every 10 minutes
         self.last_surface_clear = time.time()
+
+        # Object profiling for leak detection
+        self.last_object_count = 0
+        self.last_top_types = {}
 
         print("Starting openTPT...")
 
@@ -819,7 +837,39 @@ class OpenTPT:
                     if 'cpu_temp' in stats:
                         mem_msg += f" | Temp={stats['cpu_temp']}"
 
+                    # Total object count with delta
+                    if 'total_objects' in stats:
+                        current_count = stats['total_objects']
+                        delta = current_count - self.last_object_count if self.last_object_count > 0 else 0
+                        if delta > 0:
+                            mem_msg += f" | Objects={current_count} (+{delta})"
+                        else:
+                            mem_msg += f" | Objects={current_count}"
+                        self.last_object_count = current_count
+
                     print(mem_msg)
+
+                    # Log object type profiling on separate line for easy grepping
+                    if 'top_object_types' in stats:
+                        top_types = ', '.join([f"{name}:{count}" for name, count in stats['top_object_types']])
+                        print(f"PROFILE: Top objects: {top_types}")
+
+                        # Show which types are growing the most
+                        if self.last_top_types:
+                            current_types = dict(stats['top_object_types'])
+                            growing_types = []
+                            for name, count in stats['top_object_types'][:5]:  # Top 5
+                                prev_count = self.last_top_types.get(name, 0)
+                                delta = count - prev_count
+                                if delta > 100:  # Only show significant growth
+                                    growing_types.append(f"{name}:+{delta}")
+
+                            if growing_types:
+                                print(f"PROFILE: Growing: {', '.join(growing_types)}")
+
+                        # Update last_top_types
+                        self.last_top_types = dict(stats['top_object_types'])
+
                 elif stats and 'error' in stats:
                     print(f"MEMORY: Collection error: {stats['error']}")
 

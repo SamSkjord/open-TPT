@@ -105,8 +105,18 @@ T_actual (K) = T_measured (K) / ε^0.25
 
 **Fixes 6-hour crash issue:**
 - G-meter page would crash after ~6 hours of continuous operation
-- Root cause: pygame/SDL memory fragmentation causing `display.flip()` to block (17+ seconds)
-- Solution: Periodic GC + surface cache clearing prevents memory buildup
+- Root cause 1: CAN message object leak in radar driver (30,000 Message objects/minute)
+- Root cause 2: pygame/SDL memory fragmentation causing `display.flip()` to block (17+ seconds)
+- Solution: Removed unused BufferedReader + Periodic GC + surface cache clearing
+
+**Memory leak fix (toyota_radar_driver.py):**
+- **Issue:** `can.BufferedReader()` was accumulating all CAN messages with no limit
+- **Impact:** At 320 Hz radar rate, created 19,200+ Message objects/minute
+- **Growth:** Object count grew from 83k to 4 million in 90 minutes
+- **Fix:** Removed unused BufferedReader from Notifier (line 224-231)
+- **Result:** Object count now stable at ~55k (±3-66/minute)
+- **Verification:** Message objects no longer appear in top 10 object types
+- **Memory profiling added:** Logs top object types and growth deltas every 60s
 
 #### 🧪 Testing
 
