@@ -4,6 +4,7 @@ Polls vehicle speed via CAN bus using standard OBD2 PIDs.
 """
 
 import time
+from collections import deque
 from typing import Optional
 
 from utils.hardware_base import BoundedQueueHardwareHandler
@@ -48,13 +49,11 @@ class OBD2Handler(BoundedQueueHardwareHandler):
 
         # Current speed with smoothing
         self.current_speed_kmh = 0
-        self.speed_history = []  # Rolling window for smoothing
-        self.speed_history_size = 5  # Average over last 5 readings
+        self.speed_history = deque(maxlen=5)  # Rolling window for smoothing (O(1) operations)
 
         # MAP (manifold absolute pressure) for simulating SOC
         self.current_map_kpa = 0
-        self.map_history = []  # Rolling window for smoothing and rate calculation
-        self.map_history_size = 3  # Small window for responsive rate-of-change detection
+        self.map_history = deque(maxlen=3)  # Rolling window for smoothing and rate calculation (O(1) operations)
         self.simulated_soc = 0.0  # Calculated directly from MAP (will be set on first reading)
 
         if self.enabled:
@@ -271,10 +270,8 @@ class OBD2Handler(BoundedQueueHardwareHandler):
                     speed = self._wait_for_speed_response(timeout_s=0.15)
 
                     if speed is not None:
-                        # Add to history for smoothing
+                        # Add to history for smoothing (auto-drops oldest when full)
                         self.speed_history.append(speed)
-                        if len(self.speed_history) > self.speed_history_size:
-                            self.speed_history.pop(0)
 
                         # Calculate smoothed speed (moving average)
                         smoothed_speed = sum(self.speed_history) / len(self.speed_history)
@@ -295,10 +292,8 @@ class OBD2Handler(BoundedQueueHardwareHandler):
                     map_kpa = self._wait_for_map_response(timeout_s=0.15)
 
                     if map_kpa is not None:
-                        # Add to history for rate-of-change calculation
+                        # Add to history for rate-of-change calculation (auto-drops oldest when full)
                         self.map_history.append(map_kpa)
-                        if len(self.map_history) > self.map_history_size:
-                            self.map_history.pop(0)
 
                         # Update simulated SOC based on MAP
                         self.current_map_kpa = map_kpa

@@ -7,6 +7,7 @@ import can
 import struct
 import threading
 import time
+from collections import deque
 from hardware.hardware_handler_base import BoundedQueueHardwareHandler
 from utils.config import FORD_HYBRID_ENABLED, FORD_HYBRID_CHANNEL, FORD_HYBRID_BITRATE
 
@@ -52,8 +53,7 @@ class FordHybridHandler(BoundedQueueHardwareHandler):
         self.max_charge_kw = 0.0    # Max charge power (kW)
 
         # History for smoothing
-        self.soc_history = []
-        self.history_size = 3  # Average over 3 readings
+        self.soc_history = deque(maxlen=3)  # Average over 3 readings (O(1) operations)
 
     def initialize(self):
         """Initialize CAN bus connection to Ford hybrid module."""
@@ -202,10 +202,8 @@ class FordHybridHandler(BoundedQueueHardwareHandler):
                         if value is not None:
                             # Update internal state
                             if name == 'soc':
-                                # Smooth SOC readings
+                                # Smooth SOC readings (auto-drops oldest when full)
                                 self.soc_history.append(value)
-                                if len(self.soc_history) > self.history_size:
-                                    self.soc_history.pop(0)
                                 self.soc_percent = int(round(sum(self.soc_history) / len(self.soc_history)))
                             elif name == 'voltage':
                                 self.hv_voltage = value

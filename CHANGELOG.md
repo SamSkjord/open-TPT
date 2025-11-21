@@ -118,6 +118,32 @@ T_actual (K) = T_measured (K) / ε^0.25
 - **Verification:** Message objects no longer appear in top 10 object types
 - **Memory profiling added:** Logs top object types and growth deltas every 60s
 
+#### ⚡ Performance Optimisations
+
+**Replaced manual list management with `collections.deque`**
+- **Files modified:** `hardware/obd2_handler.py`, `hardware/ford_hybrid_handler.py`
+- **Improvement:** O(n) → O(1) for rolling window operations
+- **Details:**
+  - OBD2 handler: Replaced `speed_history` and `map_history` list management
+  - Ford Hybrid handler: Replaced `soc_history` list management
+  - Used `deque(maxlen=N)` for automatic size limiting (no manual `pop(0)` needed)
+  - Cleaner code with same functionality and better performance
+  - Particularly beneficial for real-time sensor data smoothing at 2-5 Hz poll rates
+
+**Before (O(n) operation):**
+```python
+self.speed_history = []
+self.speed_history.append(speed)
+if len(self.speed_history) > self.speed_history_size:
+    self.speed_history.pop(0)  # O(n) - shifts all elements
+```
+
+**After (O(1) operation):**
+```python
+self.speed_history = deque(maxlen=5)
+self.speed_history.append(speed)  # O(1) - auto-drops oldest
+```
+
 #### 🧪 Testing
 
 - ✅ Emissivity correction applied to both ADC and MLX90614 brake sensors
@@ -127,6 +153,7 @@ T_actual (K) = T_measured (K) / ε^0.25
 - ✅ Voltage monitoring detects power issues on CM4-POE-UPS carrier
 - ✅ Garbage collection runs every 60s, freeing 500-700 objects per cycle
 - ✅ Surface cache clearing has no visible impact on display
+- ✅ Deque optimisation maintains identical functionality with better performance
 
 ---
 
