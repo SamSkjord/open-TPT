@@ -145,6 +145,48 @@ def validate_display_dimensions(width, height):
     return width, height
 
 
+def apply_emissivity_correction(temp_celsius: float, emissivity: float) -> float:
+    """
+    Apply emissivity correction to infrared temperature reading.
+
+    MLX sensors assume emissivity of 1.0 (perfect black body). Real materials
+    have lower emissivity, causing the sensor to read lower than actual temperature.
+
+    Stefan-Boltzmann law: Power ∝ ε * T^4
+    Therefore: T_actual = T_measured / ε^0.25
+
+    Args:
+        temp_celsius: Temperature reading from sensor in Celsius
+        emissivity: Material emissivity (0.0-1.0)
+
+    Returns:
+        float: Corrected temperature in Celsius
+
+    Note:
+        - Emissivity of 1.0 returns the original temperature (no correction)
+        - Lower emissivity results in higher corrected temperature
+        - Calculation done in Kelvin, returned in Celsius
+    """
+    if emissivity <= 0.0 or emissivity > 1.0:
+        # Invalid emissivity, return uncorrected temperature
+        return temp_celsius
+
+    if emissivity == 1.0:
+        # No correction needed for perfect black body
+        return temp_celsius
+
+    # Convert to Kelvin for calculation
+    temp_kelvin = temp_celsius + 273.15
+
+    # Apply correction: T_actual = T_measured / ε^0.25
+    corrected_kelvin = temp_kelvin / (emissivity ** 0.25)
+
+    # Convert back to Celsius
+    corrected_celsius = corrected_kelvin - 273.15
+
+    return corrected_celsius
+
+
 try:
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, "r") as f:
@@ -422,4 +464,20 @@ OBD_BRAKE_SIGNALS = {
     "FR": None,  # Most cars don't broadcast brake temps
     "RL": None,  # Would need custom CAN implementation
     "RR": None,  # or aftermarket ECU
+}
+
+# Brake rotor emissivity values
+# Emissivity ranges from 0.0 to 1.0, where 1.0 is a perfect black body
+# Typical values:
+#   - Cast iron (rusty/oxidised): 0.95
+#   - Cast iron (machined/clean): 0.60-0.70
+#   - Steel (oxidised): 0.80
+#   - Steel (polished): 0.15-0.25
+#   - Ceramic composite: 0.90-0.95
+# MLX sensors assume emissivity of 1.0 by default, so correction is needed
+BRAKE_ROTOR_EMISSIVITY = {
+    "FL": 0.95,  # Front Left - typical oxidised cast iron
+    "FR": 0.95,  # Front Right
+    "RL": 0.95,  # Rear Left
+    "RR": 0.95,  # Rear Right
 }

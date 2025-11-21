@@ -26,6 +26,8 @@ from utils.config import (
     MLX90614_MUX_CHANNELS,
     ADS_ADDRESS,
     I2C_MUX_ADDRESS,
+    BRAKE_ROTOR_EMISSIVITY,
+    apply_emissivity_correction,
 )
 
 # Import for ADC hardware (ADS1115)
@@ -451,7 +453,11 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             temp = voltage * calib["gain"] * 100.0 + calib["offset"]
             temp = max(BRAKE_TEMP_MIN, min(temp, BRAKE_TEMP_HOT + 100.0))
 
-            return temp
+            # Apply emissivity correction for brake rotors (if using IR sensors)
+            emissivity = BRAKE_ROTOR_EMISSIVITY.get(position, 1.0)
+            corrected_temp = apply_emissivity_correction(temp, emissivity)
+
+            return corrected_temp
         except Exception:
             return None
 
@@ -472,7 +478,10 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             temp = sensor.object_temperature
 
             if temp is not None and -40 <= temp <= 380:
-                return temp
+                # Apply emissivity correction for brake rotors
+                emissivity = BRAKE_ROTOR_EMISSIVITY.get(position, 1.0)
+                corrected_temp = apply_emissivity_correction(temp, emissivity)
+                return corrected_temp
 
         except Exception:
             return None
