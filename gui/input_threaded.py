@@ -285,6 +285,9 @@ class InputHandlerThreaded:
 
     def cycle_brightness(self):
         """Cycle to the next brightness preset."""
+        if not self.brightness_presets:
+            # No presets defined, do nothing
+            return
         self.brightness_index = (self.brightness_index + 1) % len(self.brightness_presets)
         self.brightness = self.brightness_presets[self.brightness_index]
 
