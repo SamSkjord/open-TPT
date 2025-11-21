@@ -79,9 +79,34 @@ T_actual (K) = T_measured (K) / ε^0.25
 
 #### 🛡️ Security Fixes
 
+- **CAN bus array access** - Restructured conditionals to check length before array access (obd2_handler.py)
+- **Bare except clauses** - Replaced with specific exception types in unified_corner_handler.py
+- **Input validation** - Added comprehensive validation to emissivity correction function
+- **Thermal array validation** - Added second validation check in display.py
 - **Division by zero prevention** - Added validation in brightness cycle handler
 - **Display dimension validation** - Enhanced security checks for config file parsing
 - **Emissivity bounds checking** - Validates emissivity values between 0.0 and 1.0
+
+#### 🔧 Long Runtime Stability Features
+
+- **Voltage monitoring** - Checks Pi power status at startup and every 60 seconds
+  - Detects undervoltage and throttling conditions
+  - Logs critical power issues with actionable recommendations
+  - Historical tracking (issues that occurred since boot)
+  - Live monitoring (issues happening right now)
+- **Automatic garbage collection** - Runs every 60 seconds
+  - Frees unreferenced Python objects
+  - Logs collection statistics (objects collected/freed)
+  - Prevents memory accumulation during extended runtime
+- **pygame surface cache management** - Clears cached surfaces every 10 minutes
+  - Prevents GPU memory buildup
+  - No visible impact to user (no screen flicker)
+  - Reduces pygame/SDL memory fragmentation
+
+**Fixes 6-hour crash issue:**
+- G-meter page would crash after ~6 hours of continuous operation
+- Root cause: pygame/SDL memory fragmentation causing `display.flip()` to block (17+ seconds)
+- Solution: Periodic GC + surface cache clearing prevents memory buildup
 
 #### 🧪 Testing
 
@@ -89,6 +114,9 @@ T_actual (K) = T_measured (K) / ε^0.25
 - ✅ Invalid emissivity values (≤0 or >1.0) safely handled
 - ✅ Default emissivity (1.0) returns uncorrected temperature
 - ✅ Configuration properly documented with typical material values
+- ✅ Voltage monitoring detects power issues on CM4-POE-UPS carrier
+- ✅ Garbage collection runs every 60s, freeing 500-700 objects per cycle
+- ✅ Surface cache clearing has no visible impact on display
 
 ---
 

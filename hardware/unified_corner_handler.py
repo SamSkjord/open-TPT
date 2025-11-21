@@ -361,7 +361,8 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
                 "_mirrored_from_centre": mirrored
             }
 
-        except Exception:
+        except (IOError, OSError, RuntimeError) as e:
+            # I2C communication errors (sensor not responding, bus error, etc.)
             return None
 
     def _read_pico_int16(self, reg: int) -> Optional[int]:
@@ -412,7 +413,8 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
                     "right_median": self.tyre_mlx_ema[position],
                 }
 
-        except Exception:
+        except (IOError, OSError, RuntimeError) as e:
+            # I2C communication errors (sensor not responding, bus error, etc.)
             return None
 
         return None
@@ -464,7 +466,8 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             corrected_temp = apply_emissivity_correction(temp, emissivity)
 
             return corrected_temp
-        except Exception:
+        except (IOError, OSError, RuntimeError, ValueError) as e:
+            # I2C/ADC communication errors or emissivity correction errors
             return None
 
     def _read_brake_mlx90614(self, position: str) -> Optional[float]:
@@ -498,7 +501,8 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
                 corrected_temp = apply_emissivity_correction(temp, emissivity)
                 return corrected_temp
 
-        except Exception:
+        except (IOError, OSError, RuntimeError, ValueError) as e:
+            # I2C communication errors or emissivity correction errors
             return None
 
         return None

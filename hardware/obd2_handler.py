@@ -127,11 +127,16 @@ class OBD2Handler(BoundedQueueHardwareHandler):
 
                 # Check if this is a valid response to our speed request
                 # Response format: [length, 0x41, PID, data_byte, ...]
-                if (OBD_RESPONSE_MIN <= msg.arbitration_id <= OBD_RESPONSE_MAX
-                        and not msg.is_extended_id
-                        and len(msg.data) >= 4
-                        and msg.data[1] == 0x41  # Response to service 0x01
-                        and msg.data[2] == PID_VEHICLE_SPEED):
+                # SECURITY: Check length FIRST before any array access
+                if not (OBD_RESPONSE_MIN <= msg.arbitration_id <= OBD_RESPONSE_MAX):
+                    continue
+                if msg.is_extended_id:
+                    continue
+                if len(msg.data) < 4:
+                    continue
+
+                # Safe to access array elements now
+                if msg.data[1] == 0x41 and msg.data[2] == PID_VEHICLE_SPEED:
                     # Speed is in byte 3, directly in km/h
                     speed_kmh = msg.data[3]
                     return speed_kmh
@@ -162,11 +167,16 @@ class OBD2Handler(BoundedQueueHardwareHandler):
 
                 # Check if this is a valid response to our MAP request
                 # Response format: [length, 0x41, PID, data_byte, ...]
-                if (OBD_RESPONSE_MIN <= msg.arbitration_id <= OBD_RESPONSE_MAX
-                        and not msg.is_extended_id
-                        and len(msg.data) >= 4
-                        and msg.data[1] == 0x41  # Response to service 0x01
-                        and msg.data[2] == PID_INTAKE_MAP):
+                # SECURITY: Check length FIRST before any array access
+                if not (OBD_RESPONSE_MIN <= msg.arbitration_id <= OBD_RESPONSE_MAX):
+                    continue
+                if msg.is_extended_id:
+                    continue
+                if len(msg.data) < 4:
+                    continue
+
+                # Safe to access array elements now
+                if msg.data[1] == 0x41 and msg.data[2] == PID_INTAKE_MAP:
                     # MAP is in byte 3, directly in kPa
                     map_kpa = msg.data[3]
                     return map_kpa

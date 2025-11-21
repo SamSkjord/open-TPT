@@ -9,6 +9,8 @@ import sys
 import time
 import math
 import argparse
+import subprocess
+import gc
 import pygame
 import numpy as np
 import pygame.time as pgtime
@@ -154,6 +156,85 @@ def kpa_to_psi(kpa):
     return kpa * 0.145038
 
 
+def check_power_status():
+    """
+    Check Raspberry Pi power status for undervoltage and throttling.
+
+    Logs warnings if power issues are detected that could cause system instability.
+
+    Returns:
+        tuple: (throttled_value, has_issues, warning_message)
+    """
+    try:
+        result = subprocess.run(
+            ['vcgencmd', 'get_throttled'],
+            capture_output=True,
+            text=True,
+            timeout=2.0
+        )
+
+        if result.returncode != 0:
+            return (None, False, "Could not read throttle status")
+
+        # Parse throttled value (format: "throttled=0x50000")
+        throttled_str = result.stdout.strip().split('=')[1]
+        throttled = int(throttled_str, 16)
+
+        # Decode throttle bits
+        # Bits 0-3: Current status
+        # Bits 16-19: Has occurred since boot
+        issues = []
+        has_critical = False
+
+        # Current status bits
+        if throttled & 0x1:
+            issues.append("⚠️  CRITICAL: Undervoltage detected NOW")
+            has_critical = True
+        if throttled & 0x2:
+            issues.append("⚠️  CRITICAL: Arm frequency capped NOW")
+            has_critical = True
+        if throttled & 0x4:
+            issues.append("⚠️  WARNING: Currently throttled")
+            has_critical = True
+        if throttled & 0x8:
+            issues.append("⚠️  WARNING: Soft temperature limit active")
+
+        # Historical bits (since boot)
+        if throttled & 0x10000:
+            issues.append("📋 Undervoltage has occurred since boot")
+        if throttled & 0x20000:
+            issues.append("📋 Arm frequency capping has occurred")
+        if throttled & 0x40000:
+            issues.append("📋 Throttling has occurred")
+        if throttled & 0x80000:
+            issues.append("📋 Soft temperature limit has been reached")
+
+        if throttled == 0:
+            return (throttled, False, "Power status: OK ✅")
+
+        warning = f"\n{'='*60}\n"
+        warning += f"POWER ISSUES DETECTED (throttled={throttled_str})\n"
+        warning += f"{'='*60}\n"
+        for issue in issues:
+            warning += f"{issue}\n"
+
+        if has_critical or (throttled & 0x50000):  # Undervoltage or frequency capping occurred
+            warning += "\n🔴 CRITICAL: System experiencing power problems!\n"
+            warning += "   - Use official Raspberry Pi power supply (5V/5A)\n"
+            warning += "   - Check USB-C cable quality (use thick, short cable)\n"
+            warning += "   - Reduce connected hardware load if problem persists\n"
+            warning += "   - System may crash or behave erratically\n"
+
+        warning += f"{'='*60}\n"
+
+        return (throttled, True, warning)
+
+    except FileNotFoundError:
+        return (None, False, "vcgencmd not available (not running on Pi?)")
+    except Exception as e:
+        return (None, False, f"Error checking power status: {e}")
+
+
 class OpenTPT:
     def __init__(self, args):
         """
@@ -185,7 +266,25 @@ class OpenTPT:
         self.perf_summary_interval = 10.0  # Print summary every 10 seconds
         self.last_perf_summary = time.time()
 
+        # Voltage monitoring
+        self.last_voltage_check = time.time()
+        self.voltage_check_interval = 60.0  # Check every 60 seconds
+        self.voltage_warning_shown = False
+
+        # Memory management for long runtime stability
+        self.last_gc_time = time.time()
+        self.gc_interval = 60.0  # Run garbage collection every 60 seconds
+        self.surface_clear_interval = 600.0  # Clear cached surfaces every 10 minutes
+        self.last_surface_clear = time.time()
+
         print("Starting openTPT...")
+
+        # Check power status at startup
+        throttled, has_issues, message = check_power_status()
+        print(message)
+        if has_issues:
+            # Give user time to see the warning
+            time.sleep(3.0)
 
         # Initialize pygame and display
         self._init_display()
@@ -536,6 +635,46 @@ class OpenTPT:
 
     def _update_hardware(self):
         """Update hardware states."""
+        current_time = time.time()
+
+        # Periodic garbage collection for long runtime stability (every 60 seconds)
+        if current_time - self.last_gc_time >= self.gc_interval:
+            self.last_gc_time = current_time
+
+            # Count objects before GC
+            obj_count_before = len(gc.get_objects())
+
+            # Force garbage collection
+            collected = gc.collect()
+
+            # Count objects after GC
+            obj_count_after = len(gc.get_objects())
+
+            print(f"GC: Collected {collected} objects, "
+                  f"{obj_count_before} → {obj_count_after} objects "
+                  f"({obj_count_before - obj_count_after} freed)")
+
+        # Clear cached pygame surfaces periodically (every 10 minutes)
+        # This prevents GPU memory buildup from cached surfaces
+        if current_time - self.last_surface_clear >= self.surface_clear_interval:
+            self.last_surface_clear = current_time
+            self.cached_ui_surface = None
+            self.cached_brightness_surface = None
+            print(f"Memory: Cleared cached pygame surfaces (frame {self.frame_count})")
+
+        # Periodic voltage monitoring (every 60 seconds)
+        if current_time - self.last_voltage_check >= self.voltage_check_interval:
+            self.last_voltage_check = current_time
+            throttled, has_issues, message = check_power_status()
+
+            # Only log if there are new issues or critical issues
+            if has_issues and (throttled & 0xF):  # Current issues (bits 0-3)
+                print(message)
+            elif has_issues and not self.voltage_warning_shown:
+                # Historical issues only - log once
+                print(message)
+                self.voltage_warning_shown = True
+
         # Check for NeoKey inputs (non-blocking, handled by background thread)
         input_events = self.input_handler.check_input()
 

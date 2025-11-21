@@ -156,23 +156,34 @@ def apply_emissivity_correction(temp_celsius: float, emissivity: float) -> float
     Therefore: T_actual = T_measured / ε^0.25
 
     Args:
-        temp_celsius: Temperature reading from sensor in Celsius
+        temp_celsius: Temperature reading from sensor in Celsius (-40 to 380°C for MLX sensors)
         emissivity: Material emissivity (0.0-1.0)
 
     Returns:
         float: Corrected temperature in Celsius
+
+    Raises:
+        ValueError: If temperature is outside sensor range or emissivity is invalid
 
     Note:
         - Emissivity of 1.0 returns the original temperature (no correction)
         - Lower emissivity results in higher corrected temperature
         - Calculation done in Kelvin, returned in Celsius
     """
-    if emissivity <= 0.0 or emissivity > 1.0:
-        # Invalid emissivity, return uncorrected temperature
-        return temp_celsius
+    # Validate temperature is within MLX sensor range
+    if not (-40 <= temp_celsius <= 380):
+        raise ValueError(
+            f"Temperature {temp_celsius:.1f}°C outside MLX sensor range (-40 to 380°C)"
+        )
 
-    if emissivity == 1.0:
-        # No correction needed for perfect black body
+    # Validate emissivity is in valid range
+    if not (0.0 < emissivity <= 1.0):
+        raise ValueError(
+            f"Emissivity {emissivity:.3f} must be in range (0.0, 1.0]"
+        )
+
+    # No correction needed for perfect black body (using epsilon comparison for float)
+    if abs(emissivity - 1.0) < 1e-9:
         return temp_celsius
 
     # Convert to Kelvin for calculation

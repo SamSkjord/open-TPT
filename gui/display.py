@@ -486,6 +486,11 @@ class Display:
 
         # Create text labels for the temperatures (only if we have data)
         if thermal_data is not None:
+            # Validate shape again before processing sections (defensive programming)
+            if thermal_data.shape != (24, 32):
+                print(f"Warning: Skipping text labels - invalid thermal data shape {thermal_data.shape} for {position}")
+                return
+
             # Calculate temperatures again for text labels
             section_width = thermal_data.shape[1] // 3
             inner_section = thermal_data[:, :section_width]
