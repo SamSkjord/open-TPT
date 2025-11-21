@@ -2,7 +2,7 @@
 
 **Purpose:** This document provides essential context for AI assistants working on the openTPT project, enabling quick onboarding and effective collaboration.
 
-**Last Updated:** 2025-11-20 (v0.10)
+**Last Updated:** 2025-11-21 (v0.11)
 
 ---
 
@@ -24,12 +24,12 @@
 ## Current Production Environment
 
 ### Hardware Configuration
-- **Pi IP Address:** `192.168.199.243`
+- **Pi IP Address:** `192.168.199.247`
 - **User:** `pi`
 - **Project Path:** `/home/pi/open-TPT`
 - **Service:** `openTPT.service` (systemd, auto-start on boot)
 
-### Hardware Status (v0.10)
+### Hardware Status (v0.11)
 - ✅ **TPMS:** 4/4 sensors auto-paired (FL, FR, RL, RR)
 - ✅ **Multi-Camera:** Dual USB cameras with seamless switching
   - Rear camera: `/dev/video-rear` (USB port 1.1)
@@ -40,6 +40,7 @@
   - CAN channels: can_b1_0 (keep-alive), can_b1_1 (tracks)
 - ✅ **OBD2:** MAP-based SOC simulation for desk testing
 - ⚠️ **ADS1115:** Not connected (brake temps unavailable)
+- ✅ **Power:** Waveshare CM4-POE-UPS carrier (12V DC or PoE+, PWM fan, temp ~51°C)
 
 ---
 
@@ -145,21 +146,21 @@ openTPT/
 ### Deploying Changes
 ```bash
 # SSH to Pi and update via git
-ssh pi@192.168.199.243
+ssh pi@192.168.199.247
 cd /home/pi/open-TPT
 git pull
 sudo ./install.sh  # If dependencies changed
 
 # Quick sync (code only, for development)
-./tools/quick_sync.sh pi@192.168.199.243
+./tools/quick_sync.sh pi@192.168.199.247
 
 # Auto-deploy on save (requires fswatch)
-fswatch -o . | xargs -n1 -I{} ./tools/quick_sync.sh pi@192.168.199.243
+fswatch -o . | xargs -n1 -I{} ./tools/quick_sync.sh pi@192.168.199.247
 ```
 
 ### Testing on Pi
 ```bash
-ssh pi@192.168.199.243
+ssh pi@192.168.199.247
 cd /home/pi/open-TPT
 sudo ./main.py                    # Fullscreen mode
 sudo ./main.py --windowed         # Windowed mode
@@ -167,7 +168,7 @@ sudo ./main.py --windowed         # Windowed mode
 
 ### Service Management
 ```bash
-ssh pi@192.168.199.243
+ssh pi@192.168.199.247
 sudo systemctl status openTPT.service      # Check status
 sudo systemctl restart openTPT.service     # Restart
 sudo journalctl -u openTPT.service -f      # View logs
@@ -494,6 +495,32 @@ sudo ./main.py
 - Verify OBD2 handler initialized if using MAP-based SOC
 - Check logs for OBD2 connection status
 
+### Issue: Power Issues Detected (throttled=0x50000)
+**Solution:**
+- On CM4-POE-UPS carrier, 0x50000 (historical undervoltage + throttling) is common even with adequate power
+- Focus on bits 0-3 for **current** issues, bits 16-19 are historical
+- If bit 0 (current undervoltage) is set, check power supply
+- If bit 1 (frequency capped) is set, system is actively limiting performance
+- Temperature at 51°C with PWM fan is normal operating range
+- Check logs for voltage monitoring messages every 60 seconds
+
+### Issue: System Crashes After 6+ Hours
+**Solution (v0.11+):**
+- Fixed via periodic garbage collection (every 60s) and surface cache clearing (every 10 min)
+- Check logs for "GC: Collected N objects" messages every 60 seconds
+- Check logs for "Memory: Cleared cached pygame surfaces" every 10 minutes
+- If still crashing, check for I2C bus errors in logs (separate issue)
+- Verify pygame.display.flip() times in logs (should be <20ms, not seconds)
+- Root cause was GPU memory fragmentation after ~648,000 frames
+
+### Issue: pygame.display.flip() Blocking/Slow Render
+**Solution:**
+- Check garbage collection is running (logs every 60s)
+- Check surface cache clearing is enabled (logs every 10 min)
+- Verify not running on battery (UPS mode) - use mains power
+- Check frame count in logs - issue appeared after ~6 hours at 30-60 FPS
+- If GC not helping, may need to restart application
+
 ---
 
 ## Git Workflow
@@ -572,7 +599,58 @@ Both achieve accurate temperatures - just different implementation points approp
 
 ---
 
+## Long Runtime Stability
+
+### Overview
+The system is designed for extended motorsport sessions (6+ hours). Several mechanisms ensure stable operation under long runtime conditions.
+
+### Voltage Monitoring
+- **Purpose:** Monitor Raspberry Pi power supply health
+- **Implementation:** `main.py` lines 158-234 (`check_power_status()`)
+- **Monitoring frequency:** At startup and every 60 seconds
+- **What's checked:**
+  - Undervoltage detection (current and historical)
+  - Frequency capping due to power issues
+  - Throttling due to power or thermal issues
+  - Soft temperature limit reached
+- **Configuration:** CM4-POE-UPS carrier board common status code 0x50000 (historical undervoltage) is expected, focus on bits 0-3 for current issues
+
+### Memory Management
+- **Purpose:** Prevent pygame/SDL memory fragmentation crashes after extended runtime
+- **Implementation:** `main.py` lines 268-278 (initialization), 640-676 (periodic execution)
+- **Garbage collection:** Every 60 seconds, frees 500-700 objects typically
+- **Surface cache clearing:** Every 10 minutes, clears cached pygame surfaces
+- **Impact:** No visible screen flicker, non-invasive background operation
+- **Testing:** System runs stably at 30-60 FPS on G-meter page, needs 6+ hour runtime verification
+
+### Key Files
+- `main.py` lines 158-234: `check_power_status()` - Voltage monitoring
+- `main.py` lines 268-278: Memory management initialization
+- `main.py` lines 640-676: Periodic garbage collection and surface clearing
+
+### Historical Context (v0.11)
+Prior to v0.11, the system would crash after ~6 hours of continuous operation on the G-meter page:
+- **Symptom:** pygame.display.flip() blocking for 3-17 seconds
+- **Root cause:** GPU memory fragmentation after ~648,000 frames at 30-60 FPS
+- **Solution:** Periodic garbage collection + surface cache clearing
+- **Status:** Deployed and monitoring, awaiting long runtime verification
+
+---
+
 ## Version History Quick Reference
+
+### v0.11 (2025-11-21) - Long Runtime Stability & Security Fixes
+- Voltage monitoring at startup and every 60 seconds
+- Periodic garbage collection (every 60s) for memory stability
+- Pygame surface cache clearing (every 10 minutes)
+- Security fixes: CAN bus array access bounds checking
+- Security fixes: Replaced bare except clauses with specific exceptions
+- Security fixes: Input validation for emissivity correction
+- Security fixes: Defensive thermal array shape validation
+- Brake rotor emissivity correction documentation
+- Fix for 6-hour runtime crash (pygame/SDL memory fragmentation)
+- Pi IP address updated to 192.168.199.247
+- Testing: GC frees 500-700 objects per cycle, system stable
 
 ### v0.10 (2025-11-20) - Toyota Radar Integration
 - Toyota radar overlay enabled by default
@@ -689,6 +767,15 @@ Quick reference for finding information:
 ### "Brake temperatures reading low/high"
 → Check BRAKE_ROTOR_EMISSIVITY in utils/config.py, adjust per corner to match rotor material
 
+### "System shows power issues (throttled=0x50000)"
+→ On CM4-POE-UPS, 0x50000 is common (historical undervoltage), check bits 0-3 for current issues
+
+### "System crashed after 6+ hours"
+→ v0.11+ has GC and surface clearing, check logs for "GC: Collected" and "Memory: Cleared" messages
+
+### "pygame slow/blocking after long runtime"
+→ Check GC running (every 60s), verify not on battery, may need application restart if severe
+
 ---
 
 ## Testing Checklist
@@ -721,7 +808,7 @@ Before marking work complete:
 - Logs: `sudo journalctl -u openTPT.service`
 
 ### Network
-- Pi IP: `192.168.199.243`
+- Pi IP: `192.168.199.247`
 - User: `pi`
 - Project path: `/home/pi/open-TPT`
 - Service name: `openTPT.service`
@@ -737,6 +824,7 @@ Before marking work complete:
 5. **Update docs** - Keep CHANGELOG and README current
 6. **Use bounded queues** - All hardware handlers must extend base class
 7. **Graceful degradation** - System works with missing hardware
+8. **Long runtime stability** - GC every 60s, surface clearing every 10 min (v0.11+)
 
 **When in doubt:**
 - Check existing code patterns
@@ -748,6 +836,6 @@ Before marking work complete:
 
 **This document should be read at the start of every new session to maintain context and coding standards.**
 
-**Version:** 0.10 (Toyota Radar Integration)
-**Last Updated:** 2025-11-20
+**Version:** 0.11 (Long Runtime Stability & Security Fixes)
+**Last Updated:** 2025-11-21
 **Maintained by:** AI assistants working on openTPT
