@@ -504,6 +504,20 @@ sudo ./main.py
 - Temperature at 51°C with PWM fan is normal operating range
 - Check logs for voltage monitoring messages every 60 seconds
 
+### Issue: I2C Bus Locked Up (i2cdetect hangs)
+**Solution (v0.12+):**
+- Fixed via threading lock in unified_corner_handler.py
+- Root cause: smbus2 and busio both accessing I2C bus 1 without synchronisation
+- Partial transactions could leave Pico holding SDA low
+- If still occurs, power cycle the Pi (soft reboot may not recover the bus)
+- Check Pico serial output for "WARNING: Rebooted by watchdog" (indicates Pico hang recovered)
+- GPIO bus recovery commands (if power cycle not possible):
+  ```bash
+  sudo raspi-gpio set 2 ip && sudo raspi-gpio set 3 ip
+  sleep 0.1
+  sudo raspi-gpio set 2 a0 && sudo raspi-gpio set 3 a0
+  ```
+
 ### Issue: System Crashes After 6+ Hours
 **Solution (v0.11+):**
 - Fixed via periodic garbage collection (every 60s) and surface cache clearing (every 10 min)
@@ -638,6 +652,12 @@ Prior to v0.11, the system would crash after ~6 hours of continuous operation on
 ---
 
 ## Version History Quick Reference
+
+### v0.12 (2025-11-22) - I2C Bus Contention Fix
+- Added threading lock to serialise I2C access between smbus2 and busio
+- Prevents bus lockups that required power cycling to recover
+- Protected methods: `_read_pico_sensor`, `_read_tyre_mlx90614`, `_read_brake_adc`, `_read_brake_mlx90614`
+- Pico firmware: Added 5-second watchdog timer for hang recovery
 
 ### v0.11 (2025-11-21) - Long Runtime Stability & Security Fixes
 - Voltage monitoring at startup and every 60 seconds
@@ -836,6 +856,6 @@ Before marking work complete:
 
 **This document should be read at the start of every new session to maintain context and coding standards.**
 
-**Version:** 0.11 (Long Runtime Stability & Security Fixes)
-**Last Updated:** 2025-11-21
+**Version:** 0.12 (I2C Bus Contention Fix)
+**Last Updated:** 2025-11-22
 **Maintained by:** AI assistants working on openTPT

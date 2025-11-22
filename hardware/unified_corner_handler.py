@@ -7,6 +7,7 @@ Supports multiple sensor types for both tyres and brakes.
 import time
 import sys
 import os
+import threading
 import numpy as np
 from typing import Optional, Dict, Any
 from collections import deque
@@ -88,6 +89,11 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         super().__init__(queue_depth=2)
 
         self.smoothing_alpha = smoothing_alpha
+
+        # I2C bus lock - prevents contention between smbus2 and busio
+        # Both libraries access the same physical I2C bus, so we must
+        # serialise access to prevent partial transactions and bus lockups
+        self._i2c_lock = threading.Lock()
 
         # Sensor type configs
         self.tyre_sensor_types = TYRE_SENSOR_TYPES.copy()
@@ -326,14 +332,15 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             return None
 
         try:
-            # Select mux channel via smbus2 (write to TCA9548A control register)
-            self.i2c_smbus.write_byte(I2C_MUX_ADDRESS, 1 << channel)
-            time.sleep(0.005)  # Brief delay
+            with self._i2c_lock:
+                # Select mux channel via smbus2 (write to TCA9548A control register)
+                self.i2c_smbus.write_byte(I2C_MUX_ADDRESS, 1 << channel)
+                time.sleep(0.005)  # Brief delay
 
-            # Read temperature registers (left, centre, right)
-            left_raw = self._read_pico_int16(0x20)
-            centre_raw = self._read_pico_int16(0x22)
-            right_raw = self._read_pico_int16(0x24)
+                # Read temperature registers (left, centre, right)
+                left_raw = self._read_pico_int16(0x20)
+                centre_raw = self._read_pico_int16(0x22)
+                right_raw = self._read_pico_int16(0x24)
 
             if centre_raw is None:
                 return None
@@ -389,10 +396,11 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             return None
 
         try:
-            self.mux[channel]
-            time.sleep(0.005)
+            with self._i2c_lock:
+                self.mux[channel]
+                time.sleep(0.005)
 
-            temp = sensor.object_temperature
+                temp = sensor.object_temperature
 
             if temp is not None and -40 <= temp <= 380:
                 # Apply EMA smoothing
@@ -452,8 +460,9 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             return None
 
         try:
-            channel = self.adc_channels[position]
-            voltage = channel.voltage
+            with self._i2c_lock:
+                channel = self.adc_channels[position]
+                voltage = channel.voltage
 
             calib = self.brake_adc_calibration[position]
             temp = voltage * calib["gain"] * 100.0 + calib["offset"]
@@ -487,10 +496,11 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             return None
 
         try:
-            self.mux[channel]
-            time.sleep(0.005)
+            with self._i2c_lock:
+                self.mux[channel]
+                time.sleep(0.005)
 
-            temp = sensor.object_temperature
+                temp = sensor.object_temperature
 
             if temp is not None and -40 <= temp <= 380:
                 # Apply emissivity correction for brake rotors

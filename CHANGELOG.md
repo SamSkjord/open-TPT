@@ -1,5 +1,45 @@
 # Changelog - openTPT
 
+## [v0.12] - 2025-11-22
+
+### I2C Bus Contention Fix 🔧
+
+#### 🐛 Bug Fixes
+
+- **I2C bus contention resolved** - Added threading lock to serialise access between smbus2 and busio libraries
+  - Both libraries access the same physical I2C bus (bus 1)
+  - Without synchronisation, partial transactions could leave devices in bad states
+  - Pico thermal sensors (via smbus2) and MLX90614/ADS1115 (via busio) now properly serialised
+  - Prevents I2C bus lockups that required power cycling to recover
+
+#### 🔄 Modified Files
+
+- `hardware/unified_corner_handler.py`
+  - Added `threading` import
+  - Added `self._i2c_lock = threading.Lock()` in `__init__`
+  - Wrapped all I2C operations with `with self._i2c_lock:` context manager
+  - Protected methods: `_read_pico_sensor`, `_read_tyre_mlx90614`, `_read_brake_adc`, `_read_brake_mlx90614`
+
+#### 🔧 Technical Details
+
+**Root Cause:**
+The unified corner handler used two different I2C libraries:
+- `smbus2` - For Pico thermal sensor communication (custom I2C slave)
+- `busio` (Adafruit) - For MLX90614 and ADS1115 sensors
+
+Both libraries accessed I2C bus 1 without synchronisation. When one library was mid-transaction and the other attempted access, partial transactions could corrupt the bus state, causing devices (particularly the Pico) to hold SDA low indefinitely.
+
+**Solution:**
+A `threading.Lock()` now ensures only one I2C transaction occurs at a time, preventing bus contention.
+
+#### 🧪 Testing
+
+- ✅ I2C bus no longer locks up during extended operation
+- ✅ All sensors continue to read correctly
+- ✅ Soak testing in progress
+
+---
+
 ## [v0.11] - 2025-11-21
 
 ### Brake Temperature Emissivity Correction 🌡️
