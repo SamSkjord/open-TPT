@@ -39,6 +39,7 @@ try:
     import busio
     import adafruit_ads1x15.ads1115 as ADS
     from adafruit_ads1x15.analog_in import AnalogIn
+
     ADS_AVAILABLE = True
 except ImportError:
     ADS_AVAILABLE = False
@@ -46,6 +47,7 @@ except ImportError:
 # Import for MLX90614 sensors
 try:
     import adafruit_mlx90614
+
     MLX90614_AVAILABLE = True
 except ImportError:
     MLX90614_AVAILABLE = False
@@ -53,6 +55,7 @@ except ImportError:
 # Import for I2C multiplexer
 try:
     import adafruit_tca9548a
+
     MUX_AVAILABLE = True
 except ImportError:
     MUX_AVAILABLE = False
@@ -60,6 +63,7 @@ except ImportError:
 # Import for smbus2 (Pico I2C slave communication)
 try:
     from smbus2 import SMBus
+
     SMBUS_AVAILABLE = True
 except ImportError:
     SMBUS_AVAILABLE = False
@@ -67,6 +71,7 @@ except ImportError:
 # Import for GPIO (mux reset pin)
 try:
     import RPi.GPIO as GPIO
+
     GPIO_AVAILABLE = True
 except ImportError:
     GPIO_AVAILABLE = False
@@ -157,6 +162,23 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         self._mux_reset_available = False
         self._mux_reset_count = 0  # Track total resets for logging
 
+        # Exponential backoff for failed sensors (prevents bus hammering)
+        self._backoff_until = {
+            "FL": 0,
+            "FR": 0,
+            "RL": 0,
+            "RR": 0,
+        }  # Timestamp when next read allowed
+        self._backoff_delay = {
+            "FL": 0,
+            "FR": 0,
+            "RL": 0,
+            "RR": 0,
+        }  # Current backoff in seconds
+        self._BACKOFF_INITIAL = 1.0  # Start with 1 second
+        self._BACKOFF_MULTIPLIER = 2  # Double each time
+        self._BACKOFF_MAX = 64.0  # Cap at 60 seconds
+
         # Initialize hardware
         self._initialize_hardware()
 
@@ -183,7 +205,9 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         # Initialize I2C multiplexer
         if MUX_AVAILABLE and self.i2c_busio:
             try:
-                self.mux = adafruit_tca9548a.TCA9548A(self.i2c_busio, address=I2C_MUX_ADDRESS)
+                self.mux = adafruit_tca9548a.TCA9548A(
+                    self.i2c_busio, address=I2C_MUX_ADDRESS
+                )
                 print(f"✓ I2C multiplexer initialized at 0x{I2C_MUX_ADDRESS:02X}")
                 # Initialize mux reset GPIO if available
                 self._init_mux_reset()
@@ -217,7 +241,9 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
                     if channel is not None:
                         self.adc_channels[position] = AnalogIn(self.ads, channel)
 
-            print(f"✓ ADS1115 initialized (brake ADC sensors: {list(self.adc_channels.keys())})")
+            print(
+                f"✓ ADS1115 initialized (brake ADC sensors: {list(self.adc_channels.keys())})"
+            )
         except Exception as e:
             print(f"✗ Error initializing ADS1115: {e}")
 
@@ -262,22 +288,51 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             print(f"✗ Error resetting mux: {e}")
             return False
 
+    def _should_skip_read(self, position: str) -> bool:
+        """Check if read should be skipped due to exponential backoff."""
+        if self._backoff_until[position] > time.time():
+            return True
+        return False
+
     def _track_read_failure(self, position: str) -> bool:
-        """Track consecutive read failures and trigger mux reset if threshold exceeded.
+        """Track consecutive read failures, apply backoff, and trigger mux reset if needed.
 
         Returns True if mux was reset, False otherwise.
         """
         self._consecutive_failures[position] += 1
 
-        if self._consecutive_failures[position] >= I2C_MUX_RESET_FAILURES:
-            print(f"⚠ {position}: {self._consecutive_failures[position]} consecutive I2C failures")
+        # Apply exponential backoff
+        if self._backoff_delay[position] == 0:
+            self._backoff_delay[position] = self._BACKOFF_INITIAL
+        else:
+            self._backoff_delay[position] = min(
+                self._backoff_delay[position] * self._BACKOFF_MULTIPLIER,
+                self._BACKOFF_MAX,
+            )
+        self._backoff_until[position] = time.time() + self._backoff_delay[position]
+
+        # Log at key intervals (not every failure)
+        failures = self._consecutive_failures[position]
+        if failures in (1, 3, 10, 50) or failures % 100 == 0:
+            print(
+                f"⚠ {position}: {failures} I2C failures, backoff {self._backoff_delay[position]:.0f}s"
+            )
+
+        # Try mux reset after threshold
+        if failures >= I2C_MUX_RESET_FAILURES:
             return self._reset_i2c_mux()
 
         return False
 
     def _track_read_success(self, position: str):
-        """Reset failure counter on successful read."""
+        """Reset failure counter and backoff on successful read."""
+        if self._consecutive_failures[position] > 0:
+            print(
+                f"✓ {position}: Recovered after {self._consecutive_failures[position]} failures"
+            )
         self._consecutive_failures[position] = 0
+        self._backoff_delay[position] = 0
+        self._backoff_until[position] = 0
 
     def _initialize_corner_sensors(self, position: str):
         """Initialize all sensors for a specific corner."""
@@ -380,15 +435,9 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             brake_data[position] = brake_reading
 
         # Publish separate snapshots for tyres and brakes
-        self.tyre_queue.append({
-            "data": tyre_data,
-            "timestamp": time.time()
-        })
+        self.tyre_queue.append({"data": tyre_data, "timestamp": time.time()})
 
-        self.brake_queue.append({
-            "data": brake_data,
-            "timestamp": time.time()
-        })
+        self.brake_queue.append({"data": brake_data, "timestamp": time.time()})
 
     def _read_tyre_sensor(self, position: str) -> Optional[Dict]:
         """Read tyre sensor for a position."""
@@ -408,6 +457,10 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
 
         channel = PICO_MUX_CHANNELS.get(position)
         if channel is None:
+            return None
+
+        # Skip if in backoff period
+        if self._should_skip_read(position):
             return None
 
         try:
@@ -446,7 +499,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
                 "centre_median": centre_temp,
                 "left_median": left_temp,
                 "right_median": right_temp,
-                "_mirrored_from_centre": mirrored
+                "_mirrored_from_centre": mirrored,
             }
 
         except (IOError, OSError, RuntimeError) as e:
@@ -477,6 +530,10 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         if channel is None:
             return None
 
+        # Skip if in backoff period
+        if self._should_skip_read(position):
+            return None
+
         try:
             with self._i2c_lock:
                 self.mux[channel]
@@ -494,7 +551,9 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
                     )
 
                 # Create simple thermal array
-                thermal_array = np.full((24, 32), self.tyre_mlx_ema[position], dtype=np.float32)
+                thermal_array = np.full(
+                    (24, 32), self.tyre_mlx_ema[position], dtype=np.float32
+                )
 
                 return {
                     "thermal_array": thermal_array,
@@ -525,8 +584,8 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
                 self.brake_ema_state[position] = temp
             else:
                 self.brake_ema_state[position] = (
-                    self.smoothing_alpha * temp +
-                    (1.0 - self.smoothing_alpha) * self.brake_ema_state[position]
+                    self.smoothing_alpha * temp
+                    + (1.0 - self.smoothing_alpha) * self.brake_ema_state[position]
                 )
             temp = self.brake_ema_state[position]
 
@@ -575,6 +634,10 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
 
         channel = MLX90614_BRAKE_MUX_CHANNELS.get(position)
         if channel is None:
+            return None
+
+        # Skip if in backoff period
+        if self._should_skip_read(position):
             return None
 
         try:

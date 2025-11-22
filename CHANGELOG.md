@@ -31,6 +31,13 @@
   - Applies to both thermal heatmaps and brake temperature displays
   - Smooth display even during brief sensor read delays
 
+- **Exponential backoff for failed sensors** - Prevents I2C bus hammering
+  - Missing/failed sensors no longer spam the I2C bus with constant read attempts
+  - Backoff starts at 1s, doubles each failure (1s → 2s → 4s → ... → 64s max)
+  - Logs only at key intervals (1, 3, 10, 50, then every 100 failures)
+  - Resets immediately on successful read with recovery message
+  - Prevents bus lockups when sensors are disconnected or not yet installed
+
 #### 🔄 Modified Files
 
 - `hardware/unified_corner_handler.py`

@@ -672,6 +672,7 @@ Prior to v0.11, the system would crash after ~6 hours of continuous operation on
 - Pico firmware v1.1: Minimal critical section + 5-second watchdog timer
 - Hardware mux reset: Connect TCA9548A RESET to GPIO17 for auto-recovery
 - Stale data caching: Thermal/brake heatmaps cache last valid data for up to 1 second (`THERMAL_STALE_TIMEOUT`)
+- Exponential backoff: Failed sensors back off 1s→2s→4s→...→64s max, prevents bus hammering
 
 ### v0.11 (2025-11-21) - Long Runtime Stability & Security Fixes
 - Voltage monitoring at startup and every 60 seconds
