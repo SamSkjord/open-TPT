@@ -47,6 +47,12 @@ from utils.config import (
     FPS_COUNTER_ENABLED,
     FPS_COUNTER_POSITION,
     FPS_COUNTER_COLOR,
+    TOF_ENABLED,
+    TOF_DISPLAY_POSITIONS,
+    TOF_DISTANCE_MIN,
+    TOF_DISTANCE_OPTIMAL,
+    TOF_DISTANCE_RANGE,
+    TOF_DISTANCE_MAX,
     # ROTATION,
 )
 
@@ -389,6 +395,101 @@ class Display:
 
         # Add a border
         # pygame.draw.rect(self.surface, BLACK, rect, width=1, border_radius=3)
+
+    def draw_tof_distance(self, position, distance, min_distance=None):
+        """
+        Draw TOF distance reading for a corner.
+
+        Args:
+            position: String key for corner position (FL, FR, RL, RR)
+            distance: Current distance value in millimetres or None
+            min_distance: Minimum distance over last 10 seconds or None
+        """
+        if not TOF_ENABLED:
+            return
+
+        if position not in TOF_DISPLAY_POSITIONS:
+            return
+
+        # Get position
+        pos = TOF_DISPLAY_POSITIONS[position]
+
+        # Determine color based on current distance
+        color = self._get_tof_color(distance)
+
+        # Format current distance text
+        if distance is None:
+            distance_text = "--"
+        else:
+            distance_text = f"{int(distance)}"
+
+        # Render the current distance value
+        text_surface = self.font_medium.render(distance_text, True, color)
+        text_rect = text_surface.get_rect(center=pos)
+        self.surface.blit(text_surface, text_rect)
+
+        # Render "mm" label below the current value
+        label_y = pos[1] + text_surface.get_height() // 2 + 6
+        label_surface = self.font_small.render("mm", True, GREY)
+        label_rect = label_surface.get_rect(center=(pos[0], label_y))
+        self.surface.blit(label_surface, label_rect)
+
+        # Render minimum distance below (smaller, with "min:" prefix)
+        min_y = label_y + label_surface.get_height() + 4
+        if min_distance is None:
+            min_text = "min: --"
+            min_color = GREY
+        else:
+            min_text = f"min: {int(min_distance)}"
+            min_color = self._get_tof_color(min_distance)
+
+        min_surface = self.font_small.render(min_text, True, min_color)
+        min_rect = min_surface.get_rect(center=(pos[0], min_y))
+        self.surface.blit(min_surface, min_rect)
+
+    def _get_tof_color(self, distance):
+        """
+        Get colour for TOF distance based on ride height thresholds.
+
+        Args:
+            distance: Distance in millimetres
+
+        Returns:
+            RGB colour tuple
+        """
+        if distance is None:
+            return GREY
+
+        # Too close (compressed suspension)
+        if distance < TOF_DISTANCE_MIN:
+            return RED
+
+        # Transition from red to green (compressed to optimal)
+        if distance < TOF_DISTANCE_OPTIMAL - TOF_DISTANCE_RANGE:
+            ratio = (distance - TOF_DISTANCE_MIN) / (
+                (TOF_DISTANCE_OPTIMAL - TOF_DISTANCE_RANGE) - TOF_DISTANCE_MIN
+            )
+            r = int(255 * (1 - ratio))
+            g = int(255 * ratio)
+            b = 0
+            return (r, g, b)
+
+        # Optimal range (green)
+        if distance <= TOF_DISTANCE_OPTIMAL + TOF_DISTANCE_RANGE:
+            return GREEN
+
+        # Transition from green to yellow (optimal to extended)
+        if distance < TOF_DISTANCE_MAX:
+            ratio = (distance - (TOF_DISTANCE_OPTIMAL + TOF_DISTANCE_RANGE)) / (
+                TOF_DISTANCE_MAX - (TOF_DISTANCE_OPTIMAL + TOF_DISTANCE_RANGE)
+            )
+            r = int(255 * ratio)
+            g = 255
+            b = 0
+            return (r, g, b)
+
+        # Beyond max (fully extended) - yellow/orange
+        return YELLOW
 
     def draw_thermal_image(self, position, thermal_data):
         """

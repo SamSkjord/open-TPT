@@ -2,7 +2,7 @@
 
 **Purpose:** This document provides essential context for AI assistants working on the openTPT project, enabling quick onboarding and effective collaboration.
 
-**Last Updated:** 2025-11-21 (v0.11)
+**Last Updated:** 2025-11-22 (v0.13)
 
 ---
 
@@ -29,13 +29,15 @@
 - **Project Path:** `/home/pi/open-TPT`
 - **Service:** `openTPT.service` (systemd, auto-start on boot)
 
-### Hardware Status (v0.11)
+### Hardware Status (v0.13)
 - ✅ **TPMS:** 4/4 sensors auto-paired (FL, FR, RL, RR)
 - ✅ **Multi-Camera:** Dual USB cameras with seamless switching
   - Rear camera: `/dev/video-rear` (USB port 1.1)
   - Front camera: `/dev/video-front` (USB port 1.2)
 - ✅ **NeoKey 1x4:** Physical control buttons working
 - ✅ **Pico Thermal:** 1/4 MLX90640 connected (FL)
+- ✅ **TOF Distance:** VL53L0X sensors for ride height (1/4 connected - FR)
+  - Shows current distance (EMA smoothed) and 10-second minimum (raw)
 - ✅ **Toyota Radar:** Enabled by default, receives 1-3 tracks
   - CAN channels: can_b1_0 (keep-alive), can_b1_1 (tracks)
 - ✅ **OBD2:** MAP-based SOC simulation for desk testing

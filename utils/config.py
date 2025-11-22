@@ -520,3 +520,51 @@ BRAKE_ROTOR_EMISSIVITY = {
     "RL": 0.95,  # Rear Left
     "RR": 0.95,  # Rear Right
 }
+
+# ==============================================================================
+# TOF Distance Sensor Configuration (VL53L0X)
+# ==============================================================================
+
+# Enable/disable TOF distance sensors per corner
+# VL53L0X sensors measure distance to ground (ride height) in millimetres
+TOF_ENABLED = True  # Master enable for all TOF sensors
+
+# Per-corner TOF sensor enable
+# Set to True/False to enable/disable individual corners
+TOF_SENSOR_ENABLED = {
+    "FL": True,  # Front Left
+    "FR": True,  # Front Right
+    "RL": True,  # Rear Left
+    "RR": True,  # Rear Right
+}
+
+# I2C multiplexer channel mapping for VL53L0X sensors
+# Shares same mux channels as tyre/brake sensors (one channel per corner)
+TOF_MUX_CHANNELS = {
+    "FL": 0,  # Channel 0 - shared with tyre sensor
+    "FR": 1,  # Channel 1 - shared with tyre sensor
+    "RL": 2,  # Channel 2 - shared with tyre sensor
+    "RR": 3,  # Channel 3 - shared with tyre sensor
+}
+
+# VL53L0X I2C address (default 0x29)
+TOF_I2C_ADDRESS = 0x29
+
+# Display configuration for TOF distance readings
+# Positions are calculated relative to tyre thermal display positions
+# Distance text appears to the side of each tyre
+TOF_DISPLAY_POSITIONS = {
+    # Left side tyres: distance shown to the left of thermal display
+    "FL": scale_position((170, 130)),  # Left of FL thermal
+    "RL": scale_position((170, 338)),  # Left of RL thermal
+    # Right side tyres: distance shown to the right of thermal display
+    "FR": scale_position((630, 130)),  # Right of FR thermal
+    "RR": scale_position((630, 338)),  # Right of RR thermal
+}
+
+# Distance thresholds for colour coding (in millimetres)
+# These define the colour transitions for ride height display
+TOF_DISTANCE_MIN = 50      # Minimum expected distance (very compressed)
+TOF_DISTANCE_OPTIMAL = 120  # Optimal ride height (green)
+TOF_DISTANCE_RANGE = 20     # Range around optimal (±20mm = green zone)
+TOF_DISTANCE_MAX = 200      # Maximum expected distance (full extension)

@@ -1,5 +1,54 @@
 # Changelog - openTPT
 
+## [v0.13] - 2025-11-22
+
+### VL53L0X TOF Distance Sensors 📏
+
+#### ✨ New Features
+
+- **Per-corner TOF distance sensors** - VL53L0X Time-of-Flight sensors for ride height monitoring
+  - Supports one sensor per corner (FL, FR, RL, RR) via I2C multiplexer
+  - Displays current distance in millimetres with colour coding
+  - Shows minimum distance from last 10 seconds (true raw minimum, not smoothed)
+  - Graceful handling when sensors not connected or out of range
+
+- **Independent backoff per sensor type** - Sensor failures no longer affect other sensor types
+  - Tyre, brake, and TOF sensors each have separate backoff tracking
+  - A failed Pico sensor won't block TOF reads on the same corner
+  - Improves reliability when running with partial sensor configurations
+
+#### 🎨 Display
+
+- Current distance shown in colour-coded text (red → green → yellow based on thresholds)
+- "mm" unit label below current value
+- Minimum distance from last 10 seconds shown below with "min:" prefix
+- Shows "--" when sensor out of range or not connected (no spam)
+
+#### ⚙️ Configuration
+
+New settings in `utils/config.py`:
+- `TOF_ENABLED` - Master enable for all TOF sensors
+- `TOF_SENSOR_ENABLED` - Per-corner enable dict
+- `TOF_MUX_CHANNELS` - I2C mux channel mapping (shares channels with tyre sensors)
+- `TOF_I2C_ADDRESS` - Default 0x29
+- `TOF_DISPLAY_POSITIONS` - UI positions next to each tyre
+- `TOF_DISTANCE_MIN/OPTIMAL/RANGE/MAX` - Thresholds for colour coding
+
+#### 🔄 Modified Files
+
+- `utils/config.py` - Added TOF configuration section
+- `hardware/unified_corner_handler.py` - Added VL53L0X support with separate backoff
+- `gui/display.py` - Added `draw_tof_distance()` method
+- `main.py` - Integrated TOF rendering in main loop
+
+#### 📦 Dependencies
+
+```bash
+pip3 install --break-system-packages adafruit-circuitpython-vl53l0x
+```
+
+---
+
 ## [v0.12] - 2025-11-22
 
 ### I2C Bus Reliability Fix 🔧

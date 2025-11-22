@@ -31,6 +31,10 @@ from utils.config import (
     I2C_MUX_RESET_FAILURES,
     BRAKE_ROTOR_EMISSIVITY,
     apply_emissivity_correction,
+    TOF_ENABLED,
+    TOF_SENSOR_ENABLED,
+    TOF_MUX_CHANNELS,
+    TOF_I2C_ADDRESS,
 )
 
 # Import for ADC hardware (ADS1115)
@@ -51,6 +55,14 @@ try:
     MLX90614_AVAILABLE = True
 except ImportError:
     MLX90614_AVAILABLE = False
+
+# Import for VL53L0X TOF distance sensors
+try:
+    import adafruit_vl53l0x
+
+    VL53L0X_AVAILABLE = True
+except ImportError:
+    VL53L0X_AVAILABLE = False
 
 # Import for I2C multiplexer
 try:
@@ -123,6 +135,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         # Sensor objects
         self.tyre_mlx_sensors = {}  # MLX90614 tyre sensors
         self.brake_mlx_sensors = {}  # MLX90614 brake sensors
+        self.tof_sensors = {}  # VL53L0X TOF distance sensors
 
         # Calibration for ADC brake sensors
         self.brake_adc_calibration = {
@@ -151,8 +164,46 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         # Separate queues for tyre and brake data
         self.tyre_queue = deque(maxlen=2)
         self.brake_queue = deque(maxlen=2)
+        self.tof_queue = deque(maxlen=2)  # TOF distance data
 
-        # I2C error tracking for mux reset recovery
+        # EMA state for TOF distance smoothing
+        self.tof_ema_state = {
+            "FL": None,
+            "FR": None,
+            "RL": None,
+            "RR": None,
+        }
+
+        # Separate backoff tracking for TOF sensors (not shared with tyre/brake)
+        self._tof_backoff_until = {
+            "FL": 0,
+            "FR": 0,
+            "RL": 0,
+            "RR": 0,
+        }
+        self._tof_backoff_delay = {
+            "FL": 0,
+            "FR": 0,
+            "RL": 0,
+            "RR": 0,
+        }
+        self._tof_consecutive_failures = {
+            "FL": 0,
+            "FR": 0,
+            "RL": 0,
+            "RR": 0,
+        }
+
+        # TOF minimum distance tracking (rolling 10-second window)
+        self._tof_min_window = 10.0  # seconds
+        self._tof_history = {
+            "FL": deque(maxlen=100),  # (timestamp, distance) pairs
+            "FR": deque(maxlen=100),
+            "RL": deque(maxlen=100),
+            "RR": deque(maxlen=100),
+        }
+
+        # I2C error tracking for mux reset recovery (tyre sensors only)
         self._consecutive_failures = {
             "FL": 0,
             "FR": 0,
@@ -162,7 +213,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         self._mux_reset_available = False
         self._mux_reset_count = 0  # Track total resets for logging
 
-        # Exponential backoff for failed sensors (prevents bus hammering)
+        # Exponential backoff for tyre sensors (prevents bus hammering)
         self._backoff_until = {
             "FL": 0,
             "FR": 0,
@@ -177,7 +228,27 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         }  # Current backoff in seconds
         self._BACKOFF_INITIAL = 1.0  # Start with 1 second
         self._BACKOFF_MULTIPLIER = 2  # Double each time
-        self._BACKOFF_MAX = 64.0  # Cap at 60 seconds
+        self._BACKOFF_MAX = 64.0  # Cap at 64 seconds
+
+        # Separate backoff tracking for brake sensors
+        self._brake_backoff_until = {
+            "FL": 0,
+            "FR": 0,
+            "RL": 0,
+            "RR": 0,
+        }
+        self._brake_backoff_delay = {
+            "FL": 0,
+            "FR": 0,
+            "RL": 0,
+            "RR": 0,
+        }
+        self._brake_consecutive_failures = {
+            "FL": 0,
+            "FR": 0,
+            "RL": 0,
+            "RR": 0,
+        }
 
         # Initialize hardware
         self._initialize_hardware()
@@ -354,6 +425,10 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         if brake_type == "mlx90614":
             self._init_brake_mlx90614(position, channel)
 
+        # Initialize TOF distance sensor
+        if TOF_ENABLED and TOF_SENSOR_ENABLED.get(position, False):
+            self._init_tof_sensor(position, channel)
+
     def _init_tyre_mlx90614(self, position: str, channel: int):
         """Initialize MLX90614 tyre sensor."""
         if not self.mux or not MLX90614_AVAILABLE:
@@ -402,6 +477,26 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         except Exception as e:
             print(f"  ✗ No Pico sensor: {e}")
 
+    def _init_tof_sensor(self, position: str, channel: int):
+        """Initialise VL53L0X TOF distance sensor."""
+        if not self.mux or not VL53L0X_AVAILABLE:
+            return
+
+        try:
+            mux_channel = self.mux[channel]
+            sensor = adafruit_vl53l0x.VL53L0X(mux_channel, address=TOF_I2C_ADDRESS)
+
+            # Test read to verify sensor is working
+            distance = sensor.range
+            if distance is not None and distance > 0:
+                self.tof_sensors[position] = sensor
+                self.tof_ema_state[position] = float(distance)
+                print(f"  ✓ TOF VL53L0X: {distance}mm")
+            else:
+                print(f"  ✗ TOF VL53L0X: Invalid reading")
+        except Exception as e:
+            print(f"  ✗ TOF VL53L0X error: {e}")
+
     def _worker_loop(self):
         """
         Worker thread - reads all sensors per corner in sequence.
@@ -425,19 +520,22 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         """Read all sensors for all corners in one pass."""
         tyre_data = {}
         brake_data = {}
+        tof_data = {}
 
         for position in ["FL", "FR", "RL", "RR"]:
-            # Read both tyre and brake sensors for this corner
+            # Read tyre, brake, and TOF sensors for this corner
             tyre_reading = self._read_tyre_sensor(position)
             brake_reading = self._read_brake_sensor(position)
+            tof_reading = self._read_tof_sensor(position)
 
             tyre_data[position] = tyre_reading
             brake_data[position] = brake_reading
+            tof_data[position] = tof_reading
 
-        # Publish separate snapshots for tyres and brakes
+        # Publish separate snapshots for tyres, brakes, and TOF
         self.tyre_queue.append({"data": tyre_data, "timestamp": time.time()})
-
         self.brake_queue.append({"data": brake_data, "timestamp": time.time()})
+        self.tof_queue.append({"data": tof_data, "timestamp": time.time()})
 
     def _read_tyre_sensor(self, position: str) -> Optional[Dict]:
         """Read tyre sensor for a position."""
@@ -636,8 +734,8 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         if channel is None:
             return None
 
-        # Skip if in backoff period
-        if self._should_skip_read(position):
+        # Skip if in brake-specific backoff period
+        if self._brake_backoff_until[position] > time.time():
             return None
 
         try:
@@ -654,13 +752,109 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
                 # Correction formula: T_actual = T_measured / ε^0.25
                 emissivity = BRAKE_ROTOR_EMISSIVITY.get(position, 1.0)
                 corrected_temp = apply_emissivity_correction(temp, emissivity)
+                # Reset brake backoff on success
+                self._brake_consecutive_failures[position] = 0
+                self._brake_backoff_delay[position] = 0
+                self._brake_backoff_until[position] = 0
                 return corrected_temp
 
         except (IOError, OSError, RuntimeError, ValueError) as e:
-            # I2C communication errors or emissivity correction errors
+            # I2C communication errors - apply brake-specific backoff
+            self._brake_consecutive_failures[position] += 1
+            if self._brake_backoff_delay[position] == 0:
+                self._brake_backoff_delay[position] = self._BACKOFF_INITIAL
+            else:
+                self._brake_backoff_delay[position] = min(
+                    self._brake_backoff_delay[position] * self._BACKOFF_MULTIPLIER,
+                    self._BACKOFF_MAX,
+                )
+            self._brake_backoff_until[position] = time.time() + self._brake_backoff_delay[position]
             return None
 
         return None
+
+    def _read_tof_sensor(self, position: str) -> Dict:
+        """Read VL53L0X TOF distance sensor for a position.
+
+        Returns distance in millimetres with EMA smoothing applied.
+        """
+        distance = None
+
+        # Check if TOF is enabled for this position
+        if not TOF_ENABLED or not TOF_SENSOR_ENABLED.get(position, False):
+            return {"distance": None}
+
+        sensor = self.tof_sensors.get(position)
+        if not sensor:
+            return {"distance": None}
+        if not self.mux:
+            return {"distance": None}
+
+        channel = TOF_MUX_CHANNELS.get(position)
+        if channel is None:
+            return {"distance": None}
+
+        # Skip if in TOF-specific backoff period
+        if self._tof_backoff_until[position] > time.time():
+            return {"distance": self.tof_ema_state.get(position)}
+
+        try:
+            with self._i2c_lock:
+                self.mux[channel]
+                time.sleep(0.005)
+
+                distance = sensor.range
+
+            now = time.time()
+
+            # VL53L0X returns distance in mm, range 0-2000mm typically
+            # 8190/8191 means out of range (nothing detected)
+            if distance is not None and 0 < distance < 8190:
+                # Track RAW value in history for true min calculation
+                self._tof_history[position].append((now, float(distance)))
+
+                # Apply EMA smoothing for display (current value only)
+                if self.tof_ema_state[position] is None:
+                    self.tof_ema_state[position] = float(distance)
+                else:
+                    self.tof_ema_state[position] = (
+                        self.smoothing_alpha * distance
+                        + (1.0 - self.smoothing_alpha) * self.tof_ema_state[position]
+                    )
+
+                # Reset TOF backoff on success
+                self._tof_consecutive_failures[position] = 0
+                self._tof_backoff_delay[position] = 0
+                self._tof_backoff_until[position] = 0
+                return {"distance": self.tof_ema_state[position]}
+            else:
+                # Out of range - return None so display shows "--"
+                # Reset backoff since sensor is communicating (just nothing in range)
+                self._tof_consecutive_failures[position] = 0
+                self._tof_backoff_delay[position] = 0
+                self._tof_backoff_until[position] = 0
+                return {"distance": None}
+
+        except (IOError, OSError, RuntimeError) as e:
+            # I2C communication errors - apply TOF-specific backoff
+            self._tof_consecutive_failures[position] += 1
+            if self._tof_backoff_delay[position] == 0:
+                self._tof_backoff_delay[position] = self._BACKOFF_INITIAL
+            else:
+                self._tof_backoff_delay[position] = min(
+                    self._tof_backoff_delay[position] * self._BACKOFF_MULTIPLIER,
+                    self._BACKOFF_MAX,
+                )
+            self._tof_backoff_until[position] = time.time() + self._tof_backoff_delay[position]
+            # Only log first failure and at key intervals
+            if self._tof_consecutive_failures[position] in (1, 3, 10):
+                print(f"TOF {position}: I2C error: {e}")
+        except Exception as e:
+            # Catch any other exceptions
+            print(f"TOF {position}: unexpected error: {type(e).__name__}: {e}")
+
+        # Return None on error (display will show "--")
+        return {"distance": None}
 
     # Public API - Tyre data access (backward compatible)
     def get_thermal_data(self, position: str) -> Optional[np.ndarray]:
@@ -699,6 +893,41 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         if position in temps:
             return temps[position].get("temp")
         return None
+
+    # Public API - TOF distance data access
+    def get_tof_distances(self) -> Dict:
+        """Get TOF distances for all positions."""
+        if not self.tof_queue:
+            return {pos: {"distance": None} for pos in ["FL", "FR", "RL", "RR"]}
+
+        snapshot = self.tof_queue[-1]
+        return snapshot["data"]
+
+    def get_tof_distance(self, position: str) -> Optional[float]:
+        """Get distance for a specific corner in millimetres."""
+        distances = self.get_tof_distances()
+        if position in distances:
+            return distances[position].get("distance")
+        return None
+
+    def get_tof_min_distance(self, position: str) -> Optional[float]:
+        """Get minimum distance over last 10 seconds for a specific corner."""
+        if position not in self._tof_history:
+            return None
+
+        now = time.time()
+        cutoff = now - self._tof_min_window
+
+        # Filter to readings within the time window
+        valid_readings = [
+            dist for ts, dist in self._tof_history[position]
+            if ts >= cutoff
+        ]
+
+        if not valid_readings:
+            return None
+
+        return min(valid_readings)
 
     def get_update_rate(self) -> float:
         """Calculate update rate from recent snapshots."""
