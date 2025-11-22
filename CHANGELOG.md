@@ -18,6 +18,12 @@
   - Prevents NACKs when Pi polls during register updates (root cause of intermittent reads)
   - Added 5-second watchdog timer for automatic hang recovery
 
+- **I2C mux hardware reset** - GPIO-controlled recovery for TCA9548A
+  - Connect TCA9548A RESET pin to GPIO17 for hardware-level recovery
+  - Auto-triggers after 3 consecutive I2C read failures
+  - Uses Pi's internal pull-up resistor (no external components needed)
+  - Logs reset events for debugging
+
 #### 🔄 Modified Files
 
 - `hardware/unified_corner_handler.py`

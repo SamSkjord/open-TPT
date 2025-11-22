@@ -509,6 +509,10 @@ sudo ./main.py
 - Fixed via threading lock in unified_corner_handler.py
 - Root cause: smbus2 and busio both accessing I2C bus 1 without synchronisation
 - Partial transactions could leave Pico holding SDA low
+- **Hardware reset (recommended):** Connect TCA9548A RESET pin to GPIO17
+  - Auto-triggers after 3 consecutive I2C failures
+  - Uses Pi's internal pull-up (no external resistor needed)
+  - Check logs for "I2C mux reset triggered" messages
 - If still occurs, power cycle the Pi (soft reboot may not recover the bus)
 - Check Pico serial output for "WARNING: Rebooted by watchdog" (indicates Pico hang recovered)
 - GPIO bus recovery commands (if power cycle not possible):
@@ -653,11 +657,12 @@ Prior to v0.11, the system would crash after ~6 hours of continuous operation on
 
 ## Version History Quick Reference
 
-### v0.12 (2025-11-22) - I2C Bus Contention Fix
+### v0.12 (2025-11-22) - I2C Bus Reliability Fix
 - Added threading lock to serialise I2C access between smbus2 and busio
 - Prevents bus lockups that required power cycling to recover
 - Protected methods: `_read_pico_sensor`, `_read_tyre_mlx90614`, `_read_brake_adc`, `_read_brake_mlx90614`
-- Pico firmware: Added 5-second watchdog timer for hang recovery
+- Pico firmware v1.1: Minimal critical section + 5-second watchdog timer
+- Hardware mux reset: Connect TCA9548A RESET to GPIO17 for auto-recovery
 
 ### v0.11 (2025-11-21) - Long Runtime Stability & Security Fixes
 - Voltage monitoring at startup and every 60 seconds

@@ -62,6 +62,17 @@ try:
 except ImportError:
     SMBUS_AVAILABLE = False
 
+# Import for GPIO (mux reset pin)
+try:
+    import RPi.GPIO as GPIO
+    GPIO_AVAILABLE = True
+except ImportError:
+    GPIO_AVAILABLE = False
+
+# Mux reset pin configuration
+MUX_RESET_PIN = 17  # GPIO17 - connect to TCA9548A RESET pin
+MUX_RESET_FAILURE_THRESHOLD = 3  # Reset mux after this many consecutive failures
+
 
 class UnifiedCornerHandler(BoundedQueueHardwareHandler):
     """
@@ -138,6 +149,16 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         self.tyre_queue = deque(maxlen=2)
         self.brake_queue = deque(maxlen=2)
 
+        # I2C error tracking for mux reset recovery
+        self._consecutive_failures = {
+            "FL": 0,
+            "FR": 0,
+            "RL": 0,
+            "RR": 0,
+        }
+        self._mux_reset_available = False
+        self._mux_reset_count = 0  # Track total resets for logging
+
         # Initialize hardware
         self._initialize_hardware()
 
@@ -166,6 +187,8 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             try:
                 self.mux = adafruit_tca9548a.TCA9548A(self.i2c_busio, address=I2C_MUX_ADDRESS)
                 print(f"✓ I2C multiplexer initialized at 0x{I2C_MUX_ADDRESS:02X}")
+                # Initialize mux reset GPIO if available
+                self._init_mux_reset()
             except Exception as e:
                 print(f"✗ Error initializing mux: {e}")
 
@@ -199,6 +222,64 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             print(f"✓ ADS1115 initialized (brake ADC sensors: {list(self.adc_channels.keys())})")
         except Exception as e:
             print(f"✗ Error initializing ADS1115: {e}")
+
+    def _init_mux_reset(self):
+        """Initialize GPIO for mux reset pin with internal pull-up."""
+        if not GPIO_AVAILABLE:
+            print("  ℹ GPIO not available - mux reset disabled")
+            return
+
+        try:
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setwarnings(False)
+            # Configure as output, initially HIGH (reset is active-low)
+            GPIO.setup(MUX_RESET_PIN, GPIO.OUT, initial=GPIO.HIGH)
+            self._mux_reset_available = True
+            print(f"  ✓ Mux reset GPIO{MUX_RESET_PIN} initialized")
+        except Exception as e:
+            print(f"  ✗ Error initializing mux reset GPIO: {e}")
+
+    def _reset_i2c_mux(self):
+        """Pulse reset pin low to recover mux from bad state."""
+        if not self._mux_reset_available:
+            return False
+
+        try:
+            with self._i2c_lock:
+                # Pulse reset low for 1ms
+                GPIO.output(MUX_RESET_PIN, GPIO.LOW)
+                time.sleep(0.001)
+                GPIO.output(MUX_RESET_PIN, GPIO.HIGH)
+                time.sleep(0.010)  # 10ms for mux to stabilise
+
+            self._mux_reset_count += 1
+            print(f"⚠ I2C mux reset triggered (total resets: {self._mux_reset_count})")
+
+            # Reset failure counters
+            for pos in self._consecutive_failures:
+                self._consecutive_failures[pos] = 0
+
+            return True
+        except Exception as e:
+            print(f"✗ Error resetting mux: {e}")
+            return False
+
+    def _track_read_failure(self, position: str) -> bool:
+        """Track consecutive read failures and trigger mux reset if threshold exceeded.
+
+        Returns True if mux was reset, False otherwise.
+        """
+        self._consecutive_failures[position] += 1
+
+        if self._consecutive_failures[position] >= MUX_RESET_FAILURE_THRESHOLD:
+            print(f"⚠ {position}: {self._consecutive_failures[position]} consecutive I2C failures")
+            return self._reset_i2c_mux()
+
+        return False
+
+    def _track_read_success(self, position: str):
+        """Reset failure counter on successful read."""
+        self._consecutive_failures[position] = 0
 
     def _initialize_corner_sensors(self, position: str):
         """Initialize all sensors for a specific corner."""
@@ -343,6 +424,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
                 right_raw = self._read_pico_int16(0x24)
 
             if centre_raw is None:
+                self._track_read_failure(position)
                 return None
 
             # Convert from tenths to Celsius
@@ -360,6 +442,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
                 right_temp = centre_temp
                 mirrored = True
 
+            self._track_read_success(position)
             return {
                 "thermal_array": thermal_array,
                 "centre_median": centre_temp,
@@ -370,6 +453,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
 
         except (IOError, OSError, RuntimeError) as e:
             # I2C communication errors (sensor not responding, bus error, etc.)
+            self._track_read_failure(position)
             return None
 
     def _read_pico_int16(self, reg: int) -> Optional[int]:
@@ -564,3 +648,21 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         if time_diff > 0:
             return 1.0 / time_diff
         return 0.0
+
+    def stop(self):
+        """Stop the handler and clean up GPIO."""
+        super().stop()
+
+        # Clean up GPIO for mux reset pin
+        if self._mux_reset_available and GPIO_AVAILABLE:
+            try:
+                GPIO.cleanup(MUX_RESET_PIN)
+            except Exception:
+                pass  # Ignore cleanup errors
+
+        # Close I2C bus
+        if self.i2c_smbus:
+            try:
+                self.i2c_smbus.close()
+            except Exception:
+                pass
