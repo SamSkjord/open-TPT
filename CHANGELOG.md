@@ -2,7 +2,7 @@
 
 ## [v0.12] - 2025-11-22
 
-### I2C Bus Contention Fix 🔧
+### I2C Bus Reliability Fix 🔧
 
 #### 🐛 Bug Fixes
 
@@ -11,6 +11,12 @@
   - Without synchronisation, partial transactions could leave devices in bad states
   - Pico thermal sensors (via smbus2) and MLX90614/ADS1115 (via busio) now properly serialised
   - Prevents I2C bus lockups that required power cycling to recover
+
+- **Pico firmware v1.1** - Improved I2C slave reliability (pico-tyre-temp repo)
+  - Minimal critical section - pre-calculate all values before disabling interrupts
+  - Reduced interrupt-disabled time from ~100µs to <10µs
+  - Prevents NACKs when Pi polls during register updates (root cause of intermittent reads)
+  - Added 5-second watchdog timer for automatic hang recovery
 
 #### 🔄 Modified Files
 
