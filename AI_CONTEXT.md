@@ -539,6 +539,14 @@ sudo ./main.py
 - Check frame count in logs - issue appeared after ~6 hours at 30-60 FPS
 - If GC not helping, may need to restart application
 
+### Issue: Thermal/Brake Heatmaps Flashing Grey
+**Solution (v0.12+):**
+- Fixed via stale data caching in main.py
+- Display runs at 35 FPS but sensor data updates at 7-10 Hz
+- Stale data now cached for up to 1 second before showing offline
+- Configure timeout via `THERMAL_STALE_TIMEOUT` in utils/config.py (default 1.0s)
+- Applies to both thermal heatmaps and brake temperature displays
+
 ---
 
 ## Git Workflow
@@ -663,6 +671,7 @@ Prior to v0.11, the system would crash after ~6 hours of continuous operation on
 - Protected methods: `_read_pico_sensor`, `_read_tyre_mlx90614`, `_read_brake_adc`, `_read_brake_mlx90614`
 - Pico firmware v1.1: Minimal critical section + 5-second watchdog timer
 - Hardware mux reset: Connect TCA9548A RESET to GPIO17 for auto-recovery
+- Stale data caching: Thermal/brake heatmaps cache last valid data for up to 1 second (`THERMAL_STALE_TIMEOUT`)
 
 ### v0.11 (2025-11-21) - Long Runtime Stability & Security Fixes
 - Voltage monitoring at startup and every 60 seconds
@@ -800,6 +809,9 @@ Quick reference for finding information:
 
 ### "pygame slow/blocking after long runtime"
 → Check GC running (every 60s), verify not on battery, may need application restart if severe
+
+### "Heatmaps flashing grey/offline"
+→ Fixed in v0.12 via stale data caching, adjust `THERMAL_STALE_TIMEOUT` in config if needed (default 1.0s)
 
 ---
 

@@ -24,6 +24,13 @@
   - Uses Pi's internal pull-up resistor (no external components needed)
   - Logs reset events for debugging
 
+- **Stale data caching for heatmaps** - Prevents display flashing
+  - Display runs at 35 FPS but thermal/brake data updates at 7-10 Hz
+  - Previously showed grey "offline" state when no fresh data available
+  - Now caches last valid data for up to 1 second (configurable via `THERMAL_STALE_TIMEOUT`)
+  - Applies to both thermal heatmaps and brake temperature displays
+  - Smooth display even during brief sensor read delays
+
 #### 🔄 Modified Files
 
 - `hardware/unified_corner_handler.py`
@@ -31,6 +38,14 @@
   - Added `self._i2c_lock = threading.Lock()` in `__init__`
   - Wrapped all I2C operations with `with self._i2c_lock:` context manager
   - Protected methods: `_read_pico_sensor`, `_read_tyre_mlx90614`, `_read_brake_adc`, `_read_brake_mlx90614`
+
+- `main.py`
+  - Added `THERMAL_STALE_TIMEOUT` import from config
+  - Added `_thermal_cache` and `_brake_cache` dicts for stale data caching
+  - Modified render loop to use cached data when fresh data unavailable
+
+- `utils/config.py`
+  - Added `THERMAL_STALE_TIMEOUT = 1.0` setting
 
 #### 🔧 Technical Details
 

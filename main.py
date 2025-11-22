@@ -80,6 +80,8 @@ from utils.config import (
     FONT_SIZE_SMALL,
     # Memory monitoring configuration
     MEMORY_MONITORING_ENABLED,
+    # Thermal stale data timeout
+    THERMAL_STALE_TIMEOUT,
 )
 
 # Import unified corner sensor handler
@@ -409,6 +411,11 @@ class OpenTPT:
         # Object profiling for leak detection
         self.last_object_count = 0
         self.last_top_types = {}
+
+        # Stale data cache - show last valid data for up to THERMAL_STALE_TIMEOUT
+        # before displaying offline state (prevents flashing at display fps > data fps)
+        self._thermal_cache = {}  # {position: {"data": array, "timestamp": time}}
+        self._brake_cache = {}    # {position: {"temp": value, "timestamp": time}}
 
         print("Starting openTPT...")
 
@@ -984,19 +991,46 @@ class OpenTPT:
             self._update_ui_visibility()
 
             # Get brake temperatures (LOCK-FREE snapshot access)
+            # Uses stale data cache to prevent flashing when display fps > data fps
             t0 = time.time()
             brake_temps = self.brakes.get_temps()
+            now = time.time()
             for position, data in brake_temps.items():
                 temp = data.get("temp", None) if isinstance(data, dict) else data
-                self.display.draw_brake_temp(position, temp)
+                if temp is not None:
+                    # Fresh data - update cache and display
+                    self._brake_cache[position] = {"temp": temp, "timestamp": now}
+                    self.display.draw_brake_temp(position, temp)
+                elif position in self._brake_cache:
+                    # No fresh data - use cache if within timeout
+                    cache = self._brake_cache[position]
+                    if now - cache["timestamp"] < THERMAL_STALE_TIMEOUT:
+                        self.display.draw_brake_temp(position, cache["temp"])
+                    else:
+                        self.display.draw_brake_temp(position, None)
+                else:
+                    self.display.draw_brake_temp(position, None)
             render_times['brakes'] = (time.time() - t0) * 1000
 
             # Get thermal camera data (LOCK-FREE snapshot access)
-            # Always draw, let display method handle None
+            # Uses stale data cache to prevent flashing when display fps > data fps
             t0 = time.time()
+            now = time.time()
             for position in ["FL", "FR", "RL", "RR"]:
                 thermal_data = self.thermal.get_thermal_data(position)
-                self.display.draw_thermal_image(position, thermal_data)
+                if thermal_data is not None:
+                    # Fresh data - update cache and display
+                    self._thermal_cache[position] = {"data": thermal_data, "timestamp": now}
+                    self.display.draw_thermal_image(position, thermal_data)
+                elif position in self._thermal_cache:
+                    # No fresh data - use cache if within timeout
+                    cache = self._thermal_cache[position]
+                    if now - cache["timestamp"] < THERMAL_STALE_TIMEOUT:
+                        self.display.draw_thermal_image(position, cache["data"])
+                    else:
+                        self.display.draw_thermal_image(position, None)
+                else:
+                    self.display.draw_thermal_image(position, None)
             render_times['thermal'] = (time.time() - t0) * 1000
 
             t0 = time.time()
