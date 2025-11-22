@@ -27,6 +27,8 @@ from utils.config import (
     MLX90614_MUX_CHANNELS,
     ADS_ADDRESS,
     I2C_MUX_ADDRESS,
+    I2C_MUX_RESET_PIN,
+    I2C_MUX_RESET_FAILURES,
     BRAKE_ROTOR_EMISSIVITY,
     apply_emissivity_correction,
 )
@@ -68,10 +70,6 @@ try:
     GPIO_AVAILABLE = True
 except ImportError:
     GPIO_AVAILABLE = False
-
-# Mux reset pin configuration
-MUX_RESET_PIN = 17  # GPIO17 - connect to TCA9548A RESET pin
-MUX_RESET_FAILURE_THRESHOLD = 3  # Reset mux after this many consecutive failures
 
 
 class UnifiedCornerHandler(BoundedQueueHardwareHandler):
@@ -233,9 +231,9 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             GPIO.setmode(GPIO.BCM)
             GPIO.setwarnings(False)
             # Configure as output, initially HIGH (reset is active-low)
-            GPIO.setup(MUX_RESET_PIN, GPIO.OUT, initial=GPIO.HIGH)
+            GPIO.setup(I2C_MUX_RESET_PIN, GPIO.OUT, initial=GPIO.HIGH)
             self._mux_reset_available = True
-            print(f"  ✓ Mux reset GPIO{MUX_RESET_PIN} initialized")
+            print(f"  ✓ Mux reset GPIO{I2C_MUX_RESET_PIN} initialised")
         except Exception as e:
             print(f"  ✗ Error initializing mux reset GPIO: {e}")
 
@@ -247,9 +245,9 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         try:
             with self._i2c_lock:
                 # Pulse reset low for 1ms
-                GPIO.output(MUX_RESET_PIN, GPIO.LOW)
+                GPIO.output(I2C_MUX_RESET_PIN, GPIO.LOW)
                 time.sleep(0.001)
-                GPIO.output(MUX_RESET_PIN, GPIO.HIGH)
+                GPIO.output(I2C_MUX_RESET_PIN, GPIO.HIGH)
                 time.sleep(0.010)  # 10ms for mux to stabilise
 
             self._mux_reset_count += 1
@@ -271,7 +269,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         """
         self._consecutive_failures[position] += 1
 
-        if self._consecutive_failures[position] >= MUX_RESET_FAILURE_THRESHOLD:
+        if self._consecutive_failures[position] >= I2C_MUX_RESET_FAILURES:
             print(f"⚠ {position}: {self._consecutive_failures[position]} consecutive I2C failures")
             return self._reset_i2c_mux()
 
@@ -656,7 +654,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         # Clean up GPIO for mux reset pin
         if self._mux_reset_available and GPIO_AVAILABLE:
             try:
-                GPIO.cleanup(MUX_RESET_PIN)
+                GPIO.cleanup(I2C_MUX_RESET_PIN)
             except Exception:
                 pass  # Ignore cleanup errors
 

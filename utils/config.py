@@ -91,6 +91,8 @@ BUTTON_VIEW_MODE = 3  # Switch between categories (camera pages ↔ UI pages)
 # I2C settings
 I2C_BUS = 1  # Default I2C bus on Raspberry Pi 4
 I2C_MUX_ADDRESS = 0x70  # TCA9548A default address
+I2C_MUX_RESET_PIN = 17  # GPIO pin for TCA9548A reset (active-low, uses internal pull-up)
+I2C_MUX_RESET_FAILURES = 3  # Consecutive failures before triggering mux reset
 
 # ==============================================================================
 # IMU Configuration (for G-meter)
