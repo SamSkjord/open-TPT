@@ -313,88 +313,113 @@ class Display:
             status_rect = status_text.get_rect(center=status_pos)
             self.surface.blit(status_text, status_rect)
 
-    def draw_brake_temp(self, position, temp):
-        # print(position, temp)
+    def draw_brake_temp(self, position, temp, inner_temp=None, outer_temp=None):
         """
-        Draw brake temperature visualization as a color scale.
+        Draw brake temperature visualisation as a colour scale.
+
+        Supports dual-zone display for inner/outer brake pads with gradient blending.
 
         Args:
             position: String key for brake position (FL, FR, RL, RR)
-            temp: Temperature value in current unit or None if no data available
+            temp: Single temperature or average (backward compatible)
+            inner_temp: Inner pad temperature (optional)
+            outer_temp: Outer pad temperature (optional)
         """
         if position not in BRAKE_POSITIONS:
             return
 
-        # Get position
         pos = BRAKE_POSITIONS[position]
+        rect_width = int(34 * SCALE_X)
+        rect_height = int(114 * SCALE_Y)
 
-        # Determine color based on temperature
+        # Check if we have dual-zone data
+        has_dual = inner_temp is not None and outer_temp is not None
+
+        if has_dual:
+            # Dual-zone: draw split rectangle with gradient blend
+            self._draw_brake_dual_zone(pos, rect_width, rect_height, inner_temp, outer_temp, position)
+        else:
+            # Single zone: use temp (or inner if only inner available)
+            single_temp = temp if temp is not None else inner_temp
+            color = self._get_brake_color(single_temp)
+            rect = pygame.Rect(
+                pos[0] - rect_width // 2,
+                pos[1] - rect_height // 2,
+                rect_width,
+                rect_height,
+            )
+            pygame.draw.rect(self.surface, color, rect, border_radius=3)
+
+    def _draw_brake_dual_zone(self, pos, width, height, inner_temp, outer_temp, position):
+        """Draw dual-zone brake heatmap with gradient blend in middle."""
+        inner_color = self._get_brake_color(inner_temp)
+        outer_color = self._get_brake_color(outer_temp)
+
+        # For left-side brakes (FL, RL): inner is on right, outer on left
+        # For right-side brakes (FR, RR): inner is on left, outer on right
+        is_left_side = position in ["FL", "RL"]
+
+        if is_left_side:
+            left_color = outer_color
+            right_color = inner_color
+        else:
+            left_color = inner_color
+            right_color = outer_color
+
+        # Create surface for gradient
+        brake_surface = pygame.Surface((width, height), pygame.SRCALPHA)
+
+        # Draw in 3 sections: left (40%), blend (20%), right (40%)
+        left_width = int(width * 0.4)
+        blend_width = int(width * 0.2)
+        right_width = width - left_width - blend_width
+
+        # Left section (solid colour)
+        pygame.draw.rect(brake_surface, left_color, (0, 0, left_width, height))
+
+        # Right section (solid colour)
+        pygame.draw.rect(brake_surface, right_color, (left_width + blend_width, 0, right_width, height))
+
+        # Blend section (gradient)
+        for x in range(blend_width):
+            ratio = x / blend_width
+            blended = (
+                int(left_color[0] * (1 - ratio) + right_color[0] * ratio),
+                int(left_color[1] * (1 - ratio) + right_color[1] * ratio),
+                int(left_color[2] * (1 - ratio) + right_color[2] * ratio),
+            )
+            pygame.draw.line(brake_surface, blended, (left_width + x, 0), (left_width + x, height - 1))
+
+        # Blit to main surface
+        self.surface.blit(brake_surface, (pos[0] - width // 2, pos[1] - height // 2))
+
+    def _get_brake_color(self, temp):
+        """Get colour for brake temperature."""
         if temp is None:
-            # Grey for no data available
-            color = GREY
+            return GREY
         elif temp < BRAKE_TEMP_MIN:
-            # Blue for cold (below min)
-            color = (0, 0, 255)
+            return (0, 0, 255)
         elif temp < BRAKE_TEMP_OPTIMAL - BRAKE_TEMP_OPTIMAL_RANGE:
-            # Blue to Green transition
             ratio = (temp - BRAKE_TEMP_MIN) / (
                 (BRAKE_TEMP_OPTIMAL - BRAKE_TEMP_OPTIMAL_RANGE) - BRAKE_TEMP_MIN
             )
-            color = (
-                0,  # R stays at 0
-                int(ratio * 255),  # G increases to 255
-                int(255 * (1 - ratio)),  # B decreases to 0
-            )
+            return (0, int(ratio * 255), int(255 * (1 - ratio)))
         elif temp <= BRAKE_TEMP_OPTIMAL + BRAKE_TEMP_OPTIMAL_RANGE:
-            # Green for optimal range
-            color = (0, 255, 0)
+            return (0, 255, 0)
         elif temp < BRAKE_TEMP_HOT:
-            # Green to Yellow transition
-            # Calculate how far we are between optimal+range and hot
             ratio = (temp - (BRAKE_TEMP_OPTIMAL + BRAKE_TEMP_OPTIMAL_RANGE)) / (
                 BRAKE_TEMP_HOT - (BRAKE_TEMP_OPTIMAL + BRAKE_TEMP_OPTIMAL_RANGE)
             )
-            color = (
-                int(ratio * 255),  # R increases to 255
-                255,  # G stays at 255
-                0,  # B stays at 0
-            )
-        elif (
-            temp < BRAKE_TEMP_HOT + BRAKE_TEMP_HOT_TO_BLACK
-        ):  # Transition to black past HOT
-            # Yellow/orange to red to black transition
+            return (int(ratio * 255), 255, 0)
+        elif temp < BRAKE_TEMP_HOT + BRAKE_TEMP_HOT_TO_BLACK:
             ratio = (temp - BRAKE_TEMP_HOT) / BRAKE_TEMP_HOT_TO_BLACK
-            if ratio < 0.3:  # First transition to red (yellow→red) - 30% of the way
-                color = (
-                    255,  # R stays at 255
-                    int(255 * (1 - ratio / 0.3)),  # G decreases to 0
-                    0,  # B stays at 0
-                )
-            else:  # Then transition to black (red→black) - remaining 70%
-                adjusted_ratio = (ratio - 0.3) / 0.7  # Scale 0.3-1.0 to 0-1.0
-                color = (
-                    int(255 * (1 - adjusted_ratio)),  # R decreases from 255 to 0
-                    0,  # G stays at 0
-                    0,  # B stays at 0
-                )
+            if ratio < 0.3:
+                return (255, int(255 * (1 - ratio / 0.3)), 0)
+            else:
+                adjusted_ratio = (ratio - 0.3) / 0.7
+                return (int(255 * (1 - adjusted_ratio)), 0, 0)
         else:
-            # Beyond transition range - black
-            color = (0, 0, 0)
-
-        # Draw a rectangular shape with the color to match the brake rotors in the overlay
-        # Scale the rectangle size based on the display scale factors
-        rect_width = int(34 * SCALE_X)
-        rect_height = int(114 * SCALE_Y)
-        rect = pygame.Rect(
-            pos[0] - rect_width // 2,
-            pos[1] - rect_height // 2,
-            rect_width,
-            rect_height,
-        )
-        pygame.draw.rect(self.surface, color, rect, border_radius=3)
-
-        # Add a border
-        # pygame.draw.rect(self.surface, BLACK, rect, width=1, border_radius=3)
+            return (0, 0, 0)
 
     def draw_tof_distance(self, position, distance, min_distance=None):
         """

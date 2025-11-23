@@ -1,5 +1,42 @@
 # Changelog - openTPT
 
+## [v0.14] - 2025-11-22
+
+### MCP9601 Thermocouple Brake Sensors 🌡️
+
+#### ✨ New Features
+
+- **MCP9601 thermocouple support** - K-type thermocouple amplifiers for brake temperature
+  - Supports dual sensors per corner (inner and outer brake pads)
+  - I2C addresses: 0x65 (inner), 0x66 (outer)
+  - Uses I2C multiplexer like other corner sensors
+
+- **Dual-zone brake heatmap display** - Split visualisation with gradient blending
+  - When both inner and outer sensors present, heatmap splits into two zones
+  - Smooth gradient blend in the middle (20% of width)
+  - Correct orientation: inner pad faces centre of car
+  - Falls back to single-zone display when only one sensor present
+
+- **Independent backoff per sensor type** - Extended from v0.13
+  - Tyre, brake, and TOF sensors each have fully separate backoff tracking
+
+#### ⚙️ Configuration
+
+New settings in `utils/config.py`:
+- `BRAKE_SENSOR_TYPES` - Now supports "mcp9601" option
+- `MCP9601_DUAL_ZONE` - Per-corner enable for dual sensors
+- `MCP9601_ADDRESSES` - I2C addresses for inner/outer sensors
+- `MCP9601_MUX_CHANNELS` - Mux channel mapping
+- `BRAKE_DUAL_ZONE_MOCK` - Test mode with animated mock data
+
+#### 📦 Dependencies
+
+```bash
+pip3 install --break-system-packages adafruit-circuitpython-mcp9600
+```
+
+---
+
 ## [v0.13] - 2025-11-22
 
 ### VL53L0X TOF Distance Sensors 📏

@@ -35,6 +35,9 @@ from utils.config import (
     TOF_SENSOR_ENABLED,
     TOF_MUX_CHANNELS,
     TOF_I2C_ADDRESS,
+    MCP9601_DUAL_ZONE,
+    MCP9601_ADDRESSES,
+    MCP9601_MUX_CHANNELS,
 )
 
 # Import for ADC hardware (ADS1115)
@@ -63,6 +66,14 @@ try:
     VL53L0X_AVAILABLE = True
 except ImportError:
     VL53L0X_AVAILABLE = False
+
+# Import for MCP9601 thermocouple amplifier
+try:
+    import adafruit_mcp9600
+
+    MCP9600_AVAILABLE = True
+except ImportError:
+    MCP9600_AVAILABLE = False
 
 # Import for I2C multiplexer
 try:
@@ -135,6 +146,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         # Sensor objects
         self.tyre_mlx_sensors = {}  # MLX90614 tyre sensors
         self.brake_mlx_sensors = {}  # MLX90614 brake sensors
+        self.brake_mcp_sensors = {}  # MCP9601 thermocouple sensors {position: {"inner": sensor, "outer": sensor}}
         self.tof_sensors = {}  # VL53L0X TOF distance sensors
 
         # Calibration for ADC brake sensors
@@ -424,6 +436,8 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         brake_type = self.brake_sensor_types.get(position)
         if brake_type == "mlx90614":
             self._init_brake_mlx90614(position, channel)
+        elif brake_type == "mcp9601":
+            self._init_brake_mcp9601(position, channel)
 
         # Initialize TOF distance sensor
         if TOF_ENABLED and TOF_SENSOR_ENABLED.get(position, False):
@@ -461,6 +475,41 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
                 print(f"  ✓ Brake MLX90614: {temp:.1f}°C")
         except Exception as e:
             print(f"  ✗ Brake MLX90614 error: {e}")
+
+    def _init_brake_mcp9601(self, position: str, channel: int):
+        """Initialise MCP9601 thermocouple brake sensor(s).
+
+        Supports dual sensors per corner (inner and outer brake pads).
+        """
+        if not self.mux or not MCP9600_AVAILABLE:
+            return
+
+        mux_channel = self.mux[channel]
+        self.brake_mcp_sensors[position] = {}
+        dual_zone = MCP9601_DUAL_ZONE.get(position, False)
+
+        # Always try to init inner sensor
+        try:
+            inner_addr = MCP9601_ADDRESSES["inner"]
+            inner_sensor = adafruit_mcp9600.MCP9600(mux_channel, address=inner_addr)
+            temp = inner_sensor.temperature
+            if temp is not None:
+                self.brake_mcp_sensors[position]["inner"] = inner_sensor
+                print(f"  ✓ Brake MCP9601 inner (0x{inner_addr:02X}): {temp:.1f}°C")
+        except Exception as e:
+            print(f"  ✗ Brake MCP9601 inner error: {e}")
+
+        # Try outer sensor if dual zone enabled
+        if dual_zone:
+            try:
+                outer_addr = MCP9601_ADDRESSES["outer"]
+                outer_sensor = adafruit_mcp9600.MCP9600(mux_channel, address=outer_addr)
+                temp = outer_sensor.temperature
+                if temp is not None:
+                    self.brake_mcp_sensors[position]["outer"] = outer_sensor
+                    print(f"  ✓ Brake MCP9601 outer (0x{outer_addr:02X}): {temp:.1f}°C")
+            except Exception as e:
+                print(f"  ✗ Brake MCP9601 outer error: {e}")
 
     def _test_pico_sensor(self, position: str, channel: int):
         """Test if Pico sensor is present."""
@@ -667,27 +716,50 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         return None
 
     def _read_brake_sensor(self, position: str) -> Dict:
-        """Read brake sensor for a position."""
+        """Read brake sensor for a position.
+
+        Returns dict with:
+          - temp: Single/average temperature (for backward compatibility)
+          - inner: Inner pad temperature (MCP9601 only)
+          - outer: Outer pad temperature (MCP9601 dual zone only)
+        """
         sensor_type = self.brake_sensor_types.get(position)
-        temp = None
+        result = {"temp": None, "inner": None, "outer": None}
 
         if sensor_type == "adc":
             temp = self._read_brake_adc(position)
+            if temp is not None:
+                result["temp"] = self._apply_brake_ema(position, temp)
+
         elif sensor_type == "mlx90614":
             temp = self._read_brake_mlx90614(position)
+            if temp is not None:
+                result["temp"] = self._apply_brake_ema(position, temp)
 
-        # Apply EMA smoothing
-        if temp is not None:
-            if self.brake_ema_state[position] is None:
-                self.brake_ema_state[position] = temp
-            else:
-                self.brake_ema_state[position] = (
-                    self.smoothing_alpha * temp
-                    + (1.0 - self.smoothing_alpha) * self.brake_ema_state[position]
-                )
-            temp = self.brake_ema_state[position]
+        elif sensor_type == "mcp9601":
+            inner, outer = self._read_brake_mcp9601(position)
+            result["inner"] = inner
+            result["outer"] = outer
+            # Average for backward compatibility, or just inner if no outer
+            if inner is not None and outer is not None:
+                result["temp"] = (inner + outer) / 2.0
+            elif inner is not None:
+                result["temp"] = inner
+            elif outer is not None:
+                result["temp"] = outer
 
-        return {"temp": temp}
+        return result
+
+    def _apply_brake_ema(self, position: str, temp: float) -> float:
+        """Apply EMA smoothing to brake temperature."""
+        if self.brake_ema_state[position] is None:
+            self.brake_ema_state[position] = temp
+        else:
+            self.brake_ema_state[position] = (
+                self.smoothing_alpha * temp
+                + (1.0 - self.smoothing_alpha) * self.brake_ema_state[position]
+            )
+        return self.brake_ema_state[position]
 
     def _read_brake_adc(self, position: str) -> Optional[float]:
         """Read brake temperature from ADC.
@@ -772,6 +844,69 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             return None
 
         return None
+
+    def _read_brake_mcp9601(self, position: str) -> tuple:
+        """Read MCP9601 thermocouple brake sensor(s).
+
+        Returns tuple of (inner_temp, outer_temp). Either may be None.
+        """
+        sensors = self.brake_mcp_sensors.get(position, {})
+        if not sensors or not self.mux:
+            return (None, None)
+
+        channel = MCP9601_MUX_CHANNELS.get(position)
+        if channel is None:
+            return (None, None)
+
+        # Skip if in brake-specific backoff period
+        if self._brake_backoff_until[position] > time.time():
+            return (None, None)
+
+        inner_temp = None
+        outer_temp = None
+
+        try:
+            with self._i2c_lock:
+                self.mux[channel]
+                time.sleep(0.005)
+
+                # Read inner sensor
+                if "inner" in sensors:
+                    try:
+                        temp = sensors["inner"].temperature
+                        if temp is not None and -40 <= temp <= 800:
+                            inner_temp = temp
+                    except Exception:
+                        pass
+
+                # Read outer sensor
+                if "outer" in sensors:
+                    try:
+                        temp = sensors["outer"].temperature
+                        if temp is not None and -40 <= temp <= 800:
+                            outer_temp = temp
+                    except Exception:
+                        pass
+
+            # Reset backoff if we got any reading
+            if inner_temp is not None or outer_temp is not None:
+                self._brake_consecutive_failures[position] = 0
+                self._brake_backoff_delay[position] = 0
+                self._brake_backoff_until[position] = 0
+
+        except (IOError, OSError, RuntimeError) as e:
+            # I2C communication errors - apply brake-specific backoff
+            self._brake_consecutive_failures[position] += 1
+            if self._brake_backoff_delay[position] == 0:
+                self._brake_backoff_delay[position] = self._BACKOFF_INITIAL
+            else:
+                self._brake_backoff_delay[position] = min(
+                    self._brake_backoff_delay[position] * self._BACKOFF_MULTIPLIER,
+                    self._BACKOFF_MAX,
+                )
+            self._brake_backoff_until[position] = time.time() + self._brake_backoff_delay[position]
+
+        return (inner_temp, outer_temp)
 
     def _read_tof_sensor(self, position: str) -> Dict:
         """Read VL53L0X TOF distance sensor for a position.

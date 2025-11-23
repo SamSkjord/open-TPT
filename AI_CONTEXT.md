@@ -2,7 +2,7 @@
 
 **Purpose:** This document provides essential context for AI assistants working on the openTPT project, enabling quick onboarding and effective collaboration.
 
-**Last Updated:** 2025-11-22 (v0.13)
+**Last Updated:** 2025-11-22 (v0.14)
 
 ---
 
@@ -29,7 +29,7 @@
 - **Project Path:** `/home/pi/open-TPT`
 - **Service:** `openTPT.service` (systemd, auto-start on boot)
 
-### Hardware Status (v0.13)
+### Hardware Status (v0.14)
 - ✅ **TPMS:** 4/4 sensors auto-paired (FL, FR, RL, RR)
 - ✅ **Multi-Camera:** Dual USB cameras with seamless switching
   - Rear camera: `/dev/video-rear` (USB port 1.1)
@@ -38,6 +38,9 @@
 - ✅ **Pico Thermal:** 1/4 MLX90640 connected (FL)
 - ✅ **TOF Distance:** VL53L0X sensors for ride height (1/4 connected - FR)
   - Shows current distance (EMA smoothed) and 10-second minimum (raw)
+- ✅ **Brake Temps:** MCP9601 thermocouple support added
+  - Dual-zone display (inner/outer pads) with gradient blending
+  - I2C addresses: 0x65 (inner), 0x66 (outer)
 - ✅ **Toyota Radar:** Enabled by default, receives 1-3 tracks
   - CAN channels: can_b1_0 (keep-alive), can_b1_1 (tracks)
 - ✅ **OBD2:** MAP-based SOC simulation for desk testing

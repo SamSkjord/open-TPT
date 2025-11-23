@@ -84,6 +84,8 @@ from utils.config import (
     THERMAL_STALE_TIMEOUT,
     # TOF distance sensor configuration
     TOF_ENABLED,
+    # Brake dual-zone mock data for testing
+    BRAKE_DUAL_ZONE_MOCK,
 )
 
 # Import unified corner sensor handler
@@ -998,17 +1000,39 @@ class OpenTPT:
             t0 = time.time()
             brake_temps = self.brakes.get_temps()
             now = time.time()
+
             for position, data in brake_temps.items():
-                temp = data.get("temp", None) if isinstance(data, dict) else data
-                if temp is not None:
+                if isinstance(data, dict):
+                    temp = data.get("temp")
+                    inner = data.get("inner")
+                    outer = data.get("outer")
+                else:
+                    temp = data
+                    inner = None
+                    outer = None
+
+                # Mock data for testing dual-zone display
+                if BRAKE_DUAL_ZONE_MOCK:
+                    import math
+                    t = now * 0.5  # Slow oscillation
+                    base = 150 + 100 * math.sin(t)
+                    inner = base + 30 * math.sin(t * 2)
+                    outer = base - 20 * math.sin(t * 2 + 1)
+                    temp = (inner + outer) / 2
+
+                if temp is not None or inner is not None:
                     # Fresh data - update cache and display
-                    self._brake_cache[position] = {"temp": temp, "timestamp": now}
-                    self.display.draw_brake_temp(position, temp)
+                    self._brake_cache[position] = {
+                        "temp": temp, "inner": inner, "outer": outer, "timestamp": now
+                    }
+                    self.display.draw_brake_temp(position, temp, inner, outer)
                 elif position in self._brake_cache:
                     # No fresh data - use cache if within timeout
                     cache = self._brake_cache[position]
                     if now - cache["timestamp"] < THERMAL_STALE_TIMEOUT:
-                        self.display.draw_brake_temp(position, cache["temp"])
+                        self.display.draw_brake_temp(
+                            position, cache.get("temp"), cache.get("inner"), cache.get("outer")
+                        )
                     else:
                         self.display.draw_brake_temp(position, None)
                 else:

@@ -450,12 +450,42 @@ RADAR_OVERTAKE_ARROW_DURATION = 1.0  # Duration to show arrow (seconds)
 # ==============================================================================
 
 # Per-corner brake sensor type selection
-# Options: "adc" for IR sensors via ADS1115, "mlx90614" for single-point IR, "obd" for CAN/OBD-II
+# Options: "adc" for IR sensors via ADS1115, "mlx90614" for single-point IR,
+#          "mcp9601" for thermocouple via MCP9601, "obd" for CAN/OBD-II
 BRAKE_SENSOR_TYPES = {
     "FL": "mlx90614",  # Front Left - MLX90614 IR sensor
     "FR": "adc",  # Front Right - ADC IR sensor
     "RL": "adc",  # Rear Left - ADC IR sensor
     "RR": "adc",  # Rear Right - ADC IR sensor
+}
+
+# MCP9601 Thermocouple Amplifier Configuration
+# Supports dual sensors per corner (inner and outer brake pads)
+# Set to True to enable dual-zone brake temperature monitoring
+MCP9601_DUAL_ZONE = {
+    "FL": False,  # Set True if both inner and outer sensors installed
+    "FR": False,
+    "RL": False,
+    "RR": False,
+}
+
+# Mock data for testing dual-zone brake display without hardware
+# Set to True to show animated test data for dual-zone brakes
+BRAKE_DUAL_ZONE_MOCK = False
+
+# MCP9601 I2C addresses (two per corner for inner/outer)
+MCP9601_ADDRESSES = {
+    "inner": 0x65,  # Inner pad sensor
+    "outer": 0x66,  # Outer pad sensor
+}
+
+# MCP9601 I2C multiplexer channel mapping
+# Shares same mux channels as other corner sensors
+MCP9601_MUX_CHANNELS = {
+    "FL": 0,  # Channel 0
+    "FR": 1,  # Channel 1
+    "RL": 2,  # Channel 2
+    "RR": 3,  # Channel 3
 }
 
 # ADC channel mapping for IR brake sensors (ADS1115)
