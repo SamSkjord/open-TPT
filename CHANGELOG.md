@@ -1,5 +1,41 @@
 # Changelog - openTPT
 
+## [v0.15] - 2025-11-23
+
+### Configuration File Reorganisation 📋
+
+#### ✨ Improvements
+
+- **Logical section grouping** - Config file reorganised into 10 clear sections:
+  1. Display & UI Settings
+  2. Colours & Assets
+  3. Unit Settings
+  4. I2C Hardware Configuration (all addresses grouped together)
+  5. Camera Configuration
+  6. Per-Corner Sensor Configuration (Tyre, Brake, TOF, Pressure)
+  7. IMU/G-Meter Configuration
+  8. CAN Bus Configuration (OBD2, Ford Hybrid, Radar)
+  9. Input Configuration
+  10. Helper Functions
+
+- **I2C addresses consolidated** - All I2C addresses now in single section:
+  - `I2C_BUS`, `I2C_MUX_ADDRESS`, `I2C_MUX_RESET_PIN`
+  - `ADS_ADDRESS`, `TOF_I2C_ADDRESS`
+  - `MCP9601_ADDRESSES`
+
+- **Sensor thresholds co-located** - Temperature/distance thresholds now adjacent to sensor configuration
+  - Tyre temp thresholds with tyre sensor config
+  - Brake temp thresholds with brake sensor config
+  - TOF distance thresholds with TOF sensor config
+
+- **Module docstring** - Added table of contents listing all sections
+
+#### 🔄 Modified Files
+
+- `utils/config.py` - Complete reorganisation (no functional changes)
+
+---
+
 ## [v0.14] - 2025-11-22
 
 ### MCP9601 Thermocouple Brake Sensors 🌡️
