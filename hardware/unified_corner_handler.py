@@ -214,6 +214,12 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             "RL": deque(maxlen=100),
             "RR": deque(maxlen=100),
         }
+        self._tof_reinit_count = {
+            "FL": 0,
+            "FR": 0,
+            "RL": 0,
+            "RR": 0,
+        }  # Track reinit attempts for logging
 
         # I2C error tracking for mux reset recovery (tyre sensors only)
         self._consecutive_failures = {
@@ -545,6 +551,55 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
                 print(f"  ✗ TOF VL53L0X: Invalid reading")
         except Exception as e:
             print(f"  ✗ TOF VL53L0X error: {e}")
+
+    def _reinit_tof_sensor(self, position: str) -> bool:
+        """Attempt to reinitialise a failed TOF sensor.
+
+        Returns True if reinitialisation succeeded, False otherwise.
+        """
+        if not self.mux or not VL53L0X_AVAILABLE:
+            return False
+
+        channel = TOF_MUX_CHANNELS.get(position)
+        if channel is None:
+            return False
+
+        self._tof_reinit_count[position] += 1
+
+        try:
+            with self._i2c_lock:
+                # Clear existing sensor reference
+                if position in self.tof_sensors:
+                    del self.tof_sensors[position]
+
+                # Select mux channel and wait for it to settle
+                mux_channel = self.mux[channel]
+                time.sleep(0.010)
+
+                # Create new sensor instance
+                sensor = adafruit_vl53l0x.VL53L0X(mux_channel, address=TOF_I2C_ADDRESS)
+
+                # Test read to verify sensor is working
+                distance = sensor.range
+
+            if distance is not None and 0 < distance < 8190:
+                self.tof_sensors[position] = sensor
+                self.tof_ema_state[position] = float(distance)
+                # Reset failure tracking
+                self._tof_consecutive_failures[position] = 0
+                self._tof_backoff_delay[position] = 0
+                self._tof_backoff_until[position] = 0
+                print(
+                    f"✓ TOF {position}: Reinitialised after {self._tof_reinit_count[position]} attempts"
+                )
+                return True
+
+        except Exception as e:
+            # Log only at key intervals
+            if self._tof_reinit_count[position] in (1, 3, 10, 50) or self._tof_reinit_count[position] % 100 == 0:
+                print(f"✗ TOF {position}: Reinit failed ({self._tof_reinit_count[position]}): {e}")
+
+        return False
 
     def _worker_loop(self):
         """
@@ -912,6 +967,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         """Read VL53L0X TOF distance sensor for a position.
 
         Returns distance in millimetres with EMA smoothing applied.
+        Includes retry/reinitialise logic with exponential backoff.
         """
         distance = None
 
@@ -919,9 +975,6 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         if not TOF_ENABLED or not TOF_SENSOR_ENABLED.get(position, False):
             return {"distance": None}
 
-        sensor = self.tof_sensors.get(position)
-        if not sensor:
-            return {"distance": None}
         if not self.mux:
             return {"distance": None}
 
@@ -931,7 +984,26 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
 
         # Skip if in TOF-specific backoff period
         if self._tof_backoff_until[position] > time.time():
+            # During backoff, return last known value for smoother display
             return {"distance": self.tof_ema_state.get(position)}
+
+        sensor = self.tof_sensors.get(position)
+
+        # If no sensor object, try to reinitialise
+        if not sensor:
+            if self._reinit_tof_sensor(position):
+                sensor = self.tof_sensors.get(position)
+            else:
+                # Apply backoff before next reinit attempt
+                if self._tof_backoff_delay[position] == 0:
+                    self._tof_backoff_delay[position] = self._BACKOFF_INITIAL
+                else:
+                    self._tof_backoff_delay[position] = min(
+                        self._tof_backoff_delay[position] * self._BACKOFF_MULTIPLIER,
+                        self._BACKOFF_MAX,
+                    )
+                self._tof_backoff_until[position] = time.time() + self._tof_backoff_delay[position]
+                return {"distance": None}
 
         try:
             with self._i2c_lock:
@@ -957,7 +1029,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
                         + (1.0 - self.smoothing_alpha) * self.tof_ema_state[position]
                     )
 
-                # Reset TOF backoff on success
+                # Reset TOF backoff and failure tracking on success
                 self._tof_consecutive_failures[position] = 0
                 self._tof_backoff_delay[position] = 0
                 self._tof_backoff_until[position] = 0
@@ -971,8 +1043,11 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
                 return {"distance": None}
 
         except (IOError, OSError, RuntimeError) as e:
-            # I2C communication errors - apply TOF-specific backoff
+            # I2C communication errors - track failure and apply backoff
             self._tof_consecutive_failures[position] += 1
+            failures = self._tof_consecutive_failures[position]
+
+            # Apply exponential backoff
             if self._tof_backoff_delay[position] == 0:
                 self._tof_backoff_delay[position] = self._BACKOFF_INITIAL
             else:
@@ -981,15 +1056,23 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
                     self._BACKOFF_MAX,
                 )
             self._tof_backoff_until[position] = time.time() + self._tof_backoff_delay[position]
-            # Only log first failure and at key intervals
-            if self._tof_consecutive_failures[position] in (1, 3, 10):
-                print(f"TOF {position}: I2C error: {e}")
+
+            # Log at key intervals
+            if failures in (1, 3, 10, 50) or failures % 100 == 0:
+                print(
+                    f"⚠ TOF {position}: {failures} failures, backoff {self._tof_backoff_delay[position]:.0f}s - {e}"
+                )
+
+            # Try to reinitialise after threshold failures
+            if failures >= I2C_MUX_RESET_FAILURES:
+                self._reinit_tof_sensor(position)
+
         except Exception as e:
             # Catch any other exceptions
             print(f"TOF {position}: unexpected error: {type(e).__name__}: {e}")
 
-        # Return None on error (display will show "--")
-        return {"distance": None}
+        # Return last known value on error for smoother display
+        return {"distance": self.tof_ema_state.get(position)}
 
     # Public API - Tyre data access (backward compatible)
     def get_thermal_data(self, position: str) -> Optional[np.ndarray]:
