@@ -2,7 +2,7 @@
 
 **Purpose:** This document provides essential context for AI assistants working on the openTPT project, enabling quick onboarding and effective collaboration.
 
-**Last Updated:** 2025-11-22 (v0.14)
+**Last Updated:** 2025-11-23 (v0.15)
 
 ---
 
@@ -24,10 +24,11 @@
 ## Current Production Environment
 
 ### Hardware Configuration
-- **Pi IP Address:** `192.168.199.247`
+- **Pi IP Address:** `192.168.199.243`
 - **User:** `pi`
 - **Project Path:** `/home/pi/open-TPT`
 - **Service:** `openTPT.service` (systemd, auto-start on boot)
+- **SSH/Sync:** Always use `pi@` prefix (e.g., `./tools/quick_sync.sh pi@192.168.199.243`)
 
 ### Hardware Status (v0.14)
 - ✅ **TPMS:** 4/4 sensors auto-paired (FL, FR, RL, RR)
@@ -151,21 +152,21 @@ openTPT/
 ### Deploying Changes
 ```bash
 # SSH to Pi and update via git
-ssh pi@192.168.199.247
+ssh pi@192.168.199.243
 cd /home/pi/open-TPT
 git pull
 sudo ./install.sh  # If dependencies changed
 
 # Quick sync (code only, for development)
-./tools/quick_sync.sh pi@192.168.199.247
+./tools/quick_sync.sh pi@192.168.199.243
 
 # Auto-deploy on save (requires fswatch)
-fswatch -o . | xargs -n1 -I{} ./tools/quick_sync.sh pi@192.168.199.247
+fswatch -o . | xargs -n1 -I{} ./tools/quick_sync.sh pi@192.168.199.243
 ```
 
 ### Testing on Pi
 ```bash
-ssh pi@192.168.199.247
+ssh pi@192.168.199.243
 cd /home/pi/open-TPT
 sudo ./main.py                    # Fullscreen mode
 sudo ./main.py --windowed         # Windowed mode
@@ -173,7 +174,7 @@ sudo ./main.py --windowed         # Windowed mode
 
 ### Service Management
 ```bash
-ssh pi@192.168.199.247
+ssh pi@192.168.199.243
 sudo systemctl status openTPT.service      # Check status
 sudo systemctl restart openTPT.service     # Restart
 sudo journalctl -u openTPT.service -f      # View logs
@@ -689,7 +690,7 @@ Prior to v0.11, the system would crash after ~6 hours of continuous operation on
 - Security fixes: Defensive thermal array shape validation
 - Brake rotor emissivity correction documentation
 - Fix for 6-hour runtime crash (pygame/SDL memory fragmentation)
-- Pi IP address updated to 192.168.199.247
+- Pi IP address updated to 192.168.199.243
 - Testing: GC frees 500-700 objects per cycle, system stable
 
 ### v0.10 (2025-11-20) - Toyota Radar Integration
@@ -851,7 +852,7 @@ Before marking work complete:
 - Logs: `sudo journalctl -u openTPT.service`
 
 ### Network
-- Pi IP: `192.168.199.247`
+- Pi IP: `192.168.199.243`
 - User: `pi`
 - Project path: `/home/pi/open-TPT`
 - Service name: `openTPT.service`
