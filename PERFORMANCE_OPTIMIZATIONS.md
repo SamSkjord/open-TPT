@@ -1,6 +1,6 @@
 # Performance Optimizations - openTPT
 
-> **Note:** This document describes the v0.6 refactoring. As of v0.8, the architecture has evolved further with the `unified_corner_handler` replacing individual tyre handlers. See AI_CONTEXT.md for current architecture.
+> **Note:** This document describes the v0.6 refactoring. As of v0.8, the architecture has evolved further with the `unified_corner_handler` replacing individual tyre handlers. See clade.md for current architecture.
 
 ## Overview
 

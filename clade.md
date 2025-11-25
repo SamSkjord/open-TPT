@@ -1,6 +1,6 @@
-# AI Assistant Context - openTPT Project
+# Claude Context - openTPT Project
 
-**Purpose:** This document provides essential context for AI assistants working on the openTPT project, enabling quick onboarding and effective collaboration.
+**Purpose:** This document provides essential context for Claude AI working on the openTPT project, enabling quick onboarding and effective collaboration.
 
 **Last Updated:** 2025-11-24 (v0.15.1)
 
@@ -803,7 +803,7 @@ Quick reference for finding information:
 | CAN setup | `WAVESHARE_DUAL_CAN_HAT_SETUP.md` |
 | Performance details | `PERFORMANCE_OPTIMIZATIONS.md` |
 | Future planning | `open-TPT_System_Plan.md` |
-| AI context | `AI_CONTEXT.md` (this file) |
+| AI context | `clade.md` (this file) |
 
 ---
 

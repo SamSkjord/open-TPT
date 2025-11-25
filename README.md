@@ -473,7 +473,7 @@ openTPT/
 | `WAVESHARE_DUAL_CAN_HAT_SETUP.md` | CAN hardware configuration |
 | `CHANGELOG.md` | Version history and features |
 | `open-TPT_System_Plan.md` | Long-term architecture plan |
-| `AI_CONTEXT.md` | AI assistant onboarding guide |
+| `clade.md` | AI assistant onboarding guide |
 
 ## License
 
