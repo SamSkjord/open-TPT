@@ -184,6 +184,410 @@ sudo journalctl -u openTPT.service -f      # View logs
 
 ---
 
+## I2C Hardware Map
+
+Complete reference for all I2C devices and channels.
+
+### I2C Addresses
+
+| Address | Device | Purpose |
+|---------|--------|---------|
+| `0x08` | Pico (RP2040) | MLX90640 thermal camera slave (per corner) |
+| `0x29` | VL53L0X | TOF distance sensor (ride height, per corner) |
+| `0x48` | ADS1115 | 4-channel ADC for IR brake sensors |
+| `0x5A` | MLX90614 | Single-point IR sensor (tyre or brake, per corner) |
+| `0x65` | MCP9601 | Thermocouple amplifier (brake inner pad) |
+| `0x66` | MCP9601 | Thermocouple amplifier (brake outer pad) |
+| `0x68` | ICM20649 | IMU for G-meter |
+| `0x70` | TCA9548A | I2C multiplexer (8 channels) |
+
+### Mux Channel Assignments
+
+All per-corner sensors share the same mux channel for their corner:
+
+| Channel | Position | Devices on Channel |
+|---------|----------|-------------------|
+| 0 | FL | Pico (0x08), MLX90614 (0x5A), VL53L0X (0x29), MCP9601 (0x65/0x66) |
+| 1 | FR | Pico (0x08), MLX90614 (0x5A), VL53L0X (0x29), MCP9601 (0x65/0x66) |
+| 2 | RL | Pico (0x08), MLX90614 (0x5A), VL53L0X (0x29), MCP9601 (0x65/0x66) |
+| 3 | RR | Pico (0x08), MLX90614 (0x5A), VL53L0X (0x29), MCP9601 (0x65/0x66) |
+
+**Note:** Only one sensor type per corner is typically installed, but they all share the same I2C addresses and mux channels. The mux isolates them so address conflicts don't occur.
+
+### GPIO Pins
+
+| GPIO | Function | Notes |
+|------|----------|-------|
+| GPIO2 (SDA) | I2C1 Data | Main I2C bus for all sensors |
+| GPIO3 (SCL) | I2C1 Clock | Main I2C bus for all sensors |
+| GPIO17 | TCA9548A Reset | Active-low, has internal pull-up |
+
+### Mux Selection Commands
+
+To select a mux channel (useful for debugging):
+```bash
+# FL (channel 0): write 0x01 (1 << 0)
+sudo i2cset -y 1 0x70 0x01
+
+# FR (channel 1): write 0x02 (1 << 1)
+sudo i2cset -y 1 0x70 0x02
+
+# RL (channel 2): write 0x04 (1 << 2)
+sudo i2cset -y 1 0x70 0x04
+
+# RR (channel 3): write 0x08 (1 << 3)
+sudo i2cset -y 1 0x70 0x08
+
+# Disable all channels: write 0x00
+sudo i2cset -y 1 0x70 0x00
+```
+
+---
+
+## Pico I2C Register Map
+
+The Pico (RP2040) acts as an I2C slave at address `0x08`, providing thermal camera data.
+
+### Register Layout
+
+#### Configuration Registers (0x00-0x0F) - Read/Write
+
+| Register | Name | Description |
+|----------|------|-------------|
+| 0x00 | Firmware Version | Read-only firmware version number |
+| 0x01 | Output Mode | 0x00=USB serial, 0x01=I2C only, 0xFF=all |
+| 0x02 | Frame Rate | Target frame rate (future use) |
+| 0x03 | Fallback Mode | 0=zero temps when no tyre, 1=copy centre temp |
+| 0x04 | Emissivity | Emissivity × 100 (e.g., 95 = 0.95) |
+| 0x05 | Raw Mode | 0=tyre algorithm, 1=16-channel raw data |
+
+#### Status Registers (0x10-0x1F) - Read Only
+
+| Register | Name | Description |
+|----------|------|-------------|
+| 0x10 | Firmware Version | Same as 0x00 |
+| 0x11 | Frame Counter Low | Frame number (low byte) |
+| 0x12 | Frame Counter High | Frame number (high byte) |
+| 0x13 | FPS | Current frame rate (integer) |
+| 0x14 | **Detected** | **Tyre detected flag (0/1)** |
+| 0x15 | **Confidence** | **Detection confidence (0-100%)** |
+| 0x16 | Tyre Width | Tyre width in pixels |
+| 0x17 | Span Start | Tyre span start pixel |
+| 0x18 | Span End | Tyre span end pixel |
+| 0x19 | Warnings | Warning flags bitfield |
+
+#### Temperature Registers (0x20-0x2D) - Read Only
+
+| Register | Name | Description |
+|----------|------|-------------|
+| 0x20-0x21 | **Left Median** | **Left/inner temperature (int16, tenths °C)** |
+| 0x22-0x23 | **Centre Median** | **Centre temperature (int16, tenths °C)** |
+| 0x24-0x25 | **Right Median** | **Right/outer temperature (int16, tenths °C)** |
+| 0x26-0x27 | Left Average | Left average temperature |
+| 0x28-0x29 | Centre Average | Centre average temperature |
+| 0x2A-0x2B | Right Average | Right average temperature |
+| 0x2C-0x2D | Lateral Gradient | Temperature gradient across tyre |
+
+**Note:** All temperatures are signed int16 (little-endian) in tenths of degrees Celsius. To convert: `temp_celsius = int16_value / 10.0`
+
+#### Raw Channel Data (0x30-0x4F) - Read Only
+
+16 channels × 2 bytes when RAW_MODE=1 enabled. Each channel is int16 tenths of °C.
+
+---
+
+## Debug One-liners
+
+Quick commands for hardware debugging.
+
+### Pico Tyre Sensor (FL Example)
+
+Read full sensor packet (temps, detected, confidence):
+
+```bash
+sudo python3 -c "
+from smbus2 import SMBus
+import time
+
+bus = SMBus(1)
+bus.write_byte(0x70, 1)  # FL: channel 0
+time.sleep(0.01)
+
+def read_int16(reg):
+    low = bus.read_byte_data(0x08, reg)
+    high = bus.read_byte_data(0x08, reg + 1)
+    val = (high << 8) | low
+    return (val - 65536 if val & 0x8000 else val) / 10.0
+
+fw_ver = bus.read_byte_data(0x08, 0x10)
+detected = bus.read_byte_data(0x08, 0x14)
+confidence = bus.read_byte_data(0x08, 0x15)
+left = read_int16(0x20)
+centre = read_int16(0x22)
+right = read_int16(0x24)
+
+det_str = 'YES' if detected else 'NO'
+print(f'FL Pico (FW v{fw_ver}):')
+print(f'  Left:   {left:.1f}°C')
+print(f'  Centre: {centre:.1f}°C')
+print(f'  Right:  {right:.1f}°C')
+print(f'  Detected: {det_str}')
+print(f'  Confidence: {confidence}%')
+"
+```
+
+**Change mux channel for other corners:**
+- FL: `bus.write_byte(0x70, 1)` (channel 0)
+- FR: `bus.write_byte(0x70, 2)` (channel 1)
+- RL: `bus.write_byte(0x70, 4)` (channel 2)
+- RR: `bus.write_byte(0x70, 8)` (channel 3)
+
+### TOF Distance Sensor
+
+Quick check TOF sensor on FR (channel 1):
+
+```bash
+sudo python3 -c "
+import board, busio, adafruit_tca9548a, adafruit_vl53l0x
+i2c = busio.I2C(board.SCL, board.SDA)
+mux = adafruit_tca9548a.TCA9548A(i2c)
+tof = adafruit_vl53l0x.VL53L0X(mux[1])  # FR = channel 1
+print(f'FR TOF: {tof.range}mm')
+"
+```
+
+### I2C Device Scan
+
+Scan all devices on the bus (no mux):
+
+```bash
+sudo i2cdetect -y 1
+```
+
+Scan devices on mux channel 0 (FL):
+
+```bash
+# Select channel first
+sudo i2cset -y 1 0x70 0x01
+# Then scan
+sudo i2cdetect -y 1
+```
+
+### Check I2C Bus Health
+
+```bash
+# Check for errors
+dmesg | grep -i i2c | tail -20
+
+# Check bus speed
+sudo cat /sys/class/i2c-adapter/i2c-1/of_node/clock-frequency
+```
+
+---
+
+## Log Analysis Tips
+
+Useful journalctl commands for debugging specific issues.
+
+### TOF Sensor Logs
+
+```bash
+# Real-time TOF messages
+sudo journalctl -u openTPT.service -f | grep -iE "tof|distance|reinit"
+
+# TOF initialization and errors (last hour)
+sudo journalctl -u openTPT.service --since "1 hour ago" --no-pager | grep -i "tof\|vl53l0x"
+
+# TOF failures and recovery
+sudo journalctl -u openTPT.service --since "30 minutes ago" --no-pager | grep -E "TOF.*failures|Reinitialised"
+```
+
+### Pico/Tyre Sensor Logs
+
+```bash
+# Pico sensor errors and recovery
+sudo journalctl -u openTPT.service --since "30 minutes ago" --no-pager | grep -iE "pico|mlx90614|failures|recovered"
+
+# Pico initialization
+sudo journalctl -u openTPT.service -b --no-pager | grep -E "Pico sensor|Channel [0-3]:"
+
+# I2C mux reset events
+sudo journalctl -u openTPT.service --since "1 hour ago" --no-pager | grep "mux reset"
+```
+
+### Brake Sensor Logs
+
+```bash
+# Brake temperature sensors
+sudo journalctl -u openTPT.service --since "30 minutes ago" --no-pager | grep -iE "brake|mcp9601"
+```
+
+### IMU/G-Meter Logs
+
+```bash
+# IMU errors
+sudo journalctl -u openTPT.service --since "10 minutes ago" --no-pager | grep -i "imu"
+```
+
+### Performance Logs
+
+```bash
+# Render timing (shows which components are slow)
+sudo journalctl -u openTPT.service --since "5 minutes ago" --no-pager | grep "Render profile"
+
+# Loop timing
+sudo journalctl -u openTPT.service --since "5 minutes ago" --no-pager | grep "Loop profile"
+
+# Memory stats
+sudo journalctl -u openTPT.service --since "10 minutes ago" --no-pager | grep -E "Memory|GPU"
+```
+
+### General Sensor Status
+
+```bash
+# All sensor-related messages (last 10 mins)
+sudo journalctl -u openTPT.service --since "10 minutes ago" --no-pager | grep -E "FL|FR|RL|RR|sensor|failures"
+
+# Startup initialization sequence
+sudo journalctl -u openTPT.service -b --no-pager | grep -A 5 "Initializing Unified Corner Handler"
+
+# Recent logs (last 100 lines)
+sudo journalctl -u openTPT.service -n 100 --no-pager
+```
+
+### Filtering by Corner
+
+```bash
+# FL sensor messages only
+sudo journalctl -u openTPT.service --since "30 minutes ago" --no-pager | grep "FL"
+
+# All corners with failures
+sudo journalctl -u openTPT.service --since "30 minutes ago" --no-pager | grep -E "(FL|FR|RL|RR).*failures"
+```
+
+---
+
+## Known Issues & Workarounds
+
+### IMU I/O Errors (Recurring)
+
+**Symptom:** Logs show `IMU: Error reading sensor: [Errno 5] Input/output error`
+
+**Impact:** G-meter may show stale/frozen data temporarily
+
+**Cause:** ICM20649 IMU occasionally fails to respond on I2C bus
+
+**Workaround:**
+- Non-critical - system continues operating
+- IMU will retry on next read cycle
+- If persistent, restart service: `sudo systemctl restart openTPT.service`
+
+**Status:** Known issue, does not affect critical telemetry (tyres/brakes)
+
+### TOF Sensor Dropouts (Mitigated in v0.15.1)
+
+**Symptom:** Distance reading freezes or shows "--"
+
+**Cause:** VL53L0X sensors occasionally lose I2C communication
+
+**Solution:** Automatic retry/reinitialise implemented in v0.15.1
+- Exponential backoff: 1s → 2s → 4s → 8s → 16s → 32s → 64s max
+- Recreates sensor object after 3 consecutive failures
+- Logs: `✓ TOF FR: Reinitialised after N attempts`
+
+**Manual Check:**
+```bash
+# Check if TOF sensor responds
+sudo python3 -c "import board, busio, adafruit_tca9548a, adafruit_vl53l0x; i2c = busio.I2C(board.SCL, board.SDA); mux = adafruit_tca9548a.TCA9548A(i2c); tof = adafruit_vl53l0x.VL53L0X(mux[1]); print(f'TOF: {tof.range}mm')"
+```
+
+### I2C Bus Lockup (Rare, Mitigated in v0.12)
+
+**Symptom:** All I2C sensors stop responding, system logs I2C errors
+
+**Cause:** Pico or sensor holding SDA line low due to interrupted transaction
+
+**Solution (Automatic):**
+- Hardware mux reset on GPIO17 (added in v0.12)
+- Triggers after 3 consecutive failures per corner
+- Logs: `⚠ I2C mux reset triggered (total resets: N)`
+
+**Solution (Manual):**
+```bash
+# Restart service (soft recovery)
+sudo systemctl restart openTPT.service
+
+# If that doesn't work, power cycle the Pi
+sudo reboot
+```
+
+### Thermal Heatmap Flashing Grey/Offline
+
+**Symptom:** Tyre or brake heatmap briefly shows grey or "OFFLINE"
+
+**Cause:** Sensor read took >1 second (exceeded `THERMAL_STALE_TIMEOUT`)
+
+**Normal Behavior:** System caches last valid data for 1 second, then shows offline
+- Usually self-recovers when sensor responds again
+- Check logs for sensor-specific failures
+
+**If Persistent:**
+```bash
+# Check which sensor is failing
+sudo journalctl -u openTPT.service -f | grep -E "failures|backoff"
+```
+
+### Brake Temperatures Reading Low/High
+
+**Symptom:** Brake temps don't match expected values
+
+**Check Emissivity Settings:**
+- MLX90614/ADC brake sensors use software emissivity correction
+- Default: 0.95 (oxidised cast iron)
+- Adjust in `utils/config.py`: `BRAKE_ROTOR_EMISSIVITY`
+
+**Typical Values:**
+- Cast iron (rusty/oxidised): 0.95
+- Cast iron (machined/clean): 0.60-0.70
+- Ceramic composite: 0.90-0.95
+
+See "Brake Temperature Emissivity Correction" section for details.
+
+### System Shows Power Issues (throttled=0x50000)
+
+**Symptom:** Status bar shows throttling warning
+
+**Cause:** Insufficient power supply or voltage drop
+
+**Check Power:**
+```bash
+vcgencmd get_throttled
+# 0x0 = OK
+# 0x50000 = under-voltage occurred since boot
+```
+
+**Solution:**
+- Use official Raspberry Pi power supply (5V 3A minimum)
+- Check USB-C cable quality
+- For PoE: Ensure PoE+ HAT and switch support 802.3at (25.5W)
+
+### Long Runtime Crashes (Fixed in v0.11)
+
+**Symptom:** System crashes or becomes unresponsive after 6+ hours
+
+**Status:** Fixed in v0.11 with periodic garbage collection and surface cache clearing
+
+**If Still Occurring:**
+```bash
+# Check memory stats
+sudo journalctl -u openTPT.service --since "1 hour ago" | grep -E "Memory|GPU"
+
+# Restart service as temporary workaround
+sudo systemctl restart openTPT.service
+```
+
+---
+
 ## Configuration System
 
 ### Primary Config File: `utils/config.py`
