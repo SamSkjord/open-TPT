@@ -2,7 +2,7 @@
 
 **Purpose:** This document provides essential context for AI assistants working on the openTPT project, enabling quick onboarding and effective collaboration.
 
-**Last Updated:** 2025-11-23 (v0.15)
+**Last Updated:** 2025-11-24 (v0.15.1)
 
 ---
 
@@ -30,7 +30,7 @@
 - **Service:** `openTPT.service` (systemd, auto-start on boot)
 - **SSH/Sync:** Always use `pi@` prefix (e.g., `./tools/quick_sync.sh pi@192.168.199.243`)
 
-### Hardware Status (v0.14)
+### Hardware Status (v0.15.1)
 - ✅ **TPMS:** 4/4 sensors auto-paired (FL, FR, RL, RR)
 - ✅ **Multi-Camera:** Dual USB cameras with seamless switching
   - Rear camera: `/dev/video-rear` (USB port 1.1)
@@ -39,6 +39,8 @@
 - ✅ **Pico Thermal:** 1/4 MLX90640 connected (FL)
 - ✅ **TOF Distance:** VL53L0X sensors for ride height (1/4 connected - FR)
   - Shows current distance (EMA smoothed) and 10-second minimum (raw)
+  - Automatic retry/reinitialise with exponential backoff (fixes dropouts)
+  - Recreates sensor object after 3 consecutive I2C failures
 - ✅ **Brake Temps:** MCP9601 thermocouple support added
   - Dual-zone display (inner/outer pads) with gradient blending
   - I2C addresses: 0x65 (inner), 0x66 (outer)
@@ -670,6 +672,32 @@ Prior to v0.11, the system would crash after ~6 hours of continuous operation on
 ---
 
 ## Version History Quick Reference
+
+### v0.15.1 (2025-11-24) - TOF Sensor Reliability
+- TOF sensors: Automatic retry/reinitialise with exponential backoff
+- Recreates sensor object after 3 consecutive I2C failures (fixes dropouts)
+- Returns last known value during backoff for smoother display
+- Logs recovery attempts: `✓ TOF FR: Reinitialised after N attempts`
+- One-liner debug tool for Pico sensors: reads temps, detected flag, confidence
+
+### v0.15 (2025-11-23) - Configuration Reorganisation
+- Config file reorganised into 10 logical sections with table of contents
+- All I2C addresses consolidated into single section
+- Sensor thresholds co-located with sensor configuration
+- Pi IP updated to 192.168.199.243
+- SSH note: Always use `pi@` prefix for connections
+
+### v0.14 (2025-11-22) - MCP9601 Thermocouple Brake Sensors
+- MCP9601 thermocouple support for brake temperature
+- Dual-zone brake display (inner/outer pads) with gradient blending
+- I2C addresses: 0x65 (inner), 0x66 (outer)
+- Separate backoff tracking extended to brake sensors
+
+### v0.13 (2025-11-22) - VL53L0X TOF Distance Sensors
+- VL53L0X Time-of-Flight sensors for ride height monitoring
+- Displays current distance (EMA smoothed) and 10-second minimum (raw)
+- Separate backoff tracking per sensor type (tyre/brake/TOF)
+- Graceful handling when sensors out of range
 
 ### v0.12 (2025-11-22) - I2C Bus Reliability Fix
 - Added threading lock to serialise I2C access between smbus2 and busio
