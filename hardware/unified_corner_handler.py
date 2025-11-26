@@ -1137,8 +1137,10 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         cutoff = now - self._tof_min_window
 
         # Filter to readings within the time window
+        # Take a snapshot to avoid "deque mutated during iteration" from background thread
+        history_snapshot = list(self._tof_history[position])
         valid_readings = [
-            dist for ts, dist in self._tof_history[position]
+            dist for ts, dist in history_snapshot
             if ts >= cutoff
         ]
 
