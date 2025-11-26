@@ -650,9 +650,21 @@ class OpenTPT:
             print("\nExiting gracefully...")
         except Exception as e:
             import traceback
+            import sys
 
             print(f"Error in main loop: {e}")
+            print("Full traceback:")
             traceback.print_exc()
+            sys.stdout.flush()
+            sys.stderr.flush()
+            # Also write to file for persistent debugging
+            try:
+                with open("/tmp/opentpt_crash.log", "w") as f:
+                    f.write(f"Error: {e}\n\n")
+                    traceback.print_exc(file=f)
+                print("Crash log written to /tmp/opentpt_crash.log")
+            except Exception:
+                pass
         finally:
             self._cleanup()
 

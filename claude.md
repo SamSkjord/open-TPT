@@ -389,6 +389,21 @@ sudo cat /sys/class/i2c-adapter/i2c-1/of_node/clock-frequency
 
 Useful journalctl commands for debugging specific issues.
 
+### Crash Debugging
+
+```bash
+# Watch crash log file (written on application crash)
+tail -f /tmp/opentpt_crash.log
+
+# Follow live service logs in real-time
+sudo journalctl -u openTPT.service -f
+
+# View last 100 lines of service logs
+sudo journalctl -u openTPT.service -n 100 --no-pager
+```
+
+**Note:** The crash log (`/tmp/opentpt_crash.log`) is only written when the application crashes. For live debugging, use `journalctl -f` to follow logs in real-time.
+
 ### TOF Sensor Logs
 
 ```bash
