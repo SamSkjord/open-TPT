@@ -210,6 +210,9 @@ class Display:
         Returns:
             RGB color tuple
         """
+        if temp is None:
+            return GREY
+
         if temp < TYRE_TEMP_COLD:
             return BLUE  # Too cold
         elif temp < TYRE_TEMP_OPTIMAL - TYRE_TEMP_OPTIMAL_RANGE:

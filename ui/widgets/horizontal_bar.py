@@ -77,6 +77,12 @@ class HorizontalBar:
 
     def _get_colour_for_value(self, value):
         """Get colour for a specific value based on zones."""
+        if not self.colour_zones:
+            return (128, 128, 128)  # Default grey if no zones defined
+
+        if value is None:
+            return (128, 128, 128)  # Default grey if value is None
+
         for i, (threshold, colour) in enumerate(self.colour_zones):
             if value < threshold:
                 # Return previous colour (or first colour if before first threshold)
@@ -96,10 +102,10 @@ class HorizontalBar:
 
         # Calculate bar fill percentage
         value_range = self.max_value - self.min_value
-        if value_range > 0:
-            fill_percent = (self.value - self.min_value) / value_range
-        else:
+        if self.value is None or value_range <= 0:
             fill_percent = 0
+        else:
+            fill_percent = (self.value - self.min_value) / value_range
 
         # Calculate bar width from centre (symmetric)
         centre_x = self.x + self.width // 2
@@ -192,12 +198,12 @@ class DualDirectionBar(HorizontalBar):
 
         # Calculate bar fill
         value_range = self.max_value - self.min_value
-        if value_range > 0:
+        if self.value is None or value_range <= 0:
+            fill_offset = 0
+        else:
             fill_percent = (self.value - self.min_value) / value_range
             # Map to -0.5 to +0.5 range (0 = centre)
             fill_offset = fill_percent - 0.5
-        else:
-            fill_offset = 0
 
         # Calculate bar half-width (grows symmetrically from centre)
         bar_half_width = int((self.width // 2) * abs(fill_offset) * 2)

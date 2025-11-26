@@ -241,8 +241,9 @@ class IMUHandler(BoundedQueueHardwareHandler):
             except Exception as e:
                 self.consecutive_errors += 1
 
-                # Only print error message occasionally to avoid log spam
-                if self.consecutive_errors == 1:
+                # Only print error message after multiple consecutive failures to reduce log spam
+                # Single errors are common due to I2C bus contention and recover immediately
+                if self.consecutive_errors == 3:
                     print(f"IMU: Error reading sensor: {e}")
                 elif self.consecutive_errors == self.max_consecutive_errors:
                     print(f"IMU: {self.max_consecutive_errors} consecutive errors - hardware may be disconnected")

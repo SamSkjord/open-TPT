@@ -1,5 +1,33 @@
 # Changelog - openTPT
 
+## [v0.15.2] - 2025-11-26
+
+### Bug Fixes & Stability Improvements 🐛
+
+#### 🔧 Bug Fixes
+
+- **Fixed intermittent "invalid color argument" crash** - Added None checks to colour calculations:
+  - `gui/display.py`: `get_color_for_temp()` now returns GREY for None values
+  - `ui/widgets/horizontal_bar.py`: `_get_colour_for_value()` handles empty zones and None values
+  - `ui/widgets/horizontal_bar.py`: `HorizontalBar.draw()` and `DualDirectionBar.draw()` handle None values
+
+- **Improved crash logging** - Full traceback now written to `/tmp/opentpt_crash.log` on crash for easier debugging
+
+#### ✨ Improvements
+
+- **Reduced IMU log spam** - IMU I2C errors now only logged after 3+ consecutive failures (was 1)
+  - Single errors from I2C bus contention are common and recover immediately
+  - Prevents log flooding while still reporting persistent issues
+
+#### 🔄 Modified Files
+
+- `main.py` - Added crash log file output
+- `gui/display.py` - Added None check to `get_color_for_temp()`
+- `ui/widgets/horizontal_bar.py` - Added None/empty checks to colour and draw methods
+- `hardware/imu_handler.py` - Changed error log threshold from 1 to 3
+
+---
+
 ## [v0.15] - 2025-11-23
 
 ### Configuration File Reorganisation 📋

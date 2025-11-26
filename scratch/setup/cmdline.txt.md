@@ -1,1 +1,3 @@
 console=serial0,115200 console=tty1 root=PARTUUID=f2447cd7-02 rootfstype=ext4 fsck.repair=yes rootwait cfg80211.ieee80211_regdom=GB logo.nologo loglevel=3 vt.global_cursor_default=0
+
+console=serial0,115200 console=tty1 root=PARTUUID=f2447cd7-02 rootfstype=ext4 fsck.repair=yes rootwait cfg80211.ieee80211_regdom=GB quiet loglevel=0 logo.nologo vt.global_cursor_default=0
