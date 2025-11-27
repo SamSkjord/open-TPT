@@ -1090,97 +1090,6 @@ Prior to v0.11, the system would crash after ~6 hours of continuous operation on
 
 ---
 
-## Version History Quick Reference
-
-### v0.15.1 (2025-11-24) - TOF Sensor Reliability
-- TOF sensors: Automatic retry/reinitialise with exponential backoff
-- Recreates sensor object after 3 consecutive I2C failures (fixes dropouts)
-- Returns last known value during backoff for smoother display
-- Logs recovery attempts: `✓ TOF FR: Reinitialised after N attempts`
-- One-liner debug tool for Pico sensors: reads temps, detected flag, confidence
-
-### v0.15 (2025-11-23) - Configuration Reorganisation
-- Config file reorganised into 10 logical sections with table of contents
-- All I2C addresses consolidated into single section
-- Sensor thresholds co-located with sensor configuration
-- Pi IP updated to 192.168.199.243
-- SSH note: Always use `pi@` prefix for connections
-
-### v0.14 (2025-11-22) - MCP9601 Thermocouple Brake Sensors
-- MCP9601 thermocouple support for brake temperature
-- Dual-zone brake display (inner/outer pads) with gradient blending
-- I2C addresses: 0x65 (inner), 0x66 (outer)
-- Separate backoff tracking extended to brake sensors
-
-### v0.13 (2025-11-22) - VL53L0X TOF Distance Sensors
-- VL53L0X Time-of-Flight sensors for ride height monitoring
-- Displays current distance (EMA smoothed) and 10-second minimum (raw)
-- Separate backoff tracking per sensor type (tyre/brake/TOF)
-- Graceful handling when sensors out of range
-
-### v0.12 (2025-11-22) - I2C Bus Reliability Fix
-- Added threading lock to serialise I2C access between smbus2 and busio
-- Prevents bus lockups that required power cycling to recover
-- Protected methods: `_read_pico_sensor`, `_read_tyre_mlx90614`, `_read_brake_adc`, `_read_brake_mlx90614`
-- Pico firmware v1.1: Minimal critical section + 5-second watchdog timer
-- Hardware mux reset: Connect TCA9548A RESET to GPIO17 for auto-recovery
-- Stale data caching: Thermal/brake heatmaps cache last valid data for up to 1 second (`THERMAL_STALE_TIMEOUT`)
-- Exponential backoff: Failed sensors back off 1s→2s→4s→...→64s max, prevents bus hammering
-
-### v0.11 (2025-11-21) - Long Runtime Stability & Security Fixes
-- Voltage monitoring at startup and every 60 seconds
-- Periodic garbage collection (every 60s) for memory stability
-- Pygame surface cache clearing (every 10 minutes)
-- Security fixes: CAN bus array access bounds checking
-- Security fixes: Replaced bare except clauses with specific exceptions
-- Security fixes: Input validation for emissivity correction
-- Security fixes: Defensive thermal array shape validation
-- Brake rotor emissivity correction documentation
-- Fix for 6-hour runtime crash (pygame/SDL memory fragmentation)
-- Pi IP address updated to 192.168.199.243
-- Testing: GC frees 500-700 objects per cycle, system stable
-
-### v0.10 (2025-11-20) - Toyota Radar Integration
-- Toyota radar overlay enabled by default
-- Real-time collision warnings on rear camera
-- 3x larger solid-filled chevrons (120×108px)
-- Track detection (1-3 vehicles within 120m)
-- CAN channel configuration (can_b1_0/can_b1_1)
-- DBC files for Toyota Prius 2017
-- Overtake warnings with blue arrows
-- Added cantools dependency
-
-### v0.9 (2025-11-20) - Status Bars & OBD2
-- Application-level status bars (visible on all pages)
-- MAP-based SOC simulation for desk testing
-- Direct MAP-to-SOC conversion (instant updates)
-- Dynamic color coding for charge/discharge state
-- Clean camera transitions (no stale frames)
-- Correct front camera orientation (not mirrored)
-
-### v0.8 (2025-11-19) - Multi-Camera Support
-- Dual USB camera support with seamless switching
-- Deterministic camera identification (udev rules)
-- Smooth freeze-frame transitions
-- Dual FPS counters
-- Automated camera udev rules installation
-
-### v0.7 (2025-11-13) - Radar Overlay (Initial)
-- Optional Toyota radar CAN integration
-- Collision warning visualization
-- Overtake detection
-- Bounded queue radar handler
-- Graceful degradation when unavailable
-
-### v0.6 (2025-11-12) - Performance Refactoring
-- Bounded queue architecture
-- Lock-free rendering
-- Numba-optimised thermal processing
-- Performance monitoring
-- British English throughout
-
----
-
 ## Quick Decision Matrix
 
 ### When to Use Which Tool
@@ -1222,7 +1131,7 @@ Quick reference for finding information:
 | CAN setup | `WAVESHARE_DUAL_CAN_HAT_SETUP.md` |
 | Performance details | `PERFORMANCE_OPTIMIZATIONS.md` |
 | Future planning | `open-TPT_System_Plan.md` |
-| AI context | `clade.md` (this file) |
+| AI context | `CLAUDE.md` (this file) |
 
 ---
 
@@ -1327,6 +1236,6 @@ Before marking work complete:
 
 **This document should be read at the start of every new session to maintain context and coding standards.**
 
-**Version:** 0.12 (I2C Bus Contention Fix)
-**Last Updated:** 2025-11-22
+**Version:** 0.15.2
+**Last Updated:** 2025-11-26
 **Maintained by:** AI assistants working on openTPT
