@@ -1,5 +1,25 @@
 # Changelog - openTPT
 
+## [v0.15.3] - 2025-12-01
+
+### TPMS Library Update 🛞
+
+#### ✨ Improvements
+
+- **Updated to TPMS library v2.1.0** - Library now uses British spelling throughout
+  - `TirePosition` → `TyrePosition`
+  - `TireState` → `TyreState`
+  - `register_tire_state_callback` → `register_tyre_state_callback`
+
+- **Added TPMS to requirements.txt** - `tpms>=2.1.0` now explicitly listed
+
+#### 🔄 Modified Files
+
+- `hardware/tpms_input_optimized.py` - Updated imports and method calls to use British spelling
+- `requirements.txt` - Added TPMS dependency
+
+---
+
 ## [v0.15.2] - 2025-11-26
 
 ### Bug Fixes & Stability Improvements 🐛

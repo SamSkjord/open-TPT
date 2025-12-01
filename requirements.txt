@@ -23,6 +23,9 @@ adafruit-circuitpython-mlx90614>=1.2.0  # Single-point IR sensors (per-tyre conf
 adafruit-circuitpython-seesaw>=1.12.0
 adafruit-circuitpython-neopixel>=6.3.0
 
+# TPMS (Tyre Pressure Monitoring System)
+tpms>=2.1.0
+
 # IMU sensors (for G-meter)
 adafruit-circuitpython-icm20x>=2.0.0  # ICM20649/ICM20948 6-axis IMU
 adafruit-circuitpython-mpu6050>=1.1.0  # MPU6050 6-axis IMU (alternative)
