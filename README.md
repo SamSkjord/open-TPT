@@ -465,6 +465,30 @@ openTPT/
 - Web-based remote monitoring
 - Additional radar compatibility (other manufacturers)
 
+### Hardware TODO
+- [ ] PA1616S Adafruit GPS - for lap timing and position logging
+- [ ] Adafruit NeoDriver - LED strip control
+- [ ] MCP9601 Thermocouples - brake temperature sensors (per corner)
+
+### Software TODO
+- [ ] Bluetooth audio menu - connect, disconnect, forget device functions
+- [ ] CopePilot integration
+- [ ] TPMS menu expansion - swap corners, view sensor data
+- [ ] Display menu - brightness control (currently shows value but not adjustable)
+- [ ] Tyre temps menu - corner sensor details, full frame view for installation verification, flip inner/outer
+- [ ] Camera view options - mirror, rotate settings for front/rear cameras
+- [ ] Units menu - °C/°F, PSI/BAR/kPa, km/h/mph switching
+- [ ] Alerts/Warnings menu - temperature/pressure thresholds for visual warnings
+- [ ] Recording settings - output directory, auto-start on motion detection
+- [ ] G-meter settings - reset peaks, max G range, history duration
+- [ ] Radar settings - enable/disable, sensitivity, overlay options, invert for upside-down mounting
+- [ ] System info - IP address, storage space, uptime, sensor status
+- [ ] Network/WiFi menu - connect for remote access
+- [ ] Calibration menu - IMU zero offset
+- [ ] Power menu - screen timeout, safe shutdown
+- [ ] Track selection - for lap timing (requires GPS)
+- [ ] Config persistence - safely write settings to config file when changed
+
 ## Documentation
 
 | Document | Purpose |
