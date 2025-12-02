@@ -2,7 +2,7 @@
 
 ## [v0.17.0] - 2025-12-02
 
-### Telemetry Recording & Encoder Fixes 📊
+### Telemetry Recording, Bluetooth Audio & Encoder Fixes 📊🎵
 
 #### ✨ New Features
 
@@ -13,6 +13,16 @@
   - Records TPMS, tyre temps, brake temps, IMU, and OBD2 speed
   - Files saved to `/home/pi/telemetry/telemetry_YYYYMMDD_HHMMSS.csv`
   - 10 Hz recording rate (matches sensor/GPS max rate, configurable via RECORDING_RATE_HZ)
+
+- **Bluetooth audio menu** - Full Bluetooth audio device management
+  - Scan for devices (non-blocking, 8 second background scan)
+  - Auto power-on Bluetooth before scanning
+  - Pair new devices (filters MAC-only names, shows friendly names only)
+  - Connect to paired devices
+  - Disconnect current device
+  - Forget/unpair devices
+  - Status display shows connected device or dependency warning
+  - PulseAudio dependency check with "! Install pulseaudio" warning if missing
 
 #### 🐛 Bug Fixes
 
@@ -31,9 +41,11 @@
 
 - `main.py` - Recording integration, telemetry frame capture
 - `gui/input_threaded.py` - Recording button hold detection, LED feedback
-- `gui/menu.py` - Recording menu (Cancel/Save/Delete)
+- `gui/menu.py` - Recording menu, Bluetooth audio menu with full device management
 - `gui/encoder_input.py` - I2C stability fixes, brightness sync
 - `utils/config.py` - Added BUTTON_RECORDING and RECORDING_HOLD_DURATION
+- `install.sh` - Added PulseAudio packages for Bluetooth audio support
+- `README.md` - Added Bluetooth audio optional install step
 
 ---
 
