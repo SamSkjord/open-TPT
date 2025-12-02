@@ -12,6 +12,7 @@
   - Recording menu with Cancel/Save/Delete options
   - Records TPMS, tyre temps, brake temps, IMU, and OBD2 speed
   - Files saved to `/home/pi/telemetry/telemetry_YYYYMMDD_HHMMSS.csv`
+  - 10 Hz recording rate (matches sensor/GPS max rate, configurable via RECORDING_RATE_HZ)
 
 #### 🐛 Bug Fixes
 

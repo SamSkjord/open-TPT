@@ -68,6 +68,7 @@ from utils.config import (
     BUTTON_VIEW_MODE,
     BUTTON_RECORDING,
     RECORDING_HOLD_DURATION,
+    RECORDING_RATE_HZ,
     # Radar configuration
     RADAR_ENABLED,
     RADAR_CHANNEL,
@@ -437,6 +438,8 @@ class OpenTPT:
 
         # Telemetry recording
         self.recorder = TelemetryRecorder()
+        self.last_recording_time = 0.0
+        self.recording_interval = 1.0 / RECORDING_RATE_HZ  # 10 Hz = 0.1s interval
 
         print("Starting openTPT...")
 
@@ -867,11 +870,17 @@ class OpenTPT:
         print("Recording discarded")
 
     def _record_telemetry_frame(self):
-        """Record a single frame of telemetry data."""
+        """Record a single frame of telemetry data at configured rate."""
         if not self.recorder.is_recording():
             return
 
-        frame = TelemetryFrame(timestamp=time.time())
+        # Rate limit recording to RECORDING_RATE_HZ (default 10 Hz)
+        current_time = time.time()
+        if current_time - self.last_recording_time < self.recording_interval:
+            return
+        self.last_recording_time = current_time
+
+        frame = TelemetryFrame(timestamp=current_time)
 
         # TPMS data
         tpms_data = self.tpms.get_data()

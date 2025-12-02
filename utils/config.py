@@ -587,6 +587,7 @@ BUTTON_VIEW_MODE = 3  # Switch between categories (camera pages ↔ UI pages)
 
 # Recording configuration
 RECORDING_HOLD_DURATION = 1.0  # Seconds to hold button 0 to start/stop recording
+RECORDING_RATE_HZ = 10  # Telemetry recording rate (10 Hz matches sensor/GPS max rate)
 
 # ==============================================================================
 # ENCODER CONFIGURATION (Adafruit I2C QT Rotary Encoder)
