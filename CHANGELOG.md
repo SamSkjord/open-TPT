@@ -1,5 +1,41 @@
 # Changelog - openTPT
 
+## [v0.17.0] - 2025-12-02
+
+### Telemetry Recording & Encoder Fixes 📊
+
+#### ✨ New Features
+
+- **Telemetry recording** - Record sensor data to CSV files
+  - Hold button 0 for 1 second to start/stop recording
+  - LED feedback: dim red (idle), green (recording)
+  - Recording menu with Cancel/Save/Delete options
+  - Records TPMS, tyre temps, brake temps, IMU, and OBD2 speed
+  - Files saved to `/home/pi/telemetry/telemetry_YYYYMMDD_HHMMSS.csv`
+
+#### 🐛 Bug Fixes
+
+- **Encoder brightness sync** - Encoder now starts at DEFAULT_BRIGHTNESS (0.8) instead of hardcoded 0.5
+- **Encoder I2C stability** - Added protection against spurious rotation events
+  - Position jumps >10 ignored as I2C glitches
+  - Brightness delta capped at ±3 per poll
+- **Recording LED state** - Property setter forces immediate LED update when recording state changes
+- **Status bar brightness** - SOC and lap delta bars now affected by brightness dimming
+
+#### 🔄 New Files
+
+- `utils/telemetry_recorder.py` - TelemetryRecorder class and TelemetryFrame dataclass
+
+#### 🔄 Modified Files
+
+- `main.py` - Recording integration, telemetry frame capture
+- `gui/input_threaded.py` - Recording button hold detection, LED feedback
+- `gui/menu.py` - Recording menu (Cancel/Save/Delete)
+- `gui/encoder_input.py` - I2C stability fixes, brightness sync
+- `utils/config.py` - Added BUTTON_RECORDING and RECORDING_HOLD_DURATION
+
+---
+
 ## [v0.16.0] - 2025-12-02
 
 ### Rotary Encoder Input & Menu System 🎛️

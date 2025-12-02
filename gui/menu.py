@@ -290,6 +290,10 @@ class MenuSystem:
         self.pairing_active = False
         self.pairing_position = None
 
+        # Recording menu state
+        self.recording_callbacks = None
+        self.save_menu: Optional[Menu] = None
+
         self._build_menus()
 
     def _build_menus(self):
@@ -458,6 +462,42 @@ class MenuSystem:
             self.current_menu = parent
         else:
             self.current_menu = None
+
+    def show_recording_menu(self, on_cancel: Callable, on_save: Callable, on_delete: Callable):
+        """
+        Show recording stop menu with Cancel/Save/Delete options.
+        Recording continues while this menu is open.
+
+        Args:
+            on_cancel: Callback to continue recording (close menu)
+            on_save: Callback to stop and save recording
+            on_delete: Callback to stop and delete recording
+        """
+        self.recording_callbacks = (on_cancel, on_save, on_delete)
+
+        # Create recording menu
+        self.save_menu = Menu("Recording")
+        self.save_menu.add_item(MenuItem("Cancel", action=lambda: self._handle_recording_action("cancel")))
+        self.save_menu.add_item(MenuItem("Save", action=lambda: self._handle_recording_action("save")))
+        self.save_menu.add_item(MenuItem("Delete", action=lambda: self._handle_recording_action("delete")))
+
+        self.current_menu = self.save_menu
+        self.save_menu.show()
+
+    def _handle_recording_action(self, action: str):
+        """Handle recording menu response."""
+        if self.recording_callbacks:
+            on_cancel, on_save, on_delete = self.recording_callbacks
+            if action == "cancel":
+                on_cancel()
+            elif action == "save":
+                on_save()
+            elif action == "delete":
+                on_delete()
+            self.recording_callbacks = None
+
+        # Close the menu
+        self.hide()
 
     def render(self, surface: pygame.Surface):
         """Render the current menu."""

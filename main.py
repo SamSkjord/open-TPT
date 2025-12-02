@@ -31,6 +31,9 @@ from ui.widgets.horizontal_bar import HorizontalBar, DualDirectionBar
 from hardware.tpms_input_optimized import TPMSHandler
 print("Using optimised TPMS handler with bounded queues")
 
+# Import telemetry recorder
+from utils.telemetry_recorder import TelemetryRecorder, TelemetryFrame
+
 # Import radar handler (optional)
 try:
     from hardware.radar_handler import RadarHandler
@@ -63,6 +66,8 @@ from utils.config import (
     BUTTON_PAGE_SETTINGS,
     BUTTON_CATEGORY_SWITCH,
     BUTTON_VIEW_MODE,
+    BUTTON_RECORDING,
+    RECORDING_HOLD_DURATION,
     # Radar configuration
     RADAR_ENABLED,
     RADAR_CHANNEL,
@@ -429,6 +434,9 @@ class OpenTPT:
         self._thermal_cache = {}  # {position: {"data": array, "timestamp": time}}
         self._brake_cache = {}    # {position: {"temp": value, "timestamp": time}}
         self._tof_cache = {}      # {position: {"distance": value, "timestamp": time}}
+
+        # Telemetry recording
+        self.recorder = TelemetryRecorder()
 
         print("Starting openTPT...")
 
@@ -825,6 +833,121 @@ class OpenTPT:
         # Request LED update
         self.input_handler.request_led_update()
 
+    def _handle_recording_toggle(self):
+        """Handle recording start/stop toggle from button hold."""
+        if self.recorder.is_recording():
+            # Show recording menu (Cancel/Save/Delete)
+            self.menu.show_recording_menu(
+                on_cancel=self._recording_cancel,
+                on_save=self._recording_save,
+                on_delete=self._recording_delete,
+            )
+        else:
+            # Start recording
+            self.recorder.start_recording()
+            self.input_handler.recording = True
+
+    def _recording_cancel(self):
+        """Cancel - close menu and continue recording."""
+        pass  # Recording continues, menu closes automatically
+
+    def _recording_save(self):
+        """Save recording and stop."""
+        self.recorder.stop_recording()
+        filepath = self.recorder.save()
+        self.input_handler.recording = False
+        if filepath:
+            print(f"Recording saved to {filepath}")
+
+    def _recording_delete(self):
+        """Delete recording without saving."""
+        self.recorder.stop_recording()
+        self.recorder.discard()
+        self.input_handler.recording = False
+        print("Recording discarded")
+
+    def _record_telemetry_frame(self):
+        """Record a single frame of telemetry data."""
+        if not self.recorder.is_recording():
+            return
+
+        frame = TelemetryFrame(timestamp=time.time())
+
+        # TPMS data
+        tpms_data = self.tpms.get_data()
+        for position, data in tpms_data.items():
+            pressure = data.get("pressure")
+            temp = data.get("temp")
+            if position == "FL":
+                frame.tpms_fl_pressure = pressure
+                frame.tpms_fl_temp = temp
+            elif position == "FR":
+                frame.tpms_fr_pressure = pressure
+                frame.tpms_fr_temp = temp
+            elif position == "RL":
+                frame.tpms_rl_pressure = pressure
+                frame.tpms_rl_temp = temp
+            elif position == "RR":
+                frame.tpms_rr_pressure = pressure
+                frame.tpms_rr_temp = temp
+
+        # Tyre thermal data (3-zone temps from Pico/MLX90614)
+        for position in ["FL", "FR", "RL", "RR"]:
+            zone_data = self.thermal.get_zone_data(position)
+            if zone_data:
+                # Zone data has left_median, centre_median, right_median
+                inner = zone_data.get("left_median")
+                centre = zone_data.get("centre_median")
+                outer = zone_data.get("right_median")
+                if position == "FL":
+                    frame.tyre_fl_inner = inner
+                    frame.tyre_fl_centre = centre
+                    frame.tyre_fl_outer = outer
+                elif position == "FR":
+                    frame.tyre_fr_inner = inner
+                    frame.tyre_fr_centre = centre
+                    frame.tyre_fr_outer = outer
+                elif position == "RL":
+                    frame.tyre_rl_inner = inner
+                    frame.tyre_rl_centre = centre
+                    frame.tyre_rl_outer = outer
+                elif position == "RR":
+                    frame.tyre_rr_inner = inner
+                    frame.tyre_rr_centre = centre
+                    frame.tyre_rr_outer = outer
+
+        # Brake temps
+        brake_temps = self.brakes.get_temps()
+        for position, data in brake_temps.items():
+            temp = data.get("temp") if isinstance(data, dict) else data
+            if position == "FL":
+                frame.brake_fl = temp
+            elif position == "FR":
+                frame.brake_fr = temp
+            elif position == "RL":
+                frame.brake_rl = temp
+            elif position == "RR":
+                frame.brake_rr = temp
+
+        # IMU data
+        if self.imu:
+            imu_snapshot = self.imu.get_data()
+            if imu_snapshot:
+                frame.accel_x = imu_snapshot.get("accel_x")
+                frame.accel_y = imu_snapshot.get("accel_y")
+                frame.accel_z = imu_snapshot.get("accel_z")
+                frame.gyro_x = imu_snapshot.get("gyro_x")
+                frame.gyro_y = imu_snapshot.get("gyro_y")
+                frame.gyro_z = imu_snapshot.get("gyro_z")
+
+        # OBD2 speed
+        if self.obd2:
+            obd_snapshot = self.obd2.get_data()
+            if obd_snapshot and "speed_kmh" in obd_snapshot:
+                frame.speed_kmh = obd_snapshot["speed_kmh"]
+
+        self.recorder.record_frame(frame)
+
     def _update_hardware(self):
         """Update hardware states."""
         current_time = time.time()
@@ -955,6 +1078,10 @@ class OpenTPT:
             if self.input_handler.ui_visible:
                 self.ui_last_interaction_time = time.time()
 
+        # Handle recording toggle (button 0 held for 1 second)
+        if input_events.get("recording_toggle", False):
+            self._handle_recording_toggle()
+
         # Check for encoder inputs (if available)
         if self.encoder:
             encoder_event = self.encoder.check_input()
@@ -1033,6 +1160,9 @@ class OpenTPT:
             # Update lap delta (simulated for testing)
             test_delta = 5.0 * math.sin(time.time() * 0.1)
             self.top_bar.set_value(test_delta)
+
+        # Record telemetry frame if recording is active
+        self._record_telemetry_frame()
 
     def _render(self):
         """
@@ -1222,7 +1352,14 @@ class OpenTPT:
                 self.cached_ui_surface = None
             render_times['ui'] = (time.time() - t0) * 1000
 
-        # Apply brightness adjustment (with caching)
+        # Draw status bars on all pages (before brightness so they get dimmed too)
+        t0 = time.time()
+        if self.status_bar_enabled:
+            self.top_bar.draw(self.screen)
+            self.bottom_bar.draw(self.screen)
+        render_times['status_bars'] = (time.time() - t0) * 1000
+
+        # Apply brightness adjustment (with caching) - must be after all content
         t0 = time.time()
         brightness = self.input_handler.get_brightness()
         if brightness < 1.0:
@@ -1245,13 +1382,6 @@ class OpenTPT:
             # Clear cached brightness surface when at full brightness
             self.cached_brightness_surface = None
         render_times['brightness'] = (time.time() - t0) * 1000
-
-        # Draw status bars on all pages
-        t0 = time.time()
-        if self.status_bar_enabled:
-            self.top_bar.draw(self.screen)
-            self.bottom_bar.draw(self.screen)
-        render_times['status_bars'] = (time.time() - t0) * 1000
 
         # Draw FPS counter (always on top)
         t0 = time.time()

@@ -9,6 +9,8 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Optional, Callable
 
+from utils.config import DEFAULT_BRIGHTNESS
+
 # Import board only if available
 try:
     import board
@@ -82,7 +84,7 @@ class EncoderInputHandler:
         self.last_position = 0
         self.button_pressed = False
         self.button_press_start = 0.0
-        self.brightness = 0.5  # Current brightness (0.0-1.0)
+        self.brightness = DEFAULT_BRIGHTNESS  # Current brightness (0.0-1.0)
 
         # Thread-safe event queue
         self.event_queue = deque(maxlen=10)
@@ -128,7 +130,10 @@ class EncoderInputHandler:
 
             # Initialise NeoPixel (1 pixel on pin 6)
             self.pixel = neopixel.NeoPixel(self.seesaw, 6, 1)
-            self.pixel.brightness = 0.5
+            self.pixel.brightness = 1.0  # Use full hardware brightness, control via colour
+            # Set initial pixel to show current brightness (thread not started yet)
+            intensity = int(self.brightness * 255)
+            self.pixel_colour = (intensity, intensity, intensity)
             self._update_pixel()
 
             print(f"Encoder initialised at 0x{self.i2c_address:02X}")
@@ -198,9 +203,14 @@ class EncoderInputHandler:
         position = self.encoder.position
         delta = position - self.last_position
         if delta != 0:
-            event.rotation_delta = -delta  # Invert for natural feel
-            self.last_position = position
-            has_event = True
+            # Ignore huge deltas (likely I2C glitch or position reset)
+            if abs(delta) > 10:
+                print(f"Warning: Ignoring encoder position jump: {self.last_position} -> {position}")
+                self.last_position = position
+            else:
+                event.rotation_delta = delta
+                self.last_position = position
+                has_event = True
 
         # Check button (active low with pullup)
         button_state = not self.button.value
@@ -261,7 +271,12 @@ class EncoderInputHandler:
         Args:
             delta: Number of encoder detents (positive = brighter)
         """
-        new_brightness = self.brightness + (delta * self.brightness_step)
+        # Cap delta to prevent I2C noise causing large jumps
+        capped_delta = max(-3, min(3, delta))
+        if abs(delta) > 3:
+            print(f"Warning: Encoder delta {delta} capped to {capped_delta}")
+
+        new_brightness = self.brightness + (capped_delta * self.brightness_step)
         self.set_brightness(new_brightness)
 
     def set_pixel_colour(self, r: int, g: int, b: int):

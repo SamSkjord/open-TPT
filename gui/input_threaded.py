@@ -15,12 +15,13 @@ except ImportError:
     BOARD_AVAILABLE = False
 
 from utils.config import (
-    BUTTON_BRIGHTNESS_CYCLE,
+    BUTTON_RECORDING,
     BUTTON_PAGE_SETTINGS,
     BUTTON_CATEGORY_SWITCH,
     BUTTON_VIEW_MODE,
     DEFAULT_BRIGHTNESS,
     BRIGHTNESS_PRESETS,
+    RECORDING_HOLD_DURATION,
 )
 
 # Only try to import NeoKey if board is available
@@ -49,13 +50,13 @@ class InputHandlerThreaded:
         self.brightness_presets = BRIGHTNESS_PRESETS
         self.brightness_index = self._find_closest_brightness_index(DEFAULT_BRIGHTNESS)
         self.button_states = {
-            BUTTON_BRIGHTNESS_CYCLE: False,
+            BUTTON_RECORDING: False,
             BUTTON_PAGE_SETTINGS: False,
             BUTTON_CATEGORY_SWITCH: False,
             BUTTON_VIEW_MODE: False,
         }
         self.last_press_time = {
-            BUTTON_BRIGHTNESS_CYCLE: 0,
+            BUTTON_RECORDING: 0,
             BUTTON_PAGE_SETTINGS: 0,
             BUTTON_CATEGORY_SWITCH: 0,
             BUTTON_VIEW_MODE: 0,
@@ -65,6 +66,13 @@ class InputHandlerThreaded:
         # UI visibility state variables
         self.ui_visible = True
         self.ui_manually_toggled = False
+
+        # Recording state (set by main app via set_recording())
+        self._recording = False
+
+        # Recording button hold tracking
+        self.recording_button_hold_start = 0.0
+        self.recording_button_triggered = False
 
         # Thread-safe event queue (bounded to last 10 events)
         self.event_queue = deque(maxlen=10)
@@ -157,7 +165,26 @@ class InputHandlerThreaded:
             for i in range(4):
                 pressed = self.neokey[i]
 
-                # If button state changed and debounce time passed
+                # Special handling for recording button (hold to toggle)
+                if i == BUTTON_RECORDING:
+                    if pressed and not self.button_states[i]:
+                        # Button just pressed - start hold tracking
+                        self.recording_button_hold_start = current_time
+                        self.recording_button_triggered = False
+                    elif pressed and self.button_states[i]:
+                        # Button still held - check if hold duration reached
+                        hold_duration = current_time - self.recording_button_hold_start
+                        if hold_duration >= RECORDING_HOLD_DURATION and not self.recording_button_triggered:
+                            events["recording_toggle"] = True
+                            self.recording_button_triggered = True
+                    elif not pressed and self.button_states[i]:
+                        # Button released - reset tracking
+                        self.recording_button_hold_start = 0.0
+                        self.recording_button_triggered = False
+                    self.button_states[i] = pressed
+                    continue
+
+                # Normal button handling (instant press)
                 if pressed != self.button_states[i] and (
                     current_time - self.last_press_time[i] > self.debounce_time
                 ):
@@ -167,10 +194,7 @@ class InputHandlerThreaded:
 
                     # Handle the button press
                     if pressed:
-                        if i == BUTTON_BRIGHTNESS_CYCLE:
-                            self.cycle_brightness()
-                            events["brightness_changed"] = True
-                        elif i == BUTTON_PAGE_SETTINGS:
+                        if i == BUTTON_PAGE_SETTINGS:
                             # Page-specific settings (handled by main app based on current page)
                             events["page_settings"] = True
                         elif i == BUTTON_CATEGORY_SWITCH:
@@ -201,12 +225,19 @@ class InputHandlerThreaded:
             return
 
         try:
-            # Button 0: Brightness cycle (white intensity matches current brightness)
-            intensity = int(self.brightness * 200) + 55  # Scale to 55-255
-            if self.button_states[BUTTON_BRIGHTNESS_CYCLE]:
-                self.neokey.pixels[BUTTON_BRIGHTNESS_CYCLE] = (255, 255, 255)
+            # Button 0: Recording (green when recording, red when idle)
+            if self.button_states[BUTTON_RECORDING] and not self.recording_button_triggered:
+                # Show hold progress (orange -> white as hold completes)
+                hold_duration = time.time() - self.recording_button_hold_start
+                progress = min(1.0, hold_duration / RECORDING_HOLD_DURATION)
+                # Orange (255, 128, 0) -> White (255, 255, 255)
+                g = int(128 + 127 * progress)
+                b = int(255 * progress)
+                self.neokey.pixels[BUTTON_RECORDING] = (255, g, b)
+            elif self._recording:
+                self.neokey.pixels[BUTTON_RECORDING] = (0, 255, 0)  # Solid green when recording
             else:
-                self.neokey.pixels[BUTTON_BRIGHTNESS_CYCLE] = (intensity, intensity, intensity)
+                self.neokey.pixels[BUTTON_RECORDING] = (64, 0, 0)  # Dim red when idle
 
             # Button 1: Page settings (yellow, brightness varies with state)
             if self.button_states[BUTTON_PAGE_SETTINGS]:
@@ -237,6 +268,17 @@ class InputHandlerThreaded:
         with self.led_lock:
             self.led_update_requested = True
 
+    @property
+    def recording(self):
+        """Get recording state."""
+        return self._recording
+
+    @recording.setter
+    def recording(self, value):
+        """Set recording state and force LED update."""
+        self._recording = value
+        self._update_leds()
+
     def check_input(self):
         """
         Check for button press events (called from main thread).
@@ -246,7 +288,7 @@ class InputHandlerThreaded:
             dict: Dictionary with events that occurred
         """
         events = {
-            "brightness_changed": False,
+            "recording_toggle": False,
             "page_settings": False,
             "category_switch": False,
             "view_mode": False,

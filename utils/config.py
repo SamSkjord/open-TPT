@@ -579,10 +579,14 @@ RADAR_OVERTAKE_ARROW_DURATION = 1.0  # Duration to show arrow (seconds)
 # ==============================================================================
 
 # NeoKey 1x4 button mappings
-BUTTON_BRIGHTNESS_CYCLE = 0  # Cycle through brightness presets
+BUTTON_BRIGHTNESS_CYCLE = 0  # Cycle through brightness presets (tap)
+BUTTON_RECORDING = 0  # Start/stop telemetry recording (hold for 1 second)
 BUTTON_PAGE_SETTINGS = 1  # Toggle page-specific settings (context-sensitive per page)
 BUTTON_CATEGORY_SWITCH = 2  # Switch within category (camera↔camera OR UI page↔UI page)
 BUTTON_VIEW_MODE = 3  # Switch between categories (camera pages ↔ UI pages)
+
+# Recording configuration
+RECORDING_HOLD_DURATION = 1.0  # Seconds to hold button 0 to start/stop recording
 
 # ==============================================================================
 # ENCODER CONFIGURATION (Adafruit I2C QT Rotary Encoder)

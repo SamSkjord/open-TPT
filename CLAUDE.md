@@ -1,6 +1,6 @@
 # Claude Context - openTPT Project
 
-**Version:** 0.16.0 | **Updated:** 2025-12-02
+**Version:** 0.17.0 | **Updated:** 2025-12-02
 
 ---
 
@@ -45,7 +45,7 @@
 
 | Setting | Value |
 |---------|-------|
-| Pi IP | `192.168.199.243` |
+| Pi IP | `192.168.199.247` |
 | User | `pi` |
 | Path | `/home/pi/open-TPT` |
 | Service | `openTPT.service` |
