@@ -35,6 +35,10 @@ sudo apt install -y \
   libxrender-dev libxfixes-dev libsm-dev libice-dev \
   libgl1-mesa-dev libglu1-mesa-dev libgles2-mesa-dev libegl1-mesa-dev libglvnd-dev
 
+# Install Bluetooth audio support (PulseAudio with Bluetooth module)
+echo -e "\n==== Installing Bluetooth audio support ===="
+sudo apt install -y pulseaudio pulseaudio-module-bluetooth
+
 echo -e "\n==== Upgrading pip tooling ===="
 if ! "${PIP_CMD[@]}" install --break-system-packages --upgrade pip setuptools wheel; then
   echo "pip upgrade failed (likely due to Debian-managed pip). Continuing with system pip..."

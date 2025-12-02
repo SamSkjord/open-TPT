@@ -84,7 +84,12 @@ pip3 install python-can cantools
 # Copy toyota_radar_driver.py to your project or install as package
 ```
 
-5. Run the application:
+5. (Optional) For Bluetooth audio support:
+```bash
+sudo apt install pulseaudio pulseaudio-module-bluetooth
+```
+
+6. Run the application:
 ```bash
 sudo python3 ./main.py
 ```
@@ -471,7 +476,7 @@ openTPT/
 - [ ] MCP9601 Thermocouples - brake temperature sensors (per corner)
 
 ### Software TODO
-- [ ] Bluetooth audio menu - connect, disconnect, forget device functions
+- [x] Bluetooth audio menu - scan, pair, connect, disconnect, forget (requires PulseAudio)
 - [ ] CopePilot integration
 - [ ] TPMS menu expansion - swap corners, view sensor data
 - [ ] Display menu - brightness control (currently shows value but not adjustable)

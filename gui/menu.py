@@ -4,8 +4,10 @@ Provides a navigable menu overlay for settings and configuration.
 """
 
 import pygame
+import re
 import time
 import subprocess
+import threading
 from typing import List, Optional, Callable, Any
 from dataclasses import dataclass, field
 
@@ -307,9 +309,21 @@ class MenuSystem:
         tpms_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
 
         # Bluetooth submenu
-        bt_menu = Menu("Bluetooth")
+        bt_menu = Menu("Bluetooth Audio")
+        bt_menu.add_item(MenuItem(
+            "Status",
+            dynamic_label=lambda: self._get_bt_status_label()
+        ))
         bt_menu.add_item(MenuItem("Scan for Devices", action=lambda: self._scan_bluetooth()))
+        bt_menu.add_item(MenuItem("Pair New Device", action=lambda: self._show_bt_pair_menu()))
+        bt_menu.add_item(MenuItem("Connect", action=lambda: self._show_bt_connect_menu()))
+        bt_menu.add_item(MenuItem("Disconnect", action=lambda: self._bt_disconnect()))
+        bt_menu.add_item(MenuItem("Forget Device", action=lambda: self._show_bt_forget_menu()))
         bt_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        self.bt_menu = bt_menu  # Store reference for dynamic submenus
+
+        # Check Bluetooth audio dependencies on menu build
+        self._bt_audio_available = self._check_bt_audio_deps()
 
         # Display submenu
         display_menu = Menu("Display")
@@ -336,6 +350,19 @@ class MenuSystem:
         if self.encoder_handler:
             return self.encoder_handler.get_brightness()
         return 0.5
+
+    def _check_bt_audio_deps(self) -> bool:
+        """Check if Bluetooth audio dependencies are installed."""
+        try:
+            # Check if PulseAudio is installed
+            result = subprocess.run(
+                ["which", "pulseaudio"],
+                capture_output=True,
+                timeout=5
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
 
     def _start_tpms_pairing(self, position: str) -> str:
         """Start TPMS pairing for a position."""
@@ -385,22 +412,302 @@ class MenuSystem:
             self.current_menu.set_status(status)
 
     def _scan_bluetooth(self) -> str:
-        """Scan for Bluetooth devices."""
+        """Scan for Bluetooth devices (non-blocking)."""
+        def do_scan():
+            try:
+                # Ensure Bluetooth is powered on
+                subprocess.run(
+                    ["sudo", "rfkill", "unblock", "bluetooth"],
+                    capture_output=True,
+                    timeout=5
+                )
+                subprocess.run(
+                    ["bluetoothctl", "power", "on"],
+                    capture_output=True,
+                    timeout=5
+                )
+                # Run scan for 8 seconds
+                subprocess.run(
+                    ["bluetoothctl", "--timeout", "8", "scan", "on"],
+                    capture_output=True,
+                    text=True,
+                    timeout=15
+                )
+                # Update status when done
+                if self.current_menu:
+                    self.current_menu.set_status("Scan complete")
+            except Exception as e:
+                if self.current_menu:
+                    self.current_menu.set_status(f"Scan error: {e}")
+
+        # Start scan in background thread
+        scan_thread = threading.Thread(target=do_scan, daemon=True)
+        scan_thread.start()
+        return "Scanning... (8 sec)"
+
+    def _is_mac_address(self, name: str) -> bool:
+        """Check if a name is just a MAC address (no friendly name)."""
+        # MAC addresses look like XX:XX:XX:XX:XX:XX or XX-XX-XX-XX-XX-XX
+        mac_pattern = r'^([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$'
+        return bool(re.match(mac_pattern, name.replace('-', ':')))
+
+    def _get_bt_discovered_devices(self) -> list:
+        """Get list of discovered Bluetooth devices as (mac, name) tuples."""
         try:
-            # Run bluetoothctl scan for 5 seconds
             result = subprocess.run(
-                ["bluetoothctl", "--timeout", "5", "scan", "on"],
+                ["bluetoothctl", "devices"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            devices = []
+            paired = set(mac for mac, _ in self._get_bt_paired_devices_raw())
+            for line in result.stdout.strip().split('\n'):
+                # Format: "Device XX:XX:XX:XX:XX:XX Device Name"
+                if line.startswith("Device "):
+                    parts = line.split(" ", 2)
+                    if len(parts) >= 3:
+                        mac = parts[1]
+                        name = parts[2]
+                        # Only include devices not already paired and with friendly names
+                        if mac not in paired and not self._is_mac_address(name):
+                            devices.append((mac, name))
+            return devices
+        except Exception:
+            return []
+
+    def _get_bt_paired_devices_raw(self) -> list:
+        """Get list of paired Bluetooth devices (internal, no filtering)."""
+        try:
+            # Use 'devices Paired' filter (works on bluetoothctl 5.82+)
+            result = subprocess.run(
+                ["bluetoothctl", "devices", "Paired"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            devices = []
+            for line in result.stdout.strip().split('\n'):
+                if line.startswith("Device "):
+                    parts = line.split(" ", 2)
+                    if len(parts) >= 3:
+                        devices.append((parts[1], parts[2]))
+            return devices
+        except Exception:
+            return []
+
+    def _get_bt_paired_devices(self) -> list:
+        """Get list of paired Bluetooth devices as (mac, name) tuples."""
+        try:
+            # Use 'devices Paired' filter (works on bluetoothctl 5.82+)
+            result = subprocess.run(
+                ["bluetoothctl", "devices", "Paired"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            devices = []
+            for line in result.stdout.strip().split('\n'):
+                # Format: "Device XX:XX:XX:XX:XX:XX Device Name"
+                if line.startswith("Device "):
+                    parts = line.split(" ", 2)
+                    if len(parts) >= 3:
+                        mac = parts[1]
+                        name = parts[2]
+                        devices.append((mac, name))
+            return devices
+        except Exception:
+            return []
+
+    def _get_bt_connected_device(self) -> tuple:
+        """Get currently connected Bluetooth audio device as (mac, name) or None."""
+        try:
+            # Check each paired device for connection status
+            devices = self._get_bt_paired_devices()
+            for mac, name in devices:
+                result = subprocess.run(
+                    ["bluetoothctl", "info", mac],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if "Connected: yes" in result.stdout:
+                    return (mac, name)
+            return None
+        except Exception:
+            return None
+
+    def _get_bt_status_label(self) -> str:
+        """Get Bluetooth status label for menu."""
+        # Check if PulseAudio is installed
+        if not self._bt_audio_available:
+            return "! Install pulseaudio"
+
+        connected = self._get_bt_connected_device()
+        if connected:
+            _, name = connected
+            # Truncate long names
+            if len(name) > 20:
+                name = name[:17] + "..."
+            return f"Connected: {name}"
+        return "Status: Not connected"
+
+    def _show_bt_connect_menu(self) -> str:
+        """Show submenu with paired devices to connect."""
+        devices = self._get_bt_paired_devices()
+        if not devices:
+            return "No paired devices"
+
+        # Build connect submenu dynamically
+        connect_menu = Menu("Connect Device")
+        for mac, name in devices:
+            # Use default argument to capture mac in closure
+            connect_menu.add_item(MenuItem(
+                name[:25] if len(name) > 25 else name,
+                action=lambda m=mac, n=name: self._bt_connect(m, n)
+            ))
+        connect_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        connect_menu.parent = self.bt_menu
+
+        # Switch to connect menu
+        self.current_menu.hide()
+        self.current_menu = connect_menu
+        connect_menu.show()
+        return ""
+
+    def _bt_connect(self, mac: str, name: str) -> str:
+        """Connect to a Bluetooth device."""
+        try:
+            result = subprocess.run(
+                ["bluetoothctl", "connect", mac],
+                capture_output=True,
+                text=True,
+                timeout=15
+            )
+            if "Connection successful" in result.stdout or "Connected: yes" in result.stdout:
+                return f"Connected to {name}"
+            elif "Failed" in result.stdout or "Error" in result.stdout:
+                return f"Failed to connect"
+            return f"Connecting to {name}..."
+        except subprocess.TimeoutExpired:
+            return "Connection timed out"
+        except Exception as e:
+            return f"Error: {e}"
+
+    def _show_bt_pair_menu(self) -> str:
+        """Show submenu with discovered devices to pair."""
+        devices = self._get_bt_discovered_devices()
+        if not devices:
+            return "No new devices found. Scan first."
+
+        # Build pair submenu dynamically
+        pair_menu = Menu("Pair Device")
+        for mac, name in devices:
+            pair_menu.add_item(MenuItem(
+                name[:25] if len(name) > 25 else name,
+                action=lambda m=mac, n=name: self._bt_pair(m, n)
+            ))
+        pair_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        pair_menu.parent = self.bt_menu
+
+        # Switch to pair menu
+        self.current_menu.hide()
+        self.current_menu = pair_menu
+        pair_menu.show()
+        return ""
+
+    def _bt_pair(self, mac: str, name: str) -> str:
+        """Pair with a Bluetooth device."""
+        try:
+            # Trust the device first (allows auto-reconnect)
+            subprocess.run(
+                ["bluetoothctl", "trust", mac],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+
+            # Pair with the device using NoInputNoOutput agent
+            result = subprocess.run(
+                ["bluetoothctl", "--agent", "NoInputNoOutput", "pair", mac],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            output = result.stdout + result.stderr
+
+            if "Pairing successful" in output or "already paired" in output.lower():
+                # Try to connect after pairing
+                self._bt_connect(mac, name)
+                return f"Paired with {name}"
+            elif "AuthenticationFailed" in output:
+                return "Put device in pairing mode"
+            elif "ConnectionAttemptFailed" in output:
+                return "Device not responding"
+            elif "Failed" in output:
+                return "Pairing failed - retry"
+            return f"Pairing {name}..."
+        except subprocess.TimeoutExpired:
+            return "Pairing timed out"
+        except Exception as e:
+            return f"Error: {e}"
+
+    def _bt_disconnect(self) -> str:
+        """Disconnect current Bluetooth device."""
+        connected = self._get_bt_connected_device()
+        if not connected:
+            return "No device connected"
+
+        mac, name = connected
+        try:
+            result = subprocess.run(
+                ["bluetoothctl", "disconnect", mac],
                 capture_output=True,
                 text=True,
                 timeout=10
             )
-            return "Scan complete - check system Bluetooth"
-        except subprocess.TimeoutExpired:
-            return "Scan timed out"
-        except FileNotFoundError:
-            return "bluetoothctl not available"
+            if "Successful" in result.stdout or "Disconnected" in result.stdout:
+                return f"Disconnected from {name}"
+            return "Disconnect requested"
         except Exception as e:
-            return f"Scan error: {e}"
+            return f"Error: {e}"
+
+    def _show_bt_forget_menu(self) -> str:
+        """Show submenu to forget/unpair devices."""
+        devices = self._get_bt_paired_devices()
+        if not devices:
+            return "No paired devices"
+
+        # Build forget submenu dynamically
+        forget_menu = Menu("Forget Device")
+        for mac, name in devices:
+            forget_menu.add_item(MenuItem(
+                name[:25] if len(name) > 25 else name,
+                action=lambda m=mac, n=name: self._bt_forget(m, n)
+            ))
+        forget_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        forget_menu.parent = self.bt_menu
+
+        # Switch to forget menu
+        self.current_menu.hide()
+        self.current_menu = forget_menu
+        forget_menu.show()
+        return ""
+
+    def _bt_forget(self, mac: str, name: str) -> str:
+        """Forget/unpair a Bluetooth device."""
+        try:
+            result = subprocess.run(
+                ["bluetoothctl", "remove", mac],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            if "removed" in result.stdout.lower() or result.returncode == 0:
+                return f"Forgot {name}"
+            return f"Failed to forget {name}"
+        except Exception as e:
+            return f"Error: {e}"
 
     def _go_back(self):
         """Go back to parent menu."""
