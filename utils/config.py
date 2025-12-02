@@ -585,6 +585,16 @@ BUTTON_CATEGORY_SWITCH = 2  # Switch within category (camera↔camera OR UI page
 BUTTON_VIEW_MODE = 3  # Switch between categories (camera pages ↔ UI pages)
 
 # ==============================================================================
+# ENCODER CONFIGURATION (Adafruit I2C QT Rotary Encoder)
+# ==============================================================================
+
+ENCODER_ENABLED = True
+ENCODER_I2C_ADDRESS = 0x36  # Default address, can be 0x36-0x3D
+ENCODER_POLL_RATE = 20  # Hz - polling frequency
+ENCODER_LONG_PRESS_MS = 500  # Milliseconds for long press detection
+ENCODER_BRIGHTNESS_STEP = 0.05  # Brightness change per detent
+
+# ==============================================================================
 # HELPER FUNCTIONS
 # ==============================================================================
 

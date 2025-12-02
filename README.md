@@ -454,6 +454,9 @@ openTPT/
 - ✅ UI auto-hide with fade animation
 - ✅ Optional Toyota radar overlay with collision warnings
 - ✅ Performance monitoring and validation
+- ✅ Rotary encoder input with menu system
+- ✅ TPMS sensor pairing via on-screen menu
+- ✅ Bluetooth audio pairing for CopePilot
 
 ### Future Enhancements
 - CAN bus scheduler for OBD-II data

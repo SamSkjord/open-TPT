@@ -20,6 +20,8 @@ import pygame.time as pgtime
 from gui.display import Display
 from gui.camera import Camera
 from gui.input_threaded import InputHandlerThreaded as InputHandler
+from gui.encoder_input import EncoderInputHandler
+from gui.menu import MenuSystem
 from gui.scale_bars import ScaleBars
 from gui.icon_handler import IconHandler
 from gui.gmeter import GMeterDisplay
@@ -78,6 +80,12 @@ from utils.config import (
     SCALE_X,
     SCALE_Y,
     FONT_SIZE_SMALL,
+    # Encoder configuration
+    ENCODER_ENABLED,
+    ENCODER_I2C_ADDRESS,
+    ENCODER_POLL_RATE,
+    ENCODER_LONG_PRESS_MS,
+    ENCODER_BRIGHTNESS_STEP,
     # Memory monitoring configuration
     MEMORY_MONITORING_ENABLED,
     # Thermal stale data timeout
@@ -543,8 +551,27 @@ class OpenTPT:
         # Initialise camera (with optional radar)
         self.camera = Camera(self.screen, radar_handler=self.radar)
 
-        # Initialise input handler
+        # Initialise input handler (NeoKey)
         self.input_handler = InputHandler(self.camera)
+
+        # Initialise encoder input handler (optional)
+        self.encoder = None
+        if ENCODER_ENABLED:
+            try:
+                self.encoder = EncoderInputHandler(
+                    i2c_address=ENCODER_I2C_ADDRESS,
+                    poll_rate=ENCODER_POLL_RATE,
+                    long_press_ms=ENCODER_LONG_PRESS_MS,
+                    brightness_step=ENCODER_BRIGHTNESS_STEP,
+                )
+                if self.encoder.is_available():
+                    print("Encoder input handler initialised")
+                else:
+                    print("Warning: Encoder not detected")
+                    self.encoder = None
+            except Exception as e:
+                print(f"Warning: Could not initialise encoder: {e}")
+                self.encoder = None
 
         # Create hardware handlers
         self.tpms = TPMSHandler()
@@ -587,8 +614,16 @@ class OpenTPT:
         else:
             self.ford_hybrid = None
 
+        # Initialise menu system
+        self.menu = MenuSystem(
+            tpms_handler=self.tpms,
+            encoder_handler=self.encoder,
+        )
+
         # Start monitoring threads
         self.input_handler.start()  # Start NeoKey polling thread
+        if self.encoder:
+            self.encoder.start()  # Start encoder polling thread
         self.tpms.start()
         self.corner_sensors.start()
 
@@ -920,6 +955,30 @@ class OpenTPT:
             if self.input_handler.ui_visible:
                 self.ui_last_interaction_time = time.time()
 
+        # Check for encoder inputs (if available)
+        if self.encoder:
+            encoder_event = self.encoder.check_input()
+
+            if self.menu.is_visible():
+                # Menu is open - route encoder to menu
+                if encoder_event.rotation_delta != 0:
+                    self.menu.navigate(encoder_event.rotation_delta)
+                if encoder_event.short_press:
+                    self.menu.select()
+                if encoder_event.long_press:
+                    self.menu.back()
+            else:
+                # Menu closed - rotation controls brightness, long press opens menu
+                if encoder_event.rotation_delta != 0:
+                    self.encoder.adjust_brightness(encoder_event.rotation_delta)
+                    self.encoder.set_pixel_brightness_feedback()
+                    # Sync brightness with input handler for consistency
+                    self.input_handler.brightness = self.encoder.get_brightness()
+                if encoder_event.long_press:
+                    self.menu.show()
+                    if self.encoder:
+                        self.encoder.set_pixel_colour(50, 150, 255)  # Blue for menu
+
         # Update camera frame if active
         if self.current_category == "camera":
             self.camera.update()
@@ -1200,6 +1259,12 @@ class OpenTPT:
         self.display.draw_fps_counter(self.fps, camera_fps)
         render_times['fps_counter'] = (time.time() - t0) * 1000
 
+        # Draw menu overlay (if visible)
+        t0 = time.time()
+        if self.menu.is_visible():
+            self.menu.render(self.screen)
+        render_times['menu'] = (time.time() - t0) * 1000
+
         # Update the display
         t0 = time.time()
         pygame.display.flip()
@@ -1252,6 +1317,8 @@ class OpenTPT:
         # Stop hardware monitoring threads
         if self.input_handler:
             self.input_handler.stop()
+        if self.encoder:
+            self.encoder.stop()
         self.tpms.stop()
         self.corner_sensors.stop()
 

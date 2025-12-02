@@ -1,6 +1,6 @@
 # Claude Context - openTPT Project
 
-**Version:** 0.15.3 | **Updated:** 2025-12-01
+**Version:** 0.16.0 | **Updated:** 2025-12-02
 
 ---
 
@@ -54,6 +54,7 @@
 - ✅ TPMS: 4/4 sensors (FL, FR, RL, RR)
 - ✅ Multi-Camera: Dual USB (`/dev/video-rear`, `/dev/video-front`)
 - ✅ NeoKey 1x4: Physical buttons
+- ✅ Rotary Encoder: I2C QT with NeoPixel (0x36)
 - ✅ Pico Thermal: 1/4 MLX90640 (FL)
 - ✅ TOF Distance: 1/4 VL53L0X (FR)
 - ✅ Brake Temps: MCP9601 thermocouples (0x65/0x66)
@@ -94,6 +95,7 @@ openTPT/
 | `0x48` | ADS1115 | ADC for brake IR sensors |
 | `0x5A` | MLX90614 | Single-point IR (per corner) |
 | `0x65/0x66` | MCP9601 | Thermocouple (inner/outer brake) |
+| `0x36` | Seesaw | Rotary encoder with NeoPixel |
 | `0x68` | ICM20649 | IMU for G-meter |
 | `0x70` | TCA9548A | I2C mux (8 channels) |
 

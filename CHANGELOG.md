@@ -1,5 +1,43 @@
 # Changelog - openTPT
 
+## [v0.16.0] - 2025-12-02
+
+### Rotary Encoder Input & Menu System 🎛️
+
+#### ✨ New Features
+
+- **Rotary encoder support** - Adafruit I2C QT Rotary Encoder with NeoPixel
+  - Rotation controls brightness (default mode)
+  - Short press = select/confirm
+  - Long press = back/exit menu
+  - NeoPixel feedback for state indication
+
+- **On-screen menu system** - Navigate settings via encoder or keyboard
+  - TPMS sensor pairing (FL, FR, RL, RR)
+  - Bluetooth audio pairing for CopePilot
+  - Display brightness control
+  - Semi-transparent overlay with navigation hints
+
+- **TPMS pairing via UI** - Pair sensors directly from the menu
+  - Visual feedback during pairing (orange NeoPixel pulse)
+  - Success/failure indication (green/red flash)
+
+- **Bluetooth audio pairing** - Scan and connect Bluetooth devices
+  - Uses system `bluetoothctl` for pairing
+
+#### 🔄 New Files
+
+- `gui/encoder_input.py` - Threaded encoder handler with event queue
+- `gui/menu.py` - Menu system with hierarchical navigation
+
+#### 🔄 Modified Files
+
+- `main.py` - Integrated encoder and menu system
+- `utils/config.py` - Added encoder configuration
+- `requirements.txt` - Updated seesaw comment
+
+---
+
 ## [v0.15.3] - 2025-12-01
 
 ### TPMS Library Update 🛞

@@ -19,8 +19,8 @@ adafruit-circuitpython-ads1x15>=2.2.0
 adafruit-circuitpython-mlx90640>=1.2.0  # Optional: for setup/diagnostic tools
 adafruit-circuitpython-mlx90614>=1.2.0  # Single-point IR sensors (per-tyre config)
 
-# NeoPixel buttons
-adafruit-circuitpython-seesaw>=1.12.0
+# NeoPixel buttons and rotary encoder
+adafruit-circuitpython-seesaw>=1.12.0  # Used for NeoKey 1x4 and I2C QT Rotary Encoder
 adafruit-circuitpython-neopixel>=6.3.0
 
 # TPMS (Tyre Pressure Monitoring System)
