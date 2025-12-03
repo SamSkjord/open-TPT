@@ -81,6 +81,7 @@ class Menu:
         self.parent = parent
         self.selected_index = 0
         self.visible = False
+        self.scroll_offset = 0  # For scrolling long menus
 
         # Font initialisation (lazy)
         self._font_title = None
@@ -108,6 +109,7 @@ class Menu:
         """Show the menu."""
         self.visible = True
         self.selected_index = 0
+        self.scroll_offset = 0
 
     def hide(self):
         """Hide the menu."""
@@ -131,6 +133,22 @@ class Menu:
                 break
 
         self.selected_index = new_index
+
+        # Auto-scroll to keep selection visible
+        max_visible = self._get_max_visible_items()
+        if self.selected_index < self.scroll_offset:
+            self.scroll_offset = self.selected_index
+        elif self.selected_index >= self.scroll_offset + max_visible:
+            self.scroll_offset = self.selected_index - max_visible + 1
+
+    def _get_max_visible_items(self) -> int:
+        """Calculate maximum number of visible menu items."""
+        menu_height = int(DISPLAY_HEIGHT * 0.7)
+        title_area = 80  # Title + spacing
+        hint_area = 60   # Status + hint at bottom
+        item_height = 40
+        available_height = menu_height - title_area - hint_area
+        return max(1, available_height // item_height)
 
     def select(self) -> Optional['Menu']:
         """
@@ -217,17 +235,20 @@ class Menu:
         title_y = menu_y + 20
         surface.blit(title_surface, (title_x, title_y))
 
-        # Draw items
+        # Draw items with scrolling
         item_start_y = title_y + 60
         item_height = 40
         item_padding = 20
+        max_visible = self._get_max_visible_items()
 
-        for i, item in enumerate(self.items):
-            item_y = item_start_y + (i * item_height)
+        # Draw scroll indicator if needed
+        if self.scroll_offset > 0:
+            arrow_up = self._font_hint.render("▲ more", True, GREY)
+            surface.blit(arrow_up, (menu_x + menu_width - 80, item_start_y - 25))
 
-            # Skip if off screen
-            if item_y > menu_y + menu_height - 40:
-                break
+        for display_idx, i in enumerate(range(self.scroll_offset, min(len(self.items), self.scroll_offset + max_visible))):
+            item = self.items[i]
+            item_y = item_start_y + (display_idx * item_height)
 
             # Determine colour
             if i == self.selected_index:
@@ -252,6 +273,12 @@ class Menu:
 
             item_surface = self._font_item.render(label, True, colour)
             surface.blit(item_surface, (menu_x + item_padding, item_y))
+
+        # Draw scroll indicator if more items below
+        if self.scroll_offset + max_visible < len(self.items):
+            arrow_down = self._font_hint.render("▼ more", True, GREY)
+            last_item_y = item_start_y + (max_visible * item_height)
+            surface.blit(arrow_down, (menu_x + menu_width - 80, last_item_y - 25))
 
         # Draw status message if recent
         if self.status_message and (time.time() - self.status_time < self.status_duration):
@@ -296,6 +323,9 @@ class MenuSystem:
         self.recording_callbacks = None
         self.save_menu: Optional[Menu] = None
 
+        # Volume editing mode
+        self.volume_editing = False
+
         self._build_menus()
 
     def _build_menus(self):
@@ -316,10 +346,9 @@ class MenuSystem:
         ))
         bt_menu.add_item(MenuItem(
             "Volume",
-            dynamic_label=lambda: f"Volume: {self._get_bt_volume()}%"
+            dynamic_label=lambda: self._get_volume_label(),
+            action=lambda: self._toggle_volume_editing()
         ))
-        bt_menu.add_item(MenuItem("Volume Up", action=lambda: self._bt_volume_adjust(10)))
-        bt_menu.add_item(MenuItem("Volume Down", action=lambda: self._bt_volume_adjust(-10)))
         bt_menu.add_item(MenuItem("Scan for Devices", action=lambda: self._scan_bluetooth()))
         bt_menu.add_item(MenuItem("Pair New Device", action=lambda: self._show_bt_pair_menu()))
         bt_menu.add_item(MenuItem("Connect", action=lambda: self._show_bt_connect_menu()))
@@ -357,6 +386,20 @@ class MenuSystem:
         if self.encoder_handler:
             return self.encoder_handler.get_brightness()
         return 0.5
+
+    def _get_volume_label(self) -> str:
+        """Get volume label with editing indicator."""
+        vol = self._get_bt_volume()
+        if self.volume_editing:
+            return f"[ Volume: {vol}% ]"
+        return f"Volume: {vol}%"
+
+    def _toggle_volume_editing(self) -> str:
+        """Toggle volume editing mode."""
+        self.volume_editing = not self.volume_editing
+        if self.volume_editing:
+            return "Rotate to adjust, press to save"
+        return "Volume saved"
 
     def _check_bt_audio_deps(self) -> bool:
         """Check if Bluetooth audio dependencies are installed."""
@@ -504,9 +547,9 @@ class MenuSystem:
             return []
 
     def _get_bt_paired_devices(self) -> list:
-        """Get list of paired Bluetooth devices as (mac, name) tuples."""
+        """Get list of paired or trusted Bluetooth devices as (mac, name) tuples."""
         try:
-            # Use 'devices Paired' filter (works on bluetoothctl 5.82+)
+            # First try paired devices
             result = subprocess.run(
                 ["bluetoothctl", "devices", "Paired"],
                 capture_output=True,
@@ -514,14 +557,33 @@ class MenuSystem:
                 timeout=5
             )
             devices = []
+            seen_macs = set()
             for line in result.stdout.strip().split('\n'):
-                # Format: "Device XX:XX:XX:XX:XX:XX Device Name"
                 if line.startswith("Device "):
                     parts = line.split(" ", 2)
                     if len(parts) >= 3:
                         mac = parts[1]
                         name = parts[2]
                         devices.append((mac, name))
+                        seen_macs.add(mac)
+
+            # Also include trusted devices (may have lost pairing but can reconnect)
+            result = subprocess.run(
+                ["bluetoothctl", "devices", "Trusted"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            for line in result.stdout.strip().split('\n'):
+                if line.startswith("Device "):
+                    parts = line.split(" ", 2)
+                    if len(parts) >= 3:
+                        mac = parts[1]
+                        name = parts[2]
+                        if mac not in seen_macs:
+                            devices.append((mac, name))
+                            seen_macs.add(mac)
+
             return devices
         except Exception:
             return []
@@ -637,19 +699,23 @@ class MenuSystem:
         # Run in background to not block menu
         threading.Thread(target=do_play, daemon=True).start()
 
+    def _run_pactl(self, args: list) -> subprocess.CompletedProcess:
+        """Run pactl command as pi user with correct environment."""
+        env_cmd = ["sudo", "-u", "pi", "env", "XDG_RUNTIME_DIR=/run/user/1000"]
+        return subprocess.run(
+            env_cmd + ["pactl"] + args,
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+
     def _get_bt_volume(self) -> int:
         """Get current PulseAudio volume as percentage."""
         try:
-            result = subprocess.run(
-                ["pactl", "get-sink-volume", "@DEFAULT_SINK@"],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
+            result = self._run_pactl(["get-sink-volume", "@DEFAULT_SINK@"])
             # Output like: "Volume: front-left: 32768 /  50% / -18.06 dB, ..."
             if "%" in result.stdout:
                 # Extract first percentage
-                import re
                 match = re.search(r'(\d+)%', result.stdout)
                 if match:
                     return int(match.group(1))
@@ -662,11 +728,7 @@ class MenuSystem:
         try:
             current = self._get_bt_volume()
             new_vol = max(0, min(100, current + delta))
-            subprocess.run(
-                ["pactl", "set-sink-volume", "@DEFAULT_SINK@", f"{new_vol}%"],
-                capture_output=True,
-                timeout=5
-            )
+            self._run_pactl(["set-sink-volume", "@DEFAULT_SINK@", f"{new_vol}%"])
             return f"Volume: {new_vol}%"
         except Exception as e:
             return f"Error: {e}"
@@ -827,6 +889,9 @@ class MenuSystem:
 
     def _go_back(self):
         """Go back to parent menu."""
+        # Reset volume editing when navigating away
+        self.volume_editing = False
+
         if self.current_menu and self.current_menu.parent:
             self.current_menu.hide()
             self.current_menu = self.current_menu.parent
@@ -847,6 +912,9 @@ class MenuSystem:
             self.current_menu.hide()
         self.current_menu = None
 
+        # Reset editing modes
+        self.volume_editing = False
+
         # Stop any active pairing
         self.stop_pairing()
 
@@ -855,7 +923,12 @@ class MenuSystem:
         return self.current_menu is not None and self.current_menu.visible
 
     def navigate(self, delta: int):
-        """Navigate the current menu."""
+        """Navigate the current menu or adjust volume if in editing mode."""
+        if self.volume_editing:
+            # Adjust volume instead of navigating
+            self._bt_volume_adjust(delta * 5)  # 5% per detent
+            return
+
         if self.current_menu:
             self.current_menu.navigate(delta)
 

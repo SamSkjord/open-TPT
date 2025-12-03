@@ -1,5 +1,33 @@
 # Changelog - openTPT
 
+## [v0.17.1] - 2025-12-03
+
+### Menu Scrolling & Encoder Volume Control 🎚️
+
+#### ✨ New Features
+
+- **Menu scrolling** - Long menus now scroll automatically
+  - Auto-scroll keeps selection visible as you navigate
+  - "▲ more" / "▼ more" indicators show hidden items
+  - Scroll offset resets when opening a menu
+
+- **Encoder-based volume control** - Adjust volume with the rotary encoder
+  - Click Volume to enter edit mode (shown as `[ Volume: 50% ]`)
+  - Rotate encoder to adjust (5% per detent)
+  - Click again to save and exit edit mode
+  - Removed old Volume Up/Down menu items
+
+#### 🐛 Bug Fixes
+
+- **PulseAudio access** - Volume commands now use `XDG_RUNTIME_DIR=/run/user/1000` to access user session
+- **Connect menu** - Now shows both paired AND trusted devices (some devices lose pairing but keep trust)
+
+#### 🔄 Modified Files
+
+- `gui/menu.py` - Menu scrolling, encoder volume editing, trusted device support
+
+---
+
 ## [v0.17.0] - 2025-12-02
 
 ### Telemetry Recording, Bluetooth Audio & Encoder Fixes 📊🎵
