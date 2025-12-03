@@ -83,7 +83,7 @@ class NeoDriverHandler:
         # Thread control
         self.thread = None
         self.running = False
-        self.update_rate = 30  # Hz
+        self.update_rate = 15  # Hz (reduced to avoid I2C bus contention)
 
         # Thread-safe state
         self.state_lock = threading.Lock()
@@ -170,12 +170,21 @@ class NeoDriverHandler:
     def _update_loop(self):
         """Background thread that updates the LED strip."""
         update_interval = 1.0 / self.update_rate
+        consecutive_errors = 0
 
         while self.running:
             start_time = time.time()
 
             try:
                 self._render_mode()
+                consecutive_errors = 0
+            except OSError as e:
+                # I2C errors are common due to bus contention - only log after threshold
+                consecutive_errors += 1
+                if consecutive_errors == 3:
+                    print(f"NeoDriver: I2C errors ({e}), will retry silently")
+                # Back off slightly on errors
+                time.sleep(0.05)
             except Exception as e:
                 print(f"Error in NeoDriver update loop: {e}")
 
@@ -211,7 +220,7 @@ class NeoDriverHandler:
         self.pixels.fill((0, 0, 0))
 
     def _render_delta(self):
-        """Render lap time delta visualisation."""
+        """Render lap time delta visualisation (centre-out)."""
         with self.state_lock:
             delta = self.delta_value
 
@@ -222,24 +231,24 @@ class NeoDriverHandler:
         # Clear all
         self.pixels.fill((0, 0, 0))
 
-        if normalised > 0:
-            # Ahead - green from centre outward
-            num_lit = int(abs(normalised) * (self.num_pixels // 2))
-            centre = self.num_pixels // 2
-            for i in range(num_lit):
-                if centre + i < self.num_pixels:
-                    self.pixels[centre + i] = (0, 255, 0)
-                if centre - 1 - i >= 0:
-                    self.pixels[centre - 1 - i] = (0, 255, 0)
-        else:
-            # Behind - red from centre outward
-            num_lit = int(abs(normalised) * (self.num_pixels // 2))
-            centre = self.num_pixels // 2
-            for i in range(num_lit):
-                if centre + i < self.num_pixels:
-                    self.pixels[centre + i] = (255, 0, 0)
-                if centre - 1 - i >= 0:
-                    self.pixels[centre - 1 - i] = (255, 0, 0)
+        # Centre pixel index
+        centre = self.num_pixels // 2
+        # Max LEDs on each side (including centre)
+        max_side = centre + 1
+
+        # Calculate how many to light (1 = just centre, max_side = all)
+        num_lit = max(1, int(abs(normalised) * max_side + 0.5))
+
+        # Choose colour: green if ahead, red if behind
+        colour = (0, 255, 0) if normalised >= 0 else (255, 0, 0)
+
+        # Light centre pixel first, then expand outward
+        self.pixels[centre] = colour
+        for i in range(1, num_lit):
+            if centre + i < self.num_pixels:
+                self.pixels[centre + i] = colour
+            if centre - i >= 0:
+                self.pixels[centre - i] = colour
 
     def _render_overtake(self):
         """Render overtake warning lights."""
@@ -262,31 +271,47 @@ class NeoDriverHandler:
                 self.pixels.fill((0, 0, 0))
 
     def _render_shift(self):
-        """Render RPM-based shift lights."""
+        """Render RPM-based shift lights (centre-out with gradient)."""
         with self.state_lock:
             rpm = self.shift_rpm
             max_rpm = self.shift_max_rpm
 
-        # Calculate how many LEDs to light
+        # Calculate RPM percentage
         rpm_pct = max(0, min(1.0, rpm / max_rpm))
-        num_lit = int(rpm_pct * self.num_pixels)
 
-        # Colour gradient: green -> yellow -> red
-        for i in range(self.num_pixels):
-            if i < num_lit:
-                # Progress through colour range
-                progress = i / self.num_pixels
-                if progress < 0.5:
-                    # Green to yellow
-                    r = int(255 * (progress * 2))
-                    g = 255
-                else:
-                    # Yellow to red
-                    r = 255
-                    g = int(255 * (1 - (progress - 0.5) * 2))
-                self.pixels[i] = (r, g, 0)
+        # Centre pixel index and max expansion
+        centre = self.num_pixels // 2
+        max_side = centre + 1  # 5 levels for 9 pixels (0-4 from centre)
+
+        # Calculate how many rings to light (1 = just centre, max_side = all)
+        num_rings = int(rpm_pct * max_side + 0.5)
+
+        # Clear all
+        self.pixels.fill((0, 0, 0))
+
+        # Light from centre outward with colour gradient
+        for ring in range(num_rings):
+            # Progress through colour range (0=green, 1=red)
+            progress = ring / max(1, max_side - 1)
+            if progress < 0.5:
+                # Green to yellow
+                r = int(255 * (progress * 2))
+                g = 255
             else:
-                self.pixels[i] = (0, 0, 0)
+                # Yellow to red
+                r = 255
+                g = int(255 * (1 - (progress - 0.5) * 2))
+            colour = (r, g, 0)
+
+            # Light centre pixel
+            if ring == 0:
+                self.pixels[centre] = colour
+            else:
+                # Light pixels either side of centre
+                if centre + ring < self.num_pixels:
+                    self.pixels[centre + ring] = colour
+                if centre - ring >= 0:
+                    self.pixels[centre - ring] = colour
 
         # Flash all red at redline (>95%)
         if rpm_pct > 0.95:
