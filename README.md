@@ -474,12 +474,13 @@ openTPT/
 - [ ] PA1616S Adafruit GPS - for lap timing and position logging
 - [ ] Adafruit NeoDriver - LED strip control
 - [ ] MCP9601 Thermocouples - brake temperature sensors (per corner)
+- [ ] LTR-559 Auto brightness - ambient light sensor for automatic display brightness (enable/disable + offset settings)
 
 ### Software TODO
 - [x] Bluetooth audio menu - scan, pair, connect, disconnect, forget (requires PulseAudio)
+- [x] Display menu - encoder-based brightness control
 - [ ] CopePilot integration
 - [ ] TPMS menu expansion - swap corners, view sensor data
-- [ ] Display menu - brightness control (currently shows value but not adjustable)
 - [ ] Tyre temps menu - corner sensor details, full frame view for installation verification, flip inner/outer
 - [ ] Camera view options - mirror, rotate settings for front/rear cameras
 - [ ] Units menu - °C/°F, PSI/BAR/kPa, km/h/mph switching

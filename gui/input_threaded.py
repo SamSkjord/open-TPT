@@ -239,26 +239,10 @@ class InputHandlerThreaded:
             else:
                 self.neokey.pixels[BUTTON_RECORDING] = (64, 0, 0)  # Dim red when idle
 
-            # Button 1: Page settings (yellow, brightness varies with state)
-            if self.button_states[BUTTON_PAGE_SETTINGS]:
-                self.neokey.pixels[BUTTON_PAGE_SETTINGS] = (255, 255, 0)
-            else:
-                # Color set by main app based on current page settings
-                self.neokey.pixels[BUTTON_PAGE_SETTINGS] = (64, 64, 0)
-
-            # Button 2: Category switch (blue when pressed, color shows current item in category)
-            if self.button_states[BUTTON_CATEGORY_SWITCH]:
-                self.neokey.pixels[BUTTON_CATEGORY_SWITCH] = (255, 255, 255)
-            else:
-                # Color set by main app based on current page in category
-                self.neokey.pixels[BUTTON_CATEGORY_SWITCH] = (0, 64, 128)
-
-            # Button 3: View mode (red=camera, green=UI pages)
-            if self.button_states[BUTTON_VIEW_MODE]:
-                self.neokey.pixels[BUTTON_VIEW_MODE] = (255, 255, 255)
-            else:
-                # Color set by main app based on current mode
-                self.neokey.pixels[BUTTON_VIEW_MODE] = (128, 0, 128)  # Purple default
+            # Buttons 1, 2, 3: Solid teal
+            self.neokey.pixels[BUTTON_PAGE_SETTINGS] = (0, 64, 64)
+            self.neokey.pixels[BUTTON_CATEGORY_SWITCH] = (0, 64, 64)
+            self.neokey.pixels[BUTTON_VIEW_MODE] = (0, 64, 64)
 
         except Exception as e:
             print(f"Error updating NeoKey LEDs: {e}")
