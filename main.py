@@ -22,6 +22,7 @@ from gui.camera import Camera
 from gui.input_threaded import InputHandlerThreaded as InputHandler
 from gui.encoder_input import EncoderInputHandler
 from gui.menu import MenuSystem
+from hardware.neodriver_handler import NeoDriverHandler, NeoDriverMode
 from gui.scale_bars import ScaleBars
 from gui.icon_handler import IconHandler
 from gui.gmeter import GMeterDisplay
@@ -92,6 +93,12 @@ from utils.config import (
     ENCODER_POLL_RATE,
     ENCODER_LONG_PRESS_MS,
     ENCODER_BRIGHTNESS_STEP,
+    # NeoDriver configuration
+    NEODRIVER_ENABLED,
+    NEODRIVER_I2C_ADDRESS,
+    NEODRIVER_NUM_PIXELS,
+    NEODRIVER_BRIGHTNESS,
+    NEODRIVER_DEFAULT_MODE,
     # Memory monitoring configuration
     MEMORY_MONITORING_ENABLED,
     # Thermal stale data timeout
@@ -583,6 +590,36 @@ class OpenTPT:
             except Exception as e:
                 print(f"Warning: Could not initialise encoder: {e}")
                 self.encoder = None
+
+        # Initialise NeoDriver LED strip (optional)
+        self.neodriver = None
+        if NEODRIVER_ENABLED:
+            try:
+                # Convert mode string to enum
+                mode_map = {
+                    "off": NeoDriverMode.OFF,
+                    "delta": NeoDriverMode.DELTA,
+                    "overtake": NeoDriverMode.OVERTAKE,
+                    "shift": NeoDriverMode.SHIFT,
+                    "rainbow": NeoDriverMode.RAINBOW,
+                }
+                default_mode = mode_map.get(NEODRIVER_DEFAULT_MODE, NeoDriverMode.OFF)
+
+                self.neodriver = NeoDriverHandler(
+                    i2c_address=NEODRIVER_I2C_ADDRESS,
+                    num_pixels=NEODRIVER_NUM_PIXELS,
+                    brightness=NEODRIVER_BRIGHTNESS,
+                    default_mode=default_mode,
+                )
+                if self.neodriver.is_available():
+                    self.neodriver.start()
+                    print(f"NeoDriver initialised with {NEODRIVER_NUM_PIXELS} pixels, mode: {NEODRIVER_DEFAULT_MODE}")
+                else:
+                    print("Warning: NeoDriver not detected")
+                    self.neodriver = None
+            except Exception as e:
+                print(f"Warning: Could not initialise NeoDriver: {e}")
+                self.neodriver = None
 
         # Create hardware handlers
         self.tpms = TPMSHandler()
@@ -1459,6 +1496,8 @@ class OpenTPT:
             self.input_handler.stop()
         if self.encoder:
             self.encoder.stop()
+        if self.neodriver:
+            self.neodriver.stop()
         self.tpms.stop()
         self.corner_sensors.stop()
 

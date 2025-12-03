@@ -1,5 +1,32 @@
 # Changelog - openTPT
 
+## [v0.17.2] - 2025-12-03
+
+### NeoDriver LED Strip Support 💡
+
+#### ✨ New Features
+
+- **Adafruit NeoDriver support** - I2C to NeoPixel driver at 0x60
+  - Multiple display modes: off, delta, overtake, shift, rainbow
+  - Thread-safe 30Hz updates
+  - Configurable pixel count and brightness
+  - Delta mode: green ahead, red behind (lap time delta)
+  - Overtake mode: colour-coded warnings from radar
+  - Shift mode: RPM-based shift lights with colour gradient
+  - Rainbow mode: test/demo animation
+
+#### 🐛 Bug Fixes
+
+- **NeoDriver init retry** - Added retry logic with delays for I2C bus contention during startup
+
+#### 🔄 Modified Files
+
+- `hardware/neodriver_handler.py` - New NeoDriver handler
+- `utils/config.py` - NeoDriver configuration options
+- `main.py` - NeoDriver integration
+
+---
+
 ## [v0.17.1] - 2025-12-03
 
 ### Menu Scrolling & Encoder-Based Settings 🎚️

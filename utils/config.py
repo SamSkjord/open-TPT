@@ -599,6 +599,13 @@ ENCODER_POLL_RATE = 20  # Hz - polling frequency
 ENCODER_LONG_PRESS_MS = 500  # Milliseconds for long press detection
 ENCODER_BRIGHTNESS_STEP = 0.05  # Brightness change per detent
 
+# NeoDriver LED Strip (Adafruit NeoDriver - I2C to NeoPixel)
+NEODRIVER_ENABLED = True
+NEODRIVER_I2C_ADDRESS = 0x60  # Default NeoDriver address
+NEODRIVER_NUM_PIXELS = 8  # Number of NeoPixels in strip
+NEODRIVER_BRIGHTNESS = 0.3  # LED brightness (0.0-1.0)
+NEODRIVER_DEFAULT_MODE = "rainbow"  # off, delta, overtake, shift, rainbow
+
 # ==============================================================================
 # HELPER FUNCTIONS
 # ==============================================================================
