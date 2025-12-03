@@ -22,6 +22,7 @@ except ImportError:
 OBD_REQUEST_ID = 0x7DF
 OBD_RESPONSE_MIN = 0x7E8
 OBD_RESPONSE_MAX = 0x7EF
+PID_ENGINE_RPM = 0x0C  # Engine RPM: ((A * 256) + B) / 4
 PID_VEHICLE_SPEED = 0x0D  # Vehicle speed in km/h
 PID_INTAKE_MAP = 0x0B  # Intake manifold absolute pressure (kPa)
 
@@ -50,6 +51,10 @@ class OBD2Handler(BoundedQueueHardwareHandler):
         # Current speed with smoothing
         self.current_speed_kmh = 0
         self.speed_history = deque(maxlen=5)  # Rolling window for smoothing (O(1) operations)
+
+        # Engine RPM with smoothing
+        self.current_rpm = 0
+        self.rpm_history = deque(maxlen=3)  # Rolling window for smoothing (O(1) operations)
 
         # MAP (manifold absolute pressure) for simulating SOC
         self.current_map_kpa = 0
@@ -90,6 +95,16 @@ class OBD2Handler(BoundedQueueHardwareHandler):
         """Build OBD2 request for vehicle speed (PID 0x0D)."""
         # Service 0x01 (show current data), PID 0x0D (vehicle speed)
         data = [0x02, 0x01, PID_VEHICLE_SPEED] + [0x00] * 5
+        return can.Message(
+            arbitration_id=OBD_REQUEST_ID,
+            is_extended_id=False,
+            data=data
+        )
+
+    def _build_rpm_request(self):
+        """Build OBD2 request for engine RPM (PID 0x0C)."""
+        # Service 0x01 (show current data), PID 0x0C (RPM)
+        data = [0x02, 0x01, PID_ENGINE_RPM] + [0x00] * 5
         return can.Message(
             arbitration_id=OBD_REQUEST_ID,
             is_extended_id=False,
@@ -139,6 +154,46 @@ class OBD2Handler(BoundedQueueHardwareHandler):
                     # Speed is in byte 3, directly in km/h
                     speed_kmh = msg.data[3]
                     return speed_kmh
+
+            except Exception as e:
+                # Timeout or read error
+                return None
+
+        return None
+
+    def _wait_for_rpm_response(self, timeout_s=0.2):
+        """
+        Wait for an RPM response from the vehicle.
+
+        Returns:
+            Engine RPM, or None if no response
+        """
+        if not self.bus:
+            return None
+
+        deadline = time.time() + timeout_s
+        while time.time() < deadline:
+            remaining = max(0.0, deadline - time.time())
+            try:
+                msg = self.bus.recv(timeout=remaining)
+                if msg is None:
+                    continue
+
+                # Check if this is a valid response to our RPM request
+                # Response format: [length, 0x41, PID, A, B, ...]
+                # RPM = ((A * 256) + B) / 4
+                if not (OBD_RESPONSE_MIN <= msg.arbitration_id <= OBD_RESPONSE_MAX):
+                    continue
+                if msg.is_extended_id:
+                    continue
+                if len(msg.data) < 5:  # RPM needs 2 data bytes
+                    continue
+
+                # Safe to access array elements now
+                if msg.data[1] == 0x41 and msg.data[2] == PID_ENGINE_RPM:
+                    # RPM is in bytes 3-4: ((A * 256) + B) / 4
+                    rpm = ((msg.data[3] * 256) + msg.data[4]) / 4
+                    return int(rpm)
 
             except Exception as e:
                 # Timeout or read error
@@ -284,6 +339,21 @@ class OBD2Handler(BoundedQueueHardwareHandler):
                         # Don't treat as error, just keep last known speed
                         pass
 
+                    # Send RPM request
+                    rpm_request = self._build_rpm_request()
+                    self.bus.send(rpm_request, timeout=0.1)
+
+                    # Wait for RPM response
+                    rpm = self._wait_for_rpm_response(timeout_s=0.15)
+
+                    if rpm is not None:
+                        # Add to history for smoothing (auto-drops oldest when full)
+                        self.rpm_history.append(rpm)
+
+                        # Calculate smoothed RPM (moving average)
+                        smoothed_rpm = sum(self.rpm_history) / len(self.rpm_history)
+                        self.current_rpm = int(round(smoothed_rpm))
+
                     # Send MAP request (for simulating SOC)
                     map_request = self._build_map_request()
                     self.bus.send(map_request, timeout=0.1)
@@ -302,9 +372,10 @@ class OBD2Handler(BoundedQueueHardwareHandler):
                         # Calculate state (idle/increasing/decreasing)
                         state = self._calculate_map_state()
 
-                    # Publish combined data (speed and SOC)
+                    # Publish combined data (speed, RPM, and SOC)
                     data = {
                         'speed_kmh': self.current_speed_kmh,
+                        'rpm': self.current_rpm,
                         'map_kpa': self.current_map_kpa,
                         'simulated_soc': self.simulated_soc,
                         'soc_state': state if map_kpa is not None else 'idle',
@@ -328,6 +399,10 @@ class OBD2Handler(BoundedQueueHardwareHandler):
     def get_speed_kmh(self):
         """Get current vehicle speed in km/h."""
         return self.current_speed_kmh
+
+    def get_rpm(self):
+        """Get current engine RPM."""
+        return self.current_rpm
 
     def cleanup(self):
         """Clean up CAN bus resources."""

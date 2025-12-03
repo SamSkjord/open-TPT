@@ -22,7 +22,7 @@ from gui.camera import Camera
 from gui.input_threaded import InputHandlerThreaded as InputHandler
 from gui.encoder_input import EncoderInputHandler
 from gui.menu import MenuSystem
-from hardware.neodriver_handler import NeoDriverHandler, NeoDriverMode
+from hardware.neodriver_handler import NeoDriverHandler, NeoDriverMode, NeoDriverDirection
 from gui.scale_bars import ScaleBars
 from gui.icon_handler import IconHandler
 from gui.gmeter import GMeterDisplay
@@ -99,6 +99,9 @@ from utils.config import (
     NEODRIVER_NUM_PIXELS,
     NEODRIVER_BRIGHTNESS,
     NEODRIVER_DEFAULT_MODE,
+    NEODRIVER_DEFAULT_DIRECTION,
+    NEODRIVER_MAX_RPM,
+    NEODRIVER_SHIFT_RPM,
     # Memory monitoring configuration
     MEMORY_MONITORING_ENABLED,
     # Thermal stale data timeout
@@ -603,13 +606,23 @@ class OpenTPT:
                     "shift": NeoDriverMode.SHIFT,
                     "rainbow": NeoDriverMode.RAINBOW,
                 }
+                direction_map = {
+                    "left_right": NeoDriverDirection.LEFT_RIGHT,
+                    "right_left": NeoDriverDirection.RIGHT_LEFT,
+                    "centre_out": NeoDriverDirection.CENTRE_OUT,
+                    "edges_in": NeoDriverDirection.EDGES_IN,
+                }
                 default_mode = mode_map.get(NEODRIVER_DEFAULT_MODE, NeoDriverMode.OFF)
+                default_direction = direction_map.get(NEODRIVER_DEFAULT_DIRECTION, NeoDriverDirection.CENTRE_OUT)
 
                 self.neodriver = NeoDriverHandler(
                     i2c_address=NEODRIVER_I2C_ADDRESS,
                     num_pixels=NEODRIVER_NUM_PIXELS,
                     brightness=NEODRIVER_BRIGHTNESS,
                     default_mode=default_mode,
+                    default_direction=default_direction,
+                    max_rpm=NEODRIVER_MAX_RPM,
+                    shift_rpm=NEODRIVER_SHIFT_RPM,
                 )
                 if self.neodriver.is_available():
                     self.neodriver.start()
@@ -667,6 +680,7 @@ class OpenTPT:
             tpms_handler=self.tpms,
             encoder_handler=self.encoder,
             input_handler=self.input_handler,
+            neodriver_handler=self.neodriver,
         )
 
         # Start monitoring threads
@@ -1101,6 +1115,12 @@ class OpenTPT:
 
                 elif stats and 'error' in stats:
                     print(f"MEMORY: Collection error: {stats['error']}")
+
+        # Update NeoDriver with OBD2 RPM data
+        if self.neodriver and self.obd2:
+            obd_data = self.obd2.get_data()
+            if obd_data and 'rpm' in obd_data:
+                self.neodriver.set_rpm(obd_data['rpm'])
 
         # Check for NeoKey inputs (non-blocking, handled by background thread)
         input_events = self.input_handler.check_input()

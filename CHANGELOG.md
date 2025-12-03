@@ -1,5 +1,32 @@
 # Changelog - openTPT
 
+## [v0.17.3] - 2025-12-03
+
+### NeoDriver Menu & OBD2 RPM 🎛️
+
+#### ✨ New Features
+
+- **Light Strip settings menu** - Configure mode and direction from Settings menu
+  - Mode selection: Shift, Delta, Overtake, Off
+  - Direction selection: Centre Out, Edges In, Left to Right, Right to Left
+- **OBD2 RPM reading** - Engine RPM now read from vehicle
+  - Automatic shift light updates based on live RPM
+  - Configurable max RPM and shift point
+- **Animation directions** - All render modes now support configurable direction
+  - Centre Out: grow from middle pixel outward
+  - Edges In: grow from edges toward centre
+  - Left to Right / Right to Left: linear fill
+
+#### 🔄 Modified Files
+
+- `gui/menu.py` - Light Strip submenu with mode/direction settings
+- `hardware/obd2_handler.py` - Added RPM reading (PID 0x0C)
+- `hardware/neodriver_handler.py` - Direction enum and direction-aware rendering
+- `utils/config.py` - Added NEODRIVER_MAX_RPM, NEODRIVER_SHIFT_RPM, NEODRIVER_DEFAULT_DIRECTION
+- `main.py` - Wire RPM to NeoDriver, pass neodriver_handler to MenuSystem
+
+---
+
 ## [v0.17.2] - 2025-12-03
 
 ### NeoDriver LED Strip Support 💡
@@ -8,12 +35,13 @@
 
 - **Adafruit NeoDriver support** - I2C to NeoPixel driver at 0x60
   - Multiple display modes: off, delta, overtake, shift, rainbow
-  - Thread-safe 30Hz updates
+  - Thread-safe 15Hz updates
   - Configurable pixel count and brightness
   - Delta mode: green ahead, red behind (lap time delta)
   - Overtake mode: colour-coded warnings from radar
   - Shift mode: RPM-based shift lights with colour gradient
   - Rainbow mode: test/demo animation
+  - Startup animation: rainbow sweep on/off
 
 #### 🐛 Bug Fixes
 

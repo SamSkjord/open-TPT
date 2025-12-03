@@ -605,6 +605,9 @@ NEODRIVER_I2C_ADDRESS = 0x60  # Default NeoDriver address
 NEODRIVER_NUM_PIXELS = 9  # Number of NeoPixels in strip
 NEODRIVER_BRIGHTNESS = 0.3  # LED brightness (0.0-1.0)
 NEODRIVER_DEFAULT_MODE = "shift"  # off, delta, overtake, shift, rainbow
+NEODRIVER_DEFAULT_DIRECTION = "centre_out"  # left_right, right_left, centre_out, edges_in
+NEODRIVER_MAX_RPM = 7000  # Maximum RPM for shift light scale
+NEODRIVER_SHIFT_RPM = 6500  # RPM at which shift indicator flashes (redline)
 
 # ==============================================================================
 # HELPER FUNCTIONS

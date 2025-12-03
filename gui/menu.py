@@ -22,6 +22,13 @@ from utils.config import (
     GREY,
 )
 
+# Import NeoDriver types for menu
+try:
+    from hardware.neodriver_handler import NeoDriverMode, NeoDriverDirection
+    NEODRIVER_TYPES_AVAILABLE = True
+except ImportError:
+    NEODRIVER_TYPES_AVAILABLE = False
+
 
 # Menu colours
 MENU_BG_COLOUR = (20, 20, 30, 230)  # Dark blue-grey, semi-transparent
@@ -314,7 +321,7 @@ class MenuSystem:
     Manages the root menu and all submenus for openTPT.
     """
 
-    def __init__(self, tpms_handler=None, encoder_handler=None, input_handler=None):
+    def __init__(self, tpms_handler=None, encoder_handler=None, input_handler=None, neodriver_handler=None):
         """
         Initialise the menu system.
 
@@ -322,10 +329,12 @@ class MenuSystem:
             tpms_handler: TPMS handler for pairing functions
             encoder_handler: Encoder handler for brightness control
             input_handler: Input handler for display brightness sync
+            neodriver_handler: NeoDriver handler for LED strip control
         """
         self.tpms_handler = tpms_handler
         self.encoder_handler = encoder_handler
         self.input_handler = input_handler
+        self.neodriver_handler = neodriver_handler
         self.current_menu: Optional[Menu] = None
         self.root_menu: Optional[Menu] = None
 
@@ -385,17 +394,39 @@ class MenuSystem:
         ))
         display_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
 
+        # Light Strip submenu (NeoDriver)
+        lights_menu = Menu("Light Strip")
+        lights_menu.add_item(MenuItem(
+            "Mode",
+            dynamic_label=lambda: self._get_lights_mode_label()
+        ))
+        lights_menu.add_item(MenuItem("Shift Lights", action=lambda: self._set_lights_mode("shift")))
+        lights_menu.add_item(MenuItem("Lap Delta", action=lambda: self._set_lights_mode("delta")))
+        lights_menu.add_item(MenuItem("Overtake", action=lambda: self._set_lights_mode("overtake")))
+        lights_menu.add_item(MenuItem("Off", action=lambda: self._set_lights_mode("off")))
+        lights_menu.add_item(MenuItem(
+            "Direction",
+            dynamic_label=lambda: self._get_lights_direction_label()
+        ))
+        lights_menu.add_item(MenuItem("Centre Out", action=lambda: self._set_lights_direction("centre_out")))
+        lights_menu.add_item(MenuItem("Edges In", action=lambda: self._set_lights_direction("edges_in")))
+        lights_menu.add_item(MenuItem("Left to Right", action=lambda: self._set_lights_direction("left_right")))
+        lights_menu.add_item(MenuItem("Right to Left", action=lambda: self._set_lights_direction("right_left")))
+        lights_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+
         # Root menu
         self.root_menu = Menu("Settings")
         self.root_menu.add_item(MenuItem("TPMS", submenu=tpms_menu))
         self.root_menu.add_item(MenuItem("Bluetooth", submenu=bt_menu))
         self.root_menu.add_item(MenuItem("Display", submenu=display_menu))
+        self.root_menu.add_item(MenuItem("Light Strip", submenu=lights_menu))
         self.root_menu.add_item(MenuItem("Back", action=lambda: self._close_menu()))
 
         # Set parent references
         tpms_menu.parent = self.root_menu
         bt_menu.parent = self.root_menu
         display_menu.parent = self.root_menu
+        lights_menu.parent = self.root_menu
 
     def _get_brightness(self) -> float:
         """Get current brightness from encoder handler."""
@@ -451,6 +482,68 @@ class MenuSystem:
             return result.returncode == 0
         except Exception:
             return False
+
+    # Light Strip (NeoDriver) methods
+
+    def _get_lights_mode_label(self) -> str:
+        """Get current light strip mode label."""
+        if not self.neodriver_handler or not NEODRIVER_TYPES_AVAILABLE:
+            return "Mode: N/A"
+        mode = self.neodriver_handler.mode
+        mode_names = {
+            NeoDriverMode.OFF: "Off",
+            NeoDriverMode.SHIFT: "Shift",
+            NeoDriverMode.DELTA: "Delta",
+            NeoDriverMode.OVERTAKE: "Overtake",
+            NeoDriverMode.RAINBOW: "Rainbow",
+        }
+        return f"Mode: {mode_names.get(mode, 'Unknown')}"
+
+    def _get_lights_direction_label(self) -> str:
+        """Get current light strip direction label."""
+        if not self.neodriver_handler or not NEODRIVER_TYPES_AVAILABLE:
+            return "Direction: N/A"
+        direction = self.neodriver_handler.direction
+        direction_names = {
+            NeoDriverDirection.LEFT_RIGHT: "Left to Right",
+            NeoDriverDirection.RIGHT_LEFT: "Right to Left",
+            NeoDriverDirection.CENTRE_OUT: "Centre Out",
+            NeoDriverDirection.EDGES_IN: "Edges In",
+        }
+        return f"Direction: {direction_names.get(direction, 'Unknown')}"
+
+    def _set_lights_mode(self, mode_str: str) -> str:
+        """Set the light strip mode."""
+        if not self.neodriver_handler or not NEODRIVER_TYPES_AVAILABLE:
+            return "Light strip not available"
+        mode_map = {
+            "off": NeoDriverMode.OFF,
+            "shift": NeoDriverMode.SHIFT,
+            "delta": NeoDriverMode.DELTA,
+            "overtake": NeoDriverMode.OVERTAKE,
+            "rainbow": NeoDriverMode.RAINBOW,
+        }
+        mode = mode_map.get(mode_str)
+        if mode:
+            self.neodriver_handler.set_mode(mode)
+            return f"Mode set to {mode_str}"
+        return "Invalid mode"
+
+    def _set_lights_direction(self, direction_str: str) -> str:
+        """Set the light strip direction."""
+        if not self.neodriver_handler or not NEODRIVER_TYPES_AVAILABLE:
+            return "Light strip not available"
+        direction_map = {
+            "left_right": NeoDriverDirection.LEFT_RIGHT,
+            "right_left": NeoDriverDirection.RIGHT_LEFT,
+            "centre_out": NeoDriverDirection.CENTRE_OUT,
+            "edges_in": NeoDriverDirection.EDGES_IN,
+        }
+        direction = direction_map.get(direction_str)
+        if direction:
+            self.neodriver_handler.set_direction(direction)
+            return f"Direction set to {direction_str.replace('_', ' ')}"
+        return "Invalid direction"
 
     def _start_tpms_pairing(self, position: str) -> str:
         """Start TPMS pairing for a position."""

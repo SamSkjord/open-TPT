@@ -42,6 +42,14 @@ class NeoDriverMode(Enum):
     RAINBOW = "rainbow"
 
 
+class NeoDriverDirection(Enum):
+    """Animation direction for the NeoDriver LED strip."""
+    LEFT_RIGHT = "left_right"      # Grow from left (pixel 0) to right
+    RIGHT_LEFT = "right_left"      # Grow from right to left (pixel 0)
+    CENTRE_OUT = "centre_out"      # Grow from centre outward
+    EDGES_IN = "edges_in"          # Grow from edges toward centre
+
+
 class NeoDriverHandler:
     """
     Handler for Adafruit NeoDriver I2C to NeoPixel driver.
@@ -61,6 +69,9 @@ class NeoDriverHandler:
         num_pixels: int = 8,
         brightness: float = 0.3,
         default_mode: NeoDriverMode = NeoDriverMode.OFF,
+        default_direction: NeoDriverDirection = NeoDriverDirection.CENTRE_OUT,
+        max_rpm: int = 7000,
+        shift_rpm: int = 6500,
     ):
         """
         Initialise the NeoDriver handler.
@@ -70,11 +81,15 @@ class NeoDriverHandler:
             num_pixels: Number of NeoPixels in strip
             brightness: LED brightness (0.0-1.0)
             default_mode: Initial display mode
+            default_direction: Animation direction (left_right, right_left, centre_out, edges_in)
+            max_rpm: Maximum RPM for shift light scale
+            shift_rpm: RPM at which redline flash activates
         """
         self.i2c_address = i2c_address
         self.num_pixels = num_pixels
         self.brightness = brightness
         self.mode = default_mode
+        self.direction = default_direction
 
         # Hardware references
         self.seesaw = None
@@ -91,8 +106,9 @@ class NeoDriverHandler:
         # Mode-specific state
         self.delta_value = 0.0  # Seconds ahead (+) or behind (-)
         self.overtake_level = 0  # 0=none, 1=caution, 2=warning, 3=danger
-        self.shift_rpm = 0  # Current RPM
-        self.shift_max_rpm = 7000  # Max RPM for shift lights
+        self.current_rpm = 0  # Current RPM
+        self.max_rpm = max_rpm  # Max RPM for shift lights scale
+        self.shift_rpm = shift_rpm  # RPM at which redline activates
         self.rainbow_offset = 0  # Animation offset
 
         # Initialise hardware
@@ -256,8 +272,53 @@ class NeoDriverHandler:
         """Turn off all LEDs."""
         self.pixels.fill((0, 0, 0))
 
+    def _get_pixel_order(self, num_lit: int) -> List[int]:
+        """
+        Get pixel indices to light based on current direction setting.
+
+        Args:
+            num_lit: Number of pixels to light
+
+        Returns:
+            List of pixel indices in order they should be lit
+        """
+        with self.state_lock:
+            direction = self.direction
+
+        centre = self.num_pixels // 2
+        indices = []
+
+        if direction == NeoDriverDirection.LEFT_RIGHT:
+            # Grow from left (pixel 0) to right
+            indices = list(range(min(num_lit, self.num_pixels)))
+
+        elif direction == NeoDriverDirection.RIGHT_LEFT:
+            # Grow from right to left
+            indices = list(range(self.num_pixels - 1, max(-1, self.num_pixels - 1 - num_lit), -1))
+
+        elif direction == NeoDriverDirection.CENTRE_OUT:
+            # Grow from centre outward
+            indices.append(centre)
+            for i in range(1, num_lit):
+                if centre + i < self.num_pixels:
+                    indices.append(centre + i)
+                if centre - i >= 0:
+                    indices.append(centre - i)
+
+        elif direction == NeoDriverDirection.EDGES_IN:
+            # Grow from edges toward centre
+            for i in range(num_lit):
+                left_idx = i
+                right_idx = self.num_pixels - 1 - i
+                if left_idx <= centre and left_idx not in indices:
+                    indices.append(left_idx)
+                if right_idx >= centre and right_idx not in indices:
+                    indices.append(right_idx)
+
+        return indices[:num_lit]
+
     def _render_delta(self):
-        """Render lap time delta visualisation (centre-out)."""
+        """Render lap time delta visualisation."""
         with self.state_lock:
             delta = self.delta_value
 
@@ -268,24 +329,15 @@ class NeoDriverHandler:
         # Clear all
         self.pixels.fill((0, 0, 0))
 
-        # Centre pixel index
-        centre = self.num_pixels // 2
-        # Max LEDs on each side (including centre)
-        max_side = centre + 1
-
-        # Calculate how many to light (1 = just centre, max_side = all)
-        num_lit = max(1, int(abs(normalised) * max_side + 0.5))
+        # Calculate how many to light based on delta magnitude
+        num_lit = max(1, int(abs(normalised) * self.num_pixels + 0.5))
 
         # Choose colour: green if ahead, red if behind
         colour = (0, 255, 0) if normalised >= 0 else (255, 0, 0)
 
-        # Light centre pixel first, then expand outward
-        self.pixels[centre] = colour
-        for i in range(1, num_lit):
-            if centre + i < self.num_pixels:
-                self.pixels[centre + i] = colour
-            if centre - i >= 0:
-                self.pixels[centre - i] = colour
+        # Get pixel indices based on direction and light them
+        for idx in self._get_pixel_order(num_lit):
+            self.pixels[idx] = colour
 
     def _render_overtake(self):
         """Render overtake warning lights."""
@@ -308,28 +360,28 @@ class NeoDriverHandler:
                 self.pixels.fill((0, 0, 0))
 
     def _render_shift(self):
-        """Render RPM-based shift lights (centre-out with gradient)."""
+        """Render RPM-based shift lights with gradient."""
         with self.state_lock:
-            rpm = self.shift_rpm
-            max_rpm = self.shift_max_rpm
+            rpm = self.current_rpm
+            max_rpm = self.max_rpm
+            shift_rpm = self.shift_rpm
 
-        # Calculate RPM percentage
+        # Calculate RPM percentage for display
         rpm_pct = max(0, min(1.0, rpm / max_rpm))
 
-        # Centre pixel index and max expansion
-        centre = self.num_pixels // 2
-        max_side = centre + 1  # 5 levels for 9 pixels (0-4 from centre)
-
-        # Calculate how many rings to light (1 = just centre, max_side = all)
-        num_rings = int(rpm_pct * max_side + 0.5)
+        # Calculate how many pixels to light
+        num_lit = int(rpm_pct * self.num_pixels + 0.5)
 
         # Clear all
         self.pixels.fill((0, 0, 0))
 
-        # Light from centre outward with colour gradient
-        for ring in range(num_rings):
+        # Get pixel indices based on direction
+        pixel_order = self._get_pixel_order(num_lit)
+
+        # Light pixels with colour gradient (green -> yellow -> red)
+        for i, idx in enumerate(pixel_order):
             # Progress through colour range (0=green, 1=red)
-            progress = ring / max(1, max_side - 1)
+            progress = i / max(1, self.num_pixels - 1)
             if progress < 0.5:
                 # Green to yellow
                 r = int(255 * (progress * 2))
@@ -338,20 +390,10 @@ class NeoDriverHandler:
                 # Yellow to red
                 r = 255
                 g = int(255 * (1 - (progress - 0.5) * 2))
-            colour = (r, g, 0)
+            self.pixels[idx] = (r, g, 0)
 
-            # Light centre pixel
-            if ring == 0:
-                self.pixels[centre] = colour
-            else:
-                # Light pixels either side of centre
-                if centre + ring < self.num_pixels:
-                    self.pixels[centre + ring] = colour
-                if centre - ring >= 0:
-                    self.pixels[centre - ring] = colour
-
-        # Flash all red at redline (>95%)
-        if rpm_pct > 0.95:
+        # Flash all red at shift point (redline)
+        if rpm >= shift_rpm:
             if int(time.time() * 8) % 2:
                 self.pixels.fill((255, 0, 0))
 
@@ -392,12 +434,23 @@ class NeoDriverHandler:
         with self.state_lock:
             self.overtake_level = level
 
-    def set_shift_rpm(self, rpm: int, max_rpm: int = None):
-        """Set RPM for shift lights."""
+    def set_rpm(self, rpm: int):
+        """Set current RPM for shift lights."""
         with self.state_lock:
-            self.shift_rpm = rpm
+            self.current_rpm = rpm
+
+    def set_rpm_config(self, max_rpm: int = None, shift_rpm: int = None):
+        """Set RPM configuration for shift lights."""
+        with self.state_lock:
             if max_rpm is not None:
-                self.shift_max_rpm = max_rpm
+                self.max_rpm = max_rpm
+            if shift_rpm is not None:
+                self.shift_rpm = shift_rpm
+
+    def set_direction(self, direction: NeoDriverDirection):
+        """Set animation direction."""
+        with self.state_lock:
+            self.direction = direction
 
     def set_brightness(self, brightness: float):
         """Set LED brightness (0.0-1.0)."""
