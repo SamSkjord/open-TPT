@@ -629,6 +629,7 @@ class OpenTPT:
         self.menu = MenuSystem(
             tpms_handler=self.tpms,
             encoder_handler=self.encoder,
+            input_handler=self.input_handler,
         )
 
         # Start monitoring threads
