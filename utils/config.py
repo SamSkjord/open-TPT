@@ -406,7 +406,8 @@ BRAKE_ROTOR_EMISSIVITY = {
 
 # Enable/disable TOF distance sensors per corner
 # VL53L0X sensors measure distance to ground (ride height) in millimetres
-TOF_ENABLED = True  # Master enable for all TOF sensors
+# Disabled: VL53L0X not reliable enough for ride height measurement
+TOF_ENABLED = False  # Master enable for all TOF sensors
 
 # Per-corner TOF sensor enable
 # Set to True/False to enable/disable individual corners

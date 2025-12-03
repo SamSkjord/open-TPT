@@ -1,5 +1,40 @@
 # Changelog - openTPT
 
+## [v0.17.4] - 2025-12-03
+
+### I2C Resilience & Delta Mode Improvements 🔧
+
+#### ✨ New Features
+
+- **Delta mode improvements** - Non-linear scale and corrected colours
+  - Thresholds: 0.1s, 0.5s, 1.0s, 5.0s for progressive display
+  - Colours now match top bar: red=slower, green=faster
+- **Symmetrical light animations** - Centre-out and edges-in now light in proper pairs
+- **Brightness sync** - Light strip brightness follows display brightness setting
+
+#### 🐛 Bug Fixes
+
+- **I2C retry logic** - All seesaw devices now retry on init failure
+  - Encoder, NeoKey, NeoDriver all have 3 retry attempts with delays
+  - Silent error handling reduces log spam during bus contention
+- **Delta value wiring** - Fixed timing: delta now read after value is set
+- **Light Strip menu** - Mode and Direction are now proper submenus
+
+#### ❌ Removed
+
+- **TOF distance sensors** - Disabled VL53L0X ride height measurement (unreliable)
+
+#### 🔄 Modified Files
+
+- `gui/encoder_input.py` - Init retry logic, silent I2C error handling
+- `gui/input_threaded.py` - NeoKey init retry logic, silent error handling
+- `gui/menu.py` - Light Strip menu restructured with Mode/Direction submenus
+- `hardware/neodriver_handler.py` - Symmetrical rendering, non-linear delta scale
+- `main.py` - Fixed delta/brightness update order
+- `utils/config.py` - TOF_ENABLED set to False
+
+---
+
 ## [v0.17.3] - 2025-12-03
 
 ### NeoDriver Menu & OBD2 RPM 🎛️

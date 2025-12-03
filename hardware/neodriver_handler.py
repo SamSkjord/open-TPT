@@ -297,43 +297,61 @@ class NeoDriverHandler:
             indices = list(range(self.num_pixels - 1, max(-1, self.num_pixels - 1 - num_lit), -1))
 
         elif direction == NeoDriverDirection.CENTRE_OUT:
-            # Grow from centre outward
+            # Grow symmetrically from centre outward
+            # For 9 pixels: [4], [3,5], [2,6], [1,7], [0,8]
             indices.append(centre)
-            for i in range(1, num_lit):
-                if centre + i < self.num_pixels:
-                    indices.append(centre + i)
+            for i in range(1, centre + 1):
                 if centre - i >= 0:
                     indices.append(centre - i)
+                if centre + i < self.num_pixels:
+                    indices.append(centre + i)
+            indices = indices[:num_lit]
 
         elif direction == NeoDriverDirection.EDGES_IN:
-            # Grow from edges toward centre
-            for i in range(num_lit):
+            # Grow symmetrically from edges toward centre
+            # For 9 pixels: [0,8], [1,7], [2,6], [3,5], [4]
+            for i in range(centre + 1):
                 left_idx = i
                 right_idx = self.num_pixels - 1 - i
-                if left_idx <= centre and left_idx not in indices:
+                if left_idx < right_idx:
                     indices.append(left_idx)
-                if right_idx >= centre and right_idx not in indices:
                     indices.append(right_idx)
+                elif left_idx == right_idx:
+                    indices.append(left_idx)  # Centre pixel
+            indices = indices[:num_lit]
 
-        return indices[:num_lit]
+        return indices
 
     def _render_delta(self):
-        """Render lap time delta visualisation."""
+        """Render lap time delta visualisation with non-linear scale."""
         with self.state_lock:
             delta = self.delta_value
-
-        # Scale delta to LED count (-2.0 to +2.0 seconds = full range)
-        max_delta = 2.0
-        normalised = max(-1.0, min(1.0, delta / max_delta))
 
         # Clear all
         self.pixels.fill((0, 0, 0))
 
-        # Calculate how many to light based on delta magnitude
-        num_lit = max(1, int(abs(normalised) * self.num_pixels + 0.5))
+        # Non-linear thresholds (in seconds) for 9 pixels / 5 levels:
+        # Centre (1), +pair (3), +pair (5), +pair (7), +pair (9)
+        abs_delta = abs(delta)
+        if abs_delta > 5.0:
+            num_lit = 9  # Full
+        elif abs_delta > 1.0:
+            num_lit = 7
+        elif abs_delta > 0.5:
+            num_lit = 5
+        elif abs_delta > 0.1:
+            num_lit = 3
+        elif abs_delta > 0.01:
+            num_lit = 1  # Centre only
+        else:
+            num_lit = 0  # Nothing lit when very close to zero
 
-        # Choose colour: green if ahead, red if behind
-        colour = (0, 255, 0) if normalised >= 0 else (255, 0, 0)
+        if num_lit == 0:
+            return
+
+        # Colour: red if slower (positive delta), green if faster (negative delta)
+        # Matches top bar: positive=red=slower, negative=green=faster
+        colour = (255, 0, 0) if delta > 0 else (0, 255, 0)
 
         # Get pixel indices based on direction and light them
         for idx in self._get_pixel_order(num_lit):

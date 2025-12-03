@@ -94,6 +94,7 @@ class EncoderInputHandler:
         # Thread control
         self.thread = None
         self.running = False
+        self.consecutive_errors = 0  # Track I2C errors for adaptive logging
 
         # NeoPixel state
         self.pixel_colour = (128, 128, 128)  # Default white
@@ -107,46 +108,52 @@ class EncoderInputHandler:
         # Initialise hardware
         self._initialise()
 
-    def _initialise(self) -> bool:
-        """Initialise the encoder hardware."""
+    def _initialise(self, max_retries: int = 3) -> bool:
+        """Initialise the encoder hardware with retry logic."""
         if not ENCODER_AVAILABLE:
             print("Warning: Encoder library not available - encoder disabled")
             return False
 
-        try:
-            i2c = board.I2C()
-            self.seesaw = seesaw.Seesaw(i2c, addr=self.i2c_address)
+        for attempt in range(max_retries):
+            try:
+                if attempt > 0:
+                    time.sleep(0.5)  # Wait between retries for I2C bus to settle
 
-            # Get firmware version
-            product_id = (self.seesaw.get_version() >> 16) & 0xFFFF
-            print(f"Encoder seesaw product ID: {product_id}")
+                i2c = board.I2C()
+                self.seesaw = seesaw.Seesaw(i2c, addr=self.i2c_address)
 
-            # Initialise encoder
-            self.encoder = rotaryio.IncrementalEncoder(self.seesaw)
-            self.last_position = self.encoder.position
+                # Get firmware version
+                product_id = (self.seesaw.get_version() >> 16) & 0xFFFF
+                print(f"Encoder seesaw product ID: {product_id}")
 
-            # Initialise button (pin 24 on seesaw)
-            self.seesaw.pin_mode(self.BUTTON_PIN, self.seesaw.INPUT_PULLUP)
-            self.button = digitalio.DigitalIO(self.seesaw, self.BUTTON_PIN)
+                # Initialise encoder
+                self.encoder = rotaryio.IncrementalEncoder(self.seesaw)
+                self.last_position = self.encoder.position
 
-            # Initialise NeoPixel (1 pixel on pin 6)
-            self.pixel = neopixel.NeoPixel(self.seesaw, 6, 1)
-            self.pixel.brightness = 1.0  # Use full hardware brightness, control via colour
-            # Set initial pixel to show current brightness (thread not started yet)
-            intensity = int(self.brightness * 255)
-            self.pixel_colour = (intensity, intensity, intensity)
-            self._update_pixel()
+                # Initialise button (pin 24 on seesaw)
+                self.seesaw.pin_mode(self.BUTTON_PIN, self.seesaw.INPUT_PULLUP)
+                self.button = digitalio.DigitalIO(self.seesaw, self.BUTTON_PIN)
 
-            print(f"Encoder initialised at 0x{self.i2c_address:02X}")
-            return True
+                # Initialise NeoPixel (1 pixel on pin 6)
+                self.pixel = neopixel.NeoPixel(self.seesaw, 6, 1)
+                self.pixel.brightness = 1.0  # Use full hardware brightness, control via colour
+                # Set initial pixel to show current brightness (thread not started yet)
+                intensity = int(self.brightness * 255)
+                self.pixel_colour = (intensity, intensity, intensity)
+                self._update_pixel()
 
-        except Exception as e:
-            print(f"Error initialising encoder: {e}")
-            self.seesaw = None
-            self.encoder = None
-            self.button = None
-            self.pixel = None
-            return False
+                print(f"Encoder initialised at 0x{self.i2c_address:02X}")
+                return True
+
+            except Exception as e:
+                print(f"Encoder init attempt {attempt + 1}/{max_retries} failed: {e}")
+                self.seesaw = None
+                self.encoder = None
+                self.button = None
+                self.pixel = None
+
+        print("Warning: Encoder not detected after retries")
+        return False
 
     def start(self):
         """Start the background polling thread."""
@@ -182,8 +189,19 @@ class EncoderInputHandler:
                         self._update_pixel()
                         self.pixel_update_requested = False
 
+                self.consecutive_errors = 0  # Reset on success
+
+            except OSError as e:
+                # I2C errors are common due to bus contention
+                self.consecutive_errors += 1
+                if self.consecutive_errors == 3:
+                    print(f"Encoder: I2C errors ({e}), will retry silently")
+                # Back off slightly on errors
+                time.sleep(0.05)
             except Exception as e:
-                print(f"Error in encoder poll loop: {e}")
+                self.consecutive_errors += 1
+                if self.consecutive_errors <= 3:
+                    print(f"Error in encoder poll loop: {e}")
 
             # Maintain poll rate
             elapsed = time.time() - start_time
@@ -206,7 +224,7 @@ class EncoderInputHandler:
         if delta != 0:
             # Ignore huge deltas (likely I2C glitch or position reset)
             if abs(delta) > 10:
-                print(f"Warning: Ignoring encoder position jump: {self.last_position} -> {position}")
+                # Silently ignore I2C-caused position glitches
                 self.last_position = position
             else:
                 event.rotation_delta = delta

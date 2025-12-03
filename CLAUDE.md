@@ -56,7 +56,7 @@
 - ✅ NeoKey 1x4: Physical buttons
 - ✅ Rotary Encoder: I2C QT with NeoPixel (0x36)
 - ✅ Pico Thermal: 1/4 MLX90640 (FL)
-- ✅ TOF Distance: 1/4 VL53L0X (FR)
+- ❌ TOF Distance: Disabled (VL53L0X unreliable for ride height)
 - ✅ Brake Temps: MCP9601 thermocouples (0x65/0x66)
 - ✅ Toyota Radar: can_b1_0 (keep-alive), can_b1_1 (tracks)
 - ✅ OBD2: MAP-based SOC simulation

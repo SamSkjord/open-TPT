@@ -396,22 +396,35 @@ class MenuSystem:
 
         # Light Strip submenu (NeoDriver)
         lights_menu = Menu("Light Strip")
+
+        # Mode submenu
+        mode_menu = Menu("Light Mode")
+        mode_menu.add_item(MenuItem("Shift Lights", action=lambda: self._set_lights_mode("shift")))
+        mode_menu.add_item(MenuItem("Lap Delta", action=lambda: self._set_lights_mode("delta")))
+        mode_menu.add_item(MenuItem("Overtake", action=lambda: self._set_lights_mode("overtake")))
+        mode_menu.add_item(MenuItem("Off", action=lambda: self._set_lights_mode("off")))
+        mode_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        mode_menu.parent = lights_menu
+
+        # Direction submenu
+        direction_menu = Menu("Light Direction")
+        direction_menu.add_item(MenuItem("Centre Out", action=lambda: self._set_lights_direction("centre_out")))
+        direction_menu.add_item(MenuItem("Edges In", action=lambda: self._set_lights_direction("edges_in")))
+        direction_menu.add_item(MenuItem("Left to Right", action=lambda: self._set_lights_direction("left_right")))
+        direction_menu.add_item(MenuItem("Right to Left", action=lambda: self._set_lights_direction("right_left")))
+        direction_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        direction_menu.parent = lights_menu
+
         lights_menu.add_item(MenuItem(
             "Mode",
-            dynamic_label=lambda: self._get_lights_mode_label()
+            dynamic_label=lambda: self._get_lights_mode_label(),
+            submenu=mode_menu
         ))
-        lights_menu.add_item(MenuItem("Shift Lights", action=lambda: self._set_lights_mode("shift")))
-        lights_menu.add_item(MenuItem("Lap Delta", action=lambda: self._set_lights_mode("delta")))
-        lights_menu.add_item(MenuItem("Overtake", action=lambda: self._set_lights_mode("overtake")))
-        lights_menu.add_item(MenuItem("Off", action=lambda: self._set_lights_mode("off")))
         lights_menu.add_item(MenuItem(
             "Direction",
-            dynamic_label=lambda: self._get_lights_direction_label()
+            dynamic_label=lambda: self._get_lights_direction_label(),
+            submenu=direction_menu
         ))
-        lights_menu.add_item(MenuItem("Centre Out", action=lambda: self._set_lights_direction("centre_out")))
-        lights_menu.add_item(MenuItem("Edges In", action=lambda: self._set_lights_direction("edges_in")))
-        lights_menu.add_item(MenuItem("Left to Right", action=lambda: self._set_lights_direction("left_right")))
-        lights_menu.add_item(MenuItem("Right to Left", action=lambda: self._set_lights_direction("right_left")))
         lights_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
 
         # Root menu

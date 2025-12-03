@@ -1228,6 +1228,14 @@ class OpenTPT:
             test_delta = 5.0 * math.sin(time.time() * 0.1)
             self.top_bar.set_value(test_delta)
 
+            # Update NeoDriver with lap delta (after top_bar value is set)
+            if self.neodriver:
+                self.neodriver.set_delta(self.top_bar.value)
+
+        # Sync NeoDriver brightness with display brightness
+        if self.neodriver and self.encoder:
+            self.neodriver.set_brightness(self.encoder.get_brightness())
+
         # Record telemetry frame if recording is active
         self._record_telemetry_frame()
 

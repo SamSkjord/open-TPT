@@ -82,6 +82,7 @@ class InputHandlerThreaded:
         self.thread = None
         self.running = False
         self.poll_rate = 10  # Hz - check buttons 10 times per second
+        self.consecutive_errors = 0  # Track I2C errors for adaptive logging
 
         # LED update flags (set by main thread, read by NeoKey thread)
         self.led_update_requested = False
@@ -90,24 +91,31 @@ class InputHandlerThreaded:
         # Initialize the NeoKey if available
         self.initialize()
 
-    def initialize(self):
-        """Initialize the NeoKey device."""
+    def initialize(self, max_retries: int = 3):
+        """Initialize the NeoKey device with retry logic."""
         if not NEOKEY_AVAILABLE:
             print("Warning: NeoKey library not available - input disabled")
             return
 
-        try:
-            # Initialize I2C and NeoKey
-            i2c = board.I2C()
-            self.neokey = NeoKey1x4(i2c)
+        for attempt in range(max_retries):
+            try:
+                if attempt > 0:
+                    time.sleep(0.5)  # Wait between retries for I2C bus to settle
 
-            # Set initial LED brightness based on default
-            self._update_leds()
-            print("NeoKey 1x4 initialized successfully")
+                # Initialize I2C and NeoKey
+                i2c = board.I2C()
+                self.neokey = NeoKey1x4(i2c)
 
-        except Exception as e:
-            print(f"Error initializing NeoKey: {e}")
-            self.neokey = None
+                # Set initial LED brightness based on default
+                self._update_leds()
+                print("NeoKey 1x4 initialised successfully")
+                return
+
+            except Exception as e:
+                print(f"NeoKey init attempt {attempt + 1}/{max_retries} failed: {e}")
+                self.neokey = None
+
+        print("Warning: NeoKey not detected after retries")
 
     def start(self):
         """Start the background polling thread."""
@@ -143,8 +151,19 @@ class InputHandlerThreaded:
                         self._update_leds()
                         self.led_update_requested = False
 
+                self.consecutive_errors = 0  # Reset on success
+
+            except OSError as e:
+                # I2C errors are common due to bus contention
+                self.consecutive_errors += 1
+                if self.consecutive_errors == 3:
+                    print(f"NeoKey: I2C errors ({e}), will retry silently")
+                # Back off slightly on errors
+                time.sleep(0.05)
             except Exception as e:
-                print(f"Error in NeoKey poll loop: {e}")
+                self.consecutive_errors += 1
+                if self.consecutive_errors <= 3:
+                    print(f"Error in NeoKey poll loop: {e}")
 
             # Sleep to maintain poll rate
             elapsed = time.time() - start_time
@@ -216,8 +235,9 @@ class InputHandlerThreaded:
                 with self.led_lock:
                     self.led_update_requested = True
 
-        except Exception as e:
-            print(f"Error reading NeoKey input: {e}")
+        except Exception:
+            # Let _poll_loop handle the exception
+            raise
 
     def _update_leds(self):
         """Update the NeoKey LEDs based on current state (called from background thread)."""
@@ -244,8 +264,9 @@ class InputHandlerThreaded:
             self.neokey.pixels[BUTTON_CATEGORY_SWITCH] = (0, 64, 64)
             self.neokey.pixels[BUTTON_VIEW_MODE] = (0, 64, 64)
 
-        except Exception as e:
-            print(f"Error updating NeoKey LEDs: {e}")
+        except Exception:
+            # Let _poll_loop handle the exception
+            raise
 
     def request_led_update(self):
         """Request LED update from main thread (thread-safe)."""
