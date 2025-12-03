@@ -84,6 +84,7 @@ class EncoderInputHandler:
         self.last_position = 0
         self.button_pressed = False
         self.button_press_start = 0.0
+        self.long_press_fired = False  # Prevent repeat firing while held
         self.brightness = DEFAULT_BRIGHTNESS  # Current brightness (0.0-1.0)
 
         # Thread-safe event queue
@@ -219,17 +220,24 @@ class EncoderInputHandler:
             # Button just pressed
             self.button_pressed = True
             self.button_press_start = current_time
+            self.long_press_fired = False
+
+        elif button_state and self.button_pressed:
+            # Button still held - check for long press threshold
+            if not self.long_press_fired:
+                press_duration_ms = (current_time - self.button_press_start) * 1000
+                if press_duration_ms >= self.long_press_ms:
+                    event.long_press = True
+                    self.long_press_fired = True
+                    has_event = True
 
         elif not button_state and self.button_pressed:
             # Button just released
             self.button_pressed = False
-            press_duration_ms = (current_time - self.button_press_start) * 1000
-
-            if press_duration_ms >= self.long_press_ms:
-                event.long_press = True
-            else:
+            # Only fire short press if long press wasn't already fired
+            if not self.long_press_fired:
                 event.short_press = True
-            has_event = True
+                has_event = True
 
         # Queue event if something happened
         if has_event:

@@ -39,6 +39,32 @@ sudo apt install -y \
 echo -e "\n==== Installing Bluetooth audio support ===="
 sudo apt install -y pulseaudio pulseaudio-module-bluetooth
 
+# Add D-Bus policy for Bluetooth audio (allows pi user to access A2DP profiles)
+echo -e "\n==== Configuring Bluetooth audio permissions ===="
+sudo tee /etc/dbus-1/system.d/bluetooth-audio.conf > /dev/null << 'BTEOF'
+<!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
+<busconfig>
+  <policy user="pi">
+    <allow send_destination="org.bluez"/>
+    <allow send_interface="org.bluez.MediaEndpoint1"/>
+    <allow send_interface="org.bluez.MediaTransport1"/>
+    <allow send_interface="org.bluez.Agent1"/>
+    <allow send_interface="org.freedesktop.DBus.ObjectManager"/>
+    <allow send_interface="org.freedesktop.DBus.Properties"/>
+  </policy>
+  <policy group="bluetooth">
+    <allow send_destination="org.bluez"/>
+    <allow send_interface="org.bluez.MediaEndpoint1"/>
+    <allow send_interface="org.bluez.MediaTransport1"/>
+  </policy>
+</busconfig>
+BTEOF
+
+# Add pi user to bluetooth group
+sudo usermod -a -G bluetooth "$TARGET_USER" 2>/dev/null || true
+echo "Bluetooth audio permissions configured"
+
 echo -e "\n==== Upgrading pip tooling ===="
 if ! "${PIP_CMD[@]}" install --break-system-packages --upgrade pip setuptools wheel; then
   echo "pip upgrade failed (likely due to Debian-managed pip). Continuing with system pip..."

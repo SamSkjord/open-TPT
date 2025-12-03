@@ -18,11 +18,14 @@
   - Scan for devices (non-blocking, 8 second background scan)
   - Auto power-on Bluetooth before scanning
   - Pair new devices (filters MAC-only names, shows friendly names only)
-  - Connect to paired devices
+  - Connect to paired devices with audio confirmation sound
   - Disconnect current device
   - Forget/unpair devices
+  - Volume control (display, up/down adjustment)
+  - Refresh BT Services (restarts PulseAudio→Bluetooth in correct order)
   - Status display shows connected device or dependency warning
   - PulseAudio dependency check with "! Install pulseaudio" warning if missing
+  - D-Bus policy for pi user to access A2DP audio profiles
 
 #### 🐛 Bug Fixes
 
@@ -30,8 +33,10 @@
 - **Encoder I2C stability** - Added protection against spurious rotation events
   - Position jumps >10 ignored as I2C glitches
   - Brightness delta capped at ±3 per poll
+- **Encoder long press** - Now triggers after 500ms while held (no need to release)
 - **Recording LED state** - Property setter forces immediate LED update when recording state changes
 - **Status bar brightness** - SOC and lap delta bars now affected by brightness dimming
+- **Bluetooth audio permissions** - D-Bus policy allows pi user to access A2DP profiles
 
 #### 🔄 New Files
 
@@ -44,7 +49,7 @@
 - `gui/menu.py` - Recording menu, Bluetooth audio menu with full device management
 - `gui/encoder_input.py` - I2C stability fixes, brightness sync
 - `utils/config.py` - Added BUTTON_RECORDING and RECORDING_HOLD_DURATION
-- `install.sh` - Added PulseAudio packages for Bluetooth audio support
+- `install.sh` - Added PulseAudio packages, D-Bus policy, bluetooth group for audio support
 - `README.md` - Added Bluetooth audio optional install step
 
 ---

@@ -314,11 +314,18 @@ class MenuSystem:
             "Status",
             dynamic_label=lambda: self._get_bt_status_label()
         ))
+        bt_menu.add_item(MenuItem(
+            "Volume",
+            dynamic_label=lambda: f"Volume: {self._get_bt_volume()}%"
+        ))
+        bt_menu.add_item(MenuItem("Volume Up", action=lambda: self._bt_volume_adjust(10)))
+        bt_menu.add_item(MenuItem("Volume Down", action=lambda: self._bt_volume_adjust(-10)))
         bt_menu.add_item(MenuItem("Scan for Devices", action=lambda: self._scan_bluetooth()))
         bt_menu.add_item(MenuItem("Pair New Device", action=lambda: self._show_bt_pair_menu()))
         bt_menu.add_item(MenuItem("Connect", action=lambda: self._show_bt_connect_menu()))
         bt_menu.add_item(MenuItem("Disconnect", action=lambda: self._bt_disconnect()))
         bt_menu.add_item(MenuItem("Forget Device", action=lambda: self._show_bt_forget_menu()))
+        bt_menu.add_item(MenuItem("Refresh BT Services", action=lambda: self._bt_refresh_services()))
         bt_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
         self.bt_menu = bt_menu  # Store reference for dynamic submenus
 
@@ -422,13 +429,13 @@ class MenuSystem:
                     timeout=5
                 )
                 subprocess.run(
-                    ["bluetoothctl", "power", "on"],
+                    ["sudo", "-u", "pi", "bluetoothctl", "power", "on"],
                     capture_output=True,
                     timeout=5
                 )
                 # Run scan for 8 seconds
                 subprocess.run(
-                    ["bluetoothctl", "--timeout", "8", "scan", "on"],
+                    ["sudo", "-u", "pi", "bluetoothctl", "--timeout", "8", "scan", "on"],
                     capture_output=True,
                     text=True,
                     timeout=15
@@ -578,19 +585,89 @@ class MenuSystem:
     def _bt_connect(self, mac: str, name: str) -> str:
         """Connect to a Bluetooth device."""
         try:
+            # Run as pi user so PulseAudio audio profiles work
             result = subprocess.run(
-                ["bluetoothctl", "connect", mac],
+                ["sudo", "-u", "pi", "bluetoothctl", "connect", mac],
                 capture_output=True,
                 text=True,
                 timeout=15
             )
-            if "Connection successful" in result.stdout or "Connected: yes" in result.stdout:
+            output = result.stdout + result.stderr
+            if "Connection successful" in output or "Connected: yes" in output:
+                # Play test sound to confirm audio working
+                self._play_bt_test_sound()
                 return f"Connected to {name}"
-            elif "Failed" in result.stdout or "Error" in result.stdout:
-                return f"Failed to connect"
+            elif "profile-unavailable" in output:
+                return "Start PulseAudio first"
+            elif "Failed" in output or "Error" in output:
+                return "Failed to connect"
             return f"Connecting to {name}..."
         except subprocess.TimeoutExpired:
             return "Connection timed out"
+        except Exception as e:
+            return f"Error: {e}"
+
+    def _play_bt_test_sound(self):
+        """Play a test sound to confirm Bluetooth audio is working."""
+        def do_play():
+            try:
+                # Try system bell sound first, fall back to generated tone
+                sound_files = [
+                    "/usr/share/sounds/freedesktop/stereo/complete.oga",
+                    "/usr/share/sounds/freedesktop/stereo/bell.oga",
+                    "/usr/share/sounds/alsa/Front_Center.wav",
+                ]
+                for sound in sound_files:
+                    result = subprocess.run(
+                        ["paplay", sound],
+                        capture_output=True,
+                        timeout=5
+                    )
+                    if result.returncode == 0:
+                        return
+                # Fallback: generate a simple beep using speaker-test
+                subprocess.run(
+                    ["speaker-test", "-t", "sine", "-f", "1000", "-l", "1"],
+                    capture_output=True,
+                    timeout=2
+                )
+            except Exception:
+                pass  # Silent fail - audio test is optional
+
+        # Run in background to not block menu
+        threading.Thread(target=do_play, daemon=True).start()
+
+    def _get_bt_volume(self) -> int:
+        """Get current PulseAudio volume as percentage."""
+        try:
+            result = subprocess.run(
+                ["pactl", "get-sink-volume", "@DEFAULT_SINK@"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            # Output like: "Volume: front-left: 32768 /  50% / -18.06 dB, ..."
+            if "%" in result.stdout:
+                # Extract first percentage
+                import re
+                match = re.search(r'(\d+)%', result.stdout)
+                if match:
+                    return int(match.group(1))
+            return 50  # Default
+        except Exception:
+            return 50
+
+    def _bt_volume_adjust(self, delta: int) -> str:
+        """Adjust PulseAudio volume by delta percent."""
+        try:
+            current = self._get_bt_volume()
+            new_vol = max(0, min(100, current + delta))
+            subprocess.run(
+                ["pactl", "set-sink-volume", "@DEFAULT_SINK@", f"{new_vol}%"],
+                capture_output=True,
+                timeout=5
+            )
+            return f"Volume: {new_vol}%"
         except Exception as e:
             return f"Error: {e}"
 
@@ -619,27 +696,39 @@ class MenuSystem:
     def _bt_pair(self, mac: str, name: str) -> str:
         """Pair with a Bluetooth device."""
         try:
+            # Run as pi user so PulseAudio audio profiles work
             # Trust the device first (allows auto-reconnect)
             subprocess.run(
-                ["bluetoothctl", "trust", mac],
+                ["sudo", "-u", "pi", "bluetoothctl", "trust", mac],
                 capture_output=True,
                 text=True,
                 timeout=5
             )
 
-            # Pair with the device using NoInputNoOutput agent
+            # Pair with the device (default agent works better than NoInputNoOutput)
             result = subprocess.run(
-                ["bluetoothctl", "--agent", "NoInputNoOutput", "pair", mac],
+                ["sudo", "-u", "pi", "bluetoothctl", "pair", mac],
                 capture_output=True,
                 text=True,
                 timeout=30
             )
             output = result.stdout + result.stderr
 
-            if "Pairing successful" in output or "already paired" in output.lower():
+            # Handle stuck state - remove and retry once
+            if "AlreadyExists" in output:
+                subprocess.run(
+                    ["sudo", "-u", "pi", "bluetoothctl", "remove", mac],
+                    capture_output=True,
+                    timeout=5
+                )
+                return "Cleared stuck state - try again"
+
+            if "Pairing successful" in output:
                 # Try to connect after pairing
-                self._bt_connect(mac, name)
-                return f"Paired with {name}"
+                connect_result = self._bt_connect(mac, name)
+                if "Connected" in connect_result:
+                    return f"Paired & connected: {name}"
+                return f"Paired (connect manually)"
             elif "AuthenticationFailed" in output:
                 return "Put device in pairing mode"
             elif "ConnectionAttemptFailed" in output:
@@ -661,7 +750,7 @@ class MenuSystem:
         mac, name = connected
         try:
             result = subprocess.run(
-                ["bluetoothctl", "disconnect", mac],
+                ["sudo", "-u", "pi", "bluetoothctl", "disconnect", mac],
                 capture_output=True,
                 text=True,
                 timeout=10
@@ -698,7 +787,7 @@ class MenuSystem:
         """Forget/unpair a Bluetooth device."""
         try:
             result = subprocess.run(
-                ["bluetoothctl", "remove", mac],
+                ["sudo", "-u", "pi", "bluetoothctl", "remove", mac],
                 capture_output=True,
                 text=True,
                 timeout=10
@@ -708,6 +797,33 @@ class MenuSystem:
             return f"Failed to forget {name}"
         except Exception as e:
             return f"Error: {e}"
+
+    def _bt_refresh_services(self) -> str:
+        """Restart PulseAudio and Bluetooth in correct order for audio profiles."""
+        def do_refresh():
+            try:
+                # Restart PulseAudio first to register audio endpoints
+                subprocess.run(
+                    ["systemctl", "--user", "restart", "pulseaudio"],
+                    timeout=10
+                )
+                time.sleep(2)
+                # Then restart Bluetooth to pick up the endpoints
+                subprocess.run(
+                    ["sudo", "systemctl", "restart", "bluetooth"],
+                    timeout=10
+                )
+                time.sleep(2)
+                if self.current_menu:
+                    self.current_menu.set_status("BT services refreshed")
+            except Exception as e:
+                if self.current_menu:
+                    self.current_menu.set_status(f"Refresh failed: {e}")
+
+        # Run in background
+        refresh_thread = threading.Thread(target=do_refresh, daemon=True)
+        refresh_thread.start()
+        return "Refreshing BT services..."
 
     def _go_back(self):
         """Go back to parent menu."""
