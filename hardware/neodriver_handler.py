@@ -149,10 +149,47 @@ class NeoDriverHandler:
             print("Warning: NeoDriver thread already running")
             return
 
+        # Run startup animation before starting the update loop
+        self._startup_animation()
+
         self.running = True
         self.thread = threading.Thread(target=self._update_loop, daemon=True)
         self.thread.start()
         print("NeoDriver update thread started")
+
+    def _startup_animation(self):
+        """Play startup animation: rainbow sweep on then off."""
+        if not self.pixels:
+            return
+
+        try:
+            delay = 0.05  # 50ms per pixel
+
+            # Clear all first
+            self.pixels.fill((0, 0, 0))
+            self.pixels.show()
+
+            # Light each pixel one at a time with rainbow colours
+            for i in range(self.num_pixels):
+                hue = int(i * 256 / self.num_pixels)
+                self.pixels[i] = self._colorwheel(hue)
+                self.pixels.show()
+                time.sleep(delay)
+
+            # Brief pause with all lit
+            time.sleep(0.2)
+
+            # Fade out each pixel one at a time in same order
+            for i in range(self.num_pixels):
+                self.pixels[i] = (0, 0, 0)
+                self.pixels.show()
+                time.sleep(delay)
+
+            # Brief pause before normal operation
+            time.sleep(0.1)
+
+        except Exception as e:
+            print(f"NeoDriver startup animation error: {e}")
 
     def stop(self):
         """Stop the background update thread."""
