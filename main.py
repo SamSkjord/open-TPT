@@ -102,6 +102,7 @@ from utils.config import (
     NEODRIVER_DEFAULT_DIRECTION,
     NEODRIVER_MAX_RPM,
     NEODRIVER_SHIFT_RPM,
+    NEODRIVER_START_RPM,
     # Memory monitoring configuration
     MEMORY_MONITORING_ENABLED,
     # Thermal stale data timeout
@@ -623,6 +624,7 @@ class OpenTPT:
                     default_direction=default_direction,
                     max_rpm=NEODRIVER_MAX_RPM,
                     shift_rpm=NEODRIVER_SHIFT_RPM,
+                    start_rpm=NEODRIVER_START_RPM,
                 )
                 if self.neodriver.is_available():
                     self.neodriver.start()

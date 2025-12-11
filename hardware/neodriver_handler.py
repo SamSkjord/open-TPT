@@ -72,6 +72,7 @@ class NeoDriverHandler:
         default_direction: NeoDriverDirection = NeoDriverDirection.CENTRE_OUT,
         max_rpm: int = 7000,
         shift_rpm: int = 6500,
+        start_rpm: int = 3000,
     ):
         """
         Initialise the NeoDriver handler.
@@ -84,6 +85,7 @@ class NeoDriverHandler:
             default_direction: Animation direction (left_right, right_left, centre_out, edges_in)
             max_rpm: Maximum RPM for shift light scale
             shift_rpm: RPM at which redline flash activates
+            start_rpm: RPM at which lights begin illuminating (0 = always on)
         """
         self.i2c_address = i2c_address
         self.num_pixels = num_pixels
@@ -109,6 +111,7 @@ class NeoDriverHandler:
         self.current_rpm = 0  # Current RPM
         self.max_rpm = max_rpm  # Max RPM for shift lights scale
         self.shift_rpm = shift_rpm  # RPM at which redline activates
+        self.start_rpm = start_rpm  # RPM at which lights begin (0 = always on)
         self.rainbow_offset = 0  # Animation offset
 
         # Initialise hardware
@@ -383,15 +386,24 @@ class NeoDriverHandler:
             rpm = self.current_rpm
             max_rpm = self.max_rpm
             shift_rpm = self.shift_rpm
-
-        # Calculate RPM percentage for display
-        rpm_pct = max(0, min(1.0, rpm / max_rpm))
-
-        # Calculate how many pixels to light
-        num_lit = int(rpm_pct * self.num_pixels + 0.5)
+            start_rpm = self.start_rpm
 
         # Clear all
         self.pixels.fill((0, 0, 0))
+
+        # Don't illuminate below start RPM (e.g. at idle)
+        if rpm < start_rpm:
+            return
+
+        # Calculate RPM percentage within the active range (start_rpm to max_rpm)
+        rpm_range = max_rpm - start_rpm
+        if rpm_range <= 0:
+            rpm_pct = 1.0
+        else:
+            rpm_pct = max(0, min(1.0, (rpm - start_rpm) / rpm_range))
+
+        # Calculate how many pixels to light (at least 1 when above start_rpm)
+        num_lit = max(1, int(rpm_pct * self.num_pixels + 0.5))
 
         # Get pixel indices based on direction
         pixel_order = self._get_pixel_order(num_lit)
@@ -457,13 +469,15 @@ class NeoDriverHandler:
         with self.state_lock:
             self.current_rpm = rpm
 
-    def set_rpm_config(self, max_rpm: int = None, shift_rpm: int = None):
+    def set_rpm_config(self, max_rpm: int = None, shift_rpm: int = None, start_rpm: int = None):
         """Set RPM configuration for shift lights."""
         with self.state_lock:
             if max_rpm is not None:
                 self.max_rpm = max_rpm
             if shift_rpm is not None:
                 self.shift_rpm = shift_rpm
+            if start_rpm is not None:
+                self.start_rpm = start_rpm
 
     def set_direction(self, direction: NeoDriverDirection):
         """Set animation direction."""

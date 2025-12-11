@@ -609,6 +609,7 @@ NEODRIVER_DEFAULT_MODE = "shift"  # off, delta, overtake, shift, rainbow
 NEODRIVER_DEFAULT_DIRECTION = "centre_out"  # left_right, right_left, centre_out, edges_in
 NEODRIVER_MAX_RPM = 7000  # Maximum RPM for shift light scale
 NEODRIVER_SHIFT_RPM = 6500  # RPM at which shift indicator flashes (redline)
+NEODRIVER_START_RPM = 3000  # RPM at which shift lights begin illuminating (0 = always on)
 
 # ==============================================================================
 # HELPER FUNCTIONS

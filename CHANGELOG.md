@@ -1,5 +1,29 @@
 # Changelog - openTPT
 
+## [v0.17.5] - 2025-12-11
+
+### Shift Light Start Threshold & Ford Hybrid PID Tester 🚦
+
+#### ✨ New Features
+
+- **Shift light start RPM** - Lights stay off at idle, illuminate only above threshold
+  - New `NEODRIVER_START_RPM` config (default 3000)
+  - Scale now runs from start_rpm to max_rpm for full LED range
+  - At least 1 pixel lights when above threshold
+- **Ford Hybrid PID tester** - Standalone Windows script for testing Ford hybrid PIDs
+  - Uses CANable 2.0 PRO via gs_usb or slcan interface
+  - Tests all 14 Ford Hybrid UDS PIDs (Mode 0x22)
+  - Real-time display and CSV logging
+
+#### 🔄 Modified Files
+
+- `hardware/neodriver_handler.py` - Added start_rpm parameter and threshold logic
+- `main.py` - Pass NEODRIVER_START_RPM to handler
+- `utils/config.py` - Added NEODRIVER_START_RPM = 3000
+- `tools/ford_hybrid_pid_tester.py` - New standalone Windows test script
+
+---
+
 ## [v0.17.4] - 2025-12-03
 
 ### I2C Resilience & Delta Mode Improvements 🔧
