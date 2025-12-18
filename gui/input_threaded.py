@@ -259,10 +259,10 @@ class InputHandlerThreaded:
             else:
                 self.neokey.pixels[BUTTON_RECORDING] = (64, 0, 0)  # Dim red when idle
 
-            # Buttons 1, 2, 3: Solid teal
-            self.neokey.pixels[BUTTON_PAGE_SETTINGS] = (0, 64, 64)
-            self.neokey.pixels[BUTTON_CATEGORY_SWITCH] = (0, 64, 64)
-            self.neokey.pixels[BUTTON_VIEW_MODE] = (0, 64, 64)
+            # Buttons 1, 2, 3: Full brightness teal (ignore display brightness)
+            self.neokey.pixels[BUTTON_PAGE_SETTINGS] = (0, 255, 255)
+            self.neokey.pixels[BUTTON_CATEGORY_SWITCH] = (0, 255, 255)
+            self.neokey.pixels[BUTTON_VIEW_MODE] = (0, 255, 255)
 
         except Exception:
             # Let _poll_loop handle the exception

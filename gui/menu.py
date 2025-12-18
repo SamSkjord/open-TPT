@@ -585,9 +585,9 @@ class MenuSystem:
             self.tpms_handler.stop_pairing()
             self.pairing_active = False
             self.pairing_position = None
-            # Reset encoder LED
+            # Turn off encoder LED
             if self.encoder_handler:
-                self.encoder_handler.set_pixel_brightness_feedback()
+                self.encoder_handler.set_pixel_colour(0, 0, 0)
 
     def on_pairing_complete(self, position: str, success: bool):
         """Called when TPMS pairing completes."""
@@ -599,7 +599,7 @@ class MenuSystem:
                 self.encoder_handler.flash_pixel(0, 255, 0)  # Green flash
             else:
                 self.encoder_handler.flash_pixel(255, 0, 0)  # Red flash
-            self.encoder_handler.set_pixel_brightness_feedback()
+            self.encoder_handler.set_pixel_colour(0, 0, 0)  # Off after flash
 
         if self.current_menu:
             status = f"{position} paired!" if success else f"{position} pairing failed"

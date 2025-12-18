@@ -96,8 +96,8 @@ class EncoderInputHandler:
         self.running = False
         self.consecutive_errors = 0  # Track I2C errors for adaptive logging
 
-        # NeoPixel state
-        self.pixel_colour = (128, 128, 128)  # Default white
+        # NeoPixel state - off for now (reserved for error feedback)
+        self.pixel_colour = (0, 0, 0)
         self.pixel_update_requested = False
         self.pixel_lock = threading.Lock()
 
@@ -134,12 +134,10 @@ class EncoderInputHandler:
                 self.seesaw.pin_mode(self.BUTTON_PIN, self.seesaw.INPUT_PULLUP)
                 self.button = digitalio.DigitalIO(self.seesaw, self.BUTTON_PIN)
 
-                # Initialise NeoPixel (1 pixel on pin 6)
+                # Initialise NeoPixel (1 pixel on pin 6) - off for now
                 self.pixel = neopixel.NeoPixel(self.seesaw, 6, 1)
-                self.pixel.brightness = 1.0  # Use full hardware brightness, control via colour
-                # Set initial pixel to show current brightness (thread not started yet)
-                intensity = int(self.brightness * 255)
-                self.pixel_colour = (intensity, intensity, intensity)
+                self.pixel.brightness = 1.0
+                self.pixel_colour = (0, 0, 0)  # Off - reserved for error feedback
                 self._update_pixel()
 
                 print(f"Encoder initialised at 0x{self.i2c_address:02X}")
@@ -288,7 +286,6 @@ class EncoderInputHandler:
     def set_brightness(self, value: float):
         """Set brightness level (0.0-1.0)."""
         self.brightness = max(0.1, min(1.0, value))
-        self.request_pixel_update()
 
     def adjust_brightness(self, delta: int):
         """

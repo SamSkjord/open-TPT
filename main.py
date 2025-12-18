@@ -1167,13 +1167,10 @@ class OpenTPT:
                 # Menu closed - rotation controls brightness, long press opens menu
                 if encoder_event.rotation_delta != 0:
                     self.encoder.adjust_brightness(encoder_event.rotation_delta)
-                    self.encoder.set_pixel_brightness_feedback()
                     # Sync brightness with input handler for consistency
                     self.input_handler.brightness = self.encoder.get_brightness()
                 if encoder_event.long_press:
                     self.menu.show()
-                    if self.encoder:
-                        self.encoder.set_pixel_colour(50, 150, 255)  # Blue for menu
 
         # Update camera frame if active
         if self.current_category == "camera":
