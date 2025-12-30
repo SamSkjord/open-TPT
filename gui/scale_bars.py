@@ -25,6 +25,7 @@ from utils.config import (
     WHITE,
     BLACK,
     FONT_SIZE_SMALL,
+    FONT_PATH,
     TEMP_UNIT,
     PRESSURE_UNIT,
     PRESSURE_OFFSET,
@@ -43,9 +44,9 @@ class ScaleBars:
         """
         self.surface = surface
 
-        # Initialize fonts
+        # Initialize fonts (Noto Sans)
         pygame.font.init()
-        self.font_small = pygame.font.SysFont(None, FONT_SIZE_SMALL)
+        self.font_small = pygame.font.Font(FONT_PATH, FONT_SIZE_SMALL)
 
         # Create the brake temperature and tyre temperature colormaps
         self.brake_colormap = self._create_brake_colormap()

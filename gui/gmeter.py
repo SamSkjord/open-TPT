@@ -18,6 +18,7 @@ from utils.config import (
     FONT_SIZE_LARGE,
     FONT_SIZE_MEDIUM,
     FONT_SIZE_SMALL,
+    FONT_PATH,
     SCALE_X,
     SCALE_Y,
 )
@@ -42,19 +43,19 @@ class GMeterDisplay:
         # G-force scale
         self.max_g = GMETER_MAX_G
 
-        # Fonts
+        # Fonts (Noto Sans)
         try:
             self.font_xxlarge = pygame.font.Font(
-                None, int(FONT_SIZE_LARGE * 2.5)
+                FONT_PATH, int(FONT_SIZE_LARGE * 2.5)
             )  # Extra extra large for speed display
             self.font_xlarge = pygame.font.Font(
-                None, int(FONT_SIZE_LARGE * 1.5)
+                FONT_PATH, int(FONT_SIZE_LARGE * 1.5)
             )  # Extra large for main G reading
-            self.font_large = pygame.font.Font(None, FONT_SIZE_LARGE)
-            self.font_medium = pygame.font.Font(None, FONT_SIZE_MEDIUM)
-            self.font_small = pygame.font.Font(None, FONT_SIZE_SMALL)
+            self.font_large = pygame.font.Font(FONT_PATH, FONT_SIZE_LARGE)
+            self.font_medium = pygame.font.Font(FONT_PATH, FONT_SIZE_MEDIUM)
+            self.font_small = pygame.font.Font(FONT_PATH, FONT_SIZE_SMALL)
         except Exception as e:
-            print(f"Error loading fonts: {e}")
+            print(f"Error loading Noto Sans fonts: {e}")
             self.font_xxlarge = pygame.font.SysFont(
                 "monospace", int(FONT_SIZE_LARGE * 2.5)
             )

@@ -14,6 +14,7 @@ from utils.config import (
     CAMERA_WIDTH,
     CAMERA_HEIGHT,
     CAMERA_FPS,
+    FONT_PATH,
 )
 
 # Optional import - only needed for actual camera functionality
@@ -487,7 +488,7 @@ class Camera:
         """Render the camera feed with optional radar overlay."""
         if not self.active or self.frame is None:
             if self.error_message:
-                font = pygame.font.SysFont(None, 24)
+                font = pygame.font.Font(FONT_PATH, 24)
                 text = font.render(self.error_message, True, (255, 0, 0))
                 text_rect = text.get_rect(
                     center=(DISPLAY_WIDTH // 2, DISPLAY_HEIGHT // 2)

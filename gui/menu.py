@@ -17,6 +17,7 @@ from utils.config import (
     FONT_SIZE_MEDIUM,
     FONT_SIZE_SMALL,
     FONT_SIZE_LARGE,
+    FONT_PATH,
     WHITE,
     BLACK,
     GREY,
@@ -104,9 +105,9 @@ class Menu:
         """Initialise fonts (must be called after pygame.init)."""
         if self._font_title is None:
             pygame.font.init()
-            self._font_title = pygame.font.SysFont(None, FONT_SIZE_LARGE)
-            self._font_item = pygame.font.SysFont(None, FONT_SIZE_MEDIUM)
-            self._font_hint = pygame.font.SysFont(None, FONT_SIZE_SMALL)
+            self._font_title = pygame.font.Font(FONT_PATH, FONT_SIZE_LARGE)
+            self._font_item = pygame.font.Font(FONT_PATH, FONT_SIZE_MEDIUM)
+            self._font_hint = pygame.font.Font(FONT_PATH, FONT_SIZE_SMALL)
 
     def add_item(self, item: MenuItem):
         """Add an item to the menu."""

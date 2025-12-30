@@ -87,6 +87,7 @@ from utils.config import (
     SCALE_X,
     SCALE_Y,
     FONT_SIZE_SMALL,
+    FONT_PATH,
     # Encoder configuration
     ENCODER_ENABLED,
     ENCODER_I2C_ADDRESS,
@@ -511,7 +512,7 @@ class OpenTPT:
 
         if self.status_bar_enabled:
             bar_height = int(STATUS_BAR_HEIGHT * SCALE_Y)
-            font_small = pygame.font.Font(None, FONT_SIZE_SMALL)
+            font_small = pygame.font.Font(FONT_PATH, FONT_SIZE_SMALL)
 
             # Top bar: Lap time delta
             self.top_bar = DualDirectionBar(

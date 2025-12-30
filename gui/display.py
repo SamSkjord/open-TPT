@@ -11,6 +11,7 @@ from utils.config import (
     FONT_SIZE_MEDIUM,
     FONT_SIZE_SMALL,
     FONT_SIZE_MEDARGE,
+    FONT_PATH,
     WHITE,
     BLACK,
     RED,
@@ -98,12 +99,12 @@ class Display:
         """
         self.surface = surface
 
-        # Initialize fonts
+        # Initialize fonts (Noto Sans)
         pygame.font.init()
-        self.font_large = pygame.font.SysFont(None, FONT_SIZE_LARGE)
-        self.font_medium = pygame.font.SysFont(None, FONT_SIZE_MEDIUM)
-        self.font_small = pygame.font.SysFont(None, FONT_SIZE_SMALL)
-        self.font_medarge = pygame.font.SysFont(None, FONT_SIZE_MEDARGE)
+        self.font_large = pygame.font.Font(FONT_PATH, FONT_SIZE_LARGE)
+        self.font_medium = pygame.font.Font(FONT_PATH, FONT_SIZE_MEDIUM)
+        self.font_small = pygame.font.Font(FONT_PATH, FONT_SIZE_SMALL)
+        self.font_medarge = pygame.font.Font(FONT_PATH, FONT_SIZE_MEDARGE)
 
         # Initialize color maps for thermal display
         self.colormap = self._create_thermal_colormap()
