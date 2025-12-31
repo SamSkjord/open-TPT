@@ -286,6 +286,7 @@ The script automatically:
 - Disables serial console (saves ~0.5s)
 - Disables unnecessary services (avahi, wpa_supplicant, etc.)
 - Configures openTPT to start at `sysinit.target` (before network)
+- Installs boot splash service (displays `assets/splash.png` immediately)
 
 After reboot, verify boot time:
 ```bash

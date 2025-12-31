@@ -15,7 +15,7 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # Backup original files
-echo "[1/5] Backing up original boot files..."
+echo "[1/6] Backing up original boot files..."
 cp /boot/firmware/config.txt /boot/firmware/config.txt.backup 2>/dev/null || \
 cp /boot/config.txt /boot/config.txt.backup 2>/dev/null || true
 cp /boot/firmware/cmdline.txt /boot/firmware/cmdline.txt.backup 2>/dev/null || \
@@ -32,7 +32,7 @@ echo "  Boot directory: $BOOT_DIR"
 
 # Update config.txt with boot speed optimisations
 echo ""
-echo "[2/5] Updating config.txt..."
+echo "[2/6] Updating config.txt..."
 CONFIG_FILE="$BOOT_DIR/config.txt"
 
 # Add boot speed settings if not present
@@ -58,7 +58,7 @@ fi
 
 # Update cmdline.txt for fast boot
 echo ""
-echo "[3/5] Updating cmdline.txt..."
+echo "[3/6] Updating cmdline.txt..."
 CMDLINE_FILE="$BOOT_DIR/cmdline.txt"
 CMDLINE=$(cat "$CMDLINE_FILE")
 
@@ -99,7 +99,7 @@ echo "$CMDLINE" > "$CMDLINE_FILE"
 
 # Disable unnecessary services
 echo ""
-echo "[4/5] Disabling unnecessary services..."
+echo "[4/6] Disabling unnecessary services..."
 
 SERVICES_TO_DISABLE=(
     "avahi-daemon"
@@ -127,7 +127,7 @@ echo "  Kept enabled: bluetooth (for CopePilot audio)"
 
 # Install optimised service file
 echo ""
-echo "[5/5] Installing optimised openTPT.service..."
+echo "[5/6] Installing optimised openTPT.service..."
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVICE_SRC="$SCRIPT_DIR/../../openTPT.service"
 
@@ -140,6 +140,28 @@ else
     echo "  Warning: openTPT.service not found at $SERVICE_SRC"
 fi
 
+# Install boot splash
+echo ""
+echo "[6/6] Installing boot splash..."
+SPLASH_SERVICE="$SCRIPT_DIR/splash.service"
+
+# Install fbi (framebuffer imageviewer) if not present
+if ! command -v fbi &>/dev/null; then
+    echo "  Installing fbi package..."
+    apt-get install -y fbi >/dev/null 2>&1
+fi
+
+# Install splash service
+if [ -f "$SPLASH_SERVICE" ]; then
+    cp "$SPLASH_SERVICE" /etc/systemd/system/splash.service
+    systemctl daemon-reload
+    systemctl enable splash.service
+    echo "  Installed and enabled splash.service"
+    echo "  Splash image: /home/pi/open-TPT/assets/splash.png"
+else
+    echo "  Warning: splash.service not found at $SPLASH_SERVICE"
+fi
+
 echo ""
 echo "=== Boot Optimisation Complete ==="
 echo ""
@@ -148,6 +170,7 @@ echo "  - config.txt: boot_delay=0, initial_turbo=60, force_eeprom_read=0"
 echo "  - cmdline.txt: removed serial console, added quiet boot params"
 echo "  - Disabled: avahi, triggerhappy, wpa_supplicant, ModemManager, apt timers"
 echo "  - openTPT.service: starts at sysinit.target (before network)"
+echo "  - splash.service: displays splash.png immediately at boot"
 echo ""
 echo "WiFi is disabled at boot. To enable manually:"
 echo "  sudo systemctl start wpa_supplicant"

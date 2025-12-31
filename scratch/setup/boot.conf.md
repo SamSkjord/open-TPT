@@ -5,10 +5,16 @@
 # ============================================================================
 # Boot Speed Optimisations
 # ============================================================================
-disable_splash=1
+disable_splash=1          # Disable rainbow splash (we use custom splash)
 boot_delay=0              # Remove 1-second boot delay
 initial_turbo=60          # Turbo mode for first 60 seconds of boot
 force_eeprom_read=0       # Skip EEPROM read delay
+
+# ============================================================================
+# Boot Splash Configuration
+# ============================================================================
+# Custom splash shown via fbi + systemd service (see config/boot/splash.service)
+# The splash.png in assets/ is displayed immediately at boot until openTPT starts
 
 # ============================================================================
 # Hardware Interface Configuration
