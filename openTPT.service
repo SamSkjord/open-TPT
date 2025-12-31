@@ -1,8 +1,11 @@
 [Unit]
 Description=openTPT Main Display Service
-After=network.target
+DefaultDependencies=no
+After=sysinit.target
+Wants=can-setup.service
 
 [Service]
+Type=simple
 ExecStart=/usr/bin/python3 /home/pi/open-TPT/main.py
 WorkingDirectory=/home/pi/open-TPT
 User=pi
@@ -10,8 +13,10 @@ SupplementaryGroups=gpio i2c spi
 Environment=SDL_VIDEODRIVER=kmsdrm
 Environment=PYGAME_HIDE_SUPPORT_PROMPT=1
 Environment=LD_LIBRARY_PATH=/usr/local/lib
-StandardOutput=journal
+StandardOutput=null
+StandardError=journal
 Restart=always
+RestartSec=1
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=sysinit.target

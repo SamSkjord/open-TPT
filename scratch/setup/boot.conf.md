@@ -2,7 +2,13 @@
 # http://rptl.io/configtxt
 # Some settings may impact device functionality. See link above for details
 
+# ============================================================================
+# Boot Speed Optimisations
+# ============================================================================
 disable_splash=1
+boot_delay=0              # Remove 1-second boot delay
+initial_turbo=60          # Turbo mode for first 60 seconds of boot
+force_eeprom_read=0       # Skip EEPROM read delay
 
 # ============================================================================
 # Hardware Interface Configuration

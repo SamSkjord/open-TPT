@@ -264,6 +264,41 @@ Before deploying to production:
 - [ ] Run for 10+ minutes to check stability
 - [ ] Enable systemd service for auto-start
 
+## Boot Time Optimisation
+
+For production use, optimise boot time to under 7 seconds:
+
+```bash
+# SSH to Pi
+ssh pi@192.168.199.247
+cd /home/pi/open-TPT
+
+# Run the boot optimisation script
+sudo ./config/boot/optimize-boot.sh
+
+# Reboot to apply
+sudo reboot
+```
+
+The script automatically:
+- Removes boot delays (`boot_delay=0`, `initial_turbo=60`)
+- Skips filesystem check (`fsck.mode=skip`)
+- Disables serial console (saves ~0.5s)
+- Disables unnecessary services (avahi, wpa_supplicant, etc.)
+- Configures openTPT to start at `sysinit.target` (before network)
+
+After reboot, verify boot time:
+```bash
+systemd-analyze                              # Total boot time
+systemd-analyze blame                        # Service times
+systemd-analyze critical-chain openTPT.service  # Critical path
+```
+
+**Note**: WiFi is disabled at boot for speed. To enable manually:
+```bash
+sudo systemctl start wpa_supplicant
+```
+
 ## Systemd Service (Production)
 
 For production deployment, enable the systemd service:
