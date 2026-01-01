@@ -13,6 +13,7 @@ SupplementaryGroups=gpio i2c spi
 Environment=SDL_VIDEODRIVER=kmsdrm
 Environment=PYGAME_HIDE_SUPPORT_PROMPT=1
 Environment=LD_LIBRARY_PATH=/usr/local/lib
+Environment=PYTHONDONTWRITEBYTECODE=1
 StandardOutput=null
 StandardError=journal
 Restart=always

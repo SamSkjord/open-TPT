@@ -15,7 +15,7 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # Backup original files
-echo "[1/6] Backing up original boot files..."
+echo "[1/8] Backing up original boot files..."
 cp /boot/firmware/config.txt /boot/firmware/config.txt.backup 2>/dev/null || \
 cp /boot/config.txt /boot/config.txt.backup 2>/dev/null || true
 cp /boot/firmware/cmdline.txt /boot/firmware/cmdline.txt.backup 2>/dev/null || \
@@ -32,7 +32,7 @@ echo "  Boot directory: $BOOT_DIR"
 
 # Update config.txt with boot speed optimisations
 echo ""
-echo "[2/6] Updating config.txt..."
+echo "[2/8] Updating config.txt..."
 CONFIG_FILE="$BOOT_DIR/config.txt"
 
 # Add boot speed settings if not present
@@ -56,9 +56,18 @@ if ! grep -q "force_eeprom_read" "$CONFIG_FILE"; then
     echo "  Added: force_eeprom_read=0"
 fi
 
+# Disable initramfs for faster boot (boot directly to kernel)
+if grep -q "auto_initramfs=1" "$CONFIG_FILE"; then
+    sed -i 's/auto_initramfs=1/auto_initramfs=0/' "$CONFIG_FILE"
+    echo "  Changed: auto_initramfs=0 (skip initramfs)"
+elif ! grep -q "auto_initramfs" "$CONFIG_FILE"; then
+    echo "auto_initramfs=0" >> "$CONFIG_FILE"
+    echo "  Added: auto_initramfs=0 (skip initramfs)"
+fi
+
 # Update cmdline.txt for fast boot
 echo ""
-echo "[3/6] Updating cmdline.txt..."
+echo "[3/8] Updating cmdline.txt..."
 CMDLINE_FILE="$BOOT_DIR/cmdline.txt"
 CMDLINE=$(cat "$CMDLINE_FILE")
 
@@ -99,7 +108,7 @@ echo "$CMDLINE" > "$CMDLINE_FILE"
 
 # Disable unnecessary services
 echo ""
-echo "[4/6] Disabling unnecessary services..."
+echo "[4/8] Disabling unnecessary services..."
 
 SERVICES_TO_DISABLE=(
     "avahi-daemon"
@@ -109,7 +118,11 @@ SERVICES_TO_DISABLE=(
     "apt-daily.timer"
     "apt-daily-upgrade.timer"
     "man-db.timer"
+    "systemd-timesyncd"
 )
+
+# Mask additional slow services
+systemctl mask systemd-time-wait-sync 2>/dev/null || true
 
 for service in "${SERVICES_TO_DISABLE[@]}"; do
     if systemctl is-enabled "$service" &>/dev/null; then
@@ -125,9 +138,20 @@ echo "  Masked: plymouth"
 # Keep bluetooth enabled for CopePilot audio
 echo "  Kept enabled: bluetooth (for CopePilot audio)"
 
+# Systemd journal optimisation - use RAM only
+echo ""
+echo "[5/8] Optimising systemd journal..."
+mkdir -p /etc/systemd/journald.conf.d
+cat > /etc/systemd/journald.conf.d/volatile.conf << 'JOURNAL_EOF'
+[Journal]
+Storage=volatile
+RuntimeMaxUse=16M
+JOURNAL_EOF
+echo "  Configured: volatile journal (RAM only, 16M max)"
+
 # Install optimised service file
 echo ""
-echo "[5/6] Installing optimised openTPT.service..."
+echo "[6/8] Installing optimised openTPT.service..."
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVICE_SRC="$SCRIPT_DIR/../../openTPT.service"
 
@@ -142,7 +166,7 @@ fi
 
 # Install boot splash
 echo ""
-echo "[6/6] Installing boot splash..."
+echo "[7/8] Installing boot splash..."
 SPLASH_SERVICE="$SCRIPT_DIR/splash.service"
 
 # Install fbi (framebuffer imageviewer) if not present
@@ -162,15 +186,27 @@ else
     echo "  Warning: splash.service not found at $SPLASH_SERVICE"
 fi
 
+# Precompile Python bytecode
+echo ""
+echo "[8/8] Precompiling Python bytecode..."
+if [ -d /home/pi/open-TPT ]; then
+    python3 -m compileall -q /home/pi/open-TPT 2>/dev/null || true
+    echo "  Compiled: /home/pi/open-TPT/*.pyc"
+else
+    echo "  Skipped: /home/pi/open-TPT not found (will compile on first run)"
+fi
+
 echo ""
 echo "=== Boot Optimisation Complete ==="
 echo ""
 echo "Changes made:"
-echo "  - config.txt: boot_delay=0, initial_turbo=60, force_eeprom_read=0"
+echo "  - config.txt: boot_delay=0, initial_turbo=60, auto_initramfs=0"
 echo "  - cmdline.txt: removed serial console, added quiet boot params"
-echo "  - Disabled: avahi, triggerhappy, wpa_supplicant, ModemManager, apt timers"
+echo "  - Disabled: avahi, triggerhappy, wpa_supplicant, timesyncd, apt timers"
+echo "  - Systemd journal: volatile (RAM only, 16M max)"
 echo "  - openTPT.service: starts at sysinit.target (before network)"
 echo "  - splash.service: displays splash.png immediately at boot"
+echo "  - Python bytecode: precompiled for faster imports"
 echo ""
 echo "WiFi is disabled at boot. To enable manually:"
 echo "  sudo systemctl start wpa_supplicant"

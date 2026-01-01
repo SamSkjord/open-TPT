@@ -17,6 +17,13 @@ force_eeprom_read=0       # Skip EEPROM read delay
 # The splash.png in assets/ is displayed immediately at boot until openTPT starts
 
 # ============================================================================
+# Initramfs Configuration
+# ============================================================================
+# Disable initramfs for faster boot - kernel boots directly
+# Only safe if all required drivers are built into kernel (not modules)
+auto_initramfs=0
+
+# ============================================================================
 # Hardware Interface Configuration
 # ============================================================================
 dtparam=i2c_arm=on

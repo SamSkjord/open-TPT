@@ -244,6 +244,11 @@ else
   echo "cloud-init not found (already removed or not installed)"
 fi
 
+# Precompile Python bytecode for faster startup
+echo -e "\n==== Precompiling Python bytecode ===="
+"$PYTHON_BIN" -m compileall -q "$SCRIPT_DIR" 2>/dev/null || true
+echo "Python bytecode compiled"
+
 echo -e "\n==== Installation complete! ===="
 echo "To start openTPT now:         sudo systemctl start openTPT.service"
 echo "To check service status:      sudo systemctl status openTPT.service"
