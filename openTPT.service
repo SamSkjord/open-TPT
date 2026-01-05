@@ -14,7 +14,7 @@ Environment=SDL_VIDEODRIVER=kmsdrm
 Environment=PYGAME_HIDE_SUPPORT_PROMPT=1
 Environment=LD_LIBRARY_PATH=/usr/local/lib
 Environment=PYTHONDONTWRITEBYTECODE=1
-StandardOutput=null
+StandardOutput=journal
 StandardError=journal
 Restart=always
 RestartSec=1

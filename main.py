@@ -3,6 +3,8 @@
 openTPT - Open Tyre Pressure and Temperature Telemetry
 A modular GUI system for live racecar telemetry using Raspberry Pi 4
 """
+_boot_start = __import__('time').time()
+print(f"[BOOT] Python started", flush=True)
 
 import os
 import sys
@@ -455,12 +457,10 @@ class OpenTPT:
 
         print("Starting openTPT...")
 
-        # Check power status at startup
+        # Check power status at startup (non-blocking, logged for later review)
         throttled, has_issues, message = check_power_status()
         print(message)
-        if has_issues:
-            # Give user time to see the warning
-            time.sleep(3.0)
+        # Don't sleep on power issues - boot fast, user can check logs
 
         # Initialize pygame and display
         self._init_display()
@@ -472,6 +472,7 @@ class OpenTPT:
         """Initialize pygame and the display."""
         # Initialize pygame
         pygame.init()
+        print(f"[BOOT] pygame.init() done t={time.time()-_boot_start:.1f}s", flush=True)
 
         # Start with an appropriate display mode for Raspberry Pi
         # Use a window for development, fullscreen for deployment
@@ -489,9 +490,21 @@ class OpenTPT:
 
         pygame.display.set_caption("openTPT")
         self.clock = pygame.time.Clock()
+        print(f"[BOOT] display ready t={time.time()-_boot_start:.1f}s", flush=True)
 
         # Hide mouse cursor after display is initialized
         pygame.mouse.set_visible(False)
+
+        # Force display to wake up - clear and flip multiple times
+        # KMS/DRM sometimes needs multiple frames to "activate"
+        for i in range(5):
+            self.screen.fill((0, 0, 0))
+            pygame.display.flip()
+            time.sleep(0.05)
+        print(f"[BOOT] display wakeup done t={time.time()-_boot_start:.1f}s", flush=True)
+
+        # Show splash screen immediately
+        self._show_splash("Loading...")
 
         # Set up GUI components
         # self.Template = Template(self.screen)
@@ -550,9 +563,56 @@ class OpenTPT:
         self.current_camera_page = "rear"  # Which camera view (rear/front)
         self.current_ui_page = "telemetry"  # Which UI page (telemetry/gmeter)
 
+    def _show_splash(self, status_text, progress=None):
+        """Show splash screen with optional progress bar."""
+        # Fill with dark background
+        self.screen.fill((20, 20, 30))
+
+        # Try to load and display splash image
+        try:
+            splash_path = os.path.join(os.path.dirname(__file__), "assets", "splash.png")
+            if os.path.exists(splash_path):
+                splash_img = pygame.image.load(splash_path)
+                # Rotate 90° clockwise for display orientation
+                splash_img = pygame.transform.rotate(splash_img, -90)
+                # Scale to fit screen while maintaining aspect ratio
+                img_rect = splash_img.get_rect()
+                scale = min(DISPLAY_WIDTH / img_rect.width, DISPLAY_HEIGHT / img_rect.height) * 0.6
+                new_size = (int(img_rect.width * scale), int(img_rect.height * scale))
+                splash_img = pygame.transform.smoothscale(splash_img, new_size)
+                img_rect = splash_img.get_rect(center=(DISPLAY_WIDTH // 2, DISPLAY_HEIGHT // 2 - 50))
+                self.screen.blit(splash_img, img_rect)
+        except Exception:
+            pass  # Continue without splash image
+
+        # Draw status text
+        try:
+            font = pygame.font.Font(FONT_PATH, 24)
+        except Exception:
+            font = pygame.font.Font(None, 24)
+        text_surface = font.render(status_text, True, (200, 200, 200))
+        text_rect = text_surface.get_rect(center=(DISPLAY_WIDTH // 2, DISPLAY_HEIGHT - 80))
+        self.screen.blit(text_surface, text_rect)
+
+        # Draw progress bar if provided
+        if progress is not None:
+            bar_width = 300
+            bar_height = 8
+            bar_x = (DISPLAY_WIDTH - bar_width) // 2
+            bar_y = DISPLAY_HEIGHT - 50
+            # Background
+            pygame.draw.rect(self.screen, (60, 60, 70), (bar_x, bar_y, bar_width, bar_height))
+            # Progress
+            fill_width = int(bar_width * min(1.0, max(0.0, progress)))
+            if fill_width > 0:
+                pygame.draw.rect(self.screen, (0, 180, 220), (bar_x, bar_y, fill_width, bar_height))
+
+        pygame.display.flip()
+
     def _init_subsystems(self):
         """Initialise the hardware subsystems."""
         # Initialise radar handler (optional)
+        self._show_splash("Initialising radar...", 0.05)
         if RADAR_ENABLED and RADAR_AVAILABLE and RadarHandler:
             try:
                 self.radar = RadarHandler(
@@ -572,12 +632,20 @@ class OpenTPT:
                 self.radar = None
 
         # Initialise camera (with optional radar)
+        self._show_splash("Initialising cameras...", 0.15)
+        print(f"[BOOT] camera init start t={time.time()-_boot_start:.1f}s", flush=True)
         self.camera = Camera(self.screen, radar_handler=self.radar)
+        print(f"[BOOT] camera init done t={time.time()-_boot_start:.1f}s", flush=True)
 
         # Initialise input handler (NeoKey)
+        self._show_splash("Initialising buttons...", 0.25)
+        print(f"[BOOT] neokey init start t={time.time()-_boot_start:.1f}s", flush=True)
         self.input_handler = InputHandler(self.camera)
+        print(f"[BOOT] neokey init done t={time.time()-_boot_start:.1f}s", flush=True)
 
         # Initialise encoder input handler (optional)
+        self._show_splash("Initialising encoder...", 0.35)
+        print(f"[BOOT] encoder init start t={time.time()-_boot_start:.1f}s", flush=True)
         self.encoder = None
         if ENCODER_ENABLED:
             try:
@@ -595,8 +663,11 @@ class OpenTPT:
             except Exception as e:
                 print(f"Warning: Could not initialise encoder: {e}")
                 self.encoder = None
+        print(f"[BOOT] encoder init done t={time.time()-_boot_start:.1f}s", flush=True)
 
         # Initialise NeoDriver LED strip (optional)
+        self._show_splash("Initialising LED strip...", 0.45)
+        print(f"[BOOT] neodriver init start t={time.time()-_boot_start:.1f}s", flush=True)
         self.neodriver = None
         if NEODRIVER_ENABLED:
             try:
@@ -636,16 +707,22 @@ class OpenTPT:
             except Exception as e:
                 print(f"Warning: Could not initialise NeoDriver: {e}")
                 self.neodriver = None
+        print(f"[BOOT] neodriver init done t={time.time()-_boot_start:.1f}s", flush=True)
 
         # Create hardware handlers
+        self._show_splash("Initialising sensors...", 0.55)
         self.tpms = TPMSHandler()
+        print(f"[BOOT] corner sensors init start t={time.time()-_boot_start:.1f}s", flush=True)
         self.corner_sensors = UnifiedCornerHandler()  # Unified tyre+brake handler
+        print(f"[BOOT] corner sensors init done t={time.time()-_boot_start:.1f}s", flush=True)
 
         # Aliases for backward compatibility
         self.thermal = self.corner_sensors  # Tyre data access
         self.brakes = self.corner_sensors   # Brake data access
 
         # Initialise IMU handler (optional, for G-meter)
+        self._show_splash("Initialising IMU...", 0.65)
+        print(f"[BOOT] IMU init start t={time.time()-_boot_start:.1f}s", flush=True)
         if IMU_ENABLED and IMU_AVAILABLE and IMUHandler:
             try:
                 self.imu = IMUHandler()
@@ -655,7 +732,10 @@ class OpenTPT:
                 print(f"Warning: Could not initialise IMU: {e}")
                 self.imu = None
 
+        print(f"[BOOT] IMU init done t={time.time()-_boot_start:.1f}s", flush=True)
+
         # Initialise OBD2 handler (optional, for vehicle speed)
+        self._show_splash("Initialising OBD2...", 0.75)
         if OBD_ENABLED and OBD2_AVAILABLE and OBD2Handler:
             try:
                 self.obd2 = OBD2Handler()
@@ -677,26 +757,37 @@ class OpenTPT:
                 self.ford_hybrid = None
         else:
             self.ford_hybrid = None
+        print(f"[BOOT] handlers init done t={time.time()-_boot_start:.1f}s", flush=True)
 
         # Initialise menu system
+        self._show_splash("Initialising menu...", 0.85)
+        print(f"[BOOT] menu init start t={time.time()-_boot_start:.1f}s", flush=True)
         self.menu = MenuSystem(
             tpms_handler=self.tpms,
             encoder_handler=self.encoder,
             input_handler=self.input_handler,
             neodriver_handler=self.neodriver,
         )
+        print(f"[BOOT] menu init done t={time.time()-_boot_start:.1f}s", flush=True)
 
         # Start monitoring threads
+        self._show_splash("Starting threads...", 0.95)
+        print(f"[BOOT] threads start t={time.time()-_boot_start:.1f}s", flush=True)
         self.input_handler.start()  # Start NeoKey polling thread
         if self.encoder:
             self.encoder.start()  # Start encoder polling thread
         self.tpms.start()
         self.corner_sensors.start()
+        self._show_splash("Ready!", 1.0)
+        print(f"[BOOT] init complete t={time.time()-_boot_start:.1f}s", flush=True)
 
     def run(self):
         """Run the main application loop."""
+        print(f"[BOOT] run() start t={time.time()-_boot_start:.1f}s", flush=True)
         self.running = True
         loop_times = {}
+        first_frame = True
+        boot_frame_count = 0
 
         try:
             while self.running:
@@ -706,11 +797,15 @@ class OpenTPT:
                 t0 = time.time()
                 self._handle_events()
                 loop_times['events'] = (time.time() - t0) * 1000
+                if first_frame:
+                    print(f"[BOOT] first events t={time.time()-_boot_start:.1f}s", flush=True)
 
                 # Update hardware (camera frame, input states, etc.)
                 t0 = time.time()
                 self._update_hardware()
                 loop_times['hardware'] = (time.time() - t0) * 1000
+                if first_frame:
+                    print(f"[BOOT] first hardware t={time.time()-_boot_start:.1f}s", flush=True)
 
                 # Render the screen (with performance monitoring)
                 if self.perf_monitor:
@@ -719,6 +814,18 @@ class OpenTPT:
                 t0 = time.time()
                 self._render()
                 loop_times['render'] = (time.time() - t0) * 1000
+                boot_frame_count += 1
+                if first_frame:
+                    print(f"[BOOT] first render t={time.time()-_boot_start:.1f}s", flush=True)
+                    first_frame = False
+                elif boot_frame_count == 10:
+                    print(f"[BOOT] frame 10 t={time.time()-_boot_start:.1f}s", flush=True)
+                elif boot_frame_count == 60:
+                    print(f"[BOOT] frame 60 t={time.time()-_boot_start:.1f}s", flush=True)
+                elif boot_frame_count == 300:
+                    print(f"[BOOT] frame 300 t={time.time()-_boot_start:.1f}s", flush=True)
+                elif boot_frame_count == 600:
+                    print(f"[BOOT] frame 600 (GUI stable) t={time.time()-_boot_start:.1f}s", flush=True)
 
                 if self.perf_monitor:
                     self.perf_monitor.end_render()

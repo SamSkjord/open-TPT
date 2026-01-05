@@ -168,10 +168,8 @@ class NeoDriverHandler:
             print("Warning: NeoDriver thread already running")
             return
 
-        # Run startup animation before starting the update loop
-        self._startup_animation()
-
         self.running = True
+        self._do_startup_animation = False  # Disabled for faster boot
         self.thread = threading.Thread(target=self._update_loop, daemon=True)
         self.thread.start()
         print("NeoDriver update thread started")
@@ -225,6 +223,11 @@ class NeoDriverHandler:
 
     def _update_loop(self):
         """Background thread that updates the LED strip."""
+        # Run startup animation once (non-blocking to main thread)
+        if self._do_startup_animation:
+            self._startup_animation()
+            self._do_startup_animation = False
+
         update_interval = 1.0 / self.update_rate
         consecutive_errors = 0
 
