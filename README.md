@@ -469,6 +469,7 @@ openTPT/
 - Data logging and telemetry export
 - Web-based remote monitoring
 - Additional radar compatibility (other manufacturers)
+- Buildroot image - minimal Linux for sub-5s boot, read-only root, tiny footprint
 
 ### Hardware TODO
 - [ ] PA1616S Adafruit GPS - for lap timing and position logging
