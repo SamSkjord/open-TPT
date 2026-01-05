@@ -1,5 +1,25 @@
 # Changelog - openTPT
 
+## [v0.17.6] - 2026-01-05
+
+### Early Boot Splash Screen 🚀
+
+#### ✨ New Features
+
+- **fbi boot splash** - Framebuffer splash appears ~4 seconds into boot
+  - Uses fbi to display splash.png before Python/pygame loads
+  - Wait loop ensures /dev/fb0 is ready before displaying
+  - Seamless handoff: main.py kills fbi when pygame display is ready
+- **Faster visual feedback** - Reduces blank screen time during boot
+
+#### 🔄 Modified Files
+
+- `config/boot/fbi-splash.service` - New systemd service for early splash
+- `main.py` - Kill fbi process after pygame display initialises
+- `openTPT.service` - Order after fbi-splash.service
+
+---
+
 ## [v0.17.5] - 2025-12-11
 
 ### Shift Light Start Threshold & Ford Hybrid PID Tester 🚦

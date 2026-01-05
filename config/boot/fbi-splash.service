@@ -1,0 +1,14 @@
+[Unit]
+Description=Early Boot Splash Screen (fbi)
+DefaultDependencies=no
+After=sysinit.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash -c 'for i in $(seq 1 30); do [ -e /dev/fb0 ] && break; sleep 0.1; done; exec /usr/bin/fbi -T 1 -d /dev/fb0 --noverbose -a /home/pi/open-TPT/assets/splash-fbi.png'
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=sysinit.target

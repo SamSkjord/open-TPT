@@ -1,11 +1,12 @@
 [Unit]
 Description=openTPT Main Display Service
 DefaultDependencies=no
-After=sysinit.target
+After=sysinit.target fbi-splash.service
 Wants=can-setup.service
 
 [Service]
 Type=simple
+# fbi killed by main.py after pygame display is ready
 ExecStart=/usr/bin/python3 /home/pi/open-TPT/main.py
 WorkingDirectory=/home/pi/open-TPT
 User=pi

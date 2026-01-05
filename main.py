@@ -495,6 +495,13 @@ class OpenTPT:
         # Hide mouse cursor after display is initialized
         pygame.mouse.set_visible(False)
 
+        # Kill fbi splash now that pygame display is ready
+        try:
+            subprocess.run(['pkill', '-9', 'fbi'], capture_output=True)
+        except Exception:
+            pass
+        print(f"[BOOT] fbi killed t={time.time()-_boot_start:.1f}s", flush=True)
+
         # Force display to wake up - clear and flip multiple times
         # KMS/DRM sometimes needs multiple frames to "activate"
         for i in range(5):
