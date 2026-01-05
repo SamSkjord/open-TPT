@@ -149,27 +149,46 @@ RuntimeMaxUse=16M
 JOURNAL_EOF
 echo "  Configured: volatile journal (RAM only, 16M max)"
 
-# Install optimised service file
+# Install optimised service files
 echo ""
-echo "[6/8] Installing optimised openTPT.service..."
+echo "[6/8] Installing optimised service files..."
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVICE_SRC="$SCRIPT_DIR/../../openTPT.service"
+CAN_SERVICE_SRC="$SCRIPT_DIR/../systemd/can-setup.service"
+CAN_SCRIPT_SRC="$SCRIPT_DIR/../systemd/can-setup.sh"
 
 if [ -f "$SERVICE_SRC" ]; then
     cp "$SERVICE_SRC" /etc/systemd/system/openTPT.service
-    systemctl daemon-reload
-    systemctl enable openTPT.service
-    echo "  Installed and enabled openTPT.service"
+    echo "  Installed: openTPT.service"
 else
     echo "  Warning: openTPT.service not found at $SERVICE_SRC"
 fi
+
+if [ -f "$CAN_SERVICE_SRC" ]; then
+    cp "$CAN_SERVICE_SRC" /etc/systemd/system/can-setup.service
+    echo "  Installed: can-setup.service (removed network dependency)"
+else
+    echo "  Warning: can-setup.service not found at $CAN_SERVICE_SRC"
+fi
+
+if [ -f "$CAN_SCRIPT_SRC" ]; then
+    cp "$CAN_SCRIPT_SRC" /usr/local/bin/can-setup.sh
+    chmod +x /usr/local/bin/can-setup.sh
+    echo "  Installed: can-setup.sh (with interface wait loop)"
+else
+    echo "  Warning: can-setup.sh not found at $CAN_SCRIPT_SRC"
+fi
+
+systemctl daemon-reload
+systemctl enable openTPT.service can-setup.service 2>/dev/null || true
+echo "  Enabled services"
 
 # Install boot splash
 echo ""
 echo "[7/8] Installing boot splash..."
 SPLASH_SERVICE="$SCRIPT_DIR/splash.service"
 
-# Install fbi (framebuffer imageviewer) if not present
+# Install fbi if not present
 if ! command -v fbi &>/dev/null; then
     echo "  Installing fbi package..."
     apt-get install -y fbi >/dev/null 2>&1
@@ -204,8 +223,9 @@ echo "  - config.txt: boot_delay=0, initial_turbo=60, auto_initramfs=0"
 echo "  - cmdline.txt: removed serial console, added quiet boot params"
 echo "  - Disabled: avahi, triggerhappy, wpa_supplicant, timesyncd, apt timers"
 echo "  - Systemd journal: volatile (RAM only, 16M max)"
+echo "  - can-setup.service: removed network dependency (saves ~3s)"
 echo "  - openTPT.service: starts at sysinit.target (before network)"
-echo "  - splash.service: displays splash.png immediately at boot"
+echo "  - splash.service: displays splash-rotated.png at boot"
 echo "  - Python bytecode: precompiled for faster imports"
 echo ""
 echo "WiFi is disabled at boot. To enable manually:"
