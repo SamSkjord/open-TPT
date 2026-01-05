@@ -1,6 +1,7 @@
 [Unit]
 Description=Setup CAN interfaces for openTPT
-After=network.target
+DefaultDependencies=no
+After=sysinit.target
 Before=openTPT.service
 
 [Service]
@@ -9,4 +10,4 @@ RemainAfterExit=yes
 ExecStart=/usr/local/bin/can-setup.sh
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=sysinit.target

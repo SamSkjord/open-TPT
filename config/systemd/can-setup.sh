@@ -6,6 +6,16 @@ set -e
 
 BITRATE=500000
 
+# Wait for CAN interfaces to appear (up to 5 seconds)
+echo "Waiting for CAN interfaces..."
+for i in {1..50}; do
+    if [ -d "/sys/class/net/can_b1_0" ]; then
+        echo "CAN interfaces detected"
+        break
+    fi
+    sleep 0.1
+done
+
 # Bring up all CAN interfaces
 for iface in can_b1_0 can_b1_1 can_b2_0 can_b2_1; do
     if [ -d "/sys/class/net/$iface" ]; then
