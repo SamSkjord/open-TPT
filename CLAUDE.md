@@ -45,7 +45,7 @@
 
 | Setting | Value |
 |---------|-------|
-| Pi IP | `192.168.199.247` |
+| Pi IP | `192.168.199.246` |
 | User | `pi` |
 | Path | `/home/pi/open-TPT` |
 | Service | `openTPT.service` |
@@ -129,8 +129,8 @@ Convert: `temp_celsius = int16_value / 10.0`
 
 ### Deployment
 ```bash
-./tools/quick_sync.sh pi@192.168.199.243    # Sync code
-ssh pi@192.168.199.243 'sudo systemctl restart openTPT.service'
+./tools/quick_sync.sh pi@192.168.199.246    # Sync code
+ssh pi@192.168.199.246 'sudo systemctl restart openTPT.service'
 ```
 
 ### Service Management

@@ -9,17 +9,17 @@ set -e
 PI_HOST=${1:-pi@raspberrypi.local}
 REMOTE_PATH=/home/pi/open-TPT
 
-# Quick sync only Python files and configs
+# Sync project files (excludes .git, scratch, caches)
 rsync -avz --progress \
-    --include='*.py' \
-    --include='*.md' \
-    --include='*.yaml' \
-    --include='*.json' \
-    --include='*/' \
-    --exclude='*' \
-    --exclude='.git' \
-    --exclude='__pycache__' \
+    --exclude='.git/' \
+    --exclude='__pycache__/' \
     --exclude='scratch/' \
+    --exclude='*.pyc' \
+    --exclude='.DS_Store' \
+    --exclude='venv/' \
+    --exclude='.venv/' \
+    --exclude='.claude/' \
+    --exclude='*.webp' \
     ./ "${PI_HOST}:${REMOTE_PATH}/"
 
 echo ""
