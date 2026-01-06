@@ -118,7 +118,7 @@ SERVICES_TO_DISABLE=(
     "apt-daily.timer"
     "apt-daily-upgrade.timer"
     "man-db.timer"
-    "systemd-timesyncd"
+    # Note: systemd-timesyncd kept enabled for NTP time sync
 )
 
 # Mask additional slow services
@@ -221,7 +221,7 @@ echo ""
 echo "Changes made:"
 echo "  - config.txt: boot_delay=0, initial_turbo=60, auto_initramfs=0"
 echo "  - cmdline.txt: removed serial console, added quiet boot params"
-echo "  - Disabled: avahi, triggerhappy, wpa_supplicant, timesyncd, apt timers"
+echo "  - Disabled: avahi, triggerhappy, wpa_supplicant, apt timers"
 echo "  - Systemd journal: volatile (RAM only, 16M max)"
 echo "  - can-setup.service: removed network dependency (saves ~3s)"
 echo "  - openTPT.service: starts at sysinit.target (before network)"
