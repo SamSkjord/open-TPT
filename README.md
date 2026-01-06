@@ -471,6 +471,9 @@ openTPT/
 - Additional radar compatibility (other manufacturers)
 - Buildroot image - minimal Linux for sub-5s boot, read-only root, tiny footprint
 
+### Might Get Round To It One Day
+- SDL2 hardware rendering - use opengles2 renderer instead of software blitting for GPU acceleration
+
 ### Hardware TODO
 - [ ] PA1616S Adafruit GPS - for lap timing and position logging
 - [x] Adafruit NeoDriver - LED strip control (delta, overtake, shift, rainbow modes)
