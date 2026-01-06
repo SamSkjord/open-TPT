@@ -106,6 +106,8 @@ class RadarOverlayRenderer:
         self._arrow_cache: Dict[Tuple[int, int, int], pygame.Surface] = {}
         self._overtake_surfaces: Dict[str, pygame.Surface] = {}
         self._overtake_alert: Optional[dict] = None
+        self._text_cache: Dict[str, pygame.Surface] = {}
+        self._text_cache_max = 64  # LRU-ish limit
 
         # Font (Noto Sans)
         pygame.font.init()
@@ -225,17 +227,33 @@ class RadarOverlayRenderer:
             return MARKER_COLOUR_RED
         return MARKER_COLOUR_YELLOW
 
+    def _get_cached_text(self, text: str, colour: Tuple[int, int, int]) -> pygame.Surface:
+        """Get cached text surface, rendering if needed."""
+        key = f"{text}:{colour[0]},{colour[1]},{colour[2]}"
+        if key not in self._text_cache:
+            # Evict oldest entries if cache is full
+            if len(self._text_cache) >= self._text_cache_max:
+                # Remove first quarter of entries (simple eviction)
+                keys_to_remove = list(self._text_cache.keys())[:self._text_cache_max // 4]
+                for k in keys_to_remove:
+                    del self._text_cache[k]
+            self._text_cache[key] = self.font.render(text, True, colour)
+        return self._text_cache[key]
+
     def _draw_track_text(self, surface: pygame.Surface, track: Dict, centre_x: int):
         """Draw distance and speed text for track."""
-        # Distance
+        # Distance - round to 0.5m to improve cache hits
         range_m = math.hypot(track["long_dist"], track["lat_dist"])
-        range_surface = self.font.render(f"{range_m:.1f} m", True, TEXT_COLOUR)
+        range_rounded = round(range_m * 2) / 2  # Round to nearest 0.5
+        range_text = f"{range_rounded:.1f} m"
+        range_surface = self._get_cached_text(range_text, TEXT_COLOUR)
         range_rect = range_surface.get_rect()
         range_rect.midtop = (centre_x, TEXT_OFFSET_TOP)
         surface.blit(range_surface, range_rect)
 
-        # Speed
+        # Speed - round to 0.5 m/s to improve cache hits
         speed = track["rel_speed"]
+        speed_rounded = round(speed * 2) / 2  # Round to nearest 0.5
         if speed > 0.1:
             speed_colour = SPEED_COLOUR_AWAY
         elif speed < -0.1:
@@ -243,9 +261,9 @@ class RadarOverlayRenderer:
         else:
             speed_colour = SPEED_COLOUR_STATIONARY
 
-        speed_surface = self.font.render(
-            f"{speed:+.1f} m/s ({speed * 3.6:+.1f} km/h)", True, speed_colour
-        )
+        speed_kph = speed_rounded * 3.6
+        speed_text = f"{speed_rounded:+.1f} m/s ({speed_kph:+.1f} km/h)"
+        speed_surface = self._get_cached_text(speed_text, speed_colour)
         speed_rect = speed_surface.get_rect()
         speed_rect.midtop = (centre_x, range_rect.bottom + TEXT_SPACING)
         surface.blit(speed_surface, speed_rect)

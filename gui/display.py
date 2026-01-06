@@ -115,9 +115,10 @@ class Display:
             print(f"Loaded overlay mask from {OVERLAY_PATH}")
 
             # Scale the overlay to match the current display dimensions
-            self.overlay_mask = pygame.transform.scale(
+            scaled = pygame.transform.scale(
                 original_overlay, (DISPLAY_WIDTH, DISPLAY_HEIGHT)
             )
+            self.overlay_mask = self._convert_to_colorkey(scaled)
         except pygame.error:
             # Try loading from root directory as fallback
             try:
@@ -125,15 +126,67 @@ class Display:
                 print("Loaded overlay mask from root directory")
 
                 # Scale the overlay to match the current display dimensions
-                self.overlay_mask = pygame.transform.scale(
+                scaled = pygame.transform.scale(
                     original_overlay, (DISPLAY_WIDTH, DISPLAY_HEIGHT)
                 )
+                self.overlay_mask = self._convert_to_colorkey(scaled)
             except pygame.error as e:
                 print(f"ERROR: Failed to load overlay mask: {e}")
                 # Create a placeholder transparent overlay
                 self.overlay_mask = pygame.Surface(
                     (DISPLAY_WIDTH, DISPLAY_HEIGHT), pygame.SRCALPHA
                 )
+
+    def _convert_to_colorkey(self, surface: pygame.Surface) -> pygame.Surface:
+        """
+        Convert RGBA surface to colorkey for faster blitting.
+        If alpha is mostly binary (0 or 255), use colorkey.
+        Otherwise keep alpha blending.
+        """
+        import pygame.surfarray as surfarray
+        import numpy as np
+        try:
+            # Get pixel arrays
+            pixels = surfarray.pixels3d(surface)
+            alpha = surfarray.pixels_alpha(surface)
+
+            # Check if alpha is binary by sampling
+            sample = alpha[::10, ::10]  # Sample every 10th pixel
+            non_binary = ((sample > 10) & (sample < 245)).any()
+
+            if non_binary:
+                print("Overlay has gradient alpha - using alpha blending")
+                del pixels
+                del alpha
+                return surface
+
+            # Alpha is binary - convert to colorkey using numpy (fast)
+            print("Overlay has binary alpha - converting to colorkey (faster)")
+
+            colorkey = (255, 0, 255)  # Magenta
+            new_surface = pygame.Surface(surface.get_size())
+            new_pixels = surfarray.pixels3d(new_surface)
+
+            # Create mask where alpha > 127
+            mask = alpha > 127
+
+            # Set transparent pixels to colorkey
+            new_pixels[~mask] = colorkey
+
+            # Copy opaque pixels
+            new_pixels[mask] = pixels[mask]
+
+            del new_pixels
+            del pixels
+            del alpha
+
+            new_surface.set_colorkey(colorkey)
+            new_surface = new_surface.convert()
+            return new_surface
+
+        except Exception as e:
+            print(f"Colorkey conversion failed: {e} - using alpha blending")
+            return surface
 
     def _create_thermal_colormap(self):
         """Create a colormap for thermal imaging."""

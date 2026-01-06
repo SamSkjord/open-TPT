@@ -1548,25 +1548,21 @@ class OpenTPT:
             self.bottom_bar.draw(self.screen)
         render_times['status_bars'] = (time.time() - t0) * 1000
 
-        # Apply brightness adjustment (with caching) - must be after all content
+        # Apply brightness adjustment using BLEND_MULT (faster than alpha)
         t0 = time.time()
         brightness = self.input_handler.get_brightness()
         if brightness < 1.0:
             # Only recreate brightness surface if brightness value changed
             if self.cached_brightness_surface is None or abs(self.last_brightness - brightness) > 0.001:
-                # Create a semi-transparent black overlay to dim the screen
-                dim_surface = pygame.Surface(
-                    (DISPLAY_WIDTH, DISPLAY_HEIGHT), pygame.SRCALPHA
-                )
-                alpha = int(255 * (1.0 - brightness))
-                dim_surface.fill((0, 0, 0, alpha))
-
-                # Cache the surface
+                # Use RGB multiply instead of alpha blend - much faster
+                dim_surface = pygame.Surface((DISPLAY_WIDTH, DISPLAY_HEIGHT))
+                rgb = int(brightness * 255)  # 80% brightness = 204
+                dim_surface.fill((rgb, rgb, rgb))
                 self.cached_brightness_surface = dim_surface
                 self.last_brightness = brightness
 
-            # Blit the cached surface
-            self.screen.blit(self.cached_brightness_surface, (0, 0))
+            # Blit with BLEND_MULT - multiplies RGB values (no alpha processing)
+            self.screen.blit(self.cached_brightness_surface, (0, 0), special_flags=pygame.BLEND_MULT)
         else:
             # Clear cached brightness surface when at full brightness
             self.cached_brightness_surface = None
