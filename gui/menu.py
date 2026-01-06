@@ -428,12 +428,19 @@ class MenuSystem:
         ))
         lights_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
 
+        # System menu
+        system_menu = Menu("System")
+        system_menu.add_item(MenuItem("Shutdown", action=lambda: self._shutdown()))
+        system_menu.add_item(MenuItem("Reboot", action=lambda: self._reboot()))
+        system_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+
         # Root menu
         self.root_menu = Menu("Settings")
         self.root_menu.add_item(MenuItem("TPMS", submenu=tpms_menu))
         self.root_menu.add_item(MenuItem("Bluetooth", submenu=bt_menu))
         self.root_menu.add_item(MenuItem("Display", submenu=display_menu))
         self.root_menu.add_item(MenuItem("Light Strip", submenu=lights_menu))
+        self.root_menu.add_item(MenuItem("System", submenu=system_menu))
         self.root_menu.add_item(MenuItem("Back", action=lambda: self._close_menu()))
 
         # Set parent references
@@ -441,6 +448,7 @@ class MenuSystem:
         bt_menu.parent = self.root_menu
         display_menu.parent = self.root_menu
         lights_menu.parent = self.root_menu
+        system_menu.parent = self.root_menu
 
     def _get_brightness(self) -> float:
         """Get current brightness from encoder handler."""
@@ -1046,6 +1054,24 @@ class MenuSystem:
     def _close_menu(self):
         """Close the menu system."""
         self.hide()
+
+    def _shutdown(self) -> str:
+        """Shutdown the system."""
+        import subprocess
+        try:
+            subprocess.Popen(['sudo', 'shutdown', 'now'])
+            return "Shutting down..."
+        except Exception as e:
+            return f"Shutdown failed: {e}"
+
+    def _reboot(self) -> str:
+        """Reboot the system."""
+        import subprocess
+        try:
+            subprocess.Popen(['sudo', 'reboot'])
+            return "Rebooting..."
+        except Exception as e:
+            return f"Reboot failed: {e}"
 
     def show(self):
         """Show the root menu."""
