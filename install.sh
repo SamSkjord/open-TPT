@@ -202,18 +202,8 @@ EOF
   fi
 fi
 
-# Configure gpsd for GPS module
-echo -e "\n==== Configuring gpsd ===="
-sudo tee /etc/default/gpsd >/dev/null <<'EOF'
-# openTPT GPS configuration
-DEVICES="/dev/ttyS0 /dev/pps0"
-GPSD_OPTIONS="-n"
-START_DAEMON="true"
-USBAUTO="false"
-EOF
-echo "gpsd configured for /dev/ttyS0 and /dev/pps0"
-
 # Configure chrony for PPS time sync
+# Note: gpsd is installed but disabled - openTPT reads serial directly for 10Hz
 echo -e "\n==== Configuring chrony for PPS time sync ===="
 CHRONY_PPS_HEADER="# PPS from GPS (precise timing)"
 if sudo grep -Fq "$CHRONY_PPS_HEADER" /etc/chrony/chrony.conf; then
@@ -243,7 +233,7 @@ if [[ -f "$GPS_CONFIG_SRC" ]]; then
   sudo install -m 0644 "$GPS_SERVICE_SRC" /etc/systemd/system/gps-config.service
   sudo systemctl daemon-reload
   sudo systemctl enable gps-config.service
-  echo "GPS 10Hz configuration installed (runs before gpsd at boot)"
+  echo "GPS 10Hz configuration installed (configures GPS and disables gpsd at boot)"
 else
   echo "WARNING: Missing $GPS_CONFIG_SRC; skipping GPS 10Hz configuration."
 fi

@@ -59,62 +59,75 @@ The install script will:
 
 ### 3. GPS and Time Sync Setup
 
-Enable UART and PPS for GPS module (GPIO 14/15 for TX/RX, GPIO 18 for PPS):
+The install script handles GPS configuration automatically. It:
+- Enables UART (GPIO 14/15) and PPS (GPIO 18) in config.txt
+- Configures GPS for 10Hz RMC-only output
+- Sets up chrony for PPS time sync
+- Disables gpsd (openTPT reads serial directly for 10Hz)
+
+**Manual setup** (if not using install.sh):
 
 ```bash
 # Add to /boot/firmware/config.txt
-echo -e "\n# Enable UART for GPS\nenable_uart=1\n\n# GPS PPS on GPIO 18\ndtoverlay=pps-gpio,gpiopin=18" | sudo tee -a /boot/firmware/config.txt
+sudo tee -a /boot/firmware/config.txt << EOF
+
+# ==== openTPT GPS Configuration ====
+enable_uart=1
+dtoverlay=pps-gpio,gpiopin=18
+# ==== end openTPT GPS Configuration ====
+EOF
 
 # Reboot to enable UART and PPS
 sudo reboot
 ```
 
-Install and configure gpsd and chrony for GPS time sync:
+After reboot, configure GPS for 10Hz:
 
 ```bash
 # Install packages
-sudo apt-get install -y gpsd gpsd-clients chrony pps-tools
+sudo apt-get install -y chrony pps-tools
 
-# Configure gpsd
-sudo tee /etc/default/gpsd << EOF
-DEVICES="/dev/ttyS0 /dev/pps0"
-GPSD_OPTIONS="-n"
-START_DAEMON="true"
-USBAUTO="false"
-EOF
-
-# Configure chrony for GPS/PPS time sync
+# Configure chrony for PPS time sync
 sudo tee -a /etc/chrony/chrony.conf << EOF
 
-# GPS via gpsd shared memory
-refclock SHM 0 refid GPS precision 1e-1 offset 0.1 delay 0.05
 # PPS from GPS (precise timing)
+# openTPT sets coarse time from NMEA, PPS refines to nanosecond precision
 refclock PPS /dev/pps0 refid PPS precision 1e-7 prefer
 EOF
 
-# Disable NTP network sync (use GPS instead)
-sudo timedatectl set-ntp false
+# Keep NTP enabled as fallback
+sudo timedatectl set-ntp true
 
-# Enable and start services
-sudo systemctl enable gpsd
-sudo systemctl restart gpsd chrony
+# Restart chrony
+sudo systemctl restart chrony
 ```
 
-Verify GPS time sync:
+The `gps-config.service` runs at boot to configure the GPS module for 10Hz RMC-only output before openTPT starts.
+
+**Verify GPS:**
 
 ```bash
-# Check gpsd is receiving data
-gpspipe -w -n 5
-
-# Check PPS signal
+# Check PPS signal (should show pulses every second)
 sudo ppstest /dev/pps0
 
-# Check chrony sources (PPS should show #*)
+# Check chrony PPS sync
 chronyc sources
 
-# Check tracking (should show "Reference ID: PPS", Stratum 1)
-chronyc tracking
+# Test GPS handler directly
+cd /home/pi/open-TPT
+sudo python3 -c "
+from hardware.gps_handler import GPSHandler
+import time
+h = GPSHandler()
+time.sleep(3)
+s = h.get_snapshot()
+print(f'Update rate: {s.data.get(\"update_rate\", 0):.1f} Hz')
+print(f'Position: {s.data.get(\"latitude\")}, {s.data.get(\"longitude\")}')
+h.stop()
+"
 ```
+
+Expected output: ~10Hz update rate.
 
 ## Deployment Methods
 
