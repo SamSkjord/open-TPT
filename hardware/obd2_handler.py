@@ -24,7 +24,6 @@ OBD_RESPONSE_MIN = 0x7E8
 OBD_RESPONSE_MAX = 0x7EF
 PID_ENGINE_RPM = 0x0C  # Engine RPM: ((A * 256) + B) / 4
 PID_VEHICLE_SPEED = 0x0D  # Vehicle speed in km/h
-PID_INTAKE_MAP = 0x0B  # Intake manifold absolute pressure (kPa)
 
 # Ford Mode 22 (UDS) DIDs for hybrid battery
 # Request format: [length, 0x22, DID_high, DID_low, ...]
@@ -60,11 +59,6 @@ class OBD2Handler(BoundedQueueHardwareHandler):
         # Engine RPM with smoothing
         self.current_rpm = 0
         self.rpm_history = deque(maxlen=3)  # Rolling window for smoothing (O(1) operations)
-
-        # MAP (manifold absolute pressure) for simulating SOC
-        self.current_map_kpa = 0
-        self.map_history = deque(maxlen=3)  # Rolling window for smoothing and rate calculation (O(1) operations)
-        self.simulated_soc = 0.0  # Calculated directly from MAP (will be set on first reading)
 
         # Real HV Battery SOC from Ford Mode 22 (DID 0x4801)
         self.real_soc = None  # None = not available, float = real percentage
@@ -116,16 +110,6 @@ class OBD2Handler(BoundedQueueHardwareHandler):
         """Build OBD2 request for engine RPM (PID 0x0C)."""
         # Service 0x01 (show current data), PID 0x0C (RPM)
         data = [0x02, 0x01, PID_ENGINE_RPM] + [0x00] * 5
-        return can.Message(
-            arbitration_id=OBD_REQUEST_ID,
-            is_extended_id=False,
-            data=data
-        )
-
-    def _build_map_request(self):
-        """Build OBD2 request for intake manifold absolute pressure (PID 0x0B)."""
-        # Service 0x01 (show current data), PID 0x0B (MAP)
-        data = [0x02, 0x01, PID_INTAKE_MAP] + [0x00] * 5
         return can.Message(
             arbitration_id=OBD_REQUEST_ID,
             is_extended_id=False,
@@ -211,102 +195,6 @@ class OBD2Handler(BoundedQueueHardwareHandler):
                 return None
 
         return None
-
-    def _wait_for_map_response(self, timeout_s=0.2):
-        """
-        Wait for a MAP response from the vehicle.
-
-        Returns:
-            MAP in kPa, or None if no response
-        """
-        if not self.bus:
-            return None
-
-        deadline = time.time() + timeout_s
-        while time.time() < deadline:
-            remaining = max(0.0, deadline - time.time())
-            try:
-                msg = self.bus.recv(timeout=remaining)
-                if msg is None:
-                    continue
-
-                # Check if this is a valid response to our MAP request
-                # Response format: [length, 0x41, PID, data_byte, ...]
-                # SECURITY: Check length FIRST before any array access
-                if not (OBD_RESPONSE_MIN <= msg.arbitration_id <= OBD_RESPONSE_MAX):
-                    continue
-                if msg.is_extended_id:
-                    continue
-                if len(msg.data) < 4:
-                    continue
-
-                # Safe to access array elements now
-                if msg.data[1] == 0x41 and msg.data[2] == PID_INTAKE_MAP:
-                    # MAP is in byte 3, directly in kPa
-                    map_kpa = msg.data[3]
-                    return map_kpa
-
-            except Exception as e:
-                # Timeout or read error
-                return None
-
-        return None
-
-    def _calculate_map_state(self):
-        """
-        Calculate state (idle/increasing/decreasing) based on MAP rate of change.
-
-        Returns:
-            'idle', 'increasing', or 'decreasing'
-        """
-        if len(self.map_history) < 3:
-            return 'idle'
-
-        # Calculate rate of change (kPa per reading)
-        # Use linear regression or simple first-to-last difference
-        first_val = self.map_history[0]
-        last_val = self.map_history[-1]
-        rate = (last_val - first_val) / len(self.map_history)
-
-        # Thresholds for state detection (kPa per reading)
-        # At 5Hz polling, 0.5 kPa/reading = 2.5 kPa/s
-        idle_threshold = 0.3  # Small changes are considered idle
-
-        if abs(rate) < idle_threshold:
-            return 'idle'
-        elif rate > 0:
-            # MAP increasing = more throttle = discharging
-            return 'decreasing'
-        else:
-            # MAP decreasing = less throttle = charging
-            return 'increasing'
-
-    def _map_to_soc(self, map_kpa):
-        """
-        Map intake manifold pressure to simulated SOC percentage.
-
-        Higher MAP (more throttle) = discharging (lower SOC displayed)
-        Lower MAP (idle/decel) = charging (higher SOC displayed)
-
-        Args:
-            map_kpa: Manifold absolute pressure in kPa
-
-        Returns:
-            Simulated SOC percentage (0-100)
-        """
-        # Typical MAP range: 20-100 kPa
-        # At idle: ~30-40 kPa (low load, high SOC display)
-        # At WOT: ~90-100 kPa (high load, low SOC display)
-
-        # Directly map MAP to SOC (inverted - high MAP = low SOC)
-        # Normalize MAP to 0-1 range
-        map_normalized = (map_kpa - 20) / 80  # 20 kPa -> 0, 100 kPa -> 1
-        map_normalized = max(0, min(1, map_normalized))  # Clamp
-
-        # Invert and convert to SOC percentage (100% at idle, 0% at WOT)
-        self.simulated_soc = 100 * (1.0 - map_normalized)
-
-        return self.simulated_soc
 
     def _build_ford_soc_request(self):
         """Build Ford Mode 22 (UDS) request for HV Battery SOC (DID 0x4801)."""
@@ -423,8 +311,7 @@ class OBD2Handler(BoundedQueueHardwareHandler):
                         smoothed_rpm = sum(self.rpm_history) / len(self.rpm_history)
                         self.current_rpm = int(round(smoothed_rpm))
 
-                    # Try to read real Ford HV Battery SOC (if not already failed permanently)
-                    state = 'idle'
+                    # Try to read Ford HV Battery SOC (if not already failed permanently)
                     if self.soc_read_attempts < self.soc_max_failures:
                         soc_request = self._build_ford_soc_request()
                         self.bus.send(soc_request, timeout=0.1)
@@ -435,35 +322,17 @@ class OBD2Handler(BoundedQueueHardwareHandler):
                             self.real_soc = real_soc
                             self.real_soc_available = True
                             self.soc_read_attempts = 0  # Reset on success
-                            # Determine state from current (would need HV current PID for accurate state)
-                            state = 'idle'
                         else:
                             self.soc_read_attempts += 1
                             if self.soc_read_attempts == self.soc_max_failures:
-                                print("OBD2: Ford Mode 22 SOC not supported, using simulated SOC")
+                                print("OBD2: Ford Mode 22 SOC (DID 0x4801) not supported")
 
-                    # Fall back to MAP-based simulated SOC if real SOC not available
-                    if not self.real_soc_available:
-                        map_request = self._build_map_request()
-                        self.bus.send(map_request, timeout=0.1)
-
-                        map_kpa = self._wait_for_map_response(timeout_s=0.15)
-
-                        if map_kpa is not None:
-                            self.map_history.append(map_kpa)
-                            self.current_map_kpa = map_kpa
-                            self._map_to_soc(map_kpa)
-                            state = self._calculate_map_state()
-
-                    # Publish combined data (speed, RPM, and SOC)
+                    # Publish data (speed, RPM, and SOC if available)
                     data = {
                         'speed_kmh': self.current_speed_kmh,
                         'rpm': self.current_rpm,
-                        'map_kpa': self.current_map_kpa,
-                        'simulated_soc': self.simulated_soc,
                         'real_soc': self.real_soc,
                         'soc_available': self.real_soc_available,
-                        'soc_state': state,
                     }
                     self._publish_snapshot(data)
 
