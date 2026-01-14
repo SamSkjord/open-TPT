@@ -234,6 +234,21 @@ sudo timedatectl set-ntp false 2>/dev/null || true
 # Enable gpsd service
 sudo systemctl enable gpsd 2>/dev/null || true
 
+# Install GPS 10Hz configuration script and service
+echo -e "\n==== Installing GPS 10Hz configuration ===="
+GPS_CONFIG_SRC="$SCRIPT_DIR/config/gps/gps-config.sh"
+GPS_SERVICE_SRC="$SCRIPT_DIR/config/gps/gps-config.service"
+
+if [[ -f "$GPS_CONFIG_SRC" ]]; then
+  sudo install -m 0755 "$GPS_CONFIG_SRC" /usr/local/bin/gps-config.sh
+  sudo install -m 0644 "$GPS_SERVICE_SRC" /etc/systemd/system/gps-config.service
+  sudo systemctl daemon-reload
+  sudo systemctl enable gps-config.service
+  echo "GPS 10Hz configuration installed (runs before gpsd at boot)"
+else
+  echo "WARNING: Missing $GPS_CONFIG_SRC; skipping GPS 10Hz configuration."
+fi
+
 # Install persistent CAN naming rule
 echo -e "\n==== Installing persistent CAN interface naming rule ===="
 UDEV_RULE_SRC="$SCRIPT_DIR/config/can/80-can-persistent-names.rules"

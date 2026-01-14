@@ -1,0 +1,12 @@
+[Unit]
+Description=Configure GPS for 10Hz RMC-only output
+After=dev-ttyS0.device
+Before=openTPT.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/gps-config.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
