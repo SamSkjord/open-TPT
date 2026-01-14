@@ -15,6 +15,10 @@ from utils.config import (
     IMU_ENABLED,
     IMU_I2C_ADDRESS,
     IMU_SAMPLE_RATE,
+    IMU_AXIS_LATERAL,
+    IMU_AXIS_LONGITUDINAL,
+    IMU_AXIS_VERTICAL,
+    IMU_CALIBRATION_FILE,
     I2C_BUS,
 )
 
@@ -101,6 +105,13 @@ class IMUHandler(BoundedQueueHardwareHandler):
         self.accel_y_offset = 0.0
         self.accel_z_offset = 0.0  # Should be -1.0g when stationary (gravity)
 
+        # Axis mapping from config
+        self._axis_map = {
+            'lateral': self._parse_axis(IMU_AXIS_LATERAL),
+            'longitudinal': self._parse_axis(IMU_AXIS_LONGITUDINAL),
+            'vertical': self._parse_axis(IMU_AXIS_VERTICAL),
+        }
+
         # Error tracking for reconnection logic
         self.consecutive_errors = 0
         self.max_consecutive_errors = 5  # Report disconnection after 5 errors
@@ -109,11 +120,34 @@ class IMUHandler(BoundedQueueHardwareHandler):
         self.hardware_available = False
         self.last_successful_read = time.time()
 
+        # Load saved calibration
+        self._load_calibration()
+
         if self.enabled:
             self._initialise()
             self.start()  # Always start thread, will use mock data if hardware unavailable
         else:
             print("IMU disabled in config")
+
+    def _parse_axis(self, axis_str: str) -> tuple:
+        """Parse axis string like 'x', '-y', 'z' into (index, sign)."""
+        axis_str = axis_str.lower().strip()
+        sign = -1 if axis_str.startswith('-') else 1
+        axis = axis_str.lstrip('-')
+        index = {'x': 0, 'y': 1, 'z': 2}.get(axis, 0)
+        return (index, sign)
+
+    def _map_axes(self, raw_x: float, raw_y: float, raw_z: float) -> tuple:
+        """Map raw IMU axes to vehicle axes using config mapping."""
+        raw = (raw_x, raw_y, raw_z)
+        lat_idx, lat_sign = self._axis_map['lateral']
+        lon_idx, lon_sign = self._axis_map['longitudinal']
+        vert_idx, vert_sign = self._axis_map['vertical']
+        return (
+            raw[lat_idx] * lat_sign,
+            raw[lon_idx] * lon_sign,
+            raw[vert_idx] * vert_sign,
+        )
 
     def _initialise(self):
         """Initialise the IMU sensor based on configured type."""
@@ -192,19 +226,23 @@ class IMUHandler(BoundedQueueHardwareHandler):
                 if self.imu and self.hardware_available:
                     # Read accelerometer (in m/s²)
                     accel = self.imu.acceleration
-                    # Convert to G-force (1g = 9.81 m/s²)
-                    accel_x = accel[0] / 9.81 - self.accel_x_offset
-                    accel_y = accel[1] / 9.81 - self.accel_y_offset
-                    accel_z = accel[2] / 9.81 - self.accel_z_offset
+                    # Convert to G-force (1g = 9.81 m/s²) and apply offsets
+                    raw_x = accel[0] / 9.81 - self.accel_x_offset
+                    raw_y = accel[1] / 9.81 - self.accel_y_offset
+                    raw_z = accel[2] / 9.81 - self.accel_z_offset
+
+                    # Map physical axes to vehicle axes
+                    accel_x, accel_y, accel_z = self._map_axes(raw_x, raw_y, raw_z)
 
                     # Read gyroscope (in rad/s)
                     gyro = self.imu.gyro
-                    # Convert to degrees/s
-                    gyro_x = np.degrees(gyro[0])
-                    gyro_y = np.degrees(gyro[1])
-                    gyro_z = np.degrees(gyro[2])
+                    # Convert to degrees/s and map axes
+                    raw_gx = np.degrees(gyro[0])
+                    raw_gy = np.degrees(gyro[1])
+                    raw_gz = np.degrees(gyro[2])
+                    gyro_x, gyro_y, gyro_z = self._map_axes(raw_gx, raw_gy, raw_gz)
 
-                    # Update peak values
+                    # Update peak values (lateral=X, longitudinal=Y after mapping)
                     lateral = abs(accel_x)
                     longitudinal = abs(accel_y)
                     combined = np.sqrt(accel_x**2 + accel_y**2)
@@ -263,16 +301,63 @@ class IMUHandler(BoundedQueueHardwareHandler):
     # Use base class get_snapshot() and get_data() methods
     # These return HardwareSnapshot and dict respectively
 
-    def calibrate(self, samples=100):
+    def _load_calibration(self):
+        """Load calibration from JSON file."""
+        import json
+        import os
+        try:
+            if os.path.exists(IMU_CALIBRATION_FILE):
+                with open(IMU_CALIBRATION_FILE, 'r') as f:
+                    cal = json.load(f)
+                self.accel_x_offset = cal.get('accel_x_offset', 0.0)
+                self.accel_y_offset = cal.get('accel_y_offset', 0.0)
+                self.accel_z_offset = cal.get('accel_z_offset', 0.0)
+                # Load axis mapping if saved
+                if 'axis_lateral' in cal:
+                    self._axis_map['lateral'] = self._parse_axis(cal['axis_lateral'])
+                if 'axis_longitudinal' in cal:
+                    self._axis_map['longitudinal'] = self._parse_axis(cal['axis_longitudinal'])
+                if 'axis_vertical' in cal:
+                    self._axis_map['vertical'] = self._parse_axis(cal['axis_vertical'])
+                print(f"IMU: Loaded calibration from {IMU_CALIBRATION_FILE}")
+        except Exception as e:
+            print(f"IMU: Could not load calibration: {e}")
+
+    def _save_calibration(self):
+        """Save calibration to JSON file."""
+        import json
+        import os
+        try:
+            os.makedirs(os.path.dirname(IMU_CALIBRATION_FILE), exist_ok=True)
+            cal = {
+                'accel_x_offset': self.accel_x_offset,
+                'accel_y_offset': self.accel_y_offset,
+                'accel_z_offset': self.accel_z_offset,
+                'axis_lateral': self._axis_to_str(self._axis_map['lateral']),
+                'axis_longitudinal': self._axis_to_str(self._axis_map['longitudinal']),
+                'axis_vertical': self._axis_to_str(self._axis_map['vertical']),
+            }
+            with open(IMU_CALIBRATION_FILE, 'w') as f:
+                json.dump(cal, f, indent=2)
+            print(f"IMU: Saved calibration to {IMU_CALIBRATION_FILE}")
+            return True
+        except Exception as e:
+            print(f"IMU: Could not save calibration: {e}")
+            return False
+
+    def _axis_to_str(self, axis_tuple: tuple) -> str:
+        """Convert axis tuple (index, sign) back to string like 'x', '-y'."""
+        idx, sign = axis_tuple
+        axis = {0: 'x', 1: 'y', 2: 'z'}[idx]
+        return f"-{axis}" if sign < 0 else axis
+
+    def calibrate_zero(self, samples=100) -> str:
         """
-        Calibrate the IMU by averaging readings while stationary.
-        Call this when the vehicle is parked on level ground.
+        Calibrate zero point - call while stationary on level ground.
+        Returns status message.
         """
         if not self.imu:
-            print("IMU: Cannot calibrate - no sensor available")
-            return
-
-        print(f"IMU: Calibrating... (keep vehicle stationary, {samples} samples)")
+            return "No IMU sensor available"
 
         x_sum = 0.0
         y_sum = 0.0
@@ -287,12 +372,79 @@ class IMUHandler(BoundedQueueHardwareHandler):
 
         self.accel_x_offset = x_sum / samples
         self.accel_y_offset = y_sum / samples
-        self.accel_z_offset = (z_sum / samples) - 1.0  # Should be 1.0g when level
+        # Find which axis has ~1g (that's vertical/gravity)
+        avg = [x_sum / samples, y_sum / samples, z_sum / samples]
+        gravity_axis = max(range(3), key=lambda i: abs(avg[i]))
+        gravity_sign = 1 if avg[gravity_axis] > 0 else -1
 
-        print(f"IMU: Calibration complete")
-        print(f"  X offset: {self.accel_x_offset:.3f}g")
-        print(f"  Y offset: {self.accel_y_offset:.3f}g")
-        print(f"  Z offset: {self.accel_z_offset:.3f}g")
+        # Set vertical axis mapping based on where gravity is
+        axis_names = ['x', 'y', 'z']
+        vert_str = f"{'-' if gravity_sign < 0 else ''}{axis_names[gravity_axis]}"
+        self._axis_map['vertical'] = (gravity_axis, gravity_sign)
+
+        # Subtract gravity from that axis offset
+        if gravity_axis == 0:
+            self.accel_x_offset -= gravity_sign * 1.0
+        elif gravity_axis == 1:
+            self.accel_y_offset -= gravity_sign * 1.0
+        else:
+            self.accel_z_offset -= gravity_sign * 1.0
+
+        self._save_calibration()
+        return f"Zero calibrated (vertical={vert_str})"
+
+    def calibrate_detect_axis(self, samples=50) -> dict:
+        """
+        Sample current acceleration and return which axis has most change from zero.
+        Call this during acceleration or turning to detect axis mapping.
+        Returns dict with axis info.
+        """
+        if not self.imu:
+            return {'error': 'No IMU sensor available'}
+
+        x_sum = 0.0
+        y_sum = 0.0
+        z_sum = 0.0
+
+        for i in range(samples):
+            accel = self.imu.acceleration
+            x_sum += accel[0] / 9.81 - self.accel_x_offset
+            y_sum += accel[1] / 9.81 - self.accel_y_offset
+            z_sum += accel[2] / 9.81 - self.accel_z_offset
+            time.sleep(0.01)
+
+        avg = [x_sum / samples, y_sum / samples, z_sum / samples]
+        # Exclude vertical axis from consideration
+        vert_idx = self._axis_map['vertical'][0]
+        avg[vert_idx] = 0  # Zero out vertical so we only look at horizontal
+
+        max_axis = max(range(3), key=lambda i: abs(avg[i]))
+        max_sign = 1 if avg[max_axis] > 0 else -1
+        max_value = avg[max_axis]
+
+        axis_names = ['x', 'y', 'z']
+        return {
+            'axis': max_axis,
+            'sign': max_sign,
+            'value': max_value,
+            'axis_str': f"{'-' if max_sign < 0 else ''}{axis_names[max_axis]}"
+        }
+
+    def calibrate_set_longitudinal(self, axis_str: str) -> str:
+        """Set the longitudinal (forward/back) axis."""
+        self._axis_map['longitudinal'] = self._parse_axis(axis_str)
+        self._save_calibration()
+        return f"Longitudinal axis set to {axis_str}"
+
+    def calibrate_set_lateral(self, axis_str: str) -> str:
+        """Set the lateral (left/right) axis."""
+        self._axis_map['lateral'] = self._parse_axis(axis_str)
+        self._save_calibration()
+        return f"Lateral axis set to {axis_str}"
+
+    def calibrate(self, samples=100):
+        """Legacy calibrate method - just does zero calibration."""
+        return self.calibrate_zero(samples)
 
     def reset_peaks(self):
         """Reset peak G-force values."""

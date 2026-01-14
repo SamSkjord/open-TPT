@@ -322,7 +322,7 @@ class MenuSystem:
     Manages the root menu and all submenus for openTPT.
     """
 
-    def __init__(self, tpms_handler=None, encoder_handler=None, input_handler=None, neodriver_handler=None):
+    def __init__(self, tpms_handler=None, encoder_handler=None, input_handler=None, neodriver_handler=None, imu_handler=None):
         """
         Initialise the menu system.
 
@@ -331,11 +331,13 @@ class MenuSystem:
             encoder_handler: Encoder handler for brightness control
             input_handler: Input handler for display brightness sync
             neodriver_handler: NeoDriver handler for LED strip control
+            imu_handler: IMU handler for G-meter calibration
         """
         self.tpms_handler = tpms_handler
         self.encoder_handler = encoder_handler
         self.input_handler = input_handler
         self.neodriver_handler = neodriver_handler
+        self.imu_handler = imu_handler
         self.current_menu: Optional[Menu] = None
         self.root_menu: Optional[Menu] = None
 
@@ -350,6 +352,9 @@ class MenuSystem:
         # Editing modes
         self.volume_editing = False
         self.brightness_editing = False
+
+        # IMU calibration wizard state
+        self.imu_cal_step = None  # None, 'zero', 'accel', 'turn'
 
         self._build_menus()
 
@@ -428,8 +433,28 @@ class MenuSystem:
         ))
         lights_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
 
+        # IMU calibration submenu
+        imu_menu = Menu("IMU Calibration")
+        imu_menu.add_item(MenuItem(
+            "1. Zero (level)",
+            dynamic_label=lambda: self._get_imu_zero_label(),
+            action=lambda: self._imu_calibrate_zero()
+        ))
+        imu_menu.add_item(MenuItem(
+            "2. Accelerate",
+            dynamic_label=lambda: self._get_imu_accel_label(),
+            action=lambda: self._imu_calibrate_accel()
+        ))
+        imu_menu.add_item(MenuItem(
+            "3. Turn Left",
+            dynamic_label=lambda: self._get_imu_turn_label(),
+            action=lambda: self._imu_calibrate_turn()
+        ))
+        imu_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+
         # System menu
         system_menu = Menu("System")
+        system_menu.add_item(MenuItem("IMU Calibration", submenu=imu_menu))
         system_menu.add_item(MenuItem("Shutdown", action=lambda: self._shutdown()))
         system_menu.add_item(MenuItem("Reboot", action=lambda: self._reboot()))
         system_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
@@ -449,6 +474,7 @@ class MenuSystem:
         display_menu.parent = self.root_menu
         lights_menu.parent = self.root_menu
         system_menu.parent = self.root_menu
+        imu_menu.parent = system_menu
 
     def _get_brightness(self) -> float:
         """Get current brightness from encoder handler."""
@@ -1072,6 +1098,65 @@ class MenuSystem:
             return "Rebooting..."
         except Exception as e:
             return f"Reboot failed: {e}"
+
+    # IMU Calibration methods
+    def _get_imu_zero_label(self) -> str:
+        """Get label for zero calibration step."""
+        if self.imu_cal_step == 'zero_done':
+            return "1. Zero ✓"
+        return "1. Zero (level)"
+
+    def _get_imu_accel_label(self) -> str:
+        """Get label for acceleration calibration step."""
+        if self.imu_cal_step == 'accel_done':
+            return "2. Accelerate ✓"
+        return "2. Accelerate"
+
+    def _get_imu_turn_label(self) -> str:
+        """Get label for turn calibration step."""
+        if self.imu_cal_step == 'turn_done':
+            return "3. Turn Left ✓"
+        return "3. Turn Left"
+
+    def _imu_calibrate_zero(self) -> str:
+        """Step 1: Zero calibration - park on level ground."""
+        if not self.imu_handler:
+            return "No IMU available"
+        result = self.imu_handler.calibrate_zero()
+        self.imu_cal_step = 'zero_done'
+        return result
+
+    def _imu_calibrate_accel(self) -> str:
+        """Step 2: Detect longitudinal axis - accelerate gently."""
+        if not self.imu_handler:
+            return "No IMU available"
+        if self.imu_cal_step != 'zero_done':
+            return "Do step 1 first"
+        # Detect which axis changed most during acceleration
+        result = self.imu_handler.calibrate_detect_axis()
+        if 'error' in result:
+            return result['error']
+        # Acceleration = positive longitudinal
+        axis_str = result['axis_str']
+        self.imu_handler.calibrate_set_longitudinal(axis_str)
+        self.imu_cal_step = 'accel_done'
+        return f"Longitudinal: {axis_str}"
+
+    def _imu_calibrate_turn(self) -> str:
+        """Step 3: Detect lateral axis - turn left."""
+        if not self.imu_handler:
+            return "No IMU available"
+        if self.imu_cal_step != 'accel_done':
+            return "Do step 2 first"
+        # Detect which axis changed most during turn
+        result = self.imu_handler.calibrate_detect_axis()
+        if 'error' in result:
+            return result['error']
+        # Left turn = positive lateral (rightward force on driver)
+        axis_str = result['axis_str']
+        self.imu_handler.calibrate_set_lateral(axis_str)
+        self.imu_cal_step = 'turn_done'
+        return f"Lateral: {axis_str} - Done!"
 
     def show(self):
         """Show the root menu."""

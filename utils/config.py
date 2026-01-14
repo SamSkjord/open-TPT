@@ -510,6 +510,16 @@ IMU_ENABLED = True  # Enable IMU for G-meter functionality
 IMU_I2C_ADDRESS = 0x68  # Default I2C address (ICM20649: 0x68 or 0x69)
 IMU_SAMPLE_RATE = 50  # Hz - how often to read IMU data
 
+# IMU axis mapping - maps physical IMU axes to vehicle axes
+# Set based on how IMU is mounted in vehicle
+# Options: "x", "-x", "y", "-y", "z", "-z" (negative inverts axis)
+IMU_AXIS_LATERAL = "x"       # Vehicle left/right (positive = right)
+IMU_AXIS_LONGITUDINAL = "y"  # Vehicle forward/back (positive = forward/accel)
+IMU_AXIS_VERTICAL = "z"      # Vehicle up/down (positive = up)
+
+# IMU calibration file (stores zero offsets for persistence)
+IMU_CALIBRATION_FILE = "config/imu_calibration.json"
+
 # G-meter display settings
 GMETER_MAX_G = 2.0  # Maximum G-force to display (±2g is typical for road cars)
 GMETER_HISTORY_SECONDS = 5.0  # How many seconds of history to show on trace

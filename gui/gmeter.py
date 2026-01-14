@@ -69,10 +69,14 @@ class GMeterDisplay:
         # Peak tracking
         self.reset_peaks()
 
-        # Current G values
+        # Current G values (smoothed)
         self.current_lateral = 0.0
         self.current_longitudinal = 0.0
         self.current_speed = 0  # km/h (placeholder for future OBD2/GPS)
+
+        # Smoothing factor (0.0 = no smoothing, 1.0 = infinite smoothing)
+        # 0.7 gives good balance between responsiveness and stability
+        self.smoothing_factor = 0.7
 
         # Connection tracking
         self.last_update_time = 0.0
@@ -109,14 +113,19 @@ class GMeterDisplay:
 
         self.last_update_time = time.time()
 
-        # Update current values (handle both dict and object for compatibility)
+        # Update current values with smoothing (exponential moving average)
         if isinstance(imu_data, dict):
-            self.current_lateral = imu_data.get("accel_x", 0.0)
-            self.current_longitudinal = imu_data.get("accel_y", 0.0)
+            raw_lateral = imu_data.get("accel_x", 0.0)
+            raw_longitudinal = imu_data.get("accel_y", 0.0)
         else:
             # Legacy support for IMUSnapshot objects
-            self.current_lateral = imu_data.accel_x
-            self.current_longitudinal = imu_data.accel_y
+            raw_lateral = imu_data.accel_x
+            raw_longitudinal = imu_data.accel_y
+
+        # Apply exponential smoothing: smoothed = old * factor + new * (1 - factor)
+        sf = self.smoothing_factor
+        self.current_lateral = self.current_lateral * sf + raw_lateral * (1 - sf)
+        self.current_longitudinal = self.current_longitudinal * sf + raw_longitudinal * (1 - sf)
 
         # Update peaks (directional)
         if self.current_lateral > 0:  # Right
@@ -303,11 +312,11 @@ class GMeterDisplay:
         x_pos = int(580 * SCALE_X)  # Left side, between peak values and center
         y_pos = self.height - int(450 * SCALE_Y)  # Same Y as speed
 
-        # Combined G (extra large, 1 decimal) - RED if disconnected, WHITE if connected
+        # Combined G (large, 1 decimal) - RED if disconnected, WHITE if connected
         combined_color = WHITE if imu_connected else RED
 
         # Render the combined G reading
-        full_text = self.font_xxlarge.render(f"{combined_g:.1f}g", True, combined_color)
+        full_text = self.font_xlarge.render(f"{combined_g:.1f}g", True, combined_color)
 
         # Draw at specified position
         screen.blit(full_text, (x_pos, y_pos))
@@ -317,13 +326,13 @@ class GMeterDisplay:
         y_pos = int(120 * SCALE_Y)  # Below title
 
         text_lateral = self.font_medium.render(
-            f"Lat: {self.current_lateral:+.2f}g", True, GREEN
+            f"Lat: {self.current_lateral:+.1f}g", True, GREEN
         )
         screen.blit(text_lateral, (x_pos, y_pos))
 
         y_pos += int(35 * SCALE_Y)
         text_longitudinal = self.font_medium.render(
-            f"Long: {self.current_longitudinal:+.2f}g", True, GREEN
+            f"Long: {self.current_longitudinal:+.1f}g", True, GREEN
         )
         screen.blit(text_longitudinal, (x_pos, y_pos))
 
@@ -336,7 +345,7 @@ class GMeterDisplay:
 
         # Peak combined
         text_peak_combined = self.font_small.render(
-            f"Peak G: {self.peak_combined:.2f}g", True, YELLOW
+            f"Peak G: {self.peak_combined:.1f}g", True, YELLOW
         )
         screen.blit(text_peak_combined, (x_pos, y_pos))
 
@@ -346,7 +355,7 @@ class GMeterDisplay:
             abs(self.peak_lateral_left), abs(self.peak_lateral_right)
         )
         text_peak_lateral = self.font_small.render(
-            f"Peak Lat: {peak_lateral_display:.2f}g", True, YELLOW
+            f"Peak Lat: {peak_lateral_display:.1f}g", True, YELLOW
         )
         screen.blit(text_peak_lateral, (x_pos, y_pos))
 
@@ -356,24 +365,26 @@ class GMeterDisplay:
             abs(self.peak_longitudinal_forward), abs(self.peak_longitudinal_backward)
         )
         text_peak_long = self.font_small.render(
-            f"Peak Long: {peak_long_display:.2f}g", True, YELLOW
+            f"Peak Long: {peak_long_display:.1f}g", True, YELLOW
         )
         screen.blit(text_peak_long, (x_pos, y_pos))
 
     def _draw_speed(self, screen):
         """Draw speed (placeholder for future OBD2/GPS integration)."""
-        # Position for speed (bottom right, moved up to show km/h label above bottom bar)
-        x_pos = self.width - int(180 * SCALE_X)
-        y_pos = self.height - int(155 * SCALE_Y)  # Moved up from 120 to 155
+        # Position for speed (bottom right)
+        x_pos = self.width - int(150 * SCALE_X)
 
-        # Speed display (extra extra large font)
-        text_speed = self.font_xxlarge.render(f"{self.current_speed}", True, WHITE)
-        screen.blit(text_speed, (x_pos, y_pos))
+        # Speed display (xlarge font)
+        text_speed = self.font_xlarge.render(f"{self.current_speed}", True, WHITE)
+        speed_rect = text_speed.get_rect()
+        speed_rect.bottomright = (self.width - int(20 * SCALE_X), self.height - int(80 * SCALE_Y))
+        screen.blit(text_speed, speed_rect)
 
         # Label (smaller, below speed)
-        y_pos += int(100 * SCALE_Y)
-        text_label = self.font_medium.render("km/h", True, GREY)
-        screen.blit(text_label, (x_pos + int(10 * SCALE_X), y_pos))
+        text_label = self.font_small.render("km/h", True, GREY)
+        label_rect = text_label.get_rect()
+        label_rect.topright = (self.width - int(20 * SCALE_X), speed_rect.bottom + int(5 * SCALE_Y))
+        screen.blit(text_label, label_rect)
 
     def _draw_labels(self, screen):
         """Draw additional labels and information."""
