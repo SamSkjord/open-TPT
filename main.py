@@ -1649,6 +1649,26 @@ class OpenTPT:
             self.last_perf_summary = current_time
             print("\n" + self.perf_monitor.get_performance_summary())
 
+            # Print brake temps (useful for thermocouple debugging)
+            brake_temps = self.brakes.get_temps()
+            brake_lines = []
+            for pos in ["FL", "FR", "RL", "RR"]:
+                data = brake_temps.get(pos, {})
+                inner = data.get("inner")
+                outer = data.get("outer")
+                temp = data.get("temp")
+                if inner is not None or outer is not None:
+                    parts = []
+                    if inner is not None:
+                        parts.append(f"inner={inner:.1f}°C")
+                    if outer is not None:
+                        parts.append(f"outer={outer:.1f}°C")
+                    brake_lines.append(f"  {pos}: {', '.join(parts)}")
+                elif temp is not None:
+                    brake_lines.append(f"  {pos}: {temp:.1f}°C")
+            if brake_lines:
+                print("Brake temps:\n" + "\n".join(brake_lines))
+
     def _cleanup(self):
         """Clean up resources before exiting."""
         print("Shutting down openTPT...")
