@@ -155,8 +155,8 @@ class GPSHandler(BoundedQueueHardwareHandler):
             elif msg_type in ('GPGGA', 'GNGGA'):
                 self._parse_gga(parts)
 
-            # PGTOP - Antenna status (Adafruit Ultimate GPS)
-            elif msg_type == 'PGTOP':
+            # PGTOP/PCD - Antenna status (Adafruit Ultimate GPS)
+            elif msg_type in ('PGTOP', 'PCD'):
                 self._parse_pgtop(parts)
 
         except Exception:
