@@ -123,6 +123,7 @@ fi
 PYTHON_DEPS=(
   "numpy>=1.22.0,<2.3.0"
   "pillow>=9.0.0"
+  "pyserial>=3.5"
   "adafruit-circuitpython-neokey>=1.1.7"
   "adafruit-circuitpython-tca9548a>=0.8.3"
   "adafruit-circuitpython-ads1x15>=2.2.0"
@@ -212,27 +213,25 @@ USBAUTO="false"
 EOF
 echo "gpsd configured for /dev/ttyS0 and /dev/pps0"
 
-# Configure chrony for GPS/PPS time sync
-echo -e "\n==== Configuring chrony for GPS time sync ===="
-CHRONY_GPS_HEADER="# GPS via gpsd shared memory"
-if sudo grep -Fq "$CHRONY_GPS_HEADER" /etc/chrony/chrony.conf; then
-  echo "Chrony GPS configuration already present."
+# Configure chrony for PPS time sync
+echo -e "\n==== Configuring chrony for PPS time sync ===="
+CHRONY_PPS_HEADER="# PPS from GPS (precise timing)"
+if sudo grep -Fq "$CHRONY_PPS_HEADER" /etc/chrony/chrony.conf; then
+  echo "Chrony PPS configuration already present."
 else
   sudo tee -a /etc/chrony/chrony.conf >/dev/null <<'EOF'
 
-# GPS via gpsd shared memory
-refclock SHM 0 refid GPS precision 1e-1 offset 0.1 delay 0.05
 # PPS from GPS (precise timing)
+# openTPT sets coarse time from NMEA, PPS refines to nanosecond precision
 refclock PPS /dev/pps0 refid PPS precision 1e-7 prefer
+# Allow NTP servers as fallback when GPS unavailable
 EOF
-  echo "Chrony configured for GPS/PPS time sync (Stratum 1)"
+  echo "Chrony configured for PPS time sync (Stratum 1)"
 fi
 
-# Disable NTP network sync in favour of GPS
-sudo timedatectl set-ntp false 2>/dev/null || true
-
-# Enable gpsd service
-sudo systemctl enable gpsd 2>/dev/null || true
+# Keep NTP enabled as fallback for coarse time when GPS unavailable
+# (PPS requires system time to be within ~0.5s to lock)
+sudo timedatectl set-ntp true 2>/dev/null || true
 
 # Install GPS 10Hz configuration script and service
 echo -e "\n==== Installing GPS 10Hz configuration ===="

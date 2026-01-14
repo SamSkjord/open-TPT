@@ -1,32 +1,34 @@
 """
 GPS Handler for openTPT.
-Reads GPS data from gpsd for speed, position, and time sync.
+Reads NMEA data directly from serial at 10Hz for accurate data logging.
+PPS signal provides nanosecond time sync via chrony independently.
 """
 
 import time
-import threading
+import serial
 from typing import Optional
 
 from utils.hardware_base import BoundedQueueHardwareHandler
-from utils.config import GPS_ENABLED
+from utils.config import GPS_ENABLED, GPS_SERIAL_PORT, GPS_BAUD_RATE
 
 
 class GPSHandler(BoundedQueueHardwareHandler):
     """
-    GPS handler using gpsd for position, speed, and time.
+    GPS handler reading NMEA directly from serial at 10Hz.
 
-    Connects to gpsd socket and extracts:
-    - Speed (from TPV messages)
+    Parses GPRMC sentences for:
+    - Speed (knots converted to km/h)
     - Position (lat/lon)
     - Fix status
-    - Satellite count
-    - Time (for system clock sync)
+    - UTC time
+
+    Time sync is handled by chrony via PPS on /dev/pps0.
     """
 
     def __init__(self):
         super().__init__(queue_depth=2)
         self.enabled = GPS_ENABLED
-        self.gpsd_session = None
+        self.serial_port = None
         self.hardware_available = False
 
         # Current values
@@ -35,8 +37,13 @@ class GPSHandler(BoundedQueueHardwareHandler):
         self.longitude = 0.0
         self.has_fix = False
         self.satellites = 0
-        self.antenna_status = 0  # gpsd doesn't report this
         self.gps_time = None
+        self.gps_date = None
+
+        # Update rate tracking
+        self.last_update = 0.0
+        self.update_count = 0
+        self.update_rate = 0.0
 
         # Time sync tracking
         self.time_synced = False
@@ -52,129 +59,185 @@ class GPSHandler(BoundedQueueHardwareHandler):
             print("GPS disabled in config")
 
     def _initialise(self):
-        """Initialise the connection to gpsd."""
+        """Initialise serial connection to GPS."""
         try:
-            import gps
-            self.gpsd_session = gps.gps(mode=gps.WATCH_ENABLE | gps.WATCH_NEWSTYLE)
+            self.serial_port = serial.Serial(
+                port=GPS_SERIAL_PORT,
+                baudrate=GPS_BAUD_RATE,
+                timeout=0.15  # Slightly longer than 100ms (10Hz) interval
+            )
             self.hardware_available = True
             self.consecutive_errors = 0
-            print("GPS: Connected to gpsd")
+            print(f"GPS: Connected to {GPS_SERIAL_PORT} at {GPS_BAUD_RATE} baud")
         except Exception as e:
-            print(f"GPS: Failed to connect to gpsd: {e}")
-            self.gpsd_session = None
+            print(f"GPS: Failed to open {GPS_SERIAL_PORT}: {e}")
+            self.serial_port = None
             self.hardware_available = False
 
     def _worker_loop(self):
-        """Background thread that reads from gpsd."""
-        import gps
+        """Background thread that reads NMEA from serial."""
+        buffer = ""
+        rate_start = time.monotonic()
+        rate_count = 0
 
         while self.running:
             try:
-                if self.gpsd_session and self.hardware_available:
-                    # Read next gpsd message (non-blocking with timeout)
-                    if self.gpsd_session.waiting(timeout=0.5):
-                        report = self.gpsd_session.next()
+                if self.serial_port and self.hardware_available:
+                    # Read available data
+                    if self.serial_port.in_waiting > 0:
+                        data = self.serial_port.read(self.serial_port.in_waiting)
+                        buffer += data.decode('ascii', errors='ignore')
 
-                        if report['class'] == 'TPV':
-                            self._parse_tpv(report)
-                        elif report['class'] == 'SKY':
-                            self._parse_sky(report)
+                        # Process complete sentences
+                        while '\r\n' in buffer:
+                            line, buffer = buffer.split('\r\n', 1)
+                            if line.startswith('$GPRMC') or line.startswith('$GNRMC'):
+                                self._parse_rmc(line)
+                                rate_count += 1
+
+                                # Publish after each RMC
+                                self._publish_data()
 
                         self.consecutive_errors = 0
 
-                    # Publish current data
-                    data = {
-                        'speed_kmh': self.speed_kmh,
-                        'latitude': self.latitude,
-                        'longitude': self.longitude,
-                        'has_fix': self.has_fix,
-                        'satellites': self.satellites,
-                        'antenna_status': self.antenna_status,
-                        'gps_time': self.gps_time,
-                    }
-                    self._publish_snapshot(data)
+                    # Update rate calculation every second
+                    now = time.monotonic()
+                    if now - rate_start >= 1.0:
+                        self.update_rate = rate_count / (now - rate_start)
+                        rate_count = 0
+                        rate_start = now
+
+                    # Small sleep to prevent busy-waiting
+                    time.sleep(0.01)
 
                 else:
                     time.sleep(0.5)
 
-            except StopIteration:
-                # gpsd connection lost
+            except serial.SerialException as e:
                 self.consecutive_errors += 1
-                if self.consecutive_errors >= 3:
-                    print("GPS: gpsd connection lost, reconnecting...")
+                if self.consecutive_errors == 3:
+                    print(f"GPS: Serial error: {e}")
+                elif self.consecutive_errors >= self.max_consecutive_errors:
+                    print("GPS: Too many errors, attempting reconnect...")
                     self._initialise()
-                time.sleep(1)
+                    self.consecutive_errors = 0
+                time.sleep(0.1)
 
             except Exception as e:
                 self.consecutive_errors += 1
                 if self.consecutive_errors == 3:
-                    print(f"GPS: Error reading from gpsd: {e}")
-                elif self.consecutive_errors >= self.max_consecutive_errors:
-                    self.hardware_available = False
+                    print(f"GPS: Error: {e}")
                 time.sleep(0.1)
 
-    def _parse_tpv(self, report):
-        """Parse TPV (Time-Position-Velocity) message."""
+    def _parse_rmc(self, sentence: str):
+        """
+        Parse GPRMC/GNRMC sentence.
+
+        Format: $GPRMC,time,status,lat,N/S,lon,E/W,speed,course,date,mag,mode*checksum
+        Example: $GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*6A
+        """
         try:
-            # Mode: 0=unknown, 1=no fix, 2=2D fix, 3=3D fix
-            mode = report.get('mode', 0)
-            self.has_fix = mode >= 2
+            # Verify checksum
+            if '*' not in sentence:
+                return
+            data_part, checksum = sentence.split('*')
+            calc_checksum = 0
+            for char in data_part[1:]:  # Skip $
+                calc_checksum ^= ord(char)
+            if f"{calc_checksum:02X}" != checksum.upper():
+                return
 
-            # Position
-            if 'lat' in report and 'lon' in report:
-                self.latitude = report['lat']
-                self.longitude = report['lon']
+            parts = data_part.split(',')
+            if len(parts) < 10:
+                return
 
-            # Speed (gpsd reports in m/s, convert to km/h)
-            if 'speed' in report:
-                self.speed_kmh = report['speed'] * 3.6
+            # Status: A=valid, V=invalid
+            status = parts[2]
+            self.has_fix = (status == 'A')
 
-            # Time
-            if 'time' in report:
-                self.gps_time = report['time']
-                # Sync system time once on first valid time
-                if not self.time_synced and self.has_fix:
-                    self._sync_system_time()
+            if not self.has_fix:
+                return
 
-        except Exception:
-            pass
+            # Time: HHMMSS.sss
+            time_str = parts[1]
+            if len(time_str) >= 6:
+                self.gps_time = f"{time_str[0:2]}:{time_str[2:4]}:{time_str[4:6]}"
 
-    def _parse_sky(self, report):
-        """Parse SKY message for satellite info."""
-        try:
-            # uSat = satellites used in fix
-            if 'uSat' in report:
-                self.satellites = report['uSat']
-            elif 'nSat' in report:
-                self.satellites = report['nSat']
-        except Exception:
+            # Date: DDMMYY
+            date_str = parts[9]
+            if len(date_str) >= 6:
+                self.gps_date = f"20{date_str[4:6]}-{date_str[2:4]}-{date_str[0:2]}"
+
+            # Latitude: DDMM.MMMM,N/S
+            lat_str = parts[3]
+            lat_dir = parts[4]
+            if lat_str:
+                lat_deg = float(lat_str[:2])
+                lat_min = float(lat_str[2:])
+                self.latitude = lat_deg + lat_min / 60.0
+                if lat_dir == 'S':
+                    self.latitude = -self.latitude
+
+            # Longitude: DDDMM.MMMM,E/W
+            lon_str = parts[5]
+            lon_dir = parts[6]
+            if lon_str:
+                lon_deg = float(lon_str[:3])
+                lon_min = float(lon_str[3:])
+                self.longitude = lon_deg + lon_min / 60.0
+                if lon_dir == 'W':
+                    self.longitude = -self.longitude
+
+            # Speed: knots -> km/h
+            speed_str = parts[7]
+            if speed_str:
+                speed_knots = float(speed_str)
+                self.speed_kmh = speed_knots * 1.852
+
+            self.last_update = time.monotonic()
+
+            # Sync system time once on first valid fix
+            if not self.time_synced and self.gps_date and self.gps_time:
+                self._sync_system_time()
+
+        except (ValueError, IndexError):
             pass
 
     def _sync_system_time(self):
-        """Sync system time from GPS (once per boot)."""
-        if not self.gps_time:
-            return
+        """Set system time from GPS (once per boot). PPS then refines it."""
+        import subprocess
 
         try:
-            import subprocess
-            # timedatectl set-time expects "YYYY-MM-DD HH:MM:SS"
-            # gpsd time is ISO format: "2026-01-14T15:29:59.000Z"
-            time_str = self.gps_time.replace('T', ' ').replace('Z', '').split('.')[0]
+            # Format: "YYYY-MM-DD HH:MM:SS"
+            datetime_str = f"{self.gps_date} {self.gps_time}"
             result = subprocess.run(
-                ['sudo', 'timedatectl', 'set-time', time_str],
+                ['sudo', 'date', '-s', datetime_str],
                 capture_output=True,
                 timeout=5
             )
             if result.returncode == 0:
-                print(f"GPS: System time synced to {time_str}")
+                print(f"GPS: System time set to {datetime_str} UTC")
                 self.time_synced = True
             else:
-                # Might fail if NTP is active, that's OK
-                print(f"GPS: Time sync skipped (NTP active or error)")
+                print(f"GPS: Time sync failed: {result.stderr.decode()}")
                 self.time_synced = True  # Don't retry
         except Exception as e:
-            print(f"GPS: Time sync failed: {e}")
-            self.time_synced = True  # Don't retry on error
+            print(f"GPS: Time sync error: {e}")
+            self.time_synced = True  # Don't retry
+
+    def _publish_data(self):
+        """Publish current GPS data to snapshot."""
+        data = {
+            'speed_kmh': self.speed_kmh,
+            'latitude': self.latitude,
+            'longitude': self.longitude,
+            'has_fix': self.has_fix,
+            'satellites': self.satellites,
+            'gps_time': self.gps_time,
+            'gps_date': self.gps_date,
+            'update_rate': self.update_rate,
+        }
+        self._publish_snapshot(data)
 
     def get_speed(self) -> float:
         """Get current speed in km/h."""
@@ -190,12 +253,16 @@ class GPSHandler(BoundedQueueHardwareHandler):
         """Check if GPS has a valid fix."""
         return self.has_fix
 
+    def get_update_rate(self) -> float:
+        """Get current GPS update rate in Hz."""
+        return self.update_rate
+
     def stop(self):
-        """Stop the GPS handler and close gpsd connection."""
+        """Stop the GPS handler and close serial connection."""
         super().stop()
-        if self.gpsd_session:
+        if self.serial_port:
             try:
-                self.gpsd_session.close()
+                self.serial_port.close()
             except Exception:
                 pass
         print("GPS handler stopped")

@@ -5,13 +5,17 @@
 # PMTK314 disables all sentences except RMC.
 # PMTK220,100 sets 100ms (10Hz) update rate.
 #
-# This script stops gpsd, configures GPS, then restarts gpsd.
+# openTPT reads serial directly for 10Hz position/speed data.
+# gpsd is disabled - chrony uses PPS directly for time sync.
+# GPS handler sets coarse system time from NMEA, PPS refines it.
 
 GPS_PORT="/dev/ttyS0"
 GPS_BAUD=9600
 
-# Stop gpsd if running (it locks the serial port)
+# Disable gpsd - we read serial directly for 10Hz updates
+# PPS still works independently via /dev/pps0 for chrony
 systemctl stop gpsd.socket gpsd.service 2>/dev/null || true
+systemctl disable gpsd.socket gpsd.service 2>/dev/null || true
 
 # Wait for GPS port
 for i in {1..10}; do
@@ -35,7 +39,4 @@ sleep 0.2
 echo -ne "\$PMTK220,100*2F\r\n" > "$GPS_PORT"
 sleep 0.2
 
-echo "GPS configured for 10Hz RMC-only output"
-
-# Restart gpsd
-systemctl start gpsd.socket gpsd.service 2>/dev/null || true
+echo "GPS configured for 10Hz RMC-only output (gpsd disabled)"
