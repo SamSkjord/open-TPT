@@ -322,7 +322,7 @@ class MenuSystem:
     Manages the root menu and all submenus for openTPT.
     """
 
-    def __init__(self, tpms_handler=None, encoder_handler=None, input_handler=None, neodriver_handler=None, imu_handler=None):
+    def __init__(self, tpms_handler=None, encoder_handler=None, input_handler=None, neodriver_handler=None, imu_handler=None, gps_handler=None):
         """
         Initialise the menu system.
 
@@ -332,12 +332,14 @@ class MenuSystem:
             input_handler: Input handler for display brightness sync
             neodriver_handler: NeoDriver handler for LED strip control
             imu_handler: IMU handler for G-meter calibration
+            gps_handler: GPS handler for speed and position
         """
         self.tpms_handler = tpms_handler
         self.encoder_handler = encoder_handler
         self.input_handler = input_handler
         self.neodriver_handler = neodriver_handler
         self.imu_handler = imu_handler
+        self.gps_handler = gps_handler
         self.current_menu: Optional[Menu] = None
         self.root_menu: Optional[Menu] = None
 
@@ -355,6 +357,10 @@ class MenuSystem:
 
         # IMU calibration wizard state
         self.imu_cal_step = None  # None, 'zero', 'accel', 'turn'
+
+        # Speed source (loaded from config, runtime switchable)
+        from utils.config import SPEED_SOURCE
+        self.speed_source = SPEED_SOURCE  # "obd" or "gps"
 
         self._build_menus()
 
@@ -452,8 +458,43 @@ class MenuSystem:
         ))
         imu_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
 
+        # GPS Status submenu
+        gps_menu = Menu("GPS Status")
+        gps_menu.add_item(MenuItem(
+            "Fix",
+            dynamic_label=lambda: self._get_gps_fix_label(),
+            enabled=False  # Info only
+        ))
+        gps_menu.add_item(MenuItem(
+            "Satellites",
+            dynamic_label=lambda: self._get_gps_satellites_label(),
+            enabled=False
+        ))
+        gps_menu.add_item(MenuItem(
+            "Speed",
+            dynamic_label=lambda: self._get_gps_speed_label(),
+            enabled=False
+        ))
+        gps_menu.add_item(MenuItem(
+            "Position",
+            dynamic_label=lambda: self._get_gps_position_label(),
+            enabled=False
+        ))
+        gps_menu.add_item(MenuItem(
+            "Port",
+            dynamic_label=lambda: self._get_gps_port_label(),
+            enabled=False
+        ))
+        gps_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+
         # System menu
         system_menu = Menu("System")
+        system_menu.add_item(MenuItem(
+            "Speed Source",
+            dynamic_label=lambda: f"Speed: {self._get_speed_source().upper()}",
+            action=lambda: self._toggle_speed_source()
+        ))
+        system_menu.add_item(MenuItem("GPS Status", submenu=gps_menu))
         system_menu.add_item(MenuItem("IMU Calibration", submenu=imu_menu))
         system_menu.add_item(MenuItem("Shutdown", action=lambda: self._shutdown()))
         system_menu.add_item(MenuItem("Reboot", action=lambda: self._reboot()))
@@ -475,6 +516,7 @@ class MenuSystem:
         lights_menu.parent = self.root_menu
         system_menu.parent = self.root_menu
         imu_menu.parent = system_menu
+        gps_menu.parent = system_menu
 
     def _get_brightness(self) -> float:
         """Get current brightness from encoder handler."""
@@ -1098,6 +1140,77 @@ class MenuSystem:
             return "Rebooting..."
         except Exception as e:
             return f"Reboot failed: {e}"
+
+    # Speed source methods
+    def _get_speed_source(self) -> str:
+        """Get current speed source."""
+        return self.speed_source
+
+    def _toggle_speed_source(self) -> str:
+        """Toggle between OBD and GPS speed source."""
+        if self.speed_source == "obd":
+            self.speed_source = "gps"
+        else:
+            self.speed_source = "obd"
+        return f"Speed: {self.speed_source.upper()}"
+
+    # GPS Status methods
+    def _get_gps_fix_label(self) -> str:
+        """Get GPS fix status label."""
+        if not self.gps_handler:
+            return "Fix: No GPS"
+        snapshot = self.gps_handler.get_snapshot()
+        if not snapshot:
+            return "Fix: No data"
+        has_fix = snapshot.get('has_fix', False)
+        if has_fix:
+            return "Fix: Yes ✓"
+        return "Fix: No (searching)"
+
+    def _get_gps_satellites_label(self) -> str:
+        """Get GPS satellite count label."""
+        if not self.gps_handler:
+            return "Sats: --"
+        snapshot = self.gps_handler.get_snapshot()
+        if not snapshot:
+            return "Sats: --"
+        sats = snapshot.get('satellites', 0)
+        return f"Sats: {sats}"
+
+    def _get_gps_speed_label(self) -> str:
+        """Get GPS speed label."""
+        if not self.gps_handler:
+            return "Speed: --"
+        snapshot = self.gps_handler.get_snapshot()
+        if not snapshot:
+            return "Speed: --"
+        if not snapshot.get('has_fix', False):
+            return "Speed: -- (no fix)"
+        speed = snapshot.get('speed_kmh', 0)
+        return f"Speed: {speed:.1f} km/h"
+
+    def _get_gps_position_label(self) -> str:
+        """Get GPS position label."""
+        if not self.gps_handler:
+            return "Pos: --"
+        snapshot = self.gps_handler.get_snapshot()
+        if not snapshot:
+            return "Pos: --"
+        if not snapshot.get('has_fix', False):
+            return "Pos: -- (no fix)"
+        lat = snapshot.get('latitude', 0)
+        lon = snapshot.get('longitude', 0)
+        # Format with direction indicators
+        lat_dir = "N" if lat >= 0 else "S"
+        lon_dir = "E" if lon >= 0 else "W"
+        return f"{abs(lat):.4f}{lat_dir} {abs(lon):.4f}{lon_dir}"
+
+    def _get_gps_port_label(self) -> str:
+        """Get GPS serial port label."""
+        from utils.config import GPS_SERIAL_PORT, GPS_BAUD_RATE, GPS_ENABLED
+        if not GPS_ENABLED:
+            return "Port: Disabled"
+        return f"{GPS_SERIAL_PORT} @ {GPS_BAUD_RATE}"
 
     # IMU Calibration methods
     def _get_imu_zero_label(self) -> str:

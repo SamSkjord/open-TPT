@@ -142,6 +142,16 @@ except ImportError:
     OBD2Handler = None
     OBD_ENABLED = False
 
+# Import GPS handler (optional, for GPS speed)
+try:
+    from hardware.gps_handler import GPSHandler
+    from utils.config import GPS_ENABLED
+    GPS_AVAILABLE = True
+except ImportError:
+    GPS_AVAILABLE = False
+    GPSHandler = None
+    GPS_ENABLED = False
+
 # Import Ford Hybrid handler (optional, for battery SOC)
 try:
     from hardware.ford_hybrid_handler import FordHybridHandler
@@ -753,6 +763,18 @@ class OpenTPT:
         else:
             self.obd2 = None
 
+        # Initialise GPS handler (optional, for GPS speed)
+        self._show_splash("Initialising GPS...", 0.78)
+        if GPS_ENABLED and GPS_AVAILABLE and GPSHandler:
+            try:
+                self.gps = GPSHandler()
+                print("GPS handler initialised for speed")
+            except Exception as e:
+                print(f"Warning: Could not initialise GPS: {e}")
+                self.gps = None
+        else:
+            self.gps = None
+
         # Initialise Ford Hybrid handler (optional, for battery SOC)
         if FORD_HYBRID_ENABLED and FORD_HYBRID_AVAILABLE and FordHybridHandler:
             try:
@@ -775,6 +797,7 @@ class OpenTPT:
             input_handler=self.input_handler,
             neodriver_handler=self.neodriver,
             imu_handler=self.imu,
+            gps_handler=self.gps,
         )
         print(f"[BOOT] menu init done t={time.time()-_boot_start:.1f}s", flush=True)
 
@@ -1299,8 +1322,13 @@ class OpenTPT:
                 if imu_snapshot:
                     self.gmeter.update(imu_snapshot)
 
-            # Update OBD2 speed if available
-            if self.obd2:
+            # Update speed based on configured source (menu toggle)
+            speed_source = self.menu.speed_source if self.menu else "obd"
+            if speed_source == "gps" and self.gps:
+                gps_snapshot = self.gps.get_snapshot()
+                if gps_snapshot and gps_snapshot.get('has_fix'):
+                    self.gmeter.set_speed(int(gps_snapshot.get('speed_kmh', 0)))
+            elif self.obd2:
                 obd_snapshot = self.obd2.get_data()
                 if obd_snapshot and 'speed_kmh' in obd_snapshot:
                     self.gmeter.set_speed(obd_snapshot['speed_kmh'])
@@ -1649,6 +1677,11 @@ class OpenTPT:
         if self.obd2:
             print("Stopping OBD2...")
             self.obd2.cleanup()
+
+        # Stop GPS if enabled
+        if self.gps:
+            print("Stopping GPS...")
+            self.gps.stop()
 
         # Stop Ford Hybrid if enabled
         if self.ford_hybrid:

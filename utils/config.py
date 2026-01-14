@@ -525,6 +525,25 @@ GMETER_MAX_G = 2.0  # Maximum G-force to display (±2g is typical for road cars)
 GMETER_HISTORY_SECONDS = 5.0  # How many seconds of history to show on trace
 
 # ==============================================================================
+# SPEED CONFIGURATION
+# ==============================================================================
+
+# Speed source: "obd" for OBD2/CAN, "gps" for GPS module
+SPEED_SOURCE = "obd"
+
+# ==============================================================================
+# GPS CONFIGURATION
+# ==============================================================================
+
+# Enable/disable GPS module
+GPS_ENABLED = True  # Set to False to disable GPS
+
+# Serial port for GPS (Raspberry Pi UART)
+# GPIO 14 (TX) and GPIO 15 (RX) map to /dev/serial0
+GPS_SERIAL_PORT = "/dev/serial0"
+GPS_BAUD_RATE = 9600  # Standard NMEA baud rate (most GPS modules use 9600)
+
+# ==============================================================================
 # OBD2 CONFIGURATION (Vehicle Speed)
 # ==============================================================================
 
