@@ -38,6 +38,7 @@
 4. **Hardware requires sudo** - All I/O needs elevated privileges
 5. **Lock-free rendering** - No blocking in render path
 6. **Bounded queues** - All hardware handlers extend `BoundedQueueHardwareHandler`
+7. **No emojis** - Never use emojis in code, comments, or documentation
 
 ---
 
