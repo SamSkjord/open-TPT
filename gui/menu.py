@@ -1160,9 +1160,9 @@ class MenuSystem:
         if not self.gps_handler:
             return "Fix: No GPS"
         snapshot = self.gps_handler.get_snapshot()
-        if not snapshot:
+        if not snapshot or not snapshot.data:
             return "Fix: No data"
-        has_fix = snapshot.get('has_fix', False)
+        has_fix = snapshot.data.get('has_fix', False)
         if has_fix:
             return "Fix: Yes ✓"
         return "Fix: No (searching)"
@@ -1172,9 +1172,9 @@ class MenuSystem:
         if not self.gps_handler:
             return "Sats: --"
         snapshot = self.gps_handler.get_snapshot()
-        if not snapshot:
+        if not snapshot or not snapshot.data:
             return "Sats: --"
-        sats = snapshot.get('satellites', 0)
+        sats = snapshot.data.get('satellites', 0)
         return f"Sats: {sats}"
 
     def _get_gps_speed_label(self) -> str:
@@ -1182,11 +1182,11 @@ class MenuSystem:
         if not self.gps_handler:
             return "Speed: --"
         snapshot = self.gps_handler.get_snapshot()
-        if not snapshot:
+        if not snapshot or not snapshot.data:
             return "Speed: --"
-        if not snapshot.get('has_fix', False):
+        if not snapshot.data.get('has_fix', False):
             return "Speed: -- (no fix)"
-        speed = snapshot.get('speed_kmh', 0)
+        speed = snapshot.data.get('speed_kmh', 0)
         return f"Speed: {speed:.1f} km/h"
 
     def _get_gps_position_label(self) -> str:
@@ -1194,12 +1194,12 @@ class MenuSystem:
         if not self.gps_handler:
             return "Pos: --"
         snapshot = self.gps_handler.get_snapshot()
-        if not snapshot:
+        if not snapshot or not snapshot.data:
             return "Pos: --"
-        if not snapshot.get('has_fix', False):
+        if not snapshot.data.get('has_fix', False):
             return "Pos: -- (no fix)"
-        lat = snapshot.get('latitude', 0)
-        lon = snapshot.get('longitude', 0)
+        lat = snapshot.data.get('latitude', 0)
+        lon = snapshot.data.get('longitude', 0)
         # Format with direction indicators
         lat_dir = "N" if lat >= 0 else "S"
         lon_dir = "E" if lon >= 0 else "W"

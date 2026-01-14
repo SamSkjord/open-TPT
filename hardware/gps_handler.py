@@ -183,10 +183,6 @@ class GPSHandler(BoundedQueueHardwareHandler):
         except (ValueError, IndexError):
             pass
 
-    def get_snapshot(self) -> Optional[dict]:
-        """Get current GPS data snapshot (lock-free)."""
-        return self._get_snapshot()
-
     def get_speed(self) -> float:
         """Get current speed in km/h."""
         return self.speed_kmh if self.has_fix else 0.0

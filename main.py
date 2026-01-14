@@ -1326,8 +1326,8 @@ class OpenTPT:
             speed_source = self.menu.speed_source if self.menu else "obd"
             if speed_source == "gps" and self.gps:
                 gps_snapshot = self.gps.get_snapshot()
-                if gps_snapshot and gps_snapshot.get('has_fix'):
-                    self.gmeter.set_speed(int(gps_snapshot.get('speed_kmh', 0)))
+                if gps_snapshot and gps_snapshot.data and gps_snapshot.data.get('has_fix'):
+                    self.gmeter.set_speed(int(gps_snapshot.data.get('speed_kmh', 0)))
             elif self.obd2:
                 obd_snapshot = self.obd2.get_data()
                 if obd_snapshot and 'speed_kmh' in obd_snapshot:
