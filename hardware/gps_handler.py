@@ -61,8 +61,8 @@ class GPSHandler(BoundedQueueHardwareHandler):
             self.consecutive_errors = 0
             print(f"GPS: Initialised on {GPS_SERIAL_PORT} at {GPS_BAUD_RATE} baud")
 
-            # Request antenna status reporting (PGCMD_ANTENNA)
-            self._send_command("PGCMD,33,1")
+            # Query firmware version - this triggers PCD antenna status output
+            self._send_command("PMTK605")
         except Exception as e:
             print(f"GPS: Failed to initialise serial port: {e}")
             self.serial_port = None

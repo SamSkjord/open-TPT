@@ -1169,7 +1169,7 @@ class MenuSystem:
             return "Fix: No data"
         has_fix = snapshot.data.get('has_fix', False)
         if has_fix:
-            return "Fix: Yes ✓"
+            return "Fix: Yes"
         return "Fix: No (searching)"
 
     def _get_gps_satellites_label(self) -> str:
@@ -1229,7 +1229,7 @@ class MenuSystem:
             0: "Antenna: Unknown",
             1: "Antenna: FAULT",
             2: "Antenna: Internal",
-            3: "Antenna: External ✓",
+            3: "Antenna: External",
         }
         return status_labels.get(status, f"Antenna: {status}")
 
