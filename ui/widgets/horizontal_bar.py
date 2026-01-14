@@ -35,6 +35,7 @@ class HorizontalBar:
         self.max_value = 100
         self.unit = "%"
         self.label = ""
+        self.greyed_out = False  # When True, bar displays in grey (no data)
 
         # Colour zones (list of (threshold, colour) tuples)
         # Each zone goes from its threshold to the next
@@ -75,6 +76,10 @@ class HorizontalBar:
         """
         self.colour_zones = sorted(zones, key=lambda x: x[0])
 
+    def set_greyed_out(self, greyed_out):
+        """Set whether the bar should be greyed out (no data available)."""
+        self.greyed_out = greyed_out
+
     def _get_colour_for_value(self, value):
         """Get colour for a specific value based on zones."""
         if not self.colour_zones:
@@ -100,6 +105,30 @@ class HorizontalBar:
         bg_rect = pygame.Rect(self.x, self.y, self.width, self.height)
         pygame.draw.rect(surface, (40, 40, 40), bg_rect)
 
+        # Centre position
+        centre_x = self.x + self.width // 2
+
+        # If greyed out, show empty bar with "No Data" text
+        if self.greyed_out:
+            # Just draw the background and border in grey
+            pygame.draw.rect(surface, (60, 60, 60), bg_rect, 2)
+
+            # Centre line marker (dimmed)
+            pygame.draw.line(
+                surface,
+                (80, 80, 80),
+                (centre_x, self.y),
+                (centre_x, self.y + self.height),
+                2
+            )
+
+            # "No Data" text
+            if self.font:
+                text_surface = self.font.render("No Data", True, (100, 100, 100))
+                text_rect = text_surface.get_rect(center=(centre_x, self.y + self.height // 2))
+                surface.blit(text_surface, text_rect)
+            return
+
         # Calculate bar fill percentage
         value_range = self.max_value - self.min_value
         if self.value is None or value_range <= 0:
@@ -108,7 +137,6 @@ class HorizontalBar:
             fill_percent = (self.value - self.min_value) / value_range
 
         # Calculate bar width from centre (symmetric)
-        centre_x = self.x + self.width // 2
         bar_half_width = int((self.width // 2) * fill_percent)
 
         if bar_half_width > 0:

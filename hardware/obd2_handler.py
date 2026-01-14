@@ -19,12 +19,17 @@ except ImportError:
     print("Warning: python-can not available (running without OBD2)")
 
 # OBD2 standard IDs and PIDs
-OBD_REQUEST_ID = 0x7DF
+OBD_REQUEST_ID = 0x7DF  # Broadcast request ID
 OBD_RESPONSE_MIN = 0x7E8
 OBD_RESPONSE_MAX = 0x7EF
 PID_ENGINE_RPM = 0x0C  # Engine RPM: ((A * 256) + B) / 4
 PID_VEHICLE_SPEED = 0x0D  # Vehicle speed in km/h
 PID_INTAKE_MAP = 0x0B  # Intake manifold absolute pressure (kPa)
+
+# Ford Mode 22 (UDS) DIDs for hybrid battery
+# Request format: [length, 0x22, DID_high, DID_low, ...]
+# Response format: [length, 0x62, DID_high, DID_low, A, B, ...]
+FORD_DID_SOC = 0x4801  # HV Battery State of Charge: ((A*256)+B)*(1/5)/100
 
 
 class OBD2Handler(BoundedQueueHardwareHandler):
@@ -60,6 +65,12 @@ class OBD2Handler(BoundedQueueHardwareHandler):
         self.current_map_kpa = 0
         self.map_history = deque(maxlen=3)  # Rolling window for smoothing and rate calculation (O(1) operations)
         self.simulated_soc = 0.0  # Calculated directly from MAP (will be set on first reading)
+
+        # Real HV Battery SOC from Ford Mode 22 (DID 0x4801)
+        self.real_soc = None  # None = not available, float = real percentage
+        self.real_soc_available = False  # Track if Ford hybrid SOC is responding
+        self.soc_read_attempts = 0  # Count attempts to read real SOC
+        self.soc_max_failures = 5  # Stop trying after this many consecutive failures
 
         if self.enabled:
             self._initialise()
@@ -297,6 +308,64 @@ class OBD2Handler(BoundedQueueHardwareHandler):
 
         return self.simulated_soc
 
+    def _build_ford_soc_request(self):
+        """Build Ford Mode 22 (UDS) request for HV Battery SOC (DID 0x4801)."""
+        # Service 0x22 (Read Data By Identifier), DID 0x4801
+        # Format: [length, service_id, DID_high, DID_low, padding...]
+        data = [0x03, 0x22, 0x48, 0x01, 0x00, 0x00, 0x00, 0x00]
+        return can.Message(
+            arbitration_id=OBD_REQUEST_ID,
+            is_extended_id=False,
+            data=data
+        )
+
+    def _wait_for_ford_soc_response(self, timeout_s=0.2):
+        """
+        Wait for Ford Mode 22 SOC response.
+
+        Response format: [length, 0x62, 0x48, 0x01, A, B, ...]
+        SOC = ((A*256)+B)*(1/5)/100
+
+        Returns:
+            SOC percentage (0-100), or None if no response
+        """
+        if not self.bus:
+            return None
+
+        deadline = time.time() + timeout_s
+        while time.time() < deadline:
+            remaining = max(0.0, deadline - time.time())
+            try:
+                msg = self.bus.recv(timeout=remaining)
+                if msg is None:
+                    continue
+
+                # Check for valid response (from ECU range)
+                if not (OBD_RESPONSE_MIN <= msg.arbitration_id <= OBD_RESPONSE_MAX):
+                    continue
+                if msg.is_extended_id:
+                    continue
+                if len(msg.data) < 6:  # Need at least 6 bytes for SOC response
+                    continue
+
+                # Check for positive response to service 0x22 (0x62) and correct DID
+                if msg.data[1] == 0x62 and msg.data[2] == 0x48 and msg.data[3] == 0x01:
+                    # SOC formula: ((A*256)+B)*(1/5)/100
+                    a = msg.data[4]
+                    b = msg.data[5]
+                    soc = ((a * 256) + b) * (1 / 5) / 100
+                    return max(0, min(100, soc))  # Clamp to 0-100%
+
+                # Check for negative response (0x7F = service not supported)
+                if msg.data[1] == 0x7F and msg.data[2] == 0x22:
+                    # Service 0x22 not supported or DID not found
+                    return None
+
+            except Exception:
+                return None
+
+        return None
+
     def _worker_loop(self):
         """Background thread that polls OBD2 for vehicle speed."""
         poll_interval = 0.2  # Poll every 200ms (5 Hz) - balance between smoothness and system load
@@ -354,23 +423,37 @@ class OBD2Handler(BoundedQueueHardwareHandler):
                         smoothed_rpm = sum(self.rpm_history) / len(self.rpm_history)
                         self.current_rpm = int(round(smoothed_rpm))
 
-                    # Send MAP request (for simulating SOC)
-                    map_request = self._build_map_request()
-                    self.bus.send(map_request, timeout=0.1)
+                    # Try to read real Ford HV Battery SOC (if not already failed permanently)
+                    state = 'idle'
+                    if self.soc_read_attempts < self.soc_max_failures:
+                        soc_request = self._build_ford_soc_request()
+                        self.bus.send(soc_request, timeout=0.1)
 
-                    # Wait for MAP response
-                    map_kpa = self._wait_for_map_response(timeout_s=0.15)
+                        real_soc = self._wait_for_ford_soc_response(timeout_s=0.15)
 
-                    if map_kpa is not None:
-                        # Add to history for rate-of-change calculation (auto-drops oldest when full)
-                        self.map_history.append(map_kpa)
+                        if real_soc is not None:
+                            self.real_soc = real_soc
+                            self.real_soc_available = True
+                            self.soc_read_attempts = 0  # Reset on success
+                            # Determine state from current (would need HV current PID for accurate state)
+                            state = 'idle'
+                        else:
+                            self.soc_read_attempts += 1
+                            if self.soc_read_attempts == self.soc_max_failures:
+                                print("OBD2: Ford Mode 22 SOC not supported, using simulated SOC")
 
-                        # Update simulated SOC based on MAP
-                        self.current_map_kpa = map_kpa
-                        soc = self._map_to_soc(map_kpa)
+                    # Fall back to MAP-based simulated SOC if real SOC not available
+                    if not self.real_soc_available:
+                        map_request = self._build_map_request()
+                        self.bus.send(map_request, timeout=0.1)
 
-                        # Calculate state (idle/increasing/decreasing)
-                        state = self._calculate_map_state()
+                        map_kpa = self._wait_for_map_response(timeout_s=0.15)
+
+                        if map_kpa is not None:
+                            self.map_history.append(map_kpa)
+                            self.current_map_kpa = map_kpa
+                            self._map_to_soc(map_kpa)
+                            state = self._calculate_map_state()
 
                     # Publish combined data (speed, RPM, and SOC)
                     data = {
@@ -378,7 +461,9 @@ class OBD2Handler(BoundedQueueHardwareHandler):
                         'rpm': self.current_rpm,
                         'map_kpa': self.current_map_kpa,
                         'simulated_soc': self.simulated_soc,
-                        'soc_state': state if map_kpa is not None else 'idle',
+                        'real_soc': self.real_soc,
+                        'soc_available': self.real_soc_available,
+                        'soc_state': state,
                     }
                     self._publish_snapshot(data)
 

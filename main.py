@@ -1335,37 +1335,61 @@ class OpenTPT:
 
         # Update status bars (if enabled) - on ALL pages
         if self.status_bar_enabled:
-            # Update SOC - prefer Ford Hybrid if available, otherwise use OBD2 simulated SOC
-            if self.ford_hybrid:
+            # Update SOC bar - prefer real SOC from OBD2, grey out if unavailable
+            if self.obd2:
+                obd_snapshot = self.obd2.get_data()
+                if obd_snapshot:
+                    # Check if real SOC is available (Ford Mode 22 DID 0x4801)
+                    if obd_snapshot.get('soc_available', False) and obd_snapshot.get('real_soc') is not None:
+                        # Real HV Battery SOC available
+                        soc = obd_snapshot['real_soc']
+                        self.bottom_bar.set_value(soc)
+                        self.bottom_bar.set_greyed_out(False)
+                        # Blue colour for real battery SOC
+                        self.bottom_bar.set_colour_zones([
+                            (0, (0, 0, 255)), (50, (64, 64, 255)), (100, (0, 0, 255))
+                        ])
+                    elif 'simulated_soc' in obd_snapshot:
+                        # Fall back to MAP-based simulated SOC
+                        soc = obd_snapshot['simulated_soc']
+                        state = obd_snapshot.get('soc_state', 'idle')
+                        self.bottom_bar.set_value(soc)
+                        self.bottom_bar.set_greyed_out(False)
+
+                        # Update colour zones based on state
+                        if state == 'idle':
+                            self.bottom_bar.set_colour_zones([
+                                (0, (0, 0, 255)), (50, (64, 64, 255)), (100, (0, 0, 255))
+                            ])
+                        elif state == 'increasing':  # Charging - GREEN
+                            self.bottom_bar.set_colour_zones([
+                                (0, (0, 128, 0)), (50, (0, 255, 0)), (100, (0, 255, 0))
+                            ])
+                        elif state == 'decreasing':  # Discharging - RED
+                            self.bottom_bar.set_colour_zones([
+                                (0, (255, 0, 0)), (50, (255, 100, 100)), (100, (255, 0, 0))
+                            ])
+                    else:
+                        # No SOC data at all
+                        self.bottom_bar.set_greyed_out(True)
+                else:
+                    # No OBD2 snapshot
+                    self.bottom_bar.set_greyed_out(True)
+            elif self.ford_hybrid:
+                # Legacy Ford Hybrid handler (separate handler)
                 hybrid_snapshot = self.ford_hybrid.get_data()
                 if hybrid_snapshot and 'soc_percent' in hybrid_snapshot:
                     soc = hybrid_snapshot['soc_percent']
                     self.bottom_bar.set_value(soc)
-                    # Ford Hybrid defaults to idle state
+                    self.bottom_bar.set_greyed_out(False)
                     self.bottom_bar.set_colour_zones([
                         (0, (0, 0, 255)), (50, (64, 64, 255)), (100, (0, 0, 255))
                     ])
-            elif self.obd2:
-                # Use OBD2 MAP-based simulated SOC for desk testing
-                obd_snapshot = self.obd2.get_data()
-                if obd_snapshot and 'simulated_soc' in obd_snapshot:
-                    soc = obd_snapshot['simulated_soc']
-                    state = obd_snapshot.get('soc_state', 'idle')
-                    self.bottom_bar.set_value(soc)
-
-                    # Update color zones based on state
-                    if state == 'idle':
-                        self.bottom_bar.set_colour_zones([
-                            (0, (0, 0, 255)), (50, (64, 64, 255)), (100, (0, 0, 255))
-                        ])
-                    elif state == 'increasing':  # Charging - GREEN
-                        self.bottom_bar.set_colour_zones([
-                            (0, (0, 128, 0)), (50, (0, 255, 0)), (100, (0, 255, 0))
-                        ])
-                    elif state == 'decreasing':  # Discharging - RED
-                        self.bottom_bar.set_colour_zones([
-                            (0, (255, 0, 0)), (50, (255, 100, 100)), (100, (255, 0, 0))
-                        ])
+                else:
+                    self.bottom_bar.set_greyed_out(True)
+            else:
+                # No OBD2 or Ford Hybrid handler
+                self.bottom_bar.set_greyed_out(True)
 
             # Update lap delta (simulated for testing)
             test_delta = 5.0 * math.sin(time.time() * 0.1)
