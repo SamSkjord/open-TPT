@@ -39,6 +39,10 @@ sudo apt install -y \
 echo -e "\n==== Installing Bluetooth audio support ===="
 sudo apt install -y pulseaudio pulseaudio-module-bluetooth
 
+# Install GPS and time sync packages
+echo -e "\n==== Installing GPS and time sync packages ===="
+sudo apt install -y gpsd gpsd-clients chrony pps-tools
+
 # Add D-Bus policy for Bluetooth audio (allows pi user to access A2DP profiles)
 echo -e "\n==== Configuring Bluetooth audio permissions ===="
 sudo tee /etc/dbus-1/system.d/bluetooth-audio.conf > /dev/null << 'BTEOF'
@@ -178,7 +182,57 @@ dtoverlay=mcp2515,spi0-1,oscillator=16000000,interrupt=25  # Board 2, CAN_1 (GPI
 EOF
     echo "Appended Dual CAN block to $BOOT_CONFIG (reboot required)."
   fi
+
+  # Configure UART and PPS for GPS
+  GPS_BLOCK_HEADER="# ==== openTPT GPS Configuration ===="
+  if sudo grep -Fq "$GPS_BLOCK_HEADER" "$BOOT_CONFIG"; then
+    echo "GPS configuration block already present."
+  else
+    sudo tee -a "$BOOT_CONFIG" >/dev/null <<'EOF'
+
+# ==== openTPT GPS Configuration ====
+# Enable UART for GPS module (GPIO 14/15 TX/RX)
+enable_uart=1
+# PPS signal from GPS on GPIO 18
+dtoverlay=pps-gpio,gpiopin=18
+# ==== end openTPT GPS Configuration ====
+EOF
+    echo "Appended GPS configuration to $BOOT_CONFIG (reboot required)."
+  fi
 fi
+
+# Configure gpsd for GPS module
+echo -e "\n==== Configuring gpsd ===="
+sudo tee /etc/default/gpsd >/dev/null <<'EOF'
+# openTPT GPS configuration
+DEVICES="/dev/ttyS0 /dev/pps0"
+GPSD_OPTIONS="-n"
+START_DAEMON="true"
+USBAUTO="false"
+EOF
+echo "gpsd configured for /dev/ttyS0 and /dev/pps0"
+
+# Configure chrony for GPS/PPS time sync
+echo -e "\n==== Configuring chrony for GPS time sync ===="
+CHRONY_GPS_HEADER="# GPS via gpsd shared memory"
+if sudo grep -Fq "$CHRONY_GPS_HEADER" /etc/chrony/chrony.conf; then
+  echo "Chrony GPS configuration already present."
+else
+  sudo tee -a /etc/chrony/chrony.conf >/dev/null <<'EOF'
+
+# GPS via gpsd shared memory
+refclock SHM 0 refid GPS precision 1e-1 offset 0.1 delay 0.05
+# PPS from GPS (precise timing)
+refclock PPS /dev/pps0 refid PPS precision 1e-7 prefer
+EOF
+  echo "Chrony configured for GPS/PPS time sync (Stratum 1)"
+fi
+
+# Disable NTP network sync in favour of GPS
+sudo timedatectl set-ntp false 2>/dev/null || true
+
+# Enable gpsd service
+sudo systemctl enable gpsd 2>/dev/null || true
 
 # Install persistent CAN naming rule
 echo -e "\n==== Installing persistent CAN interface naming rule ===="
