@@ -57,6 +57,65 @@ The install script will:
 - ✓ Set up CAN interfaces
 - ✓ Enable auto-start on boot
 
+### 3. GPS and Time Sync Setup
+
+Enable UART and PPS for GPS module (GPIO 14/15 for TX/RX, GPIO 18 for PPS):
+
+```bash
+# Add to /boot/firmware/config.txt
+echo -e "\n# Enable UART for GPS\nenable_uart=1\n\n# GPS PPS on GPIO 18\ndtoverlay=pps-gpio,gpiopin=18" | sudo tee -a /boot/firmware/config.txt
+
+# Reboot to enable UART and PPS
+sudo reboot
+```
+
+Install and configure gpsd and chrony for GPS time sync:
+
+```bash
+# Install packages
+sudo apt-get install -y gpsd gpsd-clients chrony pps-tools
+
+# Configure gpsd
+sudo tee /etc/default/gpsd << EOF
+DEVICES="/dev/ttyS0 /dev/pps0"
+GPSD_OPTIONS="-n"
+START_DAEMON="true"
+USBAUTO="false"
+EOF
+
+# Configure chrony for GPS/PPS time sync
+sudo tee -a /etc/chrony/chrony.conf << EOF
+
+# GPS via gpsd shared memory
+refclock SHM 0 refid GPS precision 1e-1 offset 0.1 delay 0.05
+# PPS from GPS (precise timing)
+refclock PPS /dev/pps0 refid PPS precision 1e-7 prefer
+EOF
+
+# Disable NTP network sync (use GPS instead)
+sudo timedatectl set-ntp false
+
+# Enable and start services
+sudo systemctl enable gpsd
+sudo systemctl restart gpsd chrony
+```
+
+Verify GPS time sync:
+
+```bash
+# Check gpsd is receiving data
+gpspipe -w -n 5
+
+# Check PPS signal
+sudo ppstest /dev/pps0
+
+# Check chrony sources (PPS should show #*)
+chronyc sources
+
+# Check tracking (should show "Reference ID: PPS", Stratum 1)
+chronyc tracking
+```
+
 ## Deployment Methods
 
 ### Method 1: Git Pull (Recommended for Updates)
