@@ -298,7 +298,7 @@ TYRE_TEMP_HOT_TO_BLACK = 50.0  # Range over which red fades to black after HOT
 # Options: "adc" for IR sensors via ADS1115, "mlx90614" for single-point IR,
 #          "mcp9601" for thermocouple via MCP9601, "obd" for CAN/OBD-II
 BRAKE_SENSOR_TYPES = {
-    "FL": "mlx90614",  # Front Left - MLX90614 IR sensor
+    "FL": "mcp9601",  # Front Left - MCP9601 thermocouples (inner/outer)
     "FR": "adc",  # Front Right - ADC IR sensor
     "RL": None,  # Rear Left - No sensor connected
     "RR": None,  # Rear Right - No sensor connected
@@ -337,7 +337,7 @@ MCP9601_MUX_CHANNELS = {
 # Supports dual sensors per corner (inner and outer brake pads)
 # Set to True to enable dual-zone brake temperature monitoring
 MCP9601_DUAL_ZONE = {
-    "FL": False,  # Set True if both inner and outer sensors installed
+    "FL": True,  # Inner (0x65) and outer (0x66) thermocouples installed
     "FR": False,
     "RL": False,
     "RR": False,

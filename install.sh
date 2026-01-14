@@ -130,6 +130,8 @@ PYTHON_DEPS=(
   # Thermal sensors: MLX90640 for Pico slaves, MLX90614 for direct Pi reading
   "adafruit-circuitpython-mlx90640>=1.2.0"
   "adafruit-circuitpython-mlx90614>=1.2.0"
+  # Thermocouple amplifier for brake temperature probes
+  "adafruit-circuitpython-mcp9600>=2.0.0"
   "tpms==2.0.1"
   "pytest>=7.0.0"
   "opencv-python"
