@@ -1,34 +1,32 @@
 """
 GPS Handler for openTPT.
-Reads NMEA data from serial GPS module for speed and position.
+Reads GPS data from gpsd for speed, position, and time sync.
 """
 
 import time
-import serial
+import threading
 from typing import Optional
 
 from utils.hardware_base import BoundedQueueHardwareHandler
-from utils.config import (
-    GPS_ENABLED,
-    GPS_SERIAL_PORT,
-    GPS_BAUD_RATE,
-)
+from utils.config import GPS_ENABLED
 
 
 class GPSHandler(BoundedQueueHardwareHandler):
     """
-    GPS handler with bounded queue for NMEA parsing.
+    GPS handler using gpsd for position, speed, and time.
 
-    Reads from serial GPS module and extracts:
-    - Speed (from $GPRMC or $GNRMC)
+    Connects to gpsd socket and extracts:
+    - Speed (from TPV messages)
     - Position (lat/lon)
     - Fix status
+    - Satellite count
+    - Time (for system clock sync)
     """
 
     def __init__(self):
         super().__init__(queue_depth=2)
         self.enabled = GPS_ENABLED
-        self.serial_port = None
+        self.gpsd_session = None
         self.hardware_available = False
 
         # Current values
@@ -37,7 +35,11 @@ class GPSHandler(BoundedQueueHardwareHandler):
         self.longitude = 0.0
         self.has_fix = False
         self.satellites = 0
-        self.antenna_status = 0  # 0=unknown, 1=fault, 2=internal, 3=external
+        self.antenna_status = 0  # gpsd doesn't report this
+        self.gps_time = None
+
+        # Time sync tracking
+        self.time_synced = False
 
         # Error tracking
         self.consecutive_errors = 0
@@ -50,59 +52,33 @@ class GPSHandler(BoundedQueueHardwareHandler):
             print("GPS disabled in config")
 
     def _initialise(self):
-        """Initialise the serial connection to GPS module."""
+        """Initialise the connection to gpsd."""
         try:
-            self.serial_port = serial.Serial(
-                GPS_SERIAL_PORT,
-                baudrate=GPS_BAUD_RATE,
-                timeout=1.0
-            )
+            import gps
+            self.gpsd_session = gps.gps(mode=gps.WATCH_ENABLE | gps.WATCH_NEWSTYLE)
             self.hardware_available = True
             self.consecutive_errors = 0
-            print(f"GPS: Initialised on {GPS_SERIAL_PORT} at {GPS_BAUD_RATE} baud")
-
-            # Query firmware version - this triggers PCD antenna status output
-            self._send_command("PMTK605")
+            print("GPS: Connected to gpsd")
         except Exception as e:
-            print(f"GPS: Failed to initialise serial port: {e}")
-            self.serial_port = None
+            print(f"GPS: Failed to connect to gpsd: {e}")
+            self.gpsd_session = None
             self.hardware_available = False
 
-    def _send_command(self, command: str):
-        """Send a PMTK/PGCMD command to the GPS module."""
-        if self.serial_port:
-            try:
-                # Calculate checksum
-                checksum = 0
-                for char in command:
-                    checksum ^= ord(char)
-                full_command = f"${command}*{checksum:02X}\r\n"
-                self.serial_port.write(full_command.encode('ascii'))
-            except Exception as e:
-                print(f"GPS: Failed to send command: {e}")
-
     def _worker_loop(self):
-        """Background thread that reads NMEA sentences."""
-        buffer = ""
+        """Background thread that reads from gpsd."""
+        import gps
 
         while self.running:
             try:
-                if self.serial_port and self.hardware_available:
-                    # Read available data
-                    if self.serial_port.in_waiting > 0:
-                        data = self.serial_port.read(self.serial_port.in_waiting)
-                        buffer += data.decode('ascii', errors='ignore')
+                if self.gpsd_session and self.hardware_available:
+                    # Read next gpsd message (non-blocking with timeout)
+                    if self.gpsd_session.waiting(timeout=0.5):
+                        report = self.gpsd_session.next()
 
-                        # Process complete sentences
-                        while '\n' in buffer:
-                            line, buffer = buffer.split('\n', 1)
-                            line = line.strip()
-                            if line.startswith('$'):
-                                self._parse_nmea(line)
-
-                        # Prevent buffer overflow
-                        if len(buffer) > 1024:
-                            buffer = buffer[-512:]
+                        if report['class'] == 'TPV':
+                            self._parse_tpv(report)
+                        elif report['class'] == 'SKY':
+                            self._parse_sky(report)
 
                         self.consecutive_errors = 0
 
@@ -114,105 +90,91 @@ class GPSHandler(BoundedQueueHardwareHandler):
                         'has_fix': self.has_fix,
                         'satellites': self.satellites,
                         'antenna_status': self.antenna_status,
+                        'gps_time': self.gps_time,
                     }
                     self._publish_snapshot(data)
 
                 else:
                     time.sleep(0.5)
 
+            except StopIteration:
+                # gpsd connection lost
+                self.consecutive_errors += 1
+                if self.consecutive_errors >= 3:
+                    print("GPS: gpsd connection lost, reconnecting...")
+                    self._initialise()
+                time.sleep(1)
+
             except Exception as e:
                 self.consecutive_errors += 1
                 if self.consecutive_errors == 3:
-                    print(f"GPS: Error reading serial: {e}")
+                    print(f"GPS: Error reading from gpsd: {e}")
                 elif self.consecutive_errors >= self.max_consecutive_errors:
                     self.hardware_available = False
                 time.sleep(0.1)
 
-            time.sleep(0.05)  # ~20Hz read rate
-
-    def _parse_nmea(self, sentence: str):
-        """Parse NMEA sentence and extract relevant data."""
+    def _parse_tpv(self, report):
+        """Parse TPV (Time-Position-Velocity) message."""
         try:
-            # Validate checksum
-            if '*' in sentence:
-                data, checksum = sentence[1:].split('*')
-                calc_checksum = 0
-                for char in data:
-                    calc_checksum ^= ord(char)
-                if int(checksum, 16) != calc_checksum:
-                    return  # Invalid checksum
-            else:
-                data = sentence[1:]
+            # Mode: 0=unknown, 1=no fix, 2=2D fix, 3=3D fix
+            mode = report.get('mode', 0)
+            self.has_fix = mode >= 2
 
-            parts = data.split(',')
-            msg_type = parts[0]
+            # Position
+            if 'lat' in report and 'lon' in report:
+                self.latitude = report['lat']
+                self.longitude = report['lon']
 
-            # RMC - Recommended Minimum (has speed and position)
-            if msg_type in ('GPRMC', 'GNRMC'):
-                self._parse_rmc(parts)
+            # Speed (gpsd reports in m/s, convert to km/h)
+            if 'speed' in report:
+                self.speed_kmh = report['speed'] * 3.6
 
-            # GGA - Fix data (has satellites and fix quality)
-            elif msg_type in ('GPGGA', 'GNGGA'):
-                self._parse_gga(parts)
-
-            # PGTOP/PCD - Antenna status (Adafruit Ultimate GPS)
-            elif msg_type in ('PGTOP', 'PCD'):
-                self._parse_pgtop(parts)
+            # Time
+            if 'time' in report:
+                self.gps_time = report['time']
+                # Sync system time once on first valid time
+                if not self.time_synced and self.has_fix:
+                    self._sync_system_time()
 
         except Exception:
-            pass  # Ignore malformed sentences
-
-    def _parse_rmc(self, parts: list):
-        """Parse RMC sentence for speed and position."""
-        try:
-            # Status: A=Active, V=Void
-            if len(parts) > 2:
-                self.has_fix = parts[2] == 'A'
-
-            # Latitude (ddmm.mmmm)
-            if len(parts) > 4 and parts[3]:
-                lat = float(parts[3][:2]) + float(parts[3][2:]) / 60
-                if parts[4] == 'S':
-                    lat = -lat
-                self.latitude = lat
-
-            # Longitude (dddmm.mmmm)
-            if len(parts) > 6 and parts[5]:
-                lon = float(parts[5][:3]) + float(parts[5][3:]) / 60
-                if parts[6] == 'W':
-                    lon = -lon
-                self.longitude = lon
-
-            # Speed in knots -> km/h
-            if len(parts) > 7 and parts[7]:
-                speed_knots = float(parts[7])
-                self.speed_kmh = speed_knots * 1.852
-
-        except (ValueError, IndexError):
             pass
 
-    def _parse_gga(self, parts: list):
-        """Parse GGA sentence for satellite count."""
+    def _parse_sky(self, report):
+        """Parse SKY message for satellite info."""
         try:
-            # Number of satellites
-            if len(parts) > 7 and parts[7]:
-                self.satellites = int(parts[7])
-
-            # Fix quality (0=invalid, 1=GPS, 2=DGPS)
-            if len(parts) > 6 and parts[6]:
-                self.has_fix = int(parts[6]) > 0
-
-        except (ValueError, IndexError):
+            # uSat = satellites used in fix
+            if 'uSat' in report:
+                self.satellites = report['uSat']
+            elif 'nSat' in report:
+                self.satellites = report['nSat']
+        except Exception:
             pass
 
-    def _parse_pgtop(self, parts: list):
-        """Parse PGTOP sentence for antenna status (Adafruit Ultimate GPS)."""
+    def _sync_system_time(self):
+        """Sync system time from GPS (once per boot)."""
+        if not self.gps_time:
+            return
+
         try:
-            # $PGTOP,11,x where x is: 1=fault, 2=internal, 3=external
-            if len(parts) > 2 and parts[1] == '11':
-                self.antenna_status = int(parts[2])
-        except (ValueError, IndexError):
-            pass
+            import subprocess
+            # timedatectl set-time expects "YYYY-MM-DD HH:MM:SS"
+            # gpsd time is ISO format: "2026-01-14T15:29:59.000Z"
+            time_str = self.gps_time.replace('T', ' ').replace('Z', '').split('.')[0]
+            result = subprocess.run(
+                ['sudo', 'timedatectl', 'set-time', time_str],
+                capture_output=True,
+                timeout=5
+            )
+            if result.returncode == 0:
+                print(f"GPS: System time synced to {time_str}")
+                self.time_synced = True
+            else:
+                # Might fail if NTP is active, that's OK
+                print(f"GPS: Time sync skipped (NTP active or error)")
+                self.time_synced = True  # Don't retry
+        except Exception as e:
+            print(f"GPS: Time sync failed: {e}")
+            self.time_synced = True  # Don't retry on error
 
     def get_speed(self) -> float:
         """Get current speed in km/h."""
@@ -229,11 +191,11 @@ class GPSHandler(BoundedQueueHardwareHandler):
         return self.has_fix
 
     def stop(self):
-        """Stop the GPS handler and close serial port."""
+        """Stop the GPS handler and close gpsd connection."""
         super().stop()
-        if self.serial_port:
+        if self.gpsd_session:
             try:
-                self.serial_port.close()
+                self.gpsd_session.close()
             except Exception:
                 pass
         print("GPS handler stopped")
