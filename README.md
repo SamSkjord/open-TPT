@@ -475,7 +475,7 @@ openTPT/
 - SDL2 hardware rendering - use opengles2 renderer instead of software blitting for GPU acceleration
 
 ### Hardware TODO
-- [ ] PA1616S Adafruit GPS - for lap timing and position logging
+- [x] PA1616S Adafruit GPS - for lap timing and position logging
 - [x] Adafruit NeoDriver - LED strip control (delta, overtake, shift, rainbow modes)
 - [ ] MCP9601 Thermocouples - brake temperature sensors (per corner)
 - [ ] LTR-559 Auto brightness - ambient light sensor for automatic display brightness (enable/disable + offset settings)
@@ -499,6 +499,7 @@ openTPT/
 - [ ] Power menu - screen timeout, safe shutdown
 - [ ] Track selection - for lap timing (requires GPS)
 - [ ] Config persistence - safely write settings to config file when changed
+- [ ] Installer improvements - add GPS UART setup (enable_uart=1) and NTP time sync configuration
 
 ## Documentation
 

@@ -485,6 +485,11 @@ class MenuSystem:
             dynamic_label=lambda: self._get_gps_port_label(),
             enabled=False
         ))
+        gps_menu.add_item(MenuItem(
+            "Antenna",
+            dynamic_label=lambda: self._get_gps_antenna_label(),
+            enabled=False
+        ))
         gps_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
 
         # System menu
@@ -1211,6 +1216,22 @@ class MenuSystem:
         if not GPS_ENABLED:
             return "Port: Disabled"
         return f"{GPS_SERIAL_PORT} @ {GPS_BAUD_RATE}"
+
+    def _get_gps_antenna_label(self) -> str:
+        """Get GPS antenna status label."""
+        if not self.gps_handler:
+            return "Antenna: --"
+        snapshot = self.gps_handler.get_snapshot()
+        if not snapshot or not snapshot.data:
+            return "Antenna: --"
+        status = snapshot.data.get('antenna_status', 0)
+        status_labels = {
+            0: "Antenna: Unknown",
+            1: "Antenna: FAULT",
+            2: "Antenna: Internal",
+            3: "Antenna: External ✓",
+        }
+        return status_labels.get(status, f"Antenna: {status}")
 
     # IMU Calibration methods
     def _get_imu_zero_label(self) -> str:

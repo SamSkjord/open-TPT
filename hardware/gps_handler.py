@@ -37,6 +37,7 @@ class GPSHandler(BoundedQueueHardwareHandler):
         self.longitude = 0.0
         self.has_fix = False
         self.satellites = 0
+        self.antenna_status = 0  # 0=unknown, 1=fault, 2=internal, 3=external
 
         # Error tracking
         self.consecutive_errors = 0
@@ -59,10 +60,26 @@ class GPSHandler(BoundedQueueHardwareHandler):
             self.hardware_available = True
             self.consecutive_errors = 0
             print(f"GPS: Initialised on {GPS_SERIAL_PORT} at {GPS_BAUD_RATE} baud")
+
+            # Request antenna status reporting (PGCMD_ANTENNA)
+            self._send_command("PGCMD,33,1")
         except Exception as e:
             print(f"GPS: Failed to initialise serial port: {e}")
             self.serial_port = None
             self.hardware_available = False
+
+    def _send_command(self, command: str):
+        """Send a PMTK/PGCMD command to the GPS module."""
+        if self.serial_port:
+            try:
+                # Calculate checksum
+                checksum = 0
+                for char in command:
+                    checksum ^= ord(char)
+                full_command = f"${command}*{checksum:02X}\r\n"
+                self.serial_port.write(full_command.encode('ascii'))
+            except Exception as e:
+                print(f"GPS: Failed to send command: {e}")
 
     def _worker_loop(self):
         """Background thread that reads NMEA sentences."""
@@ -96,6 +113,7 @@ class GPSHandler(BoundedQueueHardwareHandler):
                         'longitude': self.longitude,
                         'has_fix': self.has_fix,
                         'satellites': self.satellites,
+                        'antenna_status': self.antenna_status,
                     }
                     self._publish_snapshot(data)
 
@@ -136,6 +154,10 @@ class GPSHandler(BoundedQueueHardwareHandler):
             # GGA - Fix data (has satellites and fix quality)
             elif msg_type in ('GPGGA', 'GNGGA'):
                 self._parse_gga(parts)
+
+            # PGTOP - Antenna status (Adafruit Ultimate GPS)
+            elif msg_type == 'PGTOP':
+                self._parse_pgtop(parts)
 
         except Exception:
             pass  # Ignore malformed sentences
@@ -180,6 +202,15 @@ class GPSHandler(BoundedQueueHardwareHandler):
             if len(parts) > 6 and parts[6]:
                 self.has_fix = int(parts[6]) > 0
 
+        except (ValueError, IndexError):
+            pass
+
+    def _parse_pgtop(self, parts: list):
+        """Parse PGTOP sentence for antenna status (Adafruit Ultimate GPS)."""
+        try:
+            # $PGTOP,11,x where x is: 1=fault, 2=internal, 3=external
+            if len(parts) > 2 and parts[1] == '11':
+                self.antenna_status = int(parts[2])
         except (ValueError, IndexError):
             pass
 
