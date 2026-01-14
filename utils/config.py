@@ -300,8 +300,8 @@ TYRE_TEMP_HOT_TO_BLACK = 50.0  # Range over which red fades to black after HOT
 BRAKE_SENSOR_TYPES = {
     "FL": "mlx90614",  # Front Left - MLX90614 IR sensor
     "FR": "adc",  # Front Right - ADC IR sensor
-    "RL": "adc",  # Rear Left - ADC IR sensor
-    "RR": "adc",  # Rear Right - ADC IR sensor
+    "RL": None,  # Rear Left - No sensor connected
+    "RR": None,  # Rear Right - No sensor connected
 }
 
 # I2C multiplexer channel mapping for brake sensors

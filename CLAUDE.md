@@ -58,9 +58,9 @@
 - ✅ Rotary Encoder: I2C QT with NeoPixel (0x36)
 - ✅ Pico Thermal: 1/4 MLX90640 (FL)
 - ❌ TOF Distance: Disabled (VL53L0X unreliable for ride height)
-- ✅ Brake Temps: MCP9601 thermocouples (0x65/0x66)
+- ✅ Brake Temps: FL (MLX90614), FR (ADC) - rear disabled
 - ✅ Toyota Radar: can_b1_0 (keep-alive), can_b1_1 (tracks)
-- ✅ OBD2: MAP-based SOC simulation
+- ✅ OBD2: Ford Mode 22 HV Battery SOC (DID 0x4801)
 
 ---
 
