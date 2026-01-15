@@ -55,6 +55,11 @@ class BoundedQueueHardwareHandler:
         self.last_perf_time = time.time()
         self.update_hz = 0.0
 
+        # Frame drop metrics
+        self._frames_dropped = 0
+        self._frames_dropped_total = 0
+        self._last_drop_log_time = time.time()
+
     def start(self):
         """Start the hardware reading thread."""
         if self.running:
@@ -101,8 +106,12 @@ class BoundedQueueHardwareHandler:
             try:
                 self.data_queue.get_nowait()
                 self.data_queue.put_nowait(snapshot)
+                self._frames_dropped += 1
+                self._frames_dropped_total += 1
             except (queue.Empty, queue.Full):
-                pass  # Race condition, skip this frame
+                # Race condition - frame truly dropped
+                self._frames_dropped += 1
+                self._frames_dropped_total += 1
 
         # Update performance metrics
         self.frame_count += 1
@@ -112,6 +121,18 @@ class BoundedQueueHardwareHandler:
             self.update_hz = self.frame_count / elapsed
             self.frame_count = 0
             self.last_perf_time = current_time
+
+        # Log frame drops periodically (every 60 seconds if any drops occurred)
+        drop_log_elapsed = current_time - self._last_drop_log_time
+        if drop_log_elapsed >= 60.0:
+            if self._frames_dropped > 0:
+                print(
+                    f"[WARNING] {self.__class__.__name__}: "
+                    f"{self._frames_dropped} frames dropped in last 60s "
+                    f"(total: {self._frames_dropped_total})"
+                )
+            self._frames_dropped = 0
+            self._last_drop_log_time = current_time
 
     def get_snapshot(self) -> Optional[HardwareSnapshot]:
         """
@@ -147,3 +168,15 @@ class BoundedQueueHardwareHandler:
             Update rate in Hz
         """
         return self.update_hz
+
+    def get_frame_drop_stats(self) -> Dict[str, int]:
+        """
+        Get frame drop statistics.
+
+        Returns:
+            Dictionary with 'recent' (last 60s) and 'total' frame drop counts
+        """
+        return {
+            "recent": self._frames_dropped,
+            "total": self._frames_dropped_total
+        }

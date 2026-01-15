@@ -1518,9 +1518,16 @@ class MenuSystem:
         import subprocess
 
         try:
-            subprocess.Popen(["sudo", "shutdown", "now"])
+            subprocess.run(
+                ["sudo", "shutdown", "now"],
+                timeout=10,
+                check=False,
+                capture_output=True
+            )
             return "Shutting down..."
-        except Exception as e:
+        except subprocess.TimeoutExpired:
+            return "Shutdown command timed out"
+        except (OSError, subprocess.SubprocessError) as e:
             return f"Shutdown failed: {e}"
 
     def _reboot(self) -> str:
@@ -1528,9 +1535,16 @@ class MenuSystem:
         import subprocess
 
         try:
-            subprocess.Popen(["sudo", "reboot"])
+            subprocess.run(
+                ["sudo", "reboot"],
+                timeout=10,
+                check=False,
+                capture_output=True
+            )
             return "Rebooting..."
-        except Exception as e:
+        except subprocess.TimeoutExpired:
+            return "Reboot command timed out"
+        except (OSError, subprocess.SubprocessError) as e:
             return f"Reboot failed: {e}"
 
     # Speed source methods
@@ -1636,19 +1650,19 @@ class MenuSystem:
     def _get_imu_zero_label(self) -> str:
         """Get label for zero calibration step."""
         if self.imu_cal_step == "zero_done":
-            return "1. Zero ✓"
+            return "1. Zero [OK]"
         return "1. Zero (level)"
 
     def _get_imu_accel_label(self) -> str:
         """Get label for acceleration calibration step."""
         if self.imu_cal_step == "accel_done":
-            return "2. Accelerate ✓"
+            return "2. Accelerate [OK]"
         return "2. Accelerate"
 
     def _get_imu_turn_label(self) -> str:
         """Get label for turn calibration step."""
         if self.imu_cal_step == "turn_done":
-            return "3. Turn Left ✓"
+            return "3. Turn Left [OK]"
         return "3. Turn Left"
 
     def _imu_calibrate_zero(self) -> str:

@@ -61,7 +61,7 @@ class CornerAnalyzer:
 
     def __init__(self, corners: List[Corner]):
         """
-        Initialize corner analyzer.
+        Initialise corner analyzer.
 
         Args:
             corners: List of detected corners on track

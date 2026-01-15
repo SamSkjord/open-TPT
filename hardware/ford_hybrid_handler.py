@@ -55,15 +55,15 @@ class FordHybridHandler(BoundedQueueHardwareHandler):
         # History for smoothing
         self.soc_history = deque(maxlen=3)  # Average over 3 readings (O(1) operations)
 
-    def initialize(self):
-        """Initialize CAN bus connection to Ford hybrid module."""
+    def initialise(self):
+        """Initialise CAN bus connection to Ford hybrid module."""
         if not self.enabled:
             print("Ford Hybrid handler disabled in config")
             self.hardware_available = False
             return
 
         try:
-            print(f"Initializing Ford Hybrid on {self.channel} at {self.bitrate} bps...")
+            print(f"Initialising Ford Hybrid on {self.channel} at {self.bitrate} bps...")
 
             # Create CAN bus interface
             self.bus = can.interface.Bus(
@@ -73,13 +73,13 @@ class FordHybridHandler(BoundedQueueHardwareHandler):
             )
 
             self.hardware_available = True
-            print(f"Ford Hybrid initialized on {self.channel}")
+            print(f"Ford Hybrid initialised on {self.channel}")
 
             # Start worker thread
             self.start()
 
         except Exception as e:
-            print(f"Failed to initialize Ford Hybrid: {e}")
+            print(f"Failed to initialise Ford Hybrid: {e}")
             self.hardware_available = False
             self.bus = None
 

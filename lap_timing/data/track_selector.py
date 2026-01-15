@@ -141,7 +141,7 @@ class TrackSelector:
         racelogic_tracks_dir: str = None
     ):
         """
-        Initialize track selector.
+        Initialise track selector.
 
         Args:
             tracks_db_path: Path to custom tracks SQLite database

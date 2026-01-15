@@ -35,7 +35,7 @@ class CornerDetector:
     def __init__(self, min_radius: float = 100.0, min_angle: float = 15.0,
                  edge_buffer: float = 30.0):
         """
-        Initialize corner detector.
+        Initialise corner detector.
 
         Args:
             min_radius: Minimum radius to consider a corner (meters)

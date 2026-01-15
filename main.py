@@ -251,29 +251,29 @@ def check_power_status():
 
         # Current status bits
         if throttled & 0x1:
-            issues.append("⚠️  CRITICAL: Undervoltage detected NOW")
+            issues.append("[CRITICAL] Undervoltage detected NOW")
             has_critical = True
         if throttled & 0x2:
-            issues.append("⚠️  CRITICAL: Arm frequency capped NOW")
+            issues.append("[CRITICAL] Arm frequency capped NOW")
             has_critical = True
         if throttled & 0x4:
-            issues.append("⚠️  WARNING: Currently throttled")
+            issues.append("[WARNING] Currently throttled")
             has_critical = True
         if throttled & 0x8:
-            issues.append("⚠️  WARNING: Soft temperature limit active")
+            issues.append("[WARNING] Soft temperature limit active")
 
         # Historical bits (since boot)
         if throttled & 0x10000:
-            issues.append("📋 Undervoltage has occurred since boot")
+            issues.append("[INFO] Undervoltage has occurred since boot")
         if throttled & 0x20000:
-            issues.append("📋 Arm frequency capping has occurred")
+            issues.append("[INFO] Arm frequency capping has occurred")
         if throttled & 0x40000:
-            issues.append("📋 Throttling has occurred")
+            issues.append("[INFO] Throttling has occurred")
         if throttled & 0x80000:
-            issues.append("📋 Soft temperature limit has been reached")
+            issues.append("[INFO] Soft temperature limit has been reached")
 
         if throttled == 0:
-            return (throttled, False, "Power status: OK ✅")
+            return (throttled, False, "Power status: OK")
 
         warning = f"\n{'='*60}\n"
         warning += f"POWER ISSUES DETECTED (throttled={throttled_str})\n"
@@ -282,7 +282,7 @@ def check_power_status():
             warning += f"{issue}\n"
 
         if has_critical or (throttled & 0x50000):  # Undervoltage or frequency capping occurred
-            warning += "\n🔴 CRITICAL: System experiencing power problems!\n"
+            warning += "\n[CRITICAL] System experiencing power problems!\n"
             warning += "   - Use official Raspberry Pi power supply (5V/5A)\n"
             warning += "   - Check USB-C cable quality (use thick, short cable)\n"
             warning += "   - Reduce connected hardware load if problem persists\n"
@@ -428,7 +428,7 @@ def collect_memory_stats():
 class OpenTPT:
     def __init__(self, args):
         """
-        Initialize the OpenTPT application.
+        Initialise the OpenTPT application.
 
         Args:
             args: Command line arguments
@@ -491,15 +491,15 @@ class OpenTPT:
         print(message)
         # Don't sleep on power issues - boot fast, user can check logs
 
-        # Initialize pygame and display
+        # Initialise pygame and display
         self._init_display()
 
-        # Initialize subsystems
+        # Initialise subsystems
         self._init_subsystems()
 
     def _init_display(self):
-        """Initialize pygame and the display."""
-        # Initialize pygame
+        """Initialise pygame and the display."""
+        # Initialise pygame
         pygame.init()
         print(f"[BOOT] pygame.init() done t={time.time()-_boot_start:.1f}s", flush=True)
 
@@ -521,7 +521,7 @@ class OpenTPT:
         self.clock = pygame.time.Clock()
         print(f"[BOOT] display ready t={time.time()-_boot_start:.1f}s", flush=True)
 
-        # Hide mouse cursor after display is initialized
+        # Hide mouse cursor after display is initialised
         pygame.mouse.set_visible(False)
 
         # Kill fbi splash now that pygame display is ready
@@ -820,7 +820,7 @@ class OpenTPT:
         if FORD_HYBRID_ENABLED and FORD_HYBRID_AVAILABLE and FordHybridHandler:
             try:
                 self.ford_hybrid = FordHybridHandler()
-                self.ford_hybrid.initialize()
+                self.ford_hybrid.initialise()
                 print("Ford Hybrid handler initialised for battery SOC")
             except (IOError, OSError, RuntimeError, ValueError) as e:
                 print(f"Warning: Could not initialise Ford Hybrid: {e}")
@@ -942,10 +942,16 @@ class OpenTPT:
             sys.stderr.flush()
             # Also write to file for persistent debugging
             try:
-                with open("/tmp/opentpt_crash.log", "w") as f:
+                import os
+                import stat
+                # Write to user home directory for better security
+                crash_log_path = os.path.expanduser("~/opentpt_crash.log")
+                with open(crash_log_path, "w") as f:
                     f.write(f"Error: {e}\n\n")
                     traceback.print_exc(file=f)
-                print("Crash log written to /tmp/opentpt_crash.log")
+                # Set restrictive permissions (owner read/write only)
+                os.chmod(crash_log_path, stat.S_IRUSR | stat.S_IWUSR)
+                print(f"Crash log written to {crash_log_path}")
             except (IOError, OSError):
                 pass  # Can't write crash log - filesystem issue
         finally:

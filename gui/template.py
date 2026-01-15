@@ -11,7 +11,7 @@ from utils.config import TEMPLATE_PATH, DISPLAY_WIDTH, DISPLAY_HEIGHT
 class Template:
     def __init__(self, surface):
         """
-        Initialize the Template manager.
+        Initialise the Template manager.
 
         Args:
             surface: The pygame surface to draw on

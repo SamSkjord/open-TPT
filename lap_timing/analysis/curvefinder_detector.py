@@ -138,7 +138,7 @@ class CurveFinderDetector:
         merge_same_direction: bool = True # Merge consecutive same-direction corners
     ):
         """
-        Initialize CurveFinder detector.
+        Initialise CurveFinder detector.
 
         Args:
             min_points: Minimum points to attempt circle fitting

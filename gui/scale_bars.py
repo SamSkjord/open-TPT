@@ -38,14 +38,14 @@ from utils.settings import get_settings
 class ScaleBars:
     def __init__(self, surface):
         """
-        Initialize the scale bars.
+        Initialise the scale bars.
 
         Args:
             surface: The pygame surface to draw on
         """
         self.surface = surface
 
-        # Initialize fonts (Noto Sans)
+        # Initialise fonts (Noto Sans)
         pygame.font.init()
         self.font_small = pygame.font.Font(FONT_PATH, FONT_SIZE_SMALL)
 

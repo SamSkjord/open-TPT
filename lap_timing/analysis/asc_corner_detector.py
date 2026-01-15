@@ -66,7 +66,7 @@ class ASCCornerDetector:
         merge_same_direction: bool = True         # Merge consecutive same-direction corners
     ):
         """
-        Initialize ASC detector.
+        Initialise ASC detector.
 
         Args:
             curvature_peak_threshold: Minimum curvature magnitude for peak detection

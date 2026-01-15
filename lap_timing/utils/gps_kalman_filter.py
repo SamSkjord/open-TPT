@@ -38,7 +38,7 @@ class GPSKalmanFilter:
         initial_uncertainty: float = 10.0
     ):
         """
-        Initialize GPS Kalman filter.
+        Initialise GPS Kalman filter.
 
         Args:
             process_noise: Process noise (vehicle dynamics uncertainty) in m/s²
@@ -87,16 +87,16 @@ class GPSKalmanFilter:
         Returns:
             Filtered GPS position with velocity estimate
         """
-        # Initialize on first measurement
+        # Initialise on first measurement
         if self.state is None:
-            return self._initialize(lat, lon, timestamp, speed)
+            return self._initialise(lat, lon, timestamp, speed)
 
         # Calculate time delta
         dt = timestamp - self.last_time
 
         if dt <= 0 or dt > 1.0:
-            # Invalid time delta or gap too large - reinitialize
-            return self._initialize(lat, lon, timestamp, speed)
+            # Invalid time delta or gap too large - reinitialise
+            return self._initialise(lat, lon, timestamp, speed)
 
         # Update conversion factor for current latitude
         self.meters_per_degree_lon = 111320.0 * np.cos(np.radians(lat))
@@ -122,14 +122,14 @@ class GPSKalmanFilter:
             uncertainty=uncertainty
         )
 
-    def _initialize(
+    def _initialise(
         self,
         lat: float,
         lon: float,
         timestamp: float,
         speed: Optional[float]
     ) -> FilteredGPS:
-        """Initialize filter with first measurement."""
+        """Initialise filter with first measurement."""
         # Initial state: position from GPS, zero velocity
         self.state = np.array([lat, lon, 0.0, 0.0])
 

@@ -14,7 +14,7 @@ class HorizontalBar:
 
     def __init__(self, x, y, width, height, font=None):
         """
-        Initialize horizontal bar widget.
+        Initialise horizontal bar widget.
 
         Args:
             x: X position (left edge)

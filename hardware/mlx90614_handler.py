@@ -52,7 +52,7 @@ class MLX90614Handler:
     MLX90614_ADDR = 0x5A
 
     def __init__(self):
-        """Initialize the MLX90614 sensor handler."""
+        """Initialise the MLX90614 sensor handler."""
         self.i2c = None
         self.mux = None
         self.sensors = {}  # Maps position to MLX90614 sensor object
@@ -80,37 +80,37 @@ class MLX90614Handler:
         # Mapping of tire positions to I2C multiplexer channels (from config)
         self.position_to_channel = MLX90614_MUX_CHANNELS
 
-        # Initialize I2C and mux
+        # Initialise I2C and mux
         if MLX90614_AVAILABLE:
             try:
                 # Create I2C bus
                 self.i2c = busio.I2C(board.SCL, board.SDA)
-                print("I2C bus initialized for MLX90614 sensors")
+                print("I2C bus initialised for MLX90614 sensors")
 
                 # Create mux instance
                 self.mux = I2CMux()
 
-                # Initialize sensors
-                self.initialize()
+                # Initialise sensors
+                self.initialise()
             except Exception as e:
                 print(f"Error setting up I2C for MLX90614: {e}")
         else:
             print("Warning: MLX90614 library not available (install adafruit-circuitpython-mlx90614)")
 
-    def initialize(self):
-        """Initialize MLX90614 sensors on each multiplexer channel."""
+    def initialise(self):
+        """Initialise MLX90614 sensors on each multiplexer channel."""
         if not MLX90614_AVAILABLE:
             print("Warning: MLX90614 library not available")
             return False
 
         if not self.i2c:
-            print("Error: I2C bus not initialized")
+            print("Error: I2C bus not initialised")
             return False
 
         try:
             # Check if multiplexer is available
             if not self.mux or not self.mux.is_available():
-                print("Error: I2C multiplexer not available. Cannot initialize MLX90614 sensors.")
+                print("Error: I2C multiplexer not available. Cannot initialise MLX90614 sensors.")
                 return False
 
             print("\nDetecting MLX90614 sensors on multiplexer channels...")
@@ -130,28 +130,28 @@ class MLX90614Handler:
 
                 # Try to detect MLX90614
                 try:
-                    # Try to initialize MLX90614 on this channel
+                    # Try to initialise MLX90614 on this channel
                     sensor = adafruit_mlx90614.MLX90614(self.i2c)
 
                     # Test read to verify it's working
                     test_temp = sensor.object_temperature
 
                     if test_temp is not None:
-                        print(f"  ✓ MLX90614 found at 0x{self.MLX90614_ADDR:02X}")
+                        print(f"  [OK] MLX90614 found at 0x{self.MLX90614_ADDR:02X}")
                         print(f"    Object temp: {test_temp:.1f}°C")
 
                         self.sensors[position] = sensor
                         successful_inits += 1
                     else:
-                        print(f"  ✗ No valid reading from channel {channel}")
+                        print(f"  [ERROR] No valid reading from channel {channel}")
 
                 except Exception as e:
-                    print(f"  ✗ No MLX90614 found on channel {channel}: {e}")
+                    print(f"  [ERROR] No MLX90614 found on channel {channel}: {e}")
 
             # Reset multiplexer
             self.mux.deselect_all()
 
-            print(f"\nSuccessfully initialized {successful_inits}/{len(self.position_to_channel)} MLX90614 sensors")
+            print(f"\nSuccessfully initialised {successful_inits}/{len(self.position_to_channel)} MLX90614 sensors")
 
             return successful_inits > 0
 

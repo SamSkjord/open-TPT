@@ -186,15 +186,15 @@ class Camera:
         # Restore last frame during initialization to avoid checkerboard
         self.frame = last_frame
 
-        # Initialize new camera
+        # Initialise new camera
         camera_device = f"/dev/video-{self.current_camera}"
         print(f"Initializing {self.current_camera} camera at {camera_device}")
-        if not self.initialize(camera_device=camera_device):
-            # Failed to initialize new camera, try to restore old one
-            print(f"Failed to initialize {self.current_camera} camera")
+        if not self.initialise(camera_device=camera_device):
+            # Failed to initialise new camera, try to restore old one
+            print(f"Failed to initialise {self.current_camera} camera")
             self.current_camera = old_camera
             old_device = f"/dev/video-{old_camera}"
-            if self.initialize(camera_device=old_device):
+            if self.initialise(camera_device=old_device):
                 print(f"Restored {old_camera} camera")
                 if was_active:
                     self._start_capture_thread()
@@ -391,9 +391,9 @@ class Camera:
         if DEBUG_CAMERA:
             print(f"DEBUG: Final stats - Grab success: {grab_success_count}, Grab fail: {grab_fail_count}, Retrieve fail: {retrieve_fail_count}")
 
-    def initialize(self, camera_index=None, camera_device=None):
+    def initialise(self, camera_index=None, camera_device=None):
         """
-        Initialize the camera with the specified device index or device path.
+        Initialise the camera with the specified device index or device path.
         Args:
             camera_index: Integer index (0-5) or None for auto-detect
             camera_device: Device path (e.g., "/dev/video-rear") or None
@@ -460,7 +460,7 @@ class Camera:
             self.camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
 
             self.error_message = None
-            print(f"Camera initialized successfully at index {camera_index}")
+            print(f"Camera initialised successfully at index {camera_index}")
             return True
 
         except Exception as e:
@@ -470,7 +470,7 @@ class Camera:
     def toggle(self):
         """Toggle the camera view on/off."""
         if not self.camera or not self.camera.isOpened():
-            if not self.initialize():
+            if not self.initialise():
                 self.active = False  # Ensure consistent state on init failure
                 return False
 

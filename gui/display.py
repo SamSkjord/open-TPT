@@ -96,21 +96,21 @@ def kpa_to_psi(kpa):
 class Display:
     def __init__(self, surface):
         """
-        Initialize the display manager.
+        Initialise the display manager.
 
         Args:
             surface: The pygame surface to draw on
         """
         self.surface = surface
 
-        # Initialize fonts (Noto Sans)
+        # Initialise fonts (Noto Sans)
         pygame.font.init()
         self.font_large = pygame.font.Font(FONT_PATH, FONT_SIZE_LARGE)
         self.font_medium = pygame.font.Font(FONT_PATH, FONT_SIZE_MEDIUM)
         self.font_small = pygame.font.Font(FONT_PATH, FONT_SIZE_SMALL)
         self.font_medarge = pygame.font.Font(FONT_PATH, FONT_SIZE_MEDARGE)
 
-        # Initialize color maps for thermal display
+        # Initialise color maps for thermal display
         self.colormap = self._create_thermal_colormap()
 
         # Try loading the overlay mask from both the configured path and the root directory

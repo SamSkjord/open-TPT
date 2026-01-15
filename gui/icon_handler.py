@@ -16,7 +16,7 @@ from utils.config import (
 class IconHandler:
     def __init__(self, surface):
         """
-        Initialize the icon handler.
+        Initialise the icon handler.
 
         Args:
             surface: The pygame surface to draw on

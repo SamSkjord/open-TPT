@@ -61,7 +61,7 @@ class HybridCornerDetector:
         max_chicane_length: float = 200.0
     ):
         """
-        Initialize hybrid detector.
+        Initialise hybrid detector.
 
         Args:
             curvature_peak_threshold: Curvature threshold for peak detection

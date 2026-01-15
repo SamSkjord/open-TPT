@@ -3,6 +3,7 @@ Optimised TPMS Input Handler for openTPT.
 Uses bounded queues and lock-free snapshots per system plan.
 """
 
+import threading
 import time
 import sys
 import os
@@ -56,6 +57,9 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
                 TyrePosition.REAR_LEFT: "RL",
                 TyrePosition.REAR_RIGHT: "RR",
             }
+
+        # Lock for thread-safe cache access (callbacks may come from library thread)
+        self._cache_lock = threading.Lock()
 
         # Sensor data cache (used by callbacks)
         self._sensor_cache = {
@@ -116,7 +120,7 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
                 print("Failed to connect to TPMS device")
                 return False
 
-        except Exception as e:
+        except (OSError, IOError, RuntimeError, ValueError) as e:
             print(f"Error initialising TPMS: {e}")
             self.tpms_device = None
             return False
@@ -135,20 +139,21 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
         pos_code = self.position_map[position]
         current_time = time.time()
 
-        # Update cache (this is safe because callbacks are serialized by the library)
-        self._sensor_cache[pos_code]["pressure"] = state.air_pressure
-        self._sensor_cache[pos_code]["temp"] = state.temperature
-        self._sensor_cache[pos_code]["last_update"] = current_time
+        # Update cache with lock (callbacks may come from library thread)
+        with self._cache_lock:
+            self._sensor_cache[pos_code]["pressure"] = state.air_pressure
+            self._sensor_cache[pos_code]["temp"] = state.temperature
+            self._sensor_cache[pos_code]["last_update"] = current_time
 
-        # Determine status
-        if state.no_signal:
-            self._sensor_cache[pos_code]["status"] = "NO_SIGNAL"
-        elif state.is_leaking:
-            self._sensor_cache[pos_code]["status"] = "LEAKING"
-        elif state.is_low_power:
-            self._sensor_cache[pos_code]["status"] = "LOW_BATTERY"
-        else:
-            self._sensor_cache[pos_code]["status"] = "OK"
+            # Determine status
+            if state.no_signal:
+                self._sensor_cache[pos_code]["status"] = "NO_SIGNAL"
+            elif state.is_leaking:
+                self._sensor_cache[pos_code]["status"] = "LEAKING"
+            elif state.is_low_power:
+                self._sensor_cache[pos_code]["status"] = "LOW_BATTERY"
+            else:
+                self._sensor_cache[pos_code]["status"] = "OK"
 
         # Trigger immediate snapshot publish
         self._publish_current_state()
@@ -184,34 +189,36 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
         """Check for stale data and publish current state."""
         current_time = time.time()
 
-        # Check for timeouts
-        for position, data in self._sensor_cache.items():
-            if current_time - data["last_update"] > self.timeout_s:
-                if data["status"] != "TIMEOUT":
-                    data["status"] = "TIMEOUT"
-                    data["pressure"] = None
-                    data["temp"] = None
+        # Check for timeouts with lock
+        with self._cache_lock:
+            for position, data in self._sensor_cache.items():
+                if current_time - data["last_update"] > self.timeout_s:
+                    if data["status"] != "TIMEOUT":
+                        data["status"] = "TIMEOUT"
+                        data["pressure"] = None
+                        data["temp"] = None
 
         # Publish current state
         self._publish_current_state()
 
     def _publish_current_state(self):
         """Publish current sensor data to queue."""
-        # Create immutable copy of data
+        # Create immutable copy of data with lock
         data = {}
         metadata = {
             "timestamp": time.time(),
             "sensors_ok": 0
         }
 
-        for position, cache_data in self._sensor_cache.items():
-            data[position] = {
-                "pressure": cache_data["pressure"],
-                "temp": cache_data["temp"],
-                "status": cache_data["status"],
-            }
-            if cache_data["status"] == "OK":
-                metadata["sensors_ok"] += 1
+        with self._cache_lock:
+            for position, cache_data in self._sensor_cache.items():
+                data[position] = {
+                    "pressure": cache_data["pressure"],
+                    "temp": cache_data["temp"],
+                    "status": cache_data["status"],
+                }
+                if cache_data["status"] == "OK":
+                    metadata["sensors_ok"] += 1
 
         # Publish to queue (lock-free)
         self._publish_snapshot(data, metadata)
@@ -252,7 +259,7 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
             try:
                 self.tpms_device.disconnect()
                 print("TPMS device disconnected")
-            except Exception as e:
+            except (OSError, IOError, RuntimeError) as e:
                 print(f"Error disconnecting TPMS: {e}")
 
     # Pairing methods (passthrough to device)
@@ -281,7 +288,7 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
                 return False
 
             return self.tpms_device.pair_sensor(reverse_map[position_code])
-        except Exception as e:
+        except (OSError, IOError, RuntimeError, ValueError) as e:
             print(f"Error pairing sensor: {e}")
             return False
 
@@ -292,7 +299,7 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
 
         try:
             return self.tpms_device.stop_pairing()
-        except Exception as e:
+        except (OSError, IOError, RuntimeError) as e:
             print(f"Error stopping pairing: {e}")
             return False
 

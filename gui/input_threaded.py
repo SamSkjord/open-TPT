@@ -39,7 +39,7 @@ else:
 class InputHandlerThreaded:
     def __init__(self, camera=None):
         """
-        Initialize the threaded input handler.
+        Initialise the threaded input handler.
 
         Args:
             camera: Optional camera handler to toggle
@@ -91,11 +91,11 @@ class InputHandlerThreaded:
         self.led_update_requested = False
         self.led_lock = threading.Lock()
 
-        # Initialize the NeoKey if available
-        self.initialize()
+        # Initialise the NeoKey if available
+        self.initialise()
 
-    def initialize(self, max_retries: int = 3):
-        """Initialize the NeoKey device with retry logic."""
+    def initialise(self, max_retries: int = 3):
+        """Initialise the NeoKey device with retry logic."""
         if not NEOKEY_AVAILABLE:
             print("Warning: NeoKey library not available - input disabled")
             return
@@ -105,7 +105,7 @@ class InputHandlerThreaded:
                 if attempt > 0:
                     time.sleep(0.5)  # Wait between retries for I2C bus to settle
 
-                # Initialize I2C and NeoKey
+                # Initialise I2C and NeoKey
                 i2c = board.I2C()
                 self.neokey = NeoKey1x4(i2c)
 

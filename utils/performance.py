@@ -36,7 +36,7 @@ class PerformanceMonitor:
 
     def __init__(self, history_size: int = 100):
         """
-        Initialize performance monitor.
+        Initialise performance monitor.
 
         Args:
             history_size: Number of samples to keep for statistics
@@ -234,7 +234,7 @@ class PerformanceMonitor:
             lines.append("")
             lines.append("Thermal Processing Times:")
             for pos, time_ms in self.thermal_processing_times.items():
-                status = "✓" if time_ms < 1.0 else "⚠"
+                status = "[OK]" if time_ms < 1.0 else "[!]"
                 lines.append(f"  {pos}: {time_ms:.3f}ms {status}")
 
         warnings = self.get_warnings()

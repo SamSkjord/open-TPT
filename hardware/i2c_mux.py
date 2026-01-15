@@ -19,12 +19,12 @@ except ImportError:
 
 class I2CMux:
     def __init__(self):
-        """Initialize the TCA9548A I2C multiplexer."""
+        """Initialise the TCA9548A I2C multiplexer."""
         self.i2c = None
         self.active_channel = None
         self.mux_address = I2C_MUX_ADDRESS
 
-        # Initialize I2C if available
+        # Initialise I2C if available
         if I2C_AVAILABLE:
             try:
                 self.i2c = busio.I2C(board.SCL, board.SDA)
@@ -32,7 +32,7 @@ class I2CMux:
                 # Verify multiplexer is present
                 if self.verify_multiplexer():
                     print(
-                        f"I2C multiplexer initialized at address 0x{I2C_MUX_ADDRESS:02X}"
+                        f"I2C multiplexer initialised at address 0x{I2C_MUX_ADDRESS:02X}"
                     )
                 else:
                     print(
@@ -40,7 +40,7 @@ class I2CMux:
                     )
                     self.i2c = None
             except Exception as e:
-                print(f"Warning: Error initializing I2C multiplexer: {e}")
+                print(f"Warning: Error initialising I2C multiplexer: {e}")
                 self.i2c = None
         else:
             print("Warning: I2C libraries not available - I2C multiplexing disabled")
