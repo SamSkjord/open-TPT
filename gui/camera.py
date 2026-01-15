@@ -471,6 +471,7 @@ class Camera:
         """Toggle the camera view on/off."""
         if not self.camera or not self.camera.isOpened():
             if not self.initialize():
+                self.active = False  # Ensure consistent state on init failure
                 return False
 
         self.active = not self.active
@@ -526,9 +527,8 @@ class Camera:
                 and self.capture_thread.is_alive()
             ):
                 try:
-                    if not self.frame_queue.empty():
-                        self.frame = self.frame_queue.get_nowait()
-                        result = True
+                    self.frame = self.frame_queue.get_nowait()
+                    result = True
                 except queue.Empty:
                     pass
 

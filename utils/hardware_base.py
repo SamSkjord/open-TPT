@@ -93,27 +93,25 @@ class BoundedQueueHardwareHandler:
             metadata=metadata.copy() if metadata else {}
         )
 
-        # Non-blocking put - drop old frames if queue full
+        # Non-blocking put - drop oldest frame if queue full
         try:
-            if self.data_queue.full():
-                try:
-                    self.data_queue.get_nowait()
-                except queue.Empty:
-                    pass
             self.data_queue.put_nowait(snapshot)
-
-            # Update performance metrics
-            self.frame_count += 1
-            current_time = time.time()
-            elapsed = current_time - self.last_perf_time
-            if elapsed >= 1.0:
-                self.update_hz = self.frame_count / elapsed
-                self.frame_count = 0
-                self.last_perf_time = current_time
-
         except queue.Full:
-            # Should never happen due to pre-emptive get above
-            pass
+            # Queue full - drop oldest and retry
+            try:
+                self.data_queue.get_nowait()
+                self.data_queue.put_nowait(snapshot)
+            except (queue.Empty, queue.Full):
+                pass  # Race condition, skip this frame
+
+        # Update performance metrics
+        self.frame_count += 1
+        current_time = time.time()
+        elapsed = current_time - self.last_perf_time
+        if elapsed >= 1.0:
+            self.update_hz = self.frame_count / elapsed
+            self.frame_count = 0
+            self.last_perf_time = current_time
 
     def get_snapshot(self) -> Optional[HardwareSnapshot]:
         """
@@ -122,9 +120,9 @@ class BoundedQueueHardwareHandler:
         Returns:
             HardwareSnapshot or None if no data available
         """
-        # Update current snapshot from queue (non-blocking)
+        # Drain queue keeping only latest snapshot (non-blocking)
         try:
-            while not self.data_queue.empty():
+            while True:
                 self.current_snapshot = self.data_queue.get_nowait()
         except queue.Empty:
             pass

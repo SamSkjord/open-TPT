@@ -251,8 +251,9 @@ class TelemetryRecorder:
                 self._clear()
                 return filepath
 
-            except Exception as e:
+            except (IOError, OSError, KeyError, TypeError) as e:
                 print(f"Error saving telemetry: {e}")
+                self._clear()  # Clear frames even on error to prevent stale data
                 return None
 
     def discard(self):
