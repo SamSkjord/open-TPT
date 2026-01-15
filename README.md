@@ -514,6 +514,8 @@ openTPT/
 - [ ] Installer improvements - add GPS UART setup (enable_uart=1) and NTP time sync configuration
 - [ ] Configurable OBD2 PIDs - move to config.py with key, mode, pid, bytes, formula, priority, smoothing; support Mode 22/UDS for manufacturer-specific data (brake pressures, boost, oil temp)
 
+- [ ] Lap corner analysis logging - per lap, per corner: min speeds, yaw acceleration (from lap-timing-system)
+
 ### Bugs
 - [ ] Camera settings menu always opens on rear camera even when front camera is selected
 
