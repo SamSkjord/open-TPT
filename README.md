@@ -512,6 +512,7 @@ openTPT/
 - [ ] Track selection - for lap timing (requires GPS)
 - [x] Config persistence - persistent settings via ~/.opentpt_settings.json
 - [ ] Installer improvements - add GPS UART setup (enable_uart=1) and NTP time sync configuration
+- [ ] Configurable OBD2 PIDs - move to config.py with key, mode, pid, bytes, formula, priority, smoothing; support Mode 22/UDS for manufacturer-specific data (brake pressures, boost, oil temp)
 
 ## Documentation
 

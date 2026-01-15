@@ -1,11 +1,11 @@
 """
-OBD2 Handler for openTPT vehicle speed reading.
-Polls vehicle speed via CAN bus using standard OBD2 PIDs.
+OBD2 Handler for openTPT telemetry.
+Polls vehicle data via CAN bus using standard OBD2 PIDs.
 """
 
 import time
 from collections import deque
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from utils.hardware_base import BoundedQueueHardwareHandler
 from utils.config import OBD_CHANNEL, OBD_ENABLED, OBD_BITRATE
@@ -18,24 +18,32 @@ except ImportError:
     CAN_AVAILABLE = False
     print("Warning: python-can not available (running without OBD2)")
 
-# OBD2 standard IDs and PIDs
+# OBD2 standard IDs
 OBD_REQUEST_ID = 0x7DF  # Broadcast request ID
 OBD_RESPONSE_MIN = 0x7E8
 OBD_RESPONSE_MAX = 0x7EF
-PID_ENGINE_RPM = 0x0C  # Engine RPM: ((A * 256) + B) / 4
-PID_VEHICLE_SPEED = 0x0D  # Vehicle speed in km/h
 
-# Ford Mode 22 (UDS) DIDs for hybrid battery
-# Request format: [length, 0x22, DID_high, DID_low, ...]
-# Response format: [length, 0x62, DID_high, DID_low, A, B, ...]
-FORD_DID_SOC = 0x4801  # HV Battery State of Charge: ((A*256)+B)*(1/5)/100
+# Standard OBD2 Mode 01 PIDs
+PID_COOLANT_TEMP = 0x05   # Engine coolant temp: A - 40 (C)
+PID_INTAKE_MAP = 0x0B     # Intake manifold absolute pressure: A (kPa)
+PID_ENGINE_RPM = 0x0C     # Engine RPM: ((A * 256) + B) / 4
+PID_VEHICLE_SPEED = 0x0D  # Vehicle speed: A (km/h)
+PID_INTAKE_TEMP = 0x0F    # Intake air temp: A - 40 (C)
+PID_MAF = 0x10            # Mass air flow: ((A * 256) + B) / 100 (g/s)
+PID_THROTTLE = 0x11       # Throttle position: A * 100 / 255 (%)
+PID_OIL_TEMP = 0x5C       # Engine oil temp: A - 40 (C) - not always supported
+
+# Ford Mode 22 (UDS) DIDs
+FORD_DID_SOC = 0x4801  # HV Battery State of Charge
 
 
 class OBD2Handler(BoundedQueueHardwareHandler):
     """
-    OBD2 handler for vehicle speed via CAN bus.
+    OBD2 handler for vehicle telemetry via CAN bus.
 
-    Polls PID 0x0D (vehicle speed) and provides speed data to the UI.
+    Polls standard PIDs and provides data snapshots.
+    High-priority PIDs (speed, RPM, throttle) polled every cycle.
+    Low-priority PIDs (temps) rotated to keep cycle time reasonable.
     """
 
     def __init__(self):
@@ -52,19 +60,38 @@ class OBD2Handler(BoundedQueueHardwareHandler):
         self.last_reconnect_attempt = 0.0
         self.hardware_available = False
 
-        # Current speed with smoothing
-        self.current_speed_kmh = 0
-        self.speed_history = deque(maxlen=5)  # Rolling window for smoothing (O(1) operations)
+        # Current data values
+        self.current_data: Dict[str, Any] = {
+            'obd_speed_kmh': 0,
+            'engine_rpm': 0,
+            'throttle_percent': 0.0,
+            'coolant_temp_c': None,
+            'oil_temp_c': None,
+            'intake_temp_c': None,
+            'map_kpa': None,
+            'boost_kpa': None,
+            'maf_gs': None,
+            'battery_soc': None,
+            'brake_pressure_input_bar': None,
+            'brake_pressure_output_bar': None,
+        }
 
-        # Engine RPM with smoothing
-        self.current_rpm = 0
-        self.rpm_history = deque(maxlen=3)  # Rolling window for smoothing (O(1) operations)
+        # Smoothing histories
+        self.speed_history = deque(maxlen=5)
+        self.rpm_history = deque(maxlen=3)
+        self.throttle_history = deque(maxlen=2)
 
-        # Real HV Battery SOC from Ford Mode 22 (DID 0x4801)
-        self.real_soc = None  # None = not available, float = real percentage
-        self.real_soc_available = False  # Track if Ford hybrid SOC is responding
-        self.soc_read_attempts = 0  # Count attempts to read real SOC
-        self.soc_max_failures = 5  # Stop trying after this many consecutive failures
+        # PID failure tracking (stop polling unsupported PIDs)
+        self.pid_failures: Dict[int, int] = {}
+        self.pid_max_failures = 5
+
+        # Ford SOC tracking
+        self.soc_read_attempts = 0
+        self.soc_max_failures = 5
+
+        # Low-priority PID rotation
+        self.low_priority_pids = [PID_COOLANT_TEMP, PID_OIL_TEMP, PID_INTAKE_TEMP, PID_INTAKE_MAP, PID_MAF]
+        self.low_priority_index = 0
 
         if self.enabled:
             self._initialise()
@@ -80,7 +107,6 @@ class OBD2Handler(BoundedQueueHardwareHandler):
             return
 
         try:
-            # Try to open the CAN bus
             self.bus = can.interface.Bus(
                 channel=self.channel,
                 interface='socketcan',
@@ -96,47 +122,40 @@ class OBD2Handler(BoundedQueueHardwareHandler):
             self.bus = None
             self.hardware_available = False
 
-    def _build_speed_request(self):
-        """Build OBD2 request for vehicle speed (PID 0x0D)."""
-        # Service 0x01 (show current data), PID 0x0D (vehicle speed)
-        data = [0x02, 0x01, PID_VEHICLE_SPEED] + [0x00] * 5
-        return can.Message(
-            arbitration_id=OBD_REQUEST_ID,
-            is_extended_id=False,
-            data=data
-        )
-
-    def _build_rpm_request(self):
-        """Build OBD2 request for engine RPM (PID 0x0C)."""
-        # Service 0x01 (show current data), PID 0x0C (RPM)
-        data = [0x02, 0x01, PID_ENGINE_RPM] + [0x00] * 5
-        return can.Message(
-            arbitration_id=OBD_REQUEST_ID,
-            is_extended_id=False,
-            data=data
-        )
-
-    def _wait_for_speed_response(self, timeout_s=0.2):
+    def _poll_pid(self, pid: int, timeout_s: float = 0.1) -> Optional[list]:
         """
-        Wait for a speed response from the vehicle.
+        Poll a Mode 01 PID and return raw data bytes.
 
         Returns:
-            Speed in km/h, or None if no response
+            List of data bytes, or None if no response/failed
         """
         if not self.bus:
             return None
 
-        deadline = time.time() + timeout_s
-        while time.time() < deadline:
-            remaining = max(0.0, deadline - time.time())
-            try:
+        # Check if PID has failed too many times
+        if self.pid_failures.get(pid, 0) >= self.pid_max_failures:
+            return None
+
+        try:
+            # Send request
+            data = [0x02, 0x01, pid] + [0x00] * 5
+            request = can.Message(
+                arbitration_id=OBD_REQUEST_ID,
+                is_extended_id=False,
+                data=data
+            )
+            self.bus.send(request, timeout=0.05)
+
+            # Wait for response
+            deadline = time.time() + timeout_s
+            while time.time() < deadline:
+                remaining = max(0.0, deadline - time.time())
                 msg = self.bus.recv(timeout=remaining)
+
                 if msg is None:
                     continue
 
-                # Check if this is a valid response to our speed request
-                # Response format: [length, 0x41, PID, data_byte, ...]
-                # SECURITY: Check length FIRST before any array access
+                # Validate response
                 if not (OBD_RESPONSE_MIN <= msg.arbitration_id <= OBD_RESPONSE_MAX):
                     continue
                 if msg.is_extended_id:
@@ -144,223 +163,169 @@ class OBD2Handler(BoundedQueueHardwareHandler):
                 if len(msg.data) < 4:
                     continue
 
-                # Safe to access array elements now
-                if msg.data[1] == 0x41 and msg.data[2] == PID_VEHICLE_SPEED:
-                    # Speed is in byte 3, directly in km/h
-                    speed_kmh = msg.data[3]
-                    return speed_kmh
+                # Check for Mode 01 response (0x41) with correct PID
+                if msg.data[1] == 0x41 and msg.data[2] == pid:
+                    self.pid_failures[pid] = 0
+                    return list(msg.data[3:])
 
-            except Exception as e:
-                # Timeout or read error
-                return None
-
-        return None
-
-    def _wait_for_rpm_response(self, timeout_s=0.2):
-        """
-        Wait for an RPM response from the vehicle.
-
-        Returns:
-            Engine RPM, or None if no response
-        """
-        if not self.bus:
+            # Timeout
+            self.pid_failures[pid] = self.pid_failures.get(pid, 0) + 1
+            if self.pid_failures[pid] == self.pid_max_failures:
+                print(f"OBD2: PID 0x{pid:02X} not responding - disabled")
             return None
 
-        deadline = time.time() + timeout_s
-        while time.time() < deadline:
-            remaining = max(0.0, deadline - time.time())
-            try:
+        except Exception:
+            return None
+
+    def _poll_ford_soc(self, timeout_s: float = 0.1) -> Optional[float]:
+        """Poll Ford Mode 22 HV Battery SOC."""
+        if not self.bus or self.soc_read_attempts >= self.soc_max_failures:
+            return None
+
+        try:
+            data = [0x03, 0x22, 0x48, 0x01, 0x00, 0x00, 0x00, 0x00]
+            request = can.Message(
+                arbitration_id=OBD_REQUEST_ID,
+                is_extended_id=False,
+                data=data
+            )
+            self.bus.send(request, timeout=0.05)
+
+            deadline = time.time() + timeout_s
+            while time.time() < deadline:
+                remaining = max(0.0, deadline - time.time())
                 msg = self.bus.recv(timeout=remaining)
+
                 if msg is None:
                     continue
 
-                # Check if this is a valid response to our RPM request
-                # Response format: [length, 0x41, PID, A, B, ...]
-                # RPM = ((A * 256) + B) / 4
                 if not (OBD_RESPONSE_MIN <= msg.arbitration_id <= OBD_RESPONSE_MAX):
                     continue
-                if msg.is_extended_id:
-                    continue
-                if len(msg.data) < 5:  # RPM needs 2 data bytes
+                if msg.is_extended_id or len(msg.data) < 6:
                     continue
 
-                # Safe to access array elements now
-                if msg.data[1] == 0x41 and msg.data[2] == PID_ENGINE_RPM:
-                    # RPM is in bytes 3-4: ((A * 256) + B) / 4
-                    rpm = ((msg.data[3] * 256) + msg.data[4]) / 4
-                    return int(rpm)
-
-            except Exception as e:
-                # Timeout or read error
-                return None
-
-        return None
-
-    def _build_ford_soc_request(self):
-        """Build Ford Mode 22 (UDS) request for HV Battery SOC (DID 0x4801)."""
-        # Service 0x22 (Read Data By Identifier), DID 0x4801
-        # Format: [length, service_id, DID_high, DID_low, padding...]
-        data = [0x03, 0x22, 0x48, 0x01, 0x00, 0x00, 0x00, 0x00]
-        return can.Message(
-            arbitration_id=OBD_REQUEST_ID,
-            is_extended_id=False,
-            data=data
-        )
-
-    def _wait_for_ford_soc_response(self, timeout_s=0.2):
-        """
-        Wait for Ford Mode 22 SOC response.
-
-        Response format: [length, 0x62, 0x48, 0x01, A, B, ...]
-        SOC = ((A*256)+B)*(1/5)/100
-
-        Returns:
-            SOC percentage (0-100), or None if no response
-        """
-        if not self.bus:
-            return None
-
-        deadline = time.time() + timeout_s
-        while time.time() < deadline:
-            remaining = max(0.0, deadline - time.time())
-            try:
-                msg = self.bus.recv(timeout=remaining)
-                if msg is None:
-                    continue
-
-                # Check for valid response (from ECU range)
-                if not (OBD_RESPONSE_MIN <= msg.arbitration_id <= OBD_RESPONSE_MAX):
-                    continue
-                if msg.is_extended_id:
-                    continue
-                if len(msg.data) < 6:  # Need at least 6 bytes for SOC response
-                    continue
-
-                # Check for positive response to service 0x22 (0x62) and correct DID
+                # Positive response (0x62)
                 if msg.data[1] == 0x62 and msg.data[2] == 0x48 and msg.data[3] == 0x01:
-                    # SOC formula: ((A*256)+B)*(1/5)/100
-                    a = msg.data[4]
-                    b = msg.data[5]
-                    soc = ((a * 256) + b) * (1 / 5) / 100
-                    return max(0, min(100, soc))  # Clamp to 0-100%
+                    soc = ((msg.data[4] * 256) + msg.data[5]) * (1 / 5) / 100
+                    self.soc_read_attempts = 0
+                    return max(0, min(100, soc))
 
-                # Check for negative response (0x7F = service not supported)
+                # Negative response
                 if msg.data[1] == 0x7F and msg.data[2] == 0x22:
-                    # Service 0x22 not supported or DID not found
+                    self.soc_read_attempts = self.soc_max_failures
+                    print("OBD2: Ford Mode 22 SOC not supported")
                     return None
 
-            except Exception:
-                return None
+            self.soc_read_attempts += 1
+            return None
 
-        return None
+        except Exception:
+            self.soc_read_attempts += 1
+            return None
 
     def _worker_loop(self):
-        """Background thread that polls OBD2 for vehicle speed."""
-        poll_interval = 0.2  # Poll every 200ms (5 Hz) - balance between smoothness and system load
+        """Background thread that polls OBD2 PIDs."""
+        poll_interval = 0.15
 
         while self.running:
             start_time = time.time()
 
-            # Attempt reconnection if needed
+            # Reconnection logic
             if self.consecutive_errors >= self.max_consecutive_errors:
-                current_time = time.time()
-                if current_time - self.last_reconnect_attempt >= self.reconnect_interval:
+                if time.time() - self.last_reconnect_attempt >= self.reconnect_interval:
                     print("OBD2: Attempting to reconnect...")
                     self._initialise()
-                    self.last_reconnect_attempt = current_time
+                    self.last_reconnect_attempt = time.time()
                     if not self.hardware_available:
                         time.sleep(poll_interval)
                         continue
 
             try:
                 if self.bus and self.hardware_available:
-                    # Send speed request
-                    request = self._build_speed_request()
-                    self.bus.send(request, timeout=0.1)
-
-                    # Wait for response
-                    speed = self._wait_for_speed_response(timeout_s=0.15)
-
-                    if speed is not None:
-                        # Add to history for smoothing (auto-drops oldest when full)
-                        self.speed_history.append(speed)
-
-                        # Calculate smoothed speed (moving average)
-                        smoothed_speed = sum(self.speed_history) / len(self.speed_history)
-                        self.current_speed_kmh = int(round(smoothed_speed))
-
-                        # Reset error counter on successful read
+                    # High priority: Speed
+                    result = self._poll_pid(PID_VEHICLE_SPEED, timeout_s=0.08)
+                    if result:
+                        self.speed_history.append(result[0])
+                        self.current_data['obd_speed_kmh'] = int(round(
+                            sum(self.speed_history) / len(self.speed_history)
+                        ))
                         self.consecutive_errors = 0
-                    else:
-                        # No response (possibly idling or ECU not responding)
-                        # Don't treat as error, just keep last known speed
-                        pass
 
-                    # Send RPM request
-                    rpm_request = self._build_rpm_request()
-                    self.bus.send(rpm_request, timeout=0.1)
-
-                    # Wait for RPM response
-                    rpm = self._wait_for_rpm_response(timeout_s=0.15)
-
-                    if rpm is not None:
-                        # Add to history for smoothing (auto-drops oldest when full)
+                    # High priority: RPM
+                    result = self._poll_pid(PID_ENGINE_RPM, timeout_s=0.08)
+                    if result and len(result) >= 2:
+                        rpm = ((result[0] * 256) + result[1]) / 4
                         self.rpm_history.append(rpm)
+                        self.current_data['engine_rpm'] = int(round(
+                            sum(self.rpm_history) / len(self.rpm_history)
+                        ))
 
-                        # Calculate smoothed RPM (moving average)
-                        smoothed_rpm = sum(self.rpm_history) / len(self.rpm_history)
-                        self.current_rpm = int(round(smoothed_rpm))
+                    # High priority: Throttle
+                    result = self._poll_pid(PID_THROTTLE, timeout_s=0.08)
+                    if result:
+                        throttle = result[0] * 100 / 255
+                        self.throttle_history.append(throttle)
+                        self.current_data['throttle_percent'] = round(
+                            sum(self.throttle_history) / len(self.throttle_history), 1
+                        )
 
-                    # Try to read Ford HV Battery SOC (if not already failed permanently)
+                    # Low priority: Rotate through temps/pressures
+                    pid = self.low_priority_pids[self.low_priority_index % len(self.low_priority_pids)]
+                    self.low_priority_index += 1
+
+                    if self.pid_failures.get(pid, 0) < self.pid_max_failures:
+                        result = self._poll_pid(pid, timeout_s=0.08)
+                        if result:
+                            if pid == PID_COOLANT_TEMP:
+                                self.current_data['coolant_temp_c'] = result[0] - 40
+                            elif pid == PID_OIL_TEMP:
+                                self.current_data['oil_temp_c'] = result[0] - 40
+                            elif pid == PID_INTAKE_TEMP:
+                                self.current_data['intake_temp_c'] = result[0] - 40
+                            elif pid == PID_INTAKE_MAP:
+                                self.current_data['map_kpa'] = result[0]
+                                self.current_data['boost_kpa'] = result[0] - 101
+                            elif pid == PID_MAF and len(result) >= 2:
+                                self.current_data['maf_gs'] = ((result[0] * 256) + result[1]) / 100
+
+                    # Ford SOC (if supported)
                     if self.soc_read_attempts < self.soc_max_failures:
-                        soc_request = self._build_ford_soc_request()
-                        self.bus.send(soc_request, timeout=0.1)
+                        soc = self._poll_ford_soc(timeout_s=0.08)
+                        if soc is not None:
+                            self.current_data['battery_soc'] = soc
 
-                        real_soc = self._wait_for_ford_soc_response(timeout_s=0.15)
-
-                        if real_soc is not None:
-                            self.real_soc = real_soc
-                            self.real_soc_available = True
-                            self.soc_read_attempts = 0  # Reset on success
-                        else:
-                            self.soc_read_attempts += 1
-                            if self.soc_read_attempts == self.soc_max_failures:
-                                print("OBD2: Ford Mode 22 SOC (DID 0x4801) not supported")
-
-                    # Publish data (speed, RPM, and SOC if available)
-                    data = {
-                        'speed_kmh': self.current_speed_kmh,
-                        'rpm': self.current_rpm,
-                        'real_soc': self.real_soc,
-                        'soc_available': self.real_soc_available,
-                    }
-                    self._publish_snapshot(data)
+                    # Publish snapshot
+                    self._publish_snapshot(dict(self.current_data))
 
             except Exception as e:
                 self.consecutive_errors += 1
-
                 if self.consecutive_errors == 1:
-                    print(f"OBD2: Error reading speed: {e}")
+                    print(f"OBD2: Error polling: {e}")
                 elif self.consecutive_errors == self.max_consecutive_errors:
                     print(f"OBD2: {self.max_consecutive_errors} consecutive errors - connection lost")
 
-            # Sleep to maintain poll rate
+            # Maintain poll rate
             elapsed = time.time() - start_time
             sleep_time = max(0, poll_interval - elapsed)
             if sleep_time > 0:
                 time.sleep(sleep_time)
 
-    def get_speed_kmh(self):
+    def get_speed_kmh(self) -> int:
         """Get current vehicle speed in km/h."""
-        return self.current_speed_kmh
+        return self.current_data.get('obd_speed_kmh', 0)
 
-    def get_rpm(self):
+    def get_rpm(self) -> int:
         """Get current engine RPM."""
-        return self.current_rpm
+        return self.current_data.get('engine_rpm', 0)
+
+    def get_data(self) -> Dict[str, Any]:
+        """Get all current OBD2 data."""
+        snapshot = self.get_snapshot()
+        return snapshot.data if snapshot else dict(self.current_data)
 
     def cleanup(self):
         """Clean up CAN bus resources."""
-        self.stop()  # Stop the worker thread
+        self.stop()
         if self.bus:
             try:
                 self.bus.shutdown()

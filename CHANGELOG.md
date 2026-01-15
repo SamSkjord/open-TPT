@@ -1,8 +1,39 @@
 # Changelog - openTPT
 
+## [v0.17.8] - 2026-01-15
+
+### Expanded OBD2 Telemetry Logging
+
+#### New Features
+
+- **Extended OBD2 data logging** - Comprehensive vehicle telemetry recording
+  - High-priority (7Hz): speed, RPM, throttle position
+  - Low-priority (rotated 1Hz): coolant temp, oil temp, intake temp, MAP, MAF
+  - Derived: boost pressure (MAP - atmospheric)
+  - Ford hybrid: battery SOC (Mode 22)
+  - Placeholders for brake pressure input/output (manufacturer-specific)
+- **Separate speed sources** - `obd_speed_kmh` and `gps_speed_kmh` logged independently
+- **GPS data logging** - latitude, longitude, speed, heading from GPS receiver
+- **Lap timing data logging** - lap number, time, delta, sector, track position
+
+#### Technical Details
+
+- OBD2 handler refactored with generic PID polling
+- Auto-disables unsupported PIDs after 5 failures
+- Smoothing applied to high-frequency data (speed, RPM, throttle)
+
+#### Modified Files
+
+- `hardware/obd2_handler.py` - Expanded PID polling with priority rotation
+- `utils/telemetry_recorder.py` - Added OBD, GPS, lap timing fields
+- `main.py` - Wired up all telemetry data sources
+- `README.md` - Added configurable OBD2 PIDs to TODO
+
+---
+
 ## [v0.17.7] - 2026-01-15
 
-### Lap Timing Persistence & Page Toggle Menu 🏁
+### Lap Timing Persistence & Page Toggle Menu
 
 #### ✨ New Features
 

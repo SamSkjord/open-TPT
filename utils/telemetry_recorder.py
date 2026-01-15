@@ -56,7 +56,18 @@ class TelemetryFrame:
     gyro_z: Optional[float] = None
 
     # OBD2 data
-    speed_kmh: Optional[float] = None
+    obd_speed_kmh: Optional[float] = None
+    engine_rpm: Optional[int] = None
+    throttle_percent: Optional[float] = None
+    coolant_temp_c: Optional[float] = None
+    oil_temp_c: Optional[float] = None
+    intake_temp_c: Optional[float] = None
+    map_kpa: Optional[int] = None
+    boost_kpa: Optional[int] = None
+    maf_gs: Optional[float] = None
+    battery_soc: Optional[float] = None
+    brake_pressure_input_bar: Optional[float] = None
+    brake_pressure_output_bar: Optional[float] = None
 
     # GPS data
     gps_latitude: Optional[float] = None
@@ -107,7 +118,18 @@ class TelemetryFrame:
             'gyro_x': self.gyro_x,
             'gyro_y': self.gyro_y,
             'gyro_z': self.gyro_z,
-            'speed_kmh': self.speed_kmh,
+            'obd_speed_kmh': self.obd_speed_kmh,
+            'engine_rpm': self.engine_rpm,
+            'throttle_percent': self.throttle_percent,
+            'coolant_temp_c': self.coolant_temp_c,
+            'oil_temp_c': self.oil_temp_c,
+            'intake_temp_c': self.intake_temp_c,
+            'map_kpa': self.map_kpa,
+            'boost_kpa': self.boost_kpa,
+            'maf_gs': self.maf_gs,
+            'battery_soc': self.battery_soc,
+            'brake_pressure_input_bar': self.brake_pressure_input_bar,
+            'brake_pressure_output_bar': self.brake_pressure_output_bar,
             'gps_latitude': self.gps_latitude,
             'gps_longitude': self.gps_longitude,
             'gps_speed_kmh': self.gps_speed_kmh,

@@ -1216,11 +1216,47 @@ class OpenTPT:
                 frame.gyro_y = imu_snapshot.get("gyro_y")
                 frame.gyro_z = imu_snapshot.get("gyro_z")
 
-        # OBD2 speed
+        # OBD2 data
         if self.obd2:
             obd_snapshot = self.obd2.get_data()
-            if obd_snapshot and "speed_kmh" in obd_snapshot:
-                frame.speed_kmh = obd_snapshot["speed_kmh"]
+            if obd_snapshot:
+                frame.obd_speed_kmh = obd_snapshot.get("obd_speed_kmh")
+                frame.engine_rpm = obd_snapshot.get("engine_rpm")
+                frame.throttle_percent = obd_snapshot.get("throttle_percent")
+                frame.coolant_temp_c = obd_snapshot.get("coolant_temp_c")
+                frame.oil_temp_c = obd_snapshot.get("oil_temp_c")
+                frame.intake_temp_c = obd_snapshot.get("intake_temp_c")
+                frame.map_kpa = obd_snapshot.get("map_kpa")
+                frame.boost_kpa = obd_snapshot.get("boost_kpa")
+                frame.maf_gs = obd_snapshot.get("maf_gs")
+                frame.battery_soc = obd_snapshot.get("battery_soc")
+                frame.brake_pressure_input_bar = obd_snapshot.get("brake_pressure_input_bar")
+                frame.brake_pressure_output_bar = obd_snapshot.get("brake_pressure_output_bar")
+
+        # GPS data
+        if self.gps:
+            gps_snapshot = self.gps.get_snapshot()
+            if gps_snapshot and gps_snapshot.data.get("has_fix"):
+                frame.gps_latitude = gps_snapshot.data.get("latitude")
+                frame.gps_longitude = gps_snapshot.data.get("longitude")
+                frame.gps_speed_kmh = gps_snapshot.data.get("speed_kmh")
+                frame.gps_heading = gps_snapshot.data.get("heading")
+
+        # Lap timing data
+        if self.lap_timing:
+            lap_snapshot = self.lap_timing.get_snapshot()
+            if lap_snapshot and lap_snapshot.data:
+                lap_data = lap_snapshot.data
+                frame.lap_number = lap_data.get("lap_number")
+                frame.lap_time = lap_data.get("current_lap_time")
+                frame.lap_delta = lap_data.get("delta_seconds")
+                frame.sector = lap_data.get("current_sector")
+                sector_times = lap_data.get("sector_times", [])
+                current_sector = lap_data.get("current_sector", 0)
+                if sector_times and current_sector > 0 and current_sector <= len(sector_times):
+                    frame.sector_time = sector_times[current_sector - 1]
+                frame.track_position = lap_data.get("track_position")
+                frame.track_name = lap_data.get("track_name")
 
         self.recorder.record_frame(frame)
 
