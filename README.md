@@ -477,7 +477,7 @@ openTPT/
 ### Hardware TODO
 - [x] PA1616S Adafruit GPS - for lap timing and position logging
 - [x] Adafruit NeoDriver - LED strip control (delta, overtake, shift, rainbow modes)
-- [ ] MCP9601 Thermocouples - brake temperature sensors (per corner)
+- [x] MCP9601 Thermocouples - brake temperature sensors (per corner)
 - [ ] LTR-559 Auto brightness - ambient light sensor for automatic display brightness (enable/disable + offset settings)
 
 ### Software TODO

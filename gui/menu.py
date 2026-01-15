@@ -105,7 +105,7 @@ class Menu:
         """Initialise fonts (must be called after pygame.init)."""
         if self._font_title is None:
             pygame.font.init()
-            self._font_title = pygame.font.Font(FONT_PATH, FONT_SIZE_LARGE)
+            self._font_title = pygame.font.Font(FONT_PATH, FONT_SIZE_MEDIUM)
             self._font_item = pygame.font.Font(FONT_PATH, FONT_SIZE_MEDIUM)
             self._font_hint = pygame.font.Font(FONT_PATH, FONT_SIZE_SMALL)
 
@@ -164,7 +164,7 @@ class Menu:
     def _get_max_visible_items(self) -> int:
         """Calculate maximum number of visible menu items."""
         menu_height = int(DISPLAY_HEIGHT * 0.7)
-        title_area = 80  # Title + spacing
+        title_area = 62  # Title + spacing
         hint_area = 60   # Status + hint at bottom
         item_height = 40
         available_height = menu_height - title_area - hint_area
@@ -252,11 +252,11 @@ class Menu:
         # Draw title
         title_surface = self._font_title.render(self.title, True, MENU_HEADER_COLOUR)
         title_x = menu_x + (menu_width - title_surface.get_width()) // 2
-        title_y = menu_y + 20
+        title_y = menu_y + 12
         surface.blit(title_surface, (title_x, title_y))
 
         # Draw items with scrolling
-        item_start_y = title_y + 60
+        item_start_y = title_y + 50
         item_height = 40
         item_padding = 20
         max_visible = self._get_max_visible_items()
