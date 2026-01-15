@@ -33,7 +33,7 @@ except ImportError:
 
 
 # Menu colours
-MENU_BG_COLOUR = (20, 20, 30, 230)  # Dark blue-grey, semi-transparent
+MENU_BG_COLOUR = (20, 20, 30, 180)  # Dark blue-grey, semi-transparent to see camera
 MENU_ITEM_COLOUR = WHITE
 MENU_ITEM_SELECTED_COLOUR = (50, 150, 255)  # Bright blue
 MENU_ITEM_DISABLED_COLOUR = GREY
