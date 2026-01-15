@@ -1332,14 +1332,20 @@ class OpenTPT:
 
             # Update speed based on configured source (menu toggle)
             speed_source = self.menu.speed_source if self.menu else "obd"
-            if speed_source == "gps" and self.gps:
-                gps_snapshot = self.gps.get_snapshot()
-                if gps_snapshot and gps_snapshot.data and gps_snapshot.data.get('has_fix'):
-                    self.gmeter.set_speed(int(gps_snapshot.data.get('speed_kmh', 0)))
-            elif self.obd2:
-                obd_snapshot = self.obd2.get_data()
-                if obd_snapshot and 'speed_kmh' in obd_snapshot:
-                    self.gmeter.set_speed(obd_snapshot['speed_kmh'])
+            if speed_source == "gps":
+                if self.gps:
+                    gps_snapshot = self.gps.get_snapshot()
+                    if gps_snapshot and gps_snapshot.data and gps_snapshot.data.get('has_fix'):
+                        self.gmeter.set_speed(int(gps_snapshot.data.get('speed_kmh', 0)))
+                    else:
+                        self.gmeter.set_speed(None, "no fix")
+                else:
+                    self.gmeter.set_speed(None, "no GPS")
+            else:  # OBD source
+                if self.obd2:
+                    obd_snapshot = self.obd2.get_data()
+                    if obd_snapshot and 'speed_kmh' in obd_snapshot:
+                        self.gmeter.set_speed(obd_snapshot['speed_kmh'])
 
         # Update status bars (if enabled) - on ALL pages
         if self.status_bar_enabled:

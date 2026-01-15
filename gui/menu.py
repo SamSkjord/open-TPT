@@ -28,6 +28,7 @@ from utils.settings import get_settings
 # Import NeoDriver types for menu
 try:
     from hardware.neodriver_handler import NeoDriverMode, NeoDriverDirection
+
     NEODRIVER_TYPES_AVAILABLE = True
 except ImportError:
     NEODRIVER_TYPES_AVAILABLE = False
@@ -44,11 +45,14 @@ MENU_HEADER_COLOUR = (100, 200, 255)  # Light blue
 @dataclass
 class MenuItem:
     """A single menu item."""
+
     label: str
     action: Optional[Callable[[], Any]] = None
-    submenu: Optional['Menu'] = None
+    submenu: Optional["Menu"] = None
     enabled: bool = True
-    dynamic_label: Optional[Callable[[], str]] = None  # For dynamic text like "Brightness: 50%"
+    dynamic_label: Optional[Callable[[], str]] = (
+        None  # For dynamic text like "Brightness: 50%"
+    )
 
     def get_label(self) -> str:
         """Get the display label (may be dynamic)."""
@@ -76,7 +80,7 @@ class Menu:
         self,
         title: str,
         items: List[MenuItem] = None,
-        parent: Optional['Menu'] = None,
+        parent: Optional["Menu"] = None,
     ):
         """
         Initialise the menu.
@@ -141,7 +145,10 @@ class Menu:
         new_index = self.selected_index
         for _ in range(len(self.items)):
             new_index = (new_index + delta) % len(self.items)
-            if self.items[new_index].is_selectable() or self.items[new_index].label == "Back":
+            if (
+                self.items[new_index].is_selectable()
+                or self.items[new_index].label == "Back"
+            ):
                 break
 
         self.selected_index = new_index
@@ -167,12 +174,12 @@ class Menu:
         """Calculate maximum number of visible menu items."""
         menu_height = int(DISPLAY_HEIGHT * 0.7)
         title_area = 62  # Title + spacing
-        hint_area = 30   # Status message area at bottom
+        hint_area = 30  # Status message area at bottom
         item_height = 40
         available_height = menu_height - title_area - hint_area
         return max(1, available_height // item_height)
 
-    def select(self) -> Optional['Menu']:
+    def select(self) -> Optional["Menu"]:
         """
         Select the current item.
 
@@ -202,7 +209,7 @@ class Menu:
 
         return None
 
-    def back(self) -> Optional['Menu']:
+    def back(self) -> Optional["Menu"]:
         """
         Go back to parent menu or close.
 
@@ -248,7 +255,7 @@ class Menu:
             surface,
             MENU_ITEM_SELECTED_COLOUR,
             (menu_x, menu_y, menu_width, menu_height),
-            2
+            2,
         )
 
         # Draw title
@@ -268,7 +275,12 @@ class Menu:
             arrow_up = self._font_hint.render("more", True, GREY)
             surface.blit(arrow_up, (menu_x + menu_width - 80, item_start_y - 25))
 
-        for display_idx, i in enumerate(range(self.scroll_offset, min(len(self.items), self.scroll_offset + max_visible))):
+        for display_idx, i in enumerate(
+            range(
+                self.scroll_offset,
+                min(len(self.items), self.scroll_offset + max_visible),
+            )
+        ):
             item = self.items[i]
             item_y = item_start_y + (display_idx * item_height)
 
@@ -277,10 +289,7 @@ class Menu:
                 colour = MENU_ITEM_SELECTED_COLOUR
                 # Draw selection highlight
                 highlight_rect = pygame.Rect(
-                    menu_x + 10,
-                    item_y - 5,
-                    menu_width - 20,
-                    item_height - 5
+                    menu_x + 10, item_y - 5, menu_width - 20, item_height - 5
                 )
                 pygame.draw.rect(surface, (40, 60, 80), highlight_rect, border_radius=5)
             elif not item.enabled:
@@ -303,8 +312,12 @@ class Menu:
             surface.blit(arrow_down, (menu_x + menu_width - 80, last_item_y - 25))
 
         # Draw status message if recent
-        if self.status_message and (time.time() - self.status_time < self.status_duration):
-            status_surface = self._font_hint.render(self.status_message, True, MENU_HEADER_COLOUR)
+        if self.status_message and (
+            time.time() - self.status_time < self.status_duration
+        ):
+            status_surface = self._font_hint.render(
+                self.status_message, True, MENU_HEADER_COLOUR
+            )
             status_x = menu_x + (menu_width - status_surface.get_width()) // 2
             status_y = menu_y + menu_height - 20
             surface.blit(status_surface, (status_x, status_y))
@@ -317,7 +330,17 @@ class MenuSystem:
     Manages the root menu and all submenus for openTPT.
     """
 
-    def __init__(self, tpms_handler=None, encoder_handler=None, input_handler=None, neodriver_handler=None, imu_handler=None, gps_handler=None, radar_handler=None, camera_handler=None):
+    def __init__(
+        self,
+        tpms_handler=None,
+        encoder_handler=None,
+        input_handler=None,
+        neodriver_handler=None,
+        imu_handler=None,
+        gps_handler=None,
+        radar_handler=None,
+        camera_handler=None,
+    ):
         """
         Initialise the menu system.
 
@@ -362,10 +385,12 @@ class MenuSystem:
 
         # Speed source (persistent, config.py as default)
         from utils.config import SPEED_SOURCE
+
         self.speed_source = self._settings.get("speed_source", SPEED_SOURCE)
 
         # Unit settings (persistent, config.py as defaults)
         from utils.config import TEMP_UNIT, PRESSURE_UNIT, SPEED_UNIT
+
         self.temp_unit = self._settings.get("units.temp", TEMP_UNIT)
         self.pressure_unit = self._settings.get("units.pressure", PRESSURE_UNIT)
         self.speed_unit = self._settings.get("units.speed", SPEED_UNIT)
@@ -373,245 +398,335 @@ class MenuSystem:
         self._build_menus()
 
     def _build_menus(self):
-        """Build the menu structure."""
-        # TPMS submenu
-        tpms_menu = Menu("TPMS Settings")
-        tpms_menu.add_item(MenuItem("Pair FL", action=lambda: self._start_tpms_pairing("FL")))
-        tpms_menu.add_item(MenuItem("Pair FR", action=lambda: self._start_tpms_pairing("FR")))
-        tpms_menu.add_item(MenuItem("Pair RL", action=lambda: self._start_tpms_pairing("RL")))
-        tpms_menu.add_item(MenuItem("Pair RR", action=lambda: self._start_tpms_pairing("RR")))
-        tpms_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
-
-        # Bluetooth submenu
+        """Build the menu structure (items alphabetical, Back always last)."""
+        # Bluetooth submenu (alphabetical)
         bt_menu = Menu("Bluetooth Audio")
-        bt_menu.add_item(MenuItem(
-            "Status",
-            dynamic_label=lambda: self._get_bt_status_label()
-        ))
-        bt_menu.add_item(MenuItem(
-            "Volume",
-            dynamic_label=lambda: self._get_volume_label(),
-            action=lambda: self._toggle_volume_editing()
-        ))
-        bt_menu.add_item(MenuItem("Scan for Devices", action=lambda: self._scan_bluetooth()))
-        bt_menu.add_item(MenuItem("Pair New Device", action=lambda: self._show_bt_pair_menu()))
-        bt_menu.add_item(MenuItem("Connect", action=lambda: self._show_bt_connect_menu()))
+        bt_menu.add_item(
+            MenuItem("Connect", action=lambda: self._show_bt_connect_menu())
+        )
         bt_menu.add_item(MenuItem("Disconnect", action=lambda: self._bt_disconnect()))
-        bt_menu.add_item(MenuItem("Forget Device", action=lambda: self._show_bt_forget_menu()))
-        bt_menu.add_item(MenuItem("Refresh BT Services", action=lambda: self._bt_refresh_services()))
+        bt_menu.add_item(
+            MenuItem("Forget Device", action=lambda: self._show_bt_forget_menu())
+        )
+        bt_menu.add_item(
+            MenuItem("Pair New Device", action=lambda: self._show_bt_pair_menu())
+        )
+        bt_menu.add_item(
+            MenuItem("Refresh BT Services", action=lambda: self._bt_refresh_services())
+        )
+        bt_menu.add_item(
+            MenuItem("Scan for Devices", action=lambda: self._scan_bluetooth())
+        )
+        bt_menu.add_item(
+            MenuItem("Status", dynamic_label=lambda: self._get_bt_status_label())
+        )
+        bt_menu.add_item(
+            MenuItem(
+                "Volume",
+                dynamic_label=lambda: self._get_volume_label(),
+                action=lambda: self._toggle_volume_editing(),
+            )
+        )
         bt_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
-        self.bt_menu = bt_menu  # Store reference for dynamic submenus
+        self.bt_menu = bt_menu
 
         # Check Bluetooth audio dependencies on menu build
         self._bt_audio_available = self._check_bt_audio_deps()
 
+        # Camera submenu (alphabetical)
+        camera_menu = Menu("Camera")
+        camera_menu.add_item(
+            MenuItem("Front Camera", action=lambda: self._show_camera_menu("front"))
+        )
+        camera_menu.add_item(
+            MenuItem("Rear Camera", action=lambda: self._show_camera_menu("rear"))
+        )
+        camera_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        self.camera_menu = camera_menu
+
         # Display submenu
         display_menu = Menu("Display")
-        display_menu.add_item(MenuItem(
-            "Brightness",
-            dynamic_label=lambda: self._get_brightness_label(),
-            action=lambda: self._toggle_brightness_editing()
-        ))
+        display_menu.add_item(
+            MenuItem(
+                "Brightness",
+                dynamic_label=lambda: self._get_brightness_label(),
+                action=lambda: self._toggle_brightness_editing(),
+            )
+        )
         display_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
 
         # Light Strip submenu (NeoDriver)
         lights_menu = Menu("Light Strip")
 
-        # Mode submenu
-        mode_menu = Menu("Light Mode")
-        mode_menu.add_item(MenuItem("Shift Lights", action=lambda: self._set_lights_mode("shift")))
-        mode_menu.add_item(MenuItem("Lap Delta", action=lambda: self._set_lights_mode("delta")))
-        mode_menu.add_item(MenuItem("Overtake", action=lambda: self._set_lights_mode("overtake")))
-        mode_menu.add_item(MenuItem("Off", action=lambda: self._set_lights_mode("off")))
-        mode_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
-        mode_menu.parent = lights_menu
-
-        # Direction submenu
+        # Direction submenu (alphabetical)
         direction_menu = Menu("Light Direction")
-        direction_menu.add_item(MenuItem("Centre Out", action=lambda: self._set_lights_direction("centre_out")))
-        direction_menu.add_item(MenuItem("Edges In", action=lambda: self._set_lights_direction("edges_in")))
-        direction_menu.add_item(MenuItem("Left to Right", action=lambda: self._set_lights_direction("left_right")))
-        direction_menu.add_item(MenuItem("Right to Left", action=lambda: self._set_lights_direction("right_left")))
+        direction_menu.add_item(
+            MenuItem(
+                "Centre Out", action=lambda: self._set_lights_direction("centre_out")
+            )
+        )
+        direction_menu.add_item(
+            MenuItem("Edges In", action=lambda: self._set_lights_direction("edges_in"))
+        )
+        direction_menu.add_item(
+            MenuItem(
+                "Left to Right", action=lambda: self._set_lights_direction("left_right")
+            )
+        )
+        direction_menu.add_item(
+            MenuItem(
+                "Right to Left", action=lambda: self._set_lights_direction("right_left")
+            )
+        )
         direction_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
         direction_menu.parent = lights_menu
 
-        lights_menu.add_item(MenuItem(
-            "Mode",
-            dynamic_label=lambda: self._get_lights_mode_label(),
-            submenu=mode_menu
-        ))
-        lights_menu.add_item(MenuItem(
-            "Direction",
-            dynamic_label=lambda: self._get_lights_direction_label(),
-            submenu=direction_menu
-        ))
+        # Mode submenu (alphabetical)
+        mode_menu = Menu("Light Mode")
+        mode_menu.add_item(
+            MenuItem("Lap Delta", action=lambda: self._set_lights_mode("delta"))
+        )
+        mode_menu.add_item(MenuItem("Off", action=lambda: self._set_lights_mode("off")))
+        mode_menu.add_item(
+            MenuItem("Overtake", action=lambda: self._set_lights_mode("overtake"))
+        )
+        mode_menu.add_item(
+            MenuItem("Shift Lights", action=lambda: self._set_lights_mode("shift"))
+        )
+        mode_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        mode_menu.parent = lights_menu
+
+        # Light Strip items (alphabetical)
+        lights_menu.add_item(
+            MenuItem(
+                "Direction",
+                dynamic_label=lambda: self._get_lights_direction_label(),
+                submenu=direction_menu,
+            )
+        )
+        lights_menu.add_item(
+            MenuItem(
+                "Mode",
+                dynamic_label=lambda: self._get_lights_mode_label(),
+                submenu=mode_menu,
+            )
+        )
         lights_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
 
-        # IMU calibration submenu
-        imu_menu = Menu("IMU Calibration")
-        imu_menu.add_item(MenuItem(
-            "1. Zero (level)",
-            dynamic_label=lambda: self._get_imu_zero_label(),
-            action=lambda: self._imu_calibrate_zero()
-        ))
-        imu_menu.add_item(MenuItem(
-            "2. Accelerate",
-            dynamic_label=lambda: self._get_imu_accel_label(),
-            action=lambda: self._imu_calibrate_accel()
-        ))
-        imu_menu.add_item(MenuItem(
-            "3. Turn Left",
-            dynamic_label=lambda: self._get_imu_turn_label(),
-            action=lambda: self._imu_calibrate_turn()
-        ))
-        imu_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
-
-        # GPS Status submenu
-        gps_menu = Menu("GPS Status")
-        gps_menu.add_item(MenuItem(
-            "Fix",
-            dynamic_label=lambda: self._get_gps_fix_label(),
-            enabled=False  # Info only
-        ))
-        gps_menu.add_item(MenuItem(
-            "Satellites",
-            dynamic_label=lambda: self._get_gps_satellites_label(),
-            enabled=False
-        ))
-        gps_menu.add_item(MenuItem(
-            "Speed",
-            dynamic_label=lambda: self._get_gps_speed_label(),
-            enabled=False
-        ))
-        gps_menu.add_item(MenuItem(
-            "Position",
-            dynamic_label=lambda: self._get_gps_position_label(),
-            enabled=False
-        ))
-        gps_menu.add_item(MenuItem(
-            "Port",
-            dynamic_label=lambda: self._get_gps_port_label(),
-            enabled=False
-        ))
-        gps_menu.add_item(MenuItem(
-            "Antenna",
-            dynamic_label=lambda: self._get_gps_antenna_label(),
-            enabled=False
-        ))
-        gps_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
-
-        # Radar submenu
+        # Radar submenu (alphabetical)
         radar_menu = Menu("Radar")
-        radar_menu.add_item(MenuItem(
-            "Enabled",
-            dynamic_label=lambda: self._get_radar_enabled_label(),
-            action=lambda: self._toggle_radar_enabled()
-        ))
-        radar_menu.add_item(MenuItem(
-            "Status",
-            dynamic_label=lambda: self._get_radar_status_label(),
-            enabled=False  # Info only
-        ))
-        radar_menu.add_item(MenuItem(
-            "Tracks",
-            dynamic_label=lambda: self._get_radar_tracks_label(),
-            enabled=False
-        ))
-        radar_menu.add_item(MenuItem(
-            "CAN Channel",
-            dynamic_label=lambda: self._get_radar_channel_label(),
-            enabled=False
-        ))
+        radar_menu.add_item(
+            MenuItem(
+                "Enabled",
+                dynamic_label=lambda: self._get_radar_enabled_label(),
+                action=lambda: self._toggle_radar_enabled(),
+            )
+        )
+        radar_menu.add_item(
+            MenuItem(
+                "CAN Channel",
+                dynamic_label=lambda: self._get_radar_channel_label(),
+                enabled=False,
+            )
+        )
+        radar_menu.add_item(
+            MenuItem(
+                "Status",
+                dynamic_label=lambda: self._get_radar_status_label(),
+                enabled=False,
+            )
+        )
+        radar_menu.add_item(
+            MenuItem(
+                "Tracks",
+                dynamic_label=lambda: self._get_radar_tracks_label(),
+                enabled=False,
+            )
+        )
         radar_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
 
-        # Camera submenu
-        camera_menu = Menu("Camera")
-        camera_menu.add_item(MenuItem("Rear Camera", action=lambda: self._show_camera_menu('rear')))
-        camera_menu.add_item(MenuItem("Front Camera", action=lambda: self._show_camera_menu('front')))
-        camera_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
-        self.camera_menu = camera_menu  # Store reference for dynamic submenus
+        # System submenus
 
-        # System Status submenu
+        # GPS Status submenu (alphabetical)
+        gps_menu = Menu("GPS Status")
+        gps_menu.add_item(
+            MenuItem(
+                "Antenna",
+                dynamic_label=lambda: self._get_gps_antenna_label(),
+                enabled=False,
+            )
+        )
+        gps_menu.add_item(
+            MenuItem(
+                "Fix", dynamic_label=lambda: self._get_gps_fix_label(), enabled=False
+            )
+        )
+        gps_menu.add_item(
+            MenuItem(
+                "Port", dynamic_label=lambda: self._get_gps_port_label(), enabled=False
+            )
+        )
+        gps_menu.add_item(
+            MenuItem(
+                "Position",
+                dynamic_label=lambda: self._get_gps_position_label(),
+                enabled=False,
+            )
+        )
+        gps_menu.add_item(
+            MenuItem(
+                "Satellites",
+                dynamic_label=lambda: self._get_gps_satellites_label(),
+                enabled=False,
+            )
+        )
+        gps_menu.add_item(
+            MenuItem(
+                "Speed",
+                dynamic_label=lambda: self._get_gps_speed_label(),
+                enabled=False,
+            )
+        )
+        gps_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+
+        # IMU calibration submenu (numbered steps - keep order)
+        imu_menu = Menu("IMU Calibration")
+        imu_menu.add_item(
+            MenuItem(
+                "1. Zero (level)",
+                dynamic_label=lambda: self._get_imu_zero_label(),
+                action=lambda: self._imu_calibrate_zero(),
+            )
+        )
+        imu_menu.add_item(
+            MenuItem(
+                "2. Accelerate",
+                dynamic_label=lambda: self._get_imu_accel_label(),
+                action=lambda: self._imu_calibrate_accel(),
+            )
+        )
+        imu_menu.add_item(
+            MenuItem(
+                "3. Turn Left",
+                dynamic_label=lambda: self._get_imu_turn_label(),
+                action=lambda: self._imu_calibrate_turn(),
+            )
+        )
+        imu_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+
+        # System Status submenu (alphabetical)
         status_menu = Menu("System Status")
-        status_menu.add_item(MenuItem(
-            "IP Address",
-            dynamic_label=lambda: self._get_system_ip_label(),
-            enabled=False
-        ))
-        status_menu.add_item(MenuItem(
-            "Storage",
-            dynamic_label=lambda: self._get_system_storage_label(),
-            enabled=False
-        ))
-        status_menu.add_item(MenuItem(
-            "Uptime",
-            dynamic_label=lambda: self._get_system_uptime_label(),
-            enabled=False
-        ))
-        status_menu.add_item(MenuItem(
-            "Sensors",
-            dynamic_label=lambda: self._get_sensor_status_label(),
-            enabled=False
-        ))
+        status_menu.add_item(
+            MenuItem(
+                "IP Address",
+                dynamic_label=lambda: self._get_system_ip_label(),
+                enabled=False,
+            )
+        )
+        status_menu.add_item(
+            MenuItem(
+                "Sensors",
+                dynamic_label=lambda: self._get_sensor_status_label(),
+                enabled=False,
+            )
+        )
+        status_menu.add_item(
+            MenuItem(
+                "Storage",
+                dynamic_label=lambda: self._get_system_storage_label(),
+                enabled=False,
+            )
+        )
+        status_menu.add_item(
+            MenuItem(
+                "Uptime",
+                dynamic_label=lambda: self._get_system_uptime_label(),
+                enabled=False,
+            )
+        )
         status_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
 
-        # Units submenu
+        # Units submenu (alphabetical)
         units_menu = Menu("Units")
-        units_menu.add_item(MenuItem(
-            "Temperature",
-            dynamic_label=lambda: self._get_temp_unit_label(),
-            action=lambda: self._toggle_temp_unit()
-        ))
-        units_menu.add_item(MenuItem(
-            "Pressure",
-            dynamic_label=lambda: self._get_pressure_unit_label(),
-            action=lambda: self._toggle_pressure_unit()
-        ))
-        units_menu.add_item(MenuItem(
-            "Speed",
-            dynamic_label=lambda: self._get_speed_unit_label(),
-            action=lambda: self._toggle_speed_unit()
-        ))
+        units_menu.add_item(
+            MenuItem(
+                "Pressure",
+                dynamic_label=lambda: self._get_pressure_unit_label(),
+                action=lambda: self._toggle_pressure_unit(),
+            )
+        )
+        units_menu.add_item(
+            MenuItem(
+                "Speed",
+                dynamic_label=lambda: self._get_speed_unit_label(),
+                action=lambda: self._toggle_speed_unit(),
+            )
+        )
+        units_menu.add_item(
+            MenuItem(
+                "Temperature",
+                dynamic_label=lambda: self._get_temp_unit_label(),
+                action=lambda: self._toggle_temp_unit(),
+            )
+        )
         units_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
 
-        # System menu
+        # System menu (alphabetical)
         system_menu = Menu("System")
-        system_menu.add_item(MenuItem(
-            "Speed Source",
-            dynamic_label=lambda: f"Speed: {self._get_speed_source().upper()}",
-            action=lambda: self._toggle_speed_source()
-        ))
         system_menu.add_item(MenuItem("Status", submenu=status_menu))
-        system_menu.add_item(MenuItem("Units", submenu=units_menu))
         system_menu.add_item(MenuItem("GPS Status", submenu=gps_menu))
+        system_menu.add_item(MenuItem("Units", submenu=units_menu))
+        system_menu.add_item(
+            MenuItem(
+                "Speed Source",
+                dynamic_label=lambda: f"Speed Source: {self._get_speed_source().upper()}",
+                action=lambda: self._toggle_speed_source(),
+            )
+        )
         system_menu.add_item(MenuItem("IMU Calibration", submenu=imu_menu))
-        system_menu.add_item(MenuItem("Shutdown", action=lambda: self._shutdown()))
         system_menu.add_item(MenuItem("Reboot", action=lambda: self._reboot()))
+        system_menu.add_item(MenuItem("Shutdown", action=lambda: self._shutdown()))
         system_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
 
-        # Root menu
+        # TPMS submenu (positional order - FL, FR, RL, RR)
+        tpms_menu = Menu("TPMS Settings")
+        tpms_menu.add_item(
+            MenuItem("Pair FL", action=lambda: self._start_tpms_pairing("FL"))
+        )
+        tpms_menu.add_item(
+            MenuItem("Pair FR", action=lambda: self._start_tpms_pairing("FR"))
+        )
+        tpms_menu.add_item(
+            MenuItem("Pair RL", action=lambda: self._start_tpms_pairing("RL"))
+        )
+        tpms_menu.add_item(
+            MenuItem("Pair RR", action=lambda: self._start_tpms_pairing("RR"))
+        )
+        tpms_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+
+        # Root menu (alphabetical)
         self.root_menu = Menu("Settings")
-        self.root_menu.add_item(MenuItem("TPMS", submenu=tpms_menu))
         self.root_menu.add_item(MenuItem("Bluetooth", submenu=bt_menu))
+        self.root_menu.add_item(MenuItem("Camera", submenu=camera_menu))
         self.root_menu.add_item(MenuItem("Display", submenu=display_menu))
         self.root_menu.add_item(MenuItem("Light Strip", submenu=lights_menu))
-        self.root_menu.add_item(MenuItem("Camera", submenu=camera_menu))
         self.root_menu.add_item(MenuItem("Radar", submenu=radar_menu))
         self.root_menu.add_item(MenuItem("System", submenu=system_menu))
+        self.root_menu.add_item(MenuItem("TPMS", submenu=tpms_menu))
         self.root_menu.add_item(MenuItem("Back", action=lambda: self._close_menu()))
 
         # Set parent references
-        tpms_menu.parent = self.root_menu
         bt_menu.parent = self.root_menu
+        camera_menu.parent = self.root_menu
         display_menu.parent = self.root_menu
         lights_menu.parent = self.root_menu
-        camera_menu.parent = self.root_menu
         radar_menu.parent = self.root_menu
         system_menu.parent = self.root_menu
+        tpms_menu.parent = self.root_menu
+        gps_menu.parent = system_menu
+        imu_menu.parent = system_menu
         status_menu.parent = system_menu
         units_menu.parent = system_menu
-        imu_menu.parent = system_menu
-        gps_menu.parent = system_menu
 
     def _get_brightness(self) -> float:
         """Get current brightness from encoder handler."""
@@ -660,9 +775,7 @@ class MenuSystem:
         try:
             # Check if PulseAudio is installed
             result = subprocess.run(
-                ["which", "pulseaudio"],
-                capture_output=True,
-                timeout=5
+                ["which", "pulseaudio"], capture_output=True, timeout=5
             )
             return result.returncode == 0
         except Exception:
@@ -779,25 +892,35 @@ class MenuSystem:
 
     def _scan_bluetooth(self) -> str:
         """Scan for Bluetooth devices (non-blocking)."""
+
         def do_scan():
             try:
                 # Ensure Bluetooth is powered on
                 subprocess.run(
                     ["sudo", "rfkill", "unblock", "bluetooth"],
                     capture_output=True,
-                    timeout=5
+                    timeout=5,
                 )
                 subprocess.run(
                     ["sudo", "-u", "pi", "bluetoothctl", "power", "on"],
                     capture_output=True,
-                    timeout=5
+                    timeout=5,
                 )
                 # Run scan for 8 seconds
                 subprocess.run(
-                    ["sudo", "-u", "pi", "bluetoothctl", "--timeout", "8", "scan", "on"],
+                    [
+                        "sudo",
+                        "-u",
+                        "pi",
+                        "bluetoothctl",
+                        "--timeout",
+                        "8",
+                        "scan",
+                        "on",
+                    ],
                     capture_output=True,
                     text=True,
-                    timeout=15
+                    timeout=15,
                 )
                 # Update status when done
                 if self.current_menu:
@@ -814,21 +937,18 @@ class MenuSystem:
     def _is_mac_address(self, name: str) -> bool:
         """Check if a name is just a MAC address (no friendly name)."""
         # MAC addresses look like XX:XX:XX:XX:XX:XX or XX-XX-XX-XX-XX-XX
-        mac_pattern = r'^([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$'
-        return bool(re.match(mac_pattern, name.replace('-', ':')))
+        mac_pattern = r"^([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$"
+        return bool(re.match(mac_pattern, name.replace("-", ":")))
 
     def _get_bt_discovered_devices(self) -> list:
         """Get list of discovered Bluetooth devices as (mac, name) tuples."""
         try:
             result = subprocess.run(
-                ["bluetoothctl", "devices"],
-                capture_output=True,
-                text=True,
-                timeout=5
+                ["bluetoothctl", "devices"], capture_output=True, text=True, timeout=5
             )
             devices = []
             paired = set(mac for mac, _ in self._get_bt_paired_devices_raw())
-            for line in result.stdout.strip().split('\n'):
+            for line in result.stdout.strip().split("\n"):
                 # Format: "Device XX:XX:XX:XX:XX:XX Device Name"
                 if line.startswith("Device "):
                     parts = line.split(" ", 2)
@@ -850,10 +970,10 @@ class MenuSystem:
                 ["bluetoothctl", "devices", "Paired"],
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=5,
             )
             devices = []
-            for line in result.stdout.strip().split('\n'):
+            for line in result.stdout.strip().split("\n"):
                 if line.startswith("Device "):
                     parts = line.split(" ", 2)
                     if len(parts) >= 3:
@@ -870,11 +990,11 @@ class MenuSystem:
                 ["bluetoothctl", "devices", "Paired"],
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=5,
             )
             devices = []
             seen_macs = set()
-            for line in result.stdout.strip().split('\n'):
+            for line in result.stdout.strip().split("\n"):
                 if line.startswith("Device "):
                     parts = line.split(" ", 2)
                     if len(parts) >= 3:
@@ -888,9 +1008,9 @@ class MenuSystem:
                 ["bluetoothctl", "devices", "Trusted"],
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=5,
             )
-            for line in result.stdout.strip().split('\n'):
+            for line in result.stdout.strip().split("\n"):
                 if line.startswith("Device "):
                     parts = line.split(" ", 2)
                     if len(parts) >= 3:
@@ -914,7 +1034,7 @@ class MenuSystem:
                     ["bluetoothctl", "info", mac],
                     capture_output=True,
                     text=True,
-                    timeout=5
+                    timeout=5,
                 )
                 if "Connected: yes" in result.stdout:
                     return (mac, name)
@@ -947,10 +1067,12 @@ class MenuSystem:
         connect_menu = Menu("Connect Device")
         for mac, name in devices:
             # Use default argument to capture mac in closure
-            connect_menu.add_item(MenuItem(
-                name[:25] if len(name) > 25 else name,
-                action=lambda m=mac, n=name: self._bt_connect(m, n)
-            ))
+            connect_menu.add_item(
+                MenuItem(
+                    name[:25] if len(name) > 25 else name,
+                    action=lambda m=mac, n=name: self._bt_connect(m, n),
+                )
+            )
         connect_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
         connect_menu.parent = self.bt_menu
 
@@ -968,7 +1090,7 @@ class MenuSystem:
                 ["sudo", "-u", "pi", "bluetoothctl", "connect", mac],
                 capture_output=True,
                 text=True,
-                timeout=15
+                timeout=15,
             )
             output = result.stdout + result.stderr
             if "Connection successful" in output or "Connected: yes" in output:
@@ -987,6 +1109,7 @@ class MenuSystem:
 
     def _play_bt_test_sound(self):
         """Play a test sound to confirm Bluetooth audio is working."""
+
         def do_play():
             try:
                 # Try system bell sound first, fall back to generated tone
@@ -997,9 +1120,7 @@ class MenuSystem:
                 ]
                 for sound in sound_files:
                     result = subprocess.run(
-                        ["paplay", sound],
-                        capture_output=True,
-                        timeout=5
+                        ["paplay", sound], capture_output=True, timeout=5
                     )
                     if result.returncode == 0:
                         return
@@ -1007,7 +1128,7 @@ class MenuSystem:
                 subprocess.run(
                     ["speaker-test", "-t", "sine", "-f", "1000", "-l", "1"],
                     capture_output=True,
-                    timeout=2
+                    timeout=2,
                 )
             except Exception:
                 pass  # Silent fail - audio test is optional
@@ -1019,10 +1140,7 @@ class MenuSystem:
         """Run pactl command as pi user with correct environment."""
         env_cmd = ["sudo", "-u", "pi", "env", "XDG_RUNTIME_DIR=/run/user/1000"]
         return subprocess.run(
-            env_cmd + ["pactl"] + args,
-            capture_output=True,
-            text=True,
-            timeout=5
+            env_cmd + ["pactl"] + args, capture_output=True, text=True, timeout=5
         )
 
     def _get_bt_volume(self) -> int:
@@ -1032,7 +1150,7 @@ class MenuSystem:
             # Output like: "Volume: front-left: 32768 /  50% / -18.06 dB, ..."
             if "%" in result.stdout:
                 # Extract first percentage
-                match = re.search(r'(\d+)%', result.stdout)
+                match = re.search(r"(\d+)%", result.stdout)
                 if match:
                     return int(match.group(1))
             return 50  # Default
@@ -1058,10 +1176,12 @@ class MenuSystem:
         # Build pair submenu dynamically
         pair_menu = Menu("Pair Device")
         for mac, name in devices:
-            pair_menu.add_item(MenuItem(
-                name[:25] if len(name) > 25 else name,
-                action=lambda m=mac, n=name: self._bt_pair(m, n)
-            ))
+            pair_menu.add_item(
+                MenuItem(
+                    name[:25] if len(name) > 25 else name,
+                    action=lambda m=mac, n=name: self._bt_pair(m, n),
+                )
+            )
         pair_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
         pair_menu.parent = self.bt_menu
 
@@ -1080,7 +1200,7 @@ class MenuSystem:
                 ["sudo", "-u", "pi", "bluetoothctl", "trust", mac],
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=5,
             )
 
             # Pair with the device (default agent works better than NoInputNoOutput)
@@ -1088,7 +1208,7 @@ class MenuSystem:
                 ["sudo", "-u", "pi", "bluetoothctl", "pair", mac],
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=30,
             )
             output = result.stdout + result.stderr
 
@@ -1097,7 +1217,7 @@ class MenuSystem:
                 subprocess.run(
                     ["sudo", "-u", "pi", "bluetoothctl", "remove", mac],
                     capture_output=True,
-                    timeout=5
+                    timeout=5,
                 )
                 return "Cleared stuck state - try again"
 
@@ -1131,7 +1251,7 @@ class MenuSystem:
                 ["sudo", "-u", "pi", "bluetoothctl", "disconnect", mac],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=10,
             )
             if "Successful" in result.stdout or "Disconnected" in result.stdout:
                 return f"Disconnected from {name}"
@@ -1148,10 +1268,12 @@ class MenuSystem:
         # Build forget submenu dynamically
         forget_menu = Menu("Forget Device")
         for mac, name in devices:
-            forget_menu.add_item(MenuItem(
-                name[:25] if len(name) > 25 else name,
-                action=lambda m=mac, n=name: self._bt_forget(m, n)
-            ))
+            forget_menu.add_item(
+                MenuItem(
+                    name[:25] if len(name) > 25 else name,
+                    action=lambda m=mac, n=name: self._bt_forget(m, n),
+                )
+            )
         forget_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
         forget_menu.parent = self.bt_menu
 
@@ -1168,7 +1290,7 @@ class MenuSystem:
                 ["sudo", "-u", "pi", "bluetoothctl", "remove", mac],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=10,
             )
             if "removed" in result.stdout.lower() or result.returncode == 0:
                 return f"Forgot {name}"
@@ -1178,18 +1300,17 @@ class MenuSystem:
 
     def _bt_refresh_services(self) -> str:
         """Restart PulseAudio and Bluetooth in correct order for audio profiles."""
+
         def do_refresh():
             try:
                 # Restart PulseAudio first to register audio endpoints
                 subprocess.run(
-                    ["systemctl", "--user", "restart", "pulseaudio"],
-                    timeout=10
+                    ["systemctl", "--user", "restart", "pulseaudio"], timeout=10
                 )
                 time.sleep(2)
                 # Then restart Bluetooth to pick up the endpoints
                 subprocess.run(
-                    ["sudo", "systemctl", "restart", "bluetooth"],
-                    timeout=10
+                    ["sudo", "systemctl", "restart", "bluetooth"], timeout=10
                 )
                 time.sleep(2)
                 if self.current_menu:
@@ -1221,8 +1342,9 @@ class MenuSystem:
     def _shutdown(self) -> str:
         """Shutdown the system."""
         import subprocess
+
         try:
-            subprocess.Popen(['sudo', 'shutdown', 'now'])
+            subprocess.Popen(["sudo", "shutdown", "now"])
             return "Shutting down..."
         except Exception as e:
             return f"Shutdown failed: {e}"
@@ -1230,8 +1352,9 @@ class MenuSystem:
     def _reboot(self) -> str:
         """Reboot the system."""
         import subprocess
+
         try:
-            subprocess.Popen(['sudo', 'reboot'])
+            subprocess.Popen(["sudo", "reboot"])
             return "Rebooting..."
         except Exception as e:
             return f"Reboot failed: {e}"
@@ -1258,7 +1381,7 @@ class MenuSystem:
         snapshot = self.gps_handler.get_snapshot()
         if not snapshot or not snapshot.data:
             return "Fix: No data"
-        has_fix = snapshot.data.get('has_fix', False)
+        has_fix = snapshot.data.get("has_fix", False)
         if has_fix:
             return "Fix: Yes"
         return "Fix: No (searching)"
@@ -1270,7 +1393,7 @@ class MenuSystem:
         snapshot = self.gps_handler.get_snapshot()
         if not snapshot or not snapshot.data:
             return "Sats: --"
-        sats = snapshot.data.get('satellites', 0)
+        sats = snapshot.data.get("satellites", 0)
         return f"Sats: {sats}"
 
     def _get_gps_speed_label(self) -> str:
@@ -1280,9 +1403,9 @@ class MenuSystem:
         snapshot = self.gps_handler.get_snapshot()
         if not snapshot or not snapshot.data:
             return "Speed: --"
-        if not snapshot.data.get('has_fix', False):
+        if not snapshot.data.get("has_fix", False):
             return "Speed: -- (no fix)"
-        speed = snapshot.data.get('speed_kmh', 0)
+        speed = snapshot.data.get("speed_kmh", 0)
         return f"Speed: {speed:.1f} km/h"
 
     def _get_gps_position_label(self) -> str:
@@ -1292,10 +1415,10 @@ class MenuSystem:
         snapshot = self.gps_handler.get_snapshot()
         if not snapshot or not snapshot.data:
             return "Pos: --"
-        if not snapshot.data.get('has_fix', False):
+        if not snapshot.data.get("has_fix", False):
             return "Pos: -- (no fix)"
-        lat = snapshot.data.get('latitude', 0)
-        lon = snapshot.data.get('longitude', 0)
+        lat = snapshot.data.get("latitude", 0)
+        lon = snapshot.data.get("longitude", 0)
         # Format with direction indicators
         lat_dir = "N" if lat >= 0 else "S"
         lon_dir = "E" if lon >= 0 else "W"
@@ -1304,6 +1427,7 @@ class MenuSystem:
     def _get_gps_port_label(self) -> str:
         """Get GPS serial port label."""
         from utils.config import GPS_SERIAL_PORT, GPS_BAUD_RATE, GPS_ENABLED
+
         if not GPS_ENABLED:
             return "Port: Disabled"
         return f"{GPS_SERIAL_PORT} @ {GPS_BAUD_RATE}"
@@ -1315,7 +1439,7 @@ class MenuSystem:
         snapshot = self.gps_handler.get_snapshot()
         if not snapshot or not snapshot.data:
             return "Antenna: --"
-        status = snapshot.data.get('antenna_status', 0)
+        status = snapshot.data.get("antenna_status", 0)
         status_labels = {
             0: "Antenna: Unknown",
             1: "Antenna: FAULT",
@@ -1327,19 +1451,19 @@ class MenuSystem:
     # IMU Calibration methods
     def _get_imu_zero_label(self) -> str:
         """Get label for zero calibration step."""
-        if self.imu_cal_step == 'zero_done':
+        if self.imu_cal_step == "zero_done":
             return "1. Zero ✓"
         return "1. Zero (level)"
 
     def _get_imu_accel_label(self) -> str:
         """Get label for acceleration calibration step."""
-        if self.imu_cal_step == 'accel_done':
+        if self.imu_cal_step == "accel_done":
             return "2. Accelerate ✓"
         return "2. Accelerate"
 
     def _get_imu_turn_label(self) -> str:
         """Get label for turn calibration step."""
-        if self.imu_cal_step == 'turn_done':
+        if self.imu_cal_step == "turn_done":
             return "3. Turn Left ✓"
         return "3. Turn Left"
 
@@ -1348,39 +1472,39 @@ class MenuSystem:
         if not self.imu_handler:
             return "No IMU available"
         result = self.imu_handler.calibrate_zero()
-        self.imu_cal_step = 'zero_done'
+        self.imu_cal_step = "zero_done"
         return result
 
     def _imu_calibrate_accel(self) -> str:
         """Step 2: Detect longitudinal axis - accelerate gently."""
         if not self.imu_handler:
             return "No IMU available"
-        if self.imu_cal_step != 'zero_done':
+        if self.imu_cal_step != "zero_done":
             return "Do step 1 first"
         # Detect which axis changed most during acceleration
         result = self.imu_handler.calibrate_detect_axis()
-        if 'error' in result:
-            return result['error']
+        if "error" in result:
+            return result["error"]
         # Acceleration = positive longitudinal
-        axis_str = result['axis_str']
+        axis_str = result["axis_str"]
         self.imu_handler.calibrate_set_longitudinal(axis_str)
-        self.imu_cal_step = 'accel_done'
+        self.imu_cal_step = "accel_done"
         return f"Longitudinal: {axis_str}"
 
     def _imu_calibrate_turn(self) -> str:
         """Step 3: Detect lateral axis - turn left."""
         if not self.imu_handler:
             return "No IMU available"
-        if self.imu_cal_step != 'accel_done':
+        if self.imu_cal_step != "accel_done":
             return "Do step 2 first"
         # Detect which axis changed most during turn
         result = self.imu_handler.calibrate_detect_axis()
-        if 'error' in result:
-            return result['error']
+        if "error" in result:
+            return result["error"]
         # Left turn = positive lateral (rightward force on driver)
-        axis_str = result['axis_str']
+        axis_str = result["axis_str"]
         self.imu_handler.calibrate_set_lateral(axis_str)
-        self.imu_cal_step = 'turn_done'
+        self.imu_cal_step = "turn_done"
         return f"Lateral: {axis_str} - Done!"
 
     # Radar methods
@@ -1443,28 +1567,36 @@ class MenuSystem:
         cam_menu = Menu(title)
 
         # Status info (read-only)
-        cam_menu.add_item(MenuItem(
-            "FPS",
-            dynamic_label=lambda n=camera_name: self._get_camera_fps_label(n),
-            enabled=False
-        ))
-        cam_menu.add_item(MenuItem(
-            "Status",
-            dynamic_label=lambda n=camera_name: self._get_camera_status_label(n),
-            enabled=False
-        ))
+        cam_menu.add_item(
+            MenuItem(
+                "FPS",
+                dynamic_label=lambda n=camera_name: self._get_camera_fps_label(n),
+                enabled=False,
+            )
+        )
+        cam_menu.add_item(
+            MenuItem(
+                "Status",
+                dynamic_label=lambda n=camera_name: self._get_camera_status_label(n),
+                enabled=False,
+            )
+        )
 
         # Settings
-        cam_menu.add_item(MenuItem(
-            "Mirror",
-            dynamic_label=lambda n=camera_name: self._get_camera_mirror_label(n),
-            action=lambda n=camera_name: self._toggle_camera_mirror(n)
-        ))
-        cam_menu.add_item(MenuItem(
-            "Rotate",
-            dynamic_label=lambda n=camera_name: self._get_camera_rotate_label(n),
-            action=lambda n=camera_name: self._cycle_camera_rotate(n)
-        ))
+        cam_menu.add_item(
+            MenuItem(
+                "Mirror",
+                dynamic_label=lambda n=camera_name: self._get_camera_mirror_label(n),
+                action=lambda n=camera_name: self._toggle_camera_mirror(n),
+            )
+        )
+        cam_menu.add_item(
+            MenuItem(
+                "Rotate",
+                dynamic_label=lambda n=camera_name: self._get_camera_rotate_label(n),
+                action=lambda n=camera_name: self._cycle_camera_rotate(n),
+            )
+        )
         cam_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
         cam_menu.parent = self.camera_menu
 
@@ -1534,10 +1666,7 @@ class MenuSystem:
         """Get system IP address."""
         try:
             result = subprocess.run(
-                ["hostname", "-I"],
-                capture_output=True,
-                text=True,
-                timeout=5
+                ["hostname", "-I"], capture_output=True, text=True, timeout=5
             )
             ips = result.stdout.strip().split()
             if ips:
@@ -1550,12 +1679,9 @@ class MenuSystem:
         """Get system storage info."""
         try:
             result = subprocess.run(
-                ["df", "-h", "/"],
-                capture_output=True,
-                text=True,
-                timeout=5
+                ["df", "-h", "/"], capture_output=True, text=True, timeout=5
             )
-            lines = result.stdout.strip().split('\n')
+            lines = result.stdout.strip().split("\n")
             if len(lines) >= 2:
                 parts = lines[1].split()
                 if len(parts) >= 4:
@@ -1570,14 +1696,13 @@ class MenuSystem:
         """Get system uptime."""
         try:
             result = subprocess.run(
-                ["uptime", "-p"],
-                capture_output=True,
-                text=True,
-                timeout=5
+                ["uptime", "-p"], capture_output=True, text=True, timeout=5
             )
             uptime = result.stdout.strip()
             # Shorten "up X hours, Y minutes" to fit menu
-            uptime = uptime.replace("up ", "").replace(" hours", "h").replace(" hour", "h")
+            uptime = (
+                uptime.replace("up ", "").replace(" hours", "h").replace(" hour", "h")
+            )
             uptime = uptime.replace(" minutes", "m").replace(" minute", "m")
             uptime = uptime.replace(" days", "d").replace(" day", "d")
             uptime = uptime.replace(",", "")
@@ -1625,7 +1750,9 @@ class MenuSystem:
     def _toggle_pressure_unit(self) -> str:
         """Cycle through pressure units: PSI -> BAR -> kPa -> PSI."""
         units = ["PSI", "BAR", "KPA"]
-        current_idx = units.index(self.pressure_unit) if self.pressure_unit in units else 0
+        current_idx = (
+            units.index(self.pressure_unit) if self.pressure_unit in units else 0
+        )
         self.pressure_unit = units[(current_idx + 1) % len(units)]
         self._settings.set("units.pressure", self.pressure_unit)
         return f"Pressure: {self.pressure_unit}"
@@ -1709,7 +1836,9 @@ class MenuSystem:
         else:
             self.current_menu = None
 
-    def show_recording_menu(self, on_cancel: Callable, on_save: Callable, on_delete: Callable):
+    def show_recording_menu(
+        self, on_cancel: Callable, on_save: Callable, on_delete: Callable
+    ):
         """
         Show recording stop menu with Cancel/Save/Delete options.
         Recording continues while this menu is open.
@@ -1723,9 +1852,15 @@ class MenuSystem:
 
         # Create recording menu
         self.save_menu = Menu("Recording")
-        self.save_menu.add_item(MenuItem("Cancel", action=lambda: self._handle_recording_action("cancel")))
-        self.save_menu.add_item(MenuItem("Save", action=lambda: self._handle_recording_action("save")))
-        self.save_menu.add_item(MenuItem("Delete", action=lambda: self._handle_recording_action("delete")))
+        self.save_menu.add_item(
+            MenuItem("Cancel", action=lambda: self._handle_recording_action("cancel"))
+        )
+        self.save_menu.add_item(
+            MenuItem("Save", action=lambda: self._handle_recording_action("save"))
+        )
+        self.save_menu.add_item(
+            MenuItem("Delete", action=lambda: self._handle_recording_action("delete"))
+        )
 
         self.current_menu = self.save_menu
         self.save_menu.show()

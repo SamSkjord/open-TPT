@@ -551,7 +551,7 @@ GPS_ENABLED = True  # Set to False to disable GPS
 # Serial port for GPS (Raspberry Pi UART)
 # GPIO 14 (TX) and GPIO 15 (RX) map to /dev/ttyS0 (mini UART on Pi 4/5)
 GPS_SERIAL_PORT = "/dev/ttyS0"
-GPS_BAUD_RATE = 9600  # Standard NMEA baud rate (most GPS modules use 9600)
+GPS_BAUD_RATE = 38400  # 38400 for 10Hz update rate (configure GPS module to match)
 
 # ==============================================================================
 # OBD2 CONFIGURATION (Vehicle Speed)

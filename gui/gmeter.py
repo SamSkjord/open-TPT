@@ -78,6 +78,7 @@ class GMeterDisplay:
         self.current_lateral = 0.0
         self.current_longitudinal = 0.0
         self.current_speed_kmh = 0  # Always stored in km/h internally
+        self.speed_status = None  # Status message when speed unavailable
 
         # Smoothing factor (0.0 = no smoothing, 1.0 = infinite smoothing)
         # 0.7 gives good balance between responsiveness and stability
@@ -376,15 +377,25 @@ class GMeterDisplay:
 
     def _draw_speed(self, screen):
         """Draw speed with unit conversion based on user settings."""
+        # Check if we have a status message instead of speed
+        if self.current_speed_kmh is None and self.speed_status:
+            # Show status message (e.g. "no fix")
+            text_speed = self.font_large.render(self.speed_status, True, GREY)
+            speed_rect = text_speed.get_rect()
+            speed_rect.bottomright = (self.width - int(20 * SCALE_X), self.height - int(80 * SCALE_Y))
+            screen.blit(text_speed, speed_rect)
+            return
+
         # Get speed unit preference (check each frame for live updates)
         speed_unit = self._settings.get("units.speed", SPEED_UNIT)
 
         # Convert speed based on unit preference
+        speed_value = self.current_speed_kmh or 0
         if speed_unit == "MPH":
-            display_speed = int(self.current_speed_kmh * 0.621371)
+            display_speed = int(speed_value * 0.621371)
             unit_label = "mph"
         else:
-            display_speed = int(self.current_speed_kmh)
+            display_speed = int(speed_value)
             unit_label = "km/h"
 
         # Speed display (xlarge font)
@@ -406,11 +417,18 @@ class GMeterDisplay:
         text_title = self.font_medium.render("", True, WHITE)
         screen.blit(text_title, (int(20 * SCALE_X), int(35 * SCALE_Y)))
 
-    def set_speed(self, speed_kmh):
+    def set_speed(self, speed_kmh, status=None):
         """
         Set the current speed.
 
         Args:
             speed_kmh: Speed in km/h (always pass km/h, conversion handled in display)
+                       Pass None with a status message to show status instead of speed
+            status: Optional status message (e.g. "no fix") shown when speed_kmh is None
         """
-        self.current_speed_kmh = speed_kmh
+        if speed_kmh is None:
+            self.current_speed_kmh = None
+            self.speed_status = status
+        else:
+            self.current_speed_kmh = speed_kmh
+            self.speed_status = None

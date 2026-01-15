@@ -11,6 +11,17 @@ from typing import Optional
 from utils.hardware_base import BoundedQueueHardwareHandler
 from utils.config import GPS_ENABLED, GPS_SERIAL_PORT, GPS_BAUD_RATE
 
+# MTK3339 PMTK commands for configuration
+# Checksum is XOR of all characters between $ and * (exclusive)
+MTK_BAUD_9600 = b"$PMTK251,9600*17\r\n"
+MTK_BAUD_38400 = b"$PMTK251,38400*27\r\n"
+MTK_BAUD_57600 = b"$PMTK251,57600*2C\r\n"
+MTK_BAUD_115200 = b"$PMTK251,115200*1F\r\n"
+MTK_UPDATE_1HZ = b"$PMTK220,1000*1F\r\n"
+MTK_UPDATE_5HZ = b"$PMTK220,200*2C\r\n"
+MTK_UPDATE_10HZ = b"$PMTK220,100*2F\r\n"
+MTK_DEFAULT_BAUD = 9600  # MTK3339 boots at 9600 baud
+
 
 class GPSHandler(BoundedQueueHardwareHandler):
     """
@@ -59,20 +70,91 @@ class GPSHandler(BoundedQueueHardwareHandler):
             print("GPS disabled in config")
 
     def _initialise(self):
-        """Initialise serial connection to GPS."""
+        """Initialise serial connection to GPS and configure MTK3339."""
+        try:
+            # If target baud != 9600, need to configure the GPS module first
+            if GPS_BAUD_RATE != MTK_DEFAULT_BAUD:
+                self._configure_mtk3339()
+            else:
+                # Just connect at default baud
+                self.serial_port = serial.Serial(
+                    port=GPS_SERIAL_PORT,
+                    baudrate=GPS_BAUD_RATE,
+                    timeout=0.15
+                )
+                print(f"GPS: Connected to {GPS_SERIAL_PORT} at {GPS_BAUD_RATE} baud")
+
+            self.hardware_available = True
+            self.consecutive_errors = 0
+        except Exception as e:
+            print(f"GPS: Failed to initialise: {e}")
+            self.serial_port = None
+            self.hardware_available = False
+
+    def _configure_mtk3339(self):
+        """Configure MTK3339 GPS module for higher baud rate and 10Hz updates."""
+        print(f"GPS: Configuring MTK3339 for {GPS_BAUD_RATE} baud / 10Hz...")
+
+        # First, try connecting at the target baud rate (in case already configured)
         try:
             self.serial_port = serial.Serial(
                 port=GPS_SERIAL_PORT,
                 baudrate=GPS_BAUD_RATE,
-                timeout=0.15  # Slightly longer than 100ms (10Hz) interval
+                timeout=0.5
             )
-            self.hardware_available = True
-            self.consecutive_errors = 0
-            print(f"GPS: Connected to {GPS_SERIAL_PORT} at {GPS_BAUD_RATE} baud")
+            # Check if we get valid NMEA data
+            time.sleep(0.2)
+            if self.serial_port.in_waiting > 0:
+                data = self.serial_port.read(self.serial_port.in_waiting).decode('ascii', errors='ignore')
+                if '$GP' in data or '$GN' in data:
+                    print(f"GPS: Already configured at {GPS_BAUD_RATE} baud")
+                    self.serial_port.timeout = 0.15
+                    return
+            self.serial_port.close()
+        except Exception:
+            pass
+
+        # Connect at default 9600 baud to send configuration
+        try:
+            self.serial_port = serial.Serial(
+                port=GPS_SERIAL_PORT,
+                baudrate=MTK_DEFAULT_BAUD,
+                timeout=0.5
+            )
+            time.sleep(0.1)
+
+            # Set 10Hz update rate first (while still at 9600 baud)
+            self.serial_port.write(MTK_UPDATE_10HZ)
+            time.sleep(0.1)
+
+            # Set target baud rate
+            if GPS_BAUD_RATE == 38400:
+                self.serial_port.write(MTK_BAUD_38400)
+            elif GPS_BAUD_RATE == 57600:
+                self.serial_port.write(MTK_BAUD_57600)
+            elif GPS_BAUD_RATE == 115200:
+                self.serial_port.write(MTK_BAUD_115200)
+
+            time.sleep(0.1)
+            self.serial_port.close()
+
+            # Reconnect at new baud rate
+            time.sleep(0.1)
+            self.serial_port = serial.Serial(
+                port=GPS_SERIAL_PORT,
+                baudrate=GPS_BAUD_RATE,
+                timeout=0.15
+            )
+            print(f"GPS: Configured to {GPS_BAUD_RATE} baud / 10Hz")
+
         except Exception as e:
-            print(f"GPS: Failed to open {GPS_SERIAL_PORT}: {e}")
-            self.serial_port = None
-            self.hardware_available = False
+            print(f"GPS: Configuration failed: {e}")
+            # Fall back to trying target baud rate anyway
+            self.serial_port = serial.Serial(
+                port=GPS_SERIAL_PORT,
+                baudrate=GPS_BAUD_RATE,
+                timeout=0.15
+            )
 
     def _worker_loop(self):
         """Background thread that reads NMEA from serial."""
