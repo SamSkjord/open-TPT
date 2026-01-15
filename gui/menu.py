@@ -23,6 +23,7 @@ from utils.config import (
     GREY,
     BUTTON_VIEW_MODE,
 )
+from utils.settings import get_settings
 
 # Import NeoDriver types for menu
 try:
@@ -356,9 +357,18 @@ class MenuSystem:
         # IMU calibration wizard state
         self.imu_cal_step = None  # None, 'zero', 'accel', 'turn'
 
-        # Speed source (loaded from config, runtime switchable)
+        # Persistent settings (with config.py as defaults)
+        self._settings = get_settings()
+
+        # Speed source (persistent, config.py as default)
         from utils.config import SPEED_SOURCE
-        self.speed_source = SPEED_SOURCE  # "obd" or "gps"
+        self.speed_source = self._settings.get("speed_source", SPEED_SOURCE)
+
+        # Unit settings (persistent, config.py as defaults)
+        from utils.config import TEMP_UNIT, PRESSURE_UNIT, SPEED_UNIT
+        self.temp_unit = self._settings.get("units.temp", TEMP_UNIT)
+        self.pressure_unit = self._settings.get("units.pressure", PRESSURE_UNIT)
+        self.speed_unit = self._settings.get("units.speed", SPEED_UNIT)
 
         self._build_menus()
 
@@ -545,6 +555,25 @@ class MenuSystem:
         ))
         status_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
 
+        # Units submenu
+        units_menu = Menu("Units")
+        units_menu.add_item(MenuItem(
+            "Temperature",
+            dynamic_label=lambda: self._get_temp_unit_label(),
+            action=lambda: self._toggle_temp_unit()
+        ))
+        units_menu.add_item(MenuItem(
+            "Pressure",
+            dynamic_label=lambda: self._get_pressure_unit_label(),
+            action=lambda: self._toggle_pressure_unit()
+        ))
+        units_menu.add_item(MenuItem(
+            "Speed",
+            dynamic_label=lambda: self._get_speed_unit_label(),
+            action=lambda: self._toggle_speed_unit()
+        ))
+        units_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+
         # System menu
         system_menu = Menu("System")
         system_menu.add_item(MenuItem(
@@ -553,6 +582,7 @@ class MenuSystem:
             action=lambda: self._toggle_speed_source()
         ))
         system_menu.add_item(MenuItem("Status", submenu=status_menu))
+        system_menu.add_item(MenuItem("Units", submenu=units_menu))
         system_menu.add_item(MenuItem("GPS Status", submenu=gps_menu))
         system_menu.add_item(MenuItem("IMU Calibration", submenu=imu_menu))
         system_menu.add_item(MenuItem("Shutdown", action=lambda: self._shutdown()))
@@ -579,6 +609,7 @@ class MenuSystem:
         radar_menu.parent = self.root_menu
         system_menu.parent = self.root_menu
         status_menu.parent = system_menu
+        units_menu.parent = system_menu
         imu_menu.parent = system_menu
         gps_menu.parent = system_menu
 
@@ -1216,6 +1247,7 @@ class MenuSystem:
             self.speed_source = "gps"
         else:
             self.speed_source = "obd"
+        self._settings.set("speed_source", self.speed_source)
         return f"Speed: {self.speed_source.upper()}"
 
     # GPS Status methods
@@ -1364,6 +1396,7 @@ class MenuSystem:
         if not self.radar_handler:
             return "Radar not available"
         self.radar_handler.enabled = not self.radar_handler.enabled
+        self._settings.set("radar.enabled", self.radar_handler.enabled)
         return f"Radar {'enabled' if self.radar_handler.enabled else 'disabled'}"
 
     def _get_radar_status_label(self) -> str:
@@ -1568,6 +1601,49 @@ class MenuSystem:
         if active:
             return f"Active: {', '.join(active)}"
         return "Active: None"
+
+    # Unit settings methods
+    def _get_temp_unit_label(self) -> str:
+        """Get temperature unit label."""
+        unit_labels = {"C": "Celsius", "F": "Fahrenheit"}
+        return f"Temp: {unit_labels.get(self.temp_unit, self.temp_unit)}"
+
+    def _toggle_temp_unit(self) -> str:
+        """Toggle between Celsius and Fahrenheit."""
+        if self.temp_unit == "C":
+            self.temp_unit = "F"
+        else:
+            self.temp_unit = "C"
+        self._settings.set("units.temp", self.temp_unit)
+        unit_labels = {"C": "Celsius", "F": "Fahrenheit"}
+        return f"Temperature: {unit_labels[self.temp_unit]}"
+
+    def _get_pressure_unit_label(self) -> str:
+        """Get pressure unit label."""
+        return f"Pressure: {self.pressure_unit}"
+
+    def _toggle_pressure_unit(self) -> str:
+        """Cycle through pressure units: PSI -> BAR -> kPa -> PSI."""
+        units = ["PSI", "BAR", "KPA"]
+        current_idx = units.index(self.pressure_unit) if self.pressure_unit in units else 0
+        self.pressure_unit = units[(current_idx + 1) % len(units)]
+        self._settings.set("units.pressure", self.pressure_unit)
+        return f"Pressure: {self.pressure_unit}"
+
+    def _get_speed_unit_label(self) -> str:
+        """Get speed unit label."""
+        unit_labels = {"KMH": "km/h", "MPH": "mph"}
+        return f"Speed: {unit_labels.get(self.speed_unit, self.speed_unit)}"
+
+    def _toggle_speed_unit(self) -> str:
+        """Toggle between km/h and mph."""
+        if self.speed_unit == "KMH":
+            self.speed_unit = "MPH"
+        else:
+            self.speed_unit = "KMH"
+        self._settings.set("units.speed", self.speed_unit)
+        unit_labels = {"KMH": "km/h", "MPH": "mph"}
+        return f"Speed: {unit_labels[self.speed_unit]}"
 
     def show(self):
         """Show the root menu."""

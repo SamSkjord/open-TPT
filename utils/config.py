@@ -88,6 +88,8 @@ FONT_PATH_BOLD = os.path.join(_PROJECT_ROOT, "fonts", "NotoSans-Bold.ttf")
 TEMP_UNIT = "C"
 # Pressure unit: 'PSI', 'BAR', or 'KPA'
 PRESSURE_UNIT = "PSI"
+# Speed unit: 'KMH' for km/h, 'MPH' for mph
+SPEED_UNIT = "KMH"
 
 # Note: The thresholds below are set according to the chosen units above.
 # If you change the units, you should also adjust these thresholds appropriately.

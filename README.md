@@ -146,12 +146,23 @@ The display settings are stored in `display_config.json` in the project root dir
 
 ### System Configuration
 
-Other system settings can be configured by editing the `utils/config.py` file, which contains settings for:
-- FPS target and brightness
-- Positions for telemetry indicators (automatically scaled based on resolution)
-- Colour thresholds for temperature and pressure
+Hardware and system constants are in `utils/config.py`:
 - I2C addresses and bus settings
-- Unit preferences (Celsius/Fahrenheit, PSI/BAR/kPa)
+- CAN channels and bitrates
+- Display dimensions and font paths
+- Colour thresholds for temperature and pressure
+- Default values for user preferences
+
+### User Settings (Persistent)
+
+User preferences changed via the on-screen menu are saved to `~/.opentpt_settings.json` and persist across restarts:
+- **Units**: Temperature (C/F), Pressure (PSI/BAR/kPa), Speed (km/h/mph)
+- **Camera**: Mirror and rotation for front/rear cameras
+- **Display**: Brightness level
+- **Radar**: Enabled/disabled state
+- **Speed source**: OBD or GPS
+
+Settings are saved immediately when changed. If the file doesn't exist, defaults from `config.py` are used.
 
 ### Tyre Sensor Configuration
 
@@ -433,7 +444,8 @@ openTPT/
 │   ├── radar_handler.py                 # Toyota radar CAN handler (optional)
 │   └── i2c_mux.py                       # TCA9548A Mux control
 ├── utils/
-│   ├── config.py                        # Constants: positions, colours, thresholds
+│   ├── config.py                        # Hardware constants, defaults
+│   ├── settings.py                      # Persistent user settings (~/.opentpt_settings.json)
 │   ├── hardware_base.py                 # Bounded queue base class
 │   └── performance.py                   # Performance monitoring
 └── scratch/
@@ -488,7 +500,7 @@ openTPT/
 - [ ] TPMS menu expansion - swap corners, view sensor data
 - [ ] Tyre temps menu - corner sensor details, full frame view for installation verification, flip inner/outer
 - [x] Camera view options - mirror, rotate settings for front/rear cameras
-- [ ] Units menu - °C/°F, PSI/BAR/kPa, km/h/mph switching
+- [x] Units menu - °C/°F, PSI/BAR/kPa, km/h/mph switching
 - [ ] Alerts/Warnings menu - temperature/pressure thresholds for visual warnings
 - [ ] Recording settings - output directory, auto-start on motion detection
 - [ ] G-meter settings - reset peaks, max G range, history duration

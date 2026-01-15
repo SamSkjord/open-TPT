@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Optional, Callable
 
 from utils.config import DEFAULT_BRIGHTNESS
+from utils.settings import get_settings
 
 # Import board only if available
 try:
@@ -85,7 +86,10 @@ class EncoderInputHandler:
         self.button_pressed = False
         self.button_press_start = 0.0
         self.long_press_fired = False  # Prevent repeat firing while held
-        self.brightness = DEFAULT_BRIGHTNESS  # Current brightness (0.0-1.0)
+
+        # Persistent settings (with config.py as default)
+        self._settings = get_settings()
+        self.brightness = self._settings.get("display.brightness", DEFAULT_BRIGHTNESS)
 
         # Thread-safe event queue
         self.event_queue = deque(maxlen=10)
@@ -286,6 +290,7 @@ class EncoderInputHandler:
     def set_brightness(self, value: float):
         """Set brightness level (0.0-1.0)."""
         self.brightness = max(0.1, min(1.0, value))
+        self._settings.set("display.brightness", self.brightness)
 
     def adjust_brightness(self, delta: int):
         """

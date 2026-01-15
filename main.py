@@ -37,6 +37,9 @@ print("Using optimised TPMS handler with bounded queues")
 # Import telemetry recorder
 from utils.telemetry_recorder import TelemetryRecorder, TelemetryFrame
 
+# Import persistent settings manager
+from utils.settings import get_settings
+
 # Import radar handler (optional)
 try:
     from hardware.radar_handler import RadarHandler
@@ -632,6 +635,9 @@ class OpenTPT:
         self._show_splash("Initialising radar...", 0.05)
         if RADAR_ENABLED and RADAR_AVAILABLE and RadarHandler:
             try:
+                # Load radar enabled state from persistent settings (default True)
+                settings = get_settings()
+                radar_enabled = settings.get("radar.enabled", True)
                 self.radar = RadarHandler(
                     radar_channel=RADAR_CHANNEL,
                     car_channel=CAR_CHANNEL,
@@ -640,7 +646,7 @@ class OpenTPT:
                     radar_dbc=RADAR_DBC,
                     control_dbc=CONTROL_DBC,
                     track_timeout=RADAR_TRACK_TIMEOUT,
-                    enabled=True,
+                    enabled=radar_enabled,
                 )
                 self.radar.start()
                 print("Radar overlay enabled")

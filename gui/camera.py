@@ -20,6 +20,7 @@ from utils.config import (
     CAMERA_FRONT_MIRROR,
     CAMERA_FRONT_ROTATE,
 )
+from utils.settings import get_settings
 
 # Optional import - only needed for actual camera functionality
 try:
@@ -89,15 +90,18 @@ class Camera:
         self.last_time = time.time()
         self.update_interval = 1.0  # Update FPS every 1 second
 
-        # Camera transform settings (runtime modifiable)
+        # Persistent settings (with config.py as defaults)
+        self._settings = get_settings()
+
+        # Camera transform settings (persistent, config.py as defaults)
         self.camera_settings = {
             'rear': {
-                'mirror': CAMERA_REAR_MIRROR,
-                'rotate': CAMERA_REAR_ROTATE,
+                'mirror': self._settings.get("camera.rear.mirror", CAMERA_REAR_MIRROR),
+                'rotate': self._settings.get("camera.rear.rotate", CAMERA_REAR_ROTATE),
             },
             'front': {
-                'mirror': CAMERA_FRONT_MIRROR,
-                'rotate': CAMERA_FRONT_ROTATE,
+                'mirror': self._settings.get("camera.front.mirror", CAMERA_FRONT_MIRROR),
+                'rotate': self._settings.get("camera.front.rotate", CAMERA_FRONT_ROTATE),
             },
         }
 
@@ -121,6 +125,7 @@ class Camera:
         name = camera_name or self.current_camera
         if name in self.camera_settings:
             self.camera_settings[name]['mirror'] = value
+            self._settings.set(f"camera.{name}.mirror", value)
 
     def toggle_mirror(self, camera_name: str = None) -> bool:
         """Toggle mirror setting for a camera. Returns new value."""
@@ -139,7 +144,9 @@ class Camera:
         name = camera_name or self.current_camera
         if name in self.camera_settings:
             # Normalise to valid values
-            self.camera_settings[name]['rotate'] = value % 360
+            normalised = value % 360
+            self.camera_settings[name]['rotate'] = normalised
+            self._settings.set(f"camera.{name}.rotate", normalised)
 
     def cycle_rotate(self, camera_name: str = None) -> int:
         """Cycle rotation setting (0 -> 90 -> 180 -> 270 -> 0). Returns new value."""
