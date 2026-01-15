@@ -70,7 +70,7 @@ class LapTimingDisplay:
             self.font_large = pygame.font.Font(FONT_PATH, FONT_SIZE_LARGE)
             self.font_medium = pygame.font.Font(FONT_PATH, FONT_SIZE_MEDIUM)
             self.font_small = pygame.font.Font(FONT_PATH, FONT_SIZE_SMALL)
-        except Exception as e:
+        except (pygame.error, FileNotFoundError, IOError, OSError) as e:
             print(f"Error loading fonts: {e}")
             self.font_huge = pygame.font.SysFont("monospace", int(FONT_SIZE_LARGE * 3))
             self.font_xlarge = pygame.font.SysFont("monospace", int(FONT_SIZE_LARGE * 1.8))

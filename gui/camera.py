@@ -8,6 +8,10 @@ import numpy as np
 import time
 import threading
 import queue
+
+# Debug flag - set to True for verbose camera logging (impacts performance)
+DEBUG_CAMERA = False
+
 from utils.config import (
     DISPLAY_WIDTH,
     DISPLAY_HEIGHT,
@@ -206,22 +210,24 @@ class Camera:
     def _start_capture_thread(self):
         """Start the capture thread."""
         if not self.thread_running and CV2_AVAILABLE and self.camera:
-            print(f"DEBUG: Starting capture thread for {self.current_camera} camera")
-            print(f"DEBUG: Camera object exists: {self.camera is not None}")
-            print(f"DEBUG: Camera is opened: {self.camera.isOpened() if self.camera else False}")
+            if DEBUG_CAMERA:
+                print(f"DEBUG: Starting capture thread for {self.current_camera} camera")
+                print(f"DEBUG: Camera object exists: {self.camera is not None}")
+                print(f"DEBUG: Camera is opened: {self.camera.isOpened() if self.camera else False}")
             self.thread_running = True
             self.capture_thread = threading.Thread(
                 target=self._capture_thread_function, daemon=True
             )
             self.capture_thread.start()
-        else:
+        elif DEBUG_CAMERA:
             print(f"DEBUG: Cannot start capture thread - thread_running={self.thread_running}, CV2={CV2_AVAILABLE}, camera={self.camera is not None}")
 
     def _capture_thread_function(self):
         """Thread function that continuously captures frames from the camera."""
         print(f"Camera capture thread started for {self.current_camera} camera")
-        print(f"DEBUG: Thread running flag: {self.thread_running}")
-        print(f"DEBUG: Camera object: {self.camera}")
+        if DEBUG_CAMERA:
+            print(f"DEBUG: Thread running flag: {self.thread_running}")
+            print(f"DEBUG: Camera object: {self.camera}")
 
         # Set camera properties for maximum performance
         self.camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
@@ -272,7 +278,8 @@ class Camera:
         retrieve_fail_count = 0
 
         # Thread loop - continuously capture frames as fast as possible
-        print(f"DEBUG: Entering capture loop for {self.current_camera} camera")
+        if DEBUG_CAMERA:
+            print(f"DEBUG: Entering capture loop for {self.current_camera} camera")
         while self.thread_running:
             if not self.camera.isOpened():
                 self.error_message = "Camera disconnected"
@@ -354,22 +361,22 @@ class Camera:
                     if thread_elapsed >= 5.0:  # Print every 5 seconds
                         capture_fps = thread_frame_count / thread_elapsed
                         print(f"{self.current_camera.capitalize()} camera capture FPS: {capture_fps:.1f}")
-                        print(f"DEBUG: Grab stats - Success: {grab_success_count}, Fail: {grab_fail_count}, Retrieve fail: {retrieve_fail_count}")
-                        # Reset debug counters
+                        if DEBUG_CAMERA:
+                            print(f"DEBUG: Grab stats - Success: {grab_success_count}, Fail: {grab_fail_count}, Retrieve fail: {retrieve_fail_count}")
+                            # Print profiling info
+                            if profile_count > 0:
+                                print(f"  Capture profile (avg ms): grab={profile_times['grab']/profile_count:.1f}, "
+                                      f"retrieve={profile_times['retrieve']/profile_count:.1f}, "
+                                      f"transform={profile_times['transform']/profile_count:.1f}, "
+                                      f"cvt={profile_times['cvt']/profile_count:.1f}, "
+                                      f"resize={profile_times['resize']/profile_count:.1f}, "
+                                      f"queue={profile_times['queue']/profile_count:.1f}")
+                        # Reset counters (always, to prevent overflow)
                         grab_success_count = 0
                         grab_fail_count = 0
                         retrieve_fail_count = 0
-                        # Print profiling info
-                        if profile_count > 0:
-                            print(f"  Capture profile (avg ms): grab={profile_times['grab']/profile_count:.1f}, "
-                                  f"retrieve={profile_times['retrieve']/profile_count:.1f}, "
-                                  f"transform={profile_times['transform']/profile_count:.1f}, "
-                                  f"cvt={profile_times['cvt']/profile_count:.1f}, "
-                                  f"resize={profile_times['resize']/profile_count:.1f}, "
-                                  f"queue={profile_times['queue']/profile_count:.1f}")
-                            # Reset profiling
-                            profile_times = {'grab': 0, 'retrieve': 0, 'transform': 0, 'cvt': 0, 'resize': 0, 'queue': 0}
-                            profile_count = 0
+                        profile_times = {'grab': 0, 'retrieve': 0, 'transform': 0, 'cvt': 0, 'resize': 0, 'queue': 0}
+                        profile_count = 0
                         thread_frame_count = 0
                         thread_start_time = time.time()
 
@@ -381,7 +388,8 @@ class Camera:
                 continue
 
         print(f"Camera capture thread stopped for {self.current_camera} camera")
-        print(f"DEBUG: Final stats - Grab success: {grab_success_count}, Grab fail: {grab_fail_count}, Retrieve fail: {retrieve_fail_count}")
+        if DEBUG_CAMERA:
+            print(f"DEBUG: Final stats - Grab success: {grab_success_count}, Grab fail: {grab_fail_count}, Retrieve fail: {retrieve_fail_count}")
 
     def initialize(self, camera_index=None, camera_device=None):
         """
@@ -435,7 +443,8 @@ class Camera:
 
             # Use device path directly - udev symlinks provide deterministic identification
             # OpenCV will handle the symlink resolution internally
-            print(f"DEBUG: Opening camera at {camera_to_open}")
+            if DEBUG_CAMERA:
+                print(f"DEBUG: Opening camera at {camera_to_open}")
 
             # Open camera without explicit backend specification, let OpenCV choose best one
             self.camera = cv2.VideoCapture(camera_to_open)

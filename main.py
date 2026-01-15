@@ -294,7 +294,7 @@ def check_power_status():
 
     except FileNotFoundError:
         return (None, False, "vcgencmd not available (not running on Pi?)")
-    except Exception as e:
+    except (subprocess.SubprocessError, OSError, ValueError) as e:
         return (None, False, f"Error checking power status: {e}")
 
 
@@ -344,7 +344,7 @@ def collect_memory_stats():
             if result.returncode == 0:
                 stats['gpu_total'] = result.stdout.strip().split('=')[1]
 
-        except Exception as e:
+        except (subprocess.SubprocessError, subprocess.TimeoutExpired, OSError, ValueError) as e:
             stats['gpu_error'] = str(e)
 
         # System memory (free -m)
@@ -364,7 +364,7 @@ def collect_memory_stats():
                     stats['ram_used'] = f"{mem_line[2]}M"
                     stats['ram_free'] = f"{mem_line[3]}M"
                     stats['ram_available'] = f"{mem_line[6]}M" if len(mem_line) > 6 else "N/A"
-        except Exception as e:
+        except (subprocess.SubprocessError, subprocess.TimeoutExpired, OSError, IndexError, ValueError) as e:
             stats['ram_error'] = str(e)
 
         # Python process memory (from /proc/self/status)
@@ -379,7 +379,7 @@ def collect_memory_stats():
                         # Virtual Memory Size
                         vm_kb = int(line.split()[1])
                         stats['process_vms'] = f"{vm_kb // 1024}M"
-        except Exception as e:
+        except (FileNotFoundError, IOError, OSError, IndexError, ValueError) as e:
             stats['process_error'] = str(e)
 
         # Pygame surface count (if available)
@@ -388,7 +388,7 @@ def collect_memory_stats():
             surface_count = sum(1 for obj in gc.get_objects()
                               if isinstance(obj, pygame.Surface))
             stats['pygame_surfaces'] = surface_count
-        except Exception as e:
+        except (TypeError, RuntimeError) as e:
             stats['surface_error'] = str(e)
 
         # CPU temperature
@@ -402,7 +402,7 @@ def collect_memory_stats():
             if result.returncode == 0:
                 # Format: "temp=51.1'C\n"
                 stats['cpu_temp'] = result.stdout.strip().split('=')[1]
-        except Exception as e:
+        except (subprocess.SubprocessError, subprocess.TimeoutExpired, OSError, IndexError, ValueError) as e:
             stats['temp_error'] = str(e)
 
         # Object type profiling (identify memory leaks)
@@ -416,12 +416,12 @@ def collect_memory_stats():
 
             # Get top 10 object types
             stats['top_object_types'] = type_counts.most_common(10)
-        except Exception as e:
+        except (TypeError, RuntimeError) as e:
             stats['profiling_error'] = str(e)
 
         return stats
 
-    except Exception as e:
+    except (RuntimeError, MemoryError) as e:
         return {'error': str(e)}
 
 
@@ -527,8 +527,8 @@ class OpenTPT:
         # Kill fbi splash now that pygame display is ready
         try:
             subprocess.run(['pkill', '-9', 'fbi'], capture_output=True)
-        except Exception:
-            pass
+        except (subprocess.SubprocessError, OSError, FileNotFoundError):
+            pass  # Ignore - fbi may not be running or pkill may not exist
         print(f"[BOOT] fbi killed t={time.time()-_boot_start:.1f}s", flush=True)
 
         # Force display to wake up - clear and flip multiple times
@@ -621,13 +621,13 @@ class OpenTPT:
                 splash_img = pygame.transform.smoothscale(splash_img, new_size)
                 img_rect = splash_img.get_rect(center=(DISPLAY_WIDTH // 2, DISPLAY_HEIGHT // 2 - 50))
                 self.screen.blit(splash_img, img_rect)
-        except Exception:
+        except (pygame.error, FileNotFoundError, IOError, OSError):
             pass  # Continue without splash image
 
         # Draw status text
         try:
             font = pygame.font.Font(FONT_PATH, 24)
-        except Exception:
+        except (pygame.error, FileNotFoundError, IOError, OSError):
             font = pygame.font.Font(None, 24)
         text_surface = font.render(status_text, True, (200, 200, 200))
         text_rect = text_surface.get_rect(center=(DISPLAY_WIDTH // 2, DISPLAY_HEIGHT - 80))
@@ -669,7 +669,7 @@ class OpenTPT:
                 )
                 self.radar.start()
                 print("Radar overlay enabled")
-            except Exception as e:
+            except (IOError, OSError, RuntimeError, ValueError) as e:
                 print(f"Warning: Could not initialise radar: {e}")
                 self.radar = None
 
@@ -702,7 +702,7 @@ class OpenTPT:
                 else:
                     print("Warning: Encoder not detected")
                     self.encoder = None
-            except Exception as e:
+            except (IOError, OSError, RuntimeError, ValueError) as e:
                 print(f"Warning: Could not initialise encoder: {e}")
                 self.encoder = None
         print(f"[BOOT] encoder init done t={time.time()-_boot_start:.1f}s", flush=True)
@@ -746,7 +746,7 @@ class OpenTPT:
                 else:
                     print("Warning: NeoDriver not detected")
                     self.neodriver = None
-            except Exception as e:
+            except (IOError, OSError, RuntimeError, ValueError) as e:
                 print(f"Warning: Could not initialise NeoDriver: {e}")
                 self.neodriver = None
         print(f"[BOOT] neodriver init done t={time.time()-_boot_start:.1f}s", flush=True)
@@ -770,7 +770,7 @@ class OpenTPT:
                 self.imu = IMUHandler()
                 self.imu.start()
                 print("IMU handler initialised for G-meter")
-            except Exception as e:
+            except (IOError, OSError, RuntimeError, ValueError) as e:
                 print(f"Warning: Could not initialise IMU: {e}")
                 self.imu = None
 
@@ -782,7 +782,7 @@ class OpenTPT:
             try:
                 self.obd2 = OBD2Handler()
                 print("OBD2 handler initialised for vehicle speed")
-            except Exception as e:
+            except (IOError, OSError, RuntimeError, ValueError) as e:
                 print(f"Warning: Could not initialise OBD2: {e}")
                 self.obd2 = None
         else:
@@ -794,7 +794,7 @@ class OpenTPT:
             try:
                 self.gps = GPSHandler()
                 print("GPS handler initialised for speed")
-            except Exception as e:
+            except (IOError, OSError, RuntimeError, ValueError) as e:
                 print(f"Warning: Could not initialise GPS: {e}")
                 self.gps = None
         else:
@@ -808,7 +808,7 @@ class OpenTPT:
                 self.lap_timing.start()
                 self.lap_timing_display.set_handler(self.lap_timing)
                 print("Lap timing handler initialised")
-            except Exception as e:
+            except (IOError, OSError, RuntimeError, ValueError) as e:
                 print(f"Warning: Could not initialise lap timing: {e}")
                 self.lap_timing = None
         else:
@@ -822,7 +822,7 @@ class OpenTPT:
                 self.ford_hybrid = FordHybridHandler()
                 self.ford_hybrid.initialize()
                 print("Ford Hybrid handler initialised for battery SOC")
-            except Exception as e:
+            except (IOError, OSError, RuntimeError, ValueError) as e:
                 print(f"Warning: Could not initialise Ford Hybrid: {e}")
                 self.ford_hybrid = None
         else:
@@ -946,8 +946,8 @@ class OpenTPT:
                     f.write(f"Error: {e}\n\n")
                     traceback.print_exc(file=f)
                 print("Crash log written to /tmp/opentpt_crash.log")
-            except Exception:
-                pass
+            except (IOError, OSError):
+                pass  # Can't write crash log - filesystem issue
         finally:
             self._cleanup()
 

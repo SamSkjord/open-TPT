@@ -506,6 +506,7 @@ openTPT/
 - [ ] G-meter settings - reset peaks, max G range, history duration
 - [x] Radar settings - enable/disable, sensitivity, overlay options, invert for upside-down mounting
 - [x] System info - IP address, storage space, uptime, sensor status
+- [ ] Pi power status/throttling - show vcgencmd get_throttled status on system info page (undervoltage, current throttling)
 - [ ] Network/WiFi menu - connect for remote access
 - [ ] Calibration menu - IMU zero offset
 - [x] Power menu - screen timeout, safe shutdown

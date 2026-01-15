@@ -255,7 +255,7 @@ def scale_size(size):
 
 # Font settings (scaled)
 FONT_SIZE_LARGE = int(60 * min(SCALE_X, SCALE_Y))
-FONT_SIZE_MEDARGE = int(45 * min(SCALE_X, SCALE_Y))
+FONT_SIZE_MEDARGE = int(24 * min(SCALE_X, SCALE_Y))  # TPMS pressure font
 FONT_SIZE_MEDIUM = int(24 * min(SCALE_X, SCALE_Y))
 FONT_SIZE_SMALL = int(18 * min(SCALE_X, SCALE_Y))
 

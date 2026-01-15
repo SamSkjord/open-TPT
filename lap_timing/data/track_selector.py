@@ -237,7 +237,7 @@ class TrackSelector:
 
             conn.close()
 
-        except Exception as e:
+        except (sqlite3.Error, IOError, OSError) as e:
             print(f"Warning: Error querying {db_path}: {e}")
 
         return results
@@ -454,7 +454,7 @@ class TrackSelector:
                     print("\nPlease be more specific")
                     return None
 
-            except Exception as e:
+            except (sqlite3.Error, IOError, OSError) as e:
                 print(f"Warning: Error searching {db_path}: {e}")
 
         print(f"No track found matching '{track_name}'")
@@ -500,7 +500,7 @@ class TrackSelector:
 
                 total += len(tracks)
 
-            except Exception as e:
+            except (sqlite3.Error, IOError, OSError) as e:
                 print(f"Warning: Error listing tracks from {db_path}: {e}")
 
         print(f"\nTotal: {total} tracks")
@@ -535,7 +535,7 @@ class TrackSelector:
 
                 conn.close()
 
-            except Exception as e:
+            except (sqlite3.Error, IOError, OSError) as e:
                 print(f"Warning: Error getting stats from {db_path}: {e}")
 
         return stats

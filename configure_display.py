@@ -41,7 +41,7 @@ def main():
         try:
             with open(config_path, "r") as f:
                 current_config = json.load(f)
-        except Exception as e:
+        except (json.JSONDecodeError, IOError, OSError) as e:
             print(f"Error loading config: {e}")
             current_config = default_config
     else:
@@ -88,11 +88,11 @@ def main():
                         json.dump(current_config, f, indent=4)
                     print("\nDisplay configuration updated.")
                     print("Please restart openTPT for changes to take effect.")
-                except Exception as e:
+                except (IOError, OSError) as e:
                     print(f"Error saving config: {e}")
             else:
                 print("Resolution not updated.")
-        except Exception as e:
+        except (pygame.error, RuntimeError) as e:
             print(f"Error detecting display resolution: {e}")
             print("Please specify resolution manually with --width and --height.")
         return
@@ -108,7 +108,7 @@ def main():
                 json.dump(current_config, f, indent=4)
             print(f"\nDisplay resolution set to {args.width}x{args.height}.")
             print("Please restart openTPT for changes to take effect.")
-        except Exception as e:
+        except (IOError, OSError) as e:
             print(f"Error saving config: {e}")
     elif args.width or args.height:
         print("Error: Both --width and --height must be specified together.")

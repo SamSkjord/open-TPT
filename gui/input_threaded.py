@@ -63,12 +63,15 @@ class InputHandlerThreaded:
         }
         self.debounce_time = 0.2  # seconds
 
-        # UI visibility state variables
-        self.ui_visible = True
-        self.ui_manually_toggled = False
+        # UI visibility state variables (protected by state_lock)
+        self._ui_visible = True
+        self._ui_manually_toggled = False
 
-        # Recording state (set by main app via set_recording())
+        # Recording state (set by main app via set_recording(), protected by state_lock)
         self._recording = False
+
+        # Lock for shared state (ui_visible, ui_manually_toggled, recording)
+        self._state_lock = threading.Lock()
 
         # Recording button hold tracking
         self.recording_button_hold_start = 0.0
@@ -111,7 +114,7 @@ class InputHandlerThreaded:
                 print("NeoKey 1x4 initialised successfully")
                 return
 
-            except Exception as e:
+            except (IOError, OSError, RuntimeError, ValueError) as e:
                 print(f"NeoKey init attempt {attempt + 1}/{max_retries} failed: {e}")
                 self.neokey = None
 
@@ -244,6 +247,10 @@ class InputHandlerThreaded:
         if not self.neokey:
             return
 
+        # Read recording state once with lock to avoid multiple acquisitions
+        with self._state_lock:
+            is_recording = self._recording
+
         try:
             # Button 0: Recording (green when recording, red when idle)
             if self.button_states[BUTTON_RECORDING] and not self.recording_button_triggered:
@@ -254,7 +261,7 @@ class InputHandlerThreaded:
                 g = int(128 + 127 * progress)
                 b = int(255 * progress)
                 self.neokey.pixels[BUTTON_RECORDING] = (255, g, b)
-            elif self._recording:
+            elif is_recording:
                 self.neokey.pixels[BUTTON_RECORDING] = (0, 255, 0)  # Solid green when recording
             else:
                 self.neokey.pixels[BUTTON_RECORDING] = (64, 0, 0)  # Dim red when idle
@@ -275,14 +282,40 @@ class InputHandlerThreaded:
 
     @property
     def recording(self):
-        """Get recording state."""
-        return self._recording
+        """Get recording state (thread-safe)."""
+        with self._state_lock:
+            return self._recording
 
     @recording.setter
     def recording(self, value):
-        """Set recording state and force LED update."""
-        self._recording = value
+        """Set recording state and force LED update (thread-safe)."""
+        with self._state_lock:
+            self._recording = value
         self._update_leds()
+
+    @property
+    def ui_visible(self):
+        """Get UI visibility state (thread-safe)."""
+        with self._state_lock:
+            return self._ui_visible
+
+    @ui_visible.setter
+    def ui_visible(self, value):
+        """Set UI visibility state (thread-safe)."""
+        with self._state_lock:
+            self._ui_visible = value
+
+    @property
+    def ui_manually_toggled(self):
+        """Get UI manually toggled state (thread-safe)."""
+        with self._state_lock:
+            return self._ui_manually_toggled
+
+    @ui_manually_toggled.setter
+    def ui_manually_toggled(self, value):
+        """Set UI manually toggled state (thread-safe)."""
+        with self._state_lock:
+            self._ui_manually_toggled = value
 
     def check_input(self):
         """
@@ -309,15 +342,16 @@ class InputHandlerThreaded:
         return events
 
     def toggle_ui_visibility(self):
-        """Toggle the visibility of UI elements."""
-        if not self.ui_manually_toggled or not self.ui_visible:
-            # Switching from auto mode to manual ON, or turning ON
-            self.ui_visible = True
-            self.ui_manually_toggled = True
-        else:
-            # Manual ON -> Manual OFF
-            self.ui_visible = False
-            self.ui_manually_toggled = True
+        """Toggle the visibility of UI elements (thread-safe)."""
+        with self._state_lock:
+            if not self._ui_manually_toggled or not self._ui_visible:
+                # Switching from auto mode to manual ON, or turning ON
+                self._ui_visible = True
+                self._ui_manually_toggled = True
+            else:
+                # Manual ON -> Manual OFF
+                self._ui_visible = False
+                self._ui_manually_toggled = True
 
     def _find_closest_brightness_index(self, brightness_value):
         """Find the index of the closest brightness preset to the given value."""
