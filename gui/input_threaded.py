@@ -352,21 +352,20 @@ class InputHandlerThreaded:
 
     def simulate_button_press(self, button_index):
         """Simulate a button press (for keyboard input testing)."""
-        current_time = time.time()
+        events = {}
+        if button_index == BUTTON_VIEW_MODE:
+            events["view_mode"] = True
+        elif button_index == BUTTON_CATEGORY_SWITCH:
+            events["category_switch"] = True
+        elif button_index == BUTTON_PAGE_SETTINGS:
+            events["page_settings"] = True
 
-        if button_index == BUTTON_BRIGHTNESS_UP:
-            self.increase_brightness()
-        elif button_index == BUTTON_BRIGHTNESS_DOWN:
-            self.decrease_brightness()
-        elif button_index == BUTTON_CAMERA_TOGGLE and self.camera:
-            self.camera.toggle()
-        elif button_index == BUTTON_RESERVED:
-            # If camera is active, switch between cameras
-            # Otherwise, toggle UI visibility
-            if self.camera and self.camera.is_active():
-                self.camera.switch_camera()
-            else:
-                self.toggle_ui_visibility()
+        if events:
+            with self.event_lock:
+                self.event_queue.append({
+                    "events": events,
+                    "timestamp": time.time()
+                })
 
         # Request LED update
         self.request_led_update()

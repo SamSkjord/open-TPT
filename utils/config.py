@@ -135,6 +135,14 @@ CAMERA_FRONT_ENABLED = True  # Front camera (no radar overlay)
 CAMERA_REAR_DEVICE = "/dev/video-rear"  # or None for auto-detect
 CAMERA_FRONT_DEVICE = "/dev/video-front"  # or None for auto-detect
 
+# Camera transform settings
+# Mirror: horizontally flip the image (True = rear-view mirror effect)
+# Rotate: rotate image clockwise (0, 90, 180, 270 degrees)
+CAMERA_REAR_MIRROR = True   # Default True for rear-view mirror effect
+CAMERA_REAR_ROTATE = 0      # 0, 90, 180, 270 degrees
+CAMERA_FRONT_MIRROR = False  # Default False for normal view
+CAMERA_FRONT_ROTATE = 0      # 0, 90, 180, 270 degrees
+
 # ==============================================================================
 # DISPLAY SCALING (computed at startup)
 # ==============================================================================

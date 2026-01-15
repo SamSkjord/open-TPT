@@ -21,6 +21,7 @@ from utils.config import (
     WHITE,
     BLACK,
     GREY,
+    BUTTON_VIEW_MODE,
 )
 
 # Import NeoDriver types for menu
@@ -315,7 +316,7 @@ class MenuSystem:
     Manages the root menu and all submenus for openTPT.
     """
 
-    def __init__(self, tpms_handler=None, encoder_handler=None, input_handler=None, neodriver_handler=None, imu_handler=None, gps_handler=None, radar_handler=None):
+    def __init__(self, tpms_handler=None, encoder_handler=None, input_handler=None, neodriver_handler=None, imu_handler=None, gps_handler=None, radar_handler=None, camera_handler=None):
         """
         Initialise the menu system.
 
@@ -327,6 +328,7 @@ class MenuSystem:
             imu_handler: IMU handler for G-meter calibration
             gps_handler: GPS handler for speed and position
             radar_handler: Radar handler for Toyota radar
+            camera_handler: Camera handler for camera settings
         """
         self.tpms_handler = tpms_handler
         self.encoder_handler = encoder_handler
@@ -335,6 +337,7 @@ class MenuSystem:
         self.imu_handler = imu_handler
         self.gps_handler = gps_handler
         self.radar_handler = radar_handler
+        self.camera_handler = camera_handler
         self.current_menu: Optional[Menu] = None
         self.root_menu: Optional[Menu] = None
 
@@ -511,6 +514,13 @@ class MenuSystem:
         ))
         radar_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
 
+        # Camera submenu
+        camera_menu = Menu("Camera")
+        camera_menu.add_item(MenuItem("Rear Camera", action=lambda: self._show_camera_menu('rear')))
+        camera_menu.add_item(MenuItem("Front Camera", action=lambda: self._show_camera_menu('front')))
+        camera_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        self.camera_menu = camera_menu  # Store reference for dynamic submenus
+
         # System Status submenu
         status_menu = Menu("System Status")
         status_menu.add_item(MenuItem(
@@ -555,6 +565,7 @@ class MenuSystem:
         self.root_menu.add_item(MenuItem("Bluetooth", submenu=bt_menu))
         self.root_menu.add_item(MenuItem("Display", submenu=display_menu))
         self.root_menu.add_item(MenuItem("Light Strip", submenu=lights_menu))
+        self.root_menu.add_item(MenuItem("Camera", submenu=camera_menu))
         self.root_menu.add_item(MenuItem("Radar", submenu=radar_menu))
         self.root_menu.add_item(MenuItem("System", submenu=system_menu))
         self.root_menu.add_item(MenuItem("Back", action=lambda: self._close_menu()))
@@ -564,6 +575,7 @@ class MenuSystem:
         bt_menu.parent = self.root_menu
         display_menu.parent = self.root_menu
         lights_menu.parent = self.root_menu
+        camera_menu.parent = self.root_menu
         radar_menu.parent = self.root_menu
         system_menu.parent = self.root_menu
         status_menu.parent = system_menu
@@ -1381,6 +1393,108 @@ class MenuSystem:
         if not self.radar_handler:
             return "Channel: --"
         return f"Channel: {self.radar_handler.radar_channel}"
+
+    # Camera methods
+    def _show_camera_menu(self, camera_name: str) -> str:
+        """Show camera settings submenu and switch to that camera."""
+        if self.camera_handler:
+            # Turn on camera view if not active (use input handler to switch view mode)
+            if not self.camera_handler.active and self.input_handler:
+                self.input_handler.simulate_button_press(BUTTON_VIEW_MODE)
+            # Switch to the selected camera if needed
+            if self.camera_handler.current_camera != camera_name:
+                self.camera_handler.switch_camera()
+
+        # Build dynamic camera submenu
+        title = f"{camera_name.capitalize()} Camera"
+        cam_menu = Menu(title)
+
+        # Status info (read-only)
+        cam_menu.add_item(MenuItem(
+            "FPS",
+            dynamic_label=lambda n=camera_name: self._get_camera_fps_label(n),
+            enabled=False
+        ))
+        cam_menu.add_item(MenuItem(
+            "Status",
+            dynamic_label=lambda n=camera_name: self._get_camera_status_label(n),
+            enabled=False
+        ))
+
+        # Settings
+        cam_menu.add_item(MenuItem(
+            "Mirror",
+            dynamic_label=lambda n=camera_name: self._get_camera_mirror_label(n),
+            action=lambda n=camera_name: self._toggle_camera_mirror(n)
+        ))
+        cam_menu.add_item(MenuItem(
+            "Rotate",
+            dynamic_label=lambda n=camera_name: self._get_camera_rotate_label(n),
+            action=lambda n=camera_name: self._cycle_camera_rotate(n)
+        ))
+        cam_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        cam_menu.parent = self.camera_menu
+
+        # Switch to camera menu
+        self.current_menu.hide()
+        self.current_menu = cam_menu
+        cam_menu.show()
+        return ""
+
+    def _get_camera_fps_label(self, camera_name: str) -> str:
+        """Get camera FPS label."""
+        if not self.camera_handler:
+            return "FPS: N/A"
+        if not self.camera_handler.active:
+            return "FPS: -- (camera off)"
+        # Only show FPS if this is the active camera
+        if self.camera_handler.current_camera != camera_name:
+            return f"FPS: -- (showing {self.camera_handler.current_camera})"
+        fps = self.camera_handler.fps
+        return f"FPS: {fps:.1f}"
+
+    def _get_camera_status_label(self, camera_name: str) -> str:
+        """Get camera status label."""
+        if not self.camera_handler:
+            return "Status: No handler"
+        if not self.camera_handler.active:
+            return "Status: Camera off"
+        # Check if this is the active camera
+        if self.camera_handler.current_camera != camera_name:
+            return f"Status: Not selected"
+        if self.camera_handler.error_message:
+            return f"Status: {self.camera_handler.error_message[:20]}"
+        if self.camera_handler.thread_running:
+            return "Status: Running"
+        return "Status: Stopped"
+
+    def _get_camera_mirror_label(self, camera_name: str) -> str:
+        """Get mirror setting label for a camera."""
+        if not self.camera_handler:
+            return "Mirror: N/A"
+        mirror = self.camera_handler.get_mirror(camera_name)
+        return f"Mirror: {'On' if mirror else 'Off'}"
+
+    def _toggle_camera_mirror(self, camera_name: str) -> str:
+        """Toggle mirror setting for a camera."""
+        if not self.camera_handler:
+            return "Camera not available"
+        new_value = self.camera_handler.toggle_mirror(camera_name)
+        return f"Mirror {'enabled' if new_value else 'disabled'}"
+
+    def _get_camera_rotate_label(self, camera_name: str) -> str:
+        """Get rotation setting label for a camera."""
+        if not self.camera_handler:
+            return "Rotate: N/A"
+        rotate = self.camera_handler.get_rotate(camera_name)
+        return f"Rotate: {rotate}deg"
+
+    def _cycle_camera_rotate(self, camera_name: str) -> str:
+        """Cycle rotation setting for a camera (0 -> 90 -> 180 -> 270 -> 0)."""
+        if not self.camera_handler:
+            return "Camera not available"
+        new_value = self.camera_handler.cycle_rotate(camera_name)
+        return f"Rotation: {new_value}deg"
 
     # System Status methods
     def _get_system_ip_label(self) -> str:

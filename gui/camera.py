@@ -15,6 +15,10 @@ from utils.config import (
     CAMERA_HEIGHT,
     CAMERA_FPS,
     FONT_PATH,
+    CAMERA_REAR_MIRROR,
+    CAMERA_REAR_ROTATE,
+    CAMERA_FRONT_MIRROR,
+    CAMERA_FRONT_ROTATE,
 )
 
 # Optional import - only needed for actual camera functionality
@@ -85,6 +89,18 @@ class Camera:
         self.last_time = time.time()
         self.update_interval = 1.0  # Update FPS every 1 second
 
+        # Camera transform settings (runtime modifiable)
+        self.camera_settings = {
+            'rear': {
+                'mirror': CAMERA_REAR_MIRROR,
+                'rotate': CAMERA_REAR_ROTATE,
+            },
+            'front': {
+                'mirror': CAMERA_FRONT_MIRROR,
+                'rotate': CAMERA_FRONT_ROTATE,
+            },
+        }
+
     @property
     def camera(self):
         """Get the currently active camera object."""
@@ -94,6 +110,44 @@ class Camera:
     def camera(self, value):
         """Set the currently active camera object."""
         self.cameras[self.current_camera] = value
+
+    def get_mirror(self, camera_name: str = None) -> bool:
+        """Get mirror setting for a camera."""
+        name = camera_name or self.current_camera
+        return self.camera_settings.get(name, {}).get('mirror', False)
+
+    def set_mirror(self, value: bool, camera_name: str = None):
+        """Set mirror setting for a camera."""
+        name = camera_name or self.current_camera
+        if name in self.camera_settings:
+            self.camera_settings[name]['mirror'] = value
+
+    def toggle_mirror(self, camera_name: str = None) -> bool:
+        """Toggle mirror setting for a camera. Returns new value."""
+        name = camera_name or self.current_camera
+        current = self.get_mirror(name)
+        self.set_mirror(not current, name)
+        return not current
+
+    def get_rotate(self, camera_name: str = None) -> int:
+        """Get rotation setting for a camera (0, 90, 180, 270)."""
+        name = camera_name or self.current_camera
+        return self.camera_settings.get(name, {}).get('rotate', 0)
+
+    def set_rotate(self, value: int, camera_name: str = None):
+        """Set rotation setting for a camera (0, 90, 180, 270)."""
+        name = camera_name or self.current_camera
+        if name in self.camera_settings:
+            # Normalise to valid values
+            self.camera_settings[name]['rotate'] = value % 360
+
+    def cycle_rotate(self, camera_name: str = None) -> int:
+        """Cycle rotation setting (0 -> 90 -> 180 -> 270 -> 0). Returns new value."""
+        name = camera_name or self.current_camera
+        current = self.get_rotate(name)
+        new_value = (current + 90) % 360
+        self.set_rotate(new_value, name)
+        return new_value
 
     def switch_camera(self):
         """Switch between rear and front cameras."""
@@ -202,7 +256,7 @@ class Camera:
         thread_start_time = time.time()
 
         # Profiling variables
-        profile_times = {'grab': 0, 'retrieve': 0, 'flip': 0, 'cvt': 0, 'resize': 0, 'queue': 0}
+        profile_times = {'grab': 0, 'retrieve': 0, 'transform': 0, 'cvt': 0, 'resize': 0, 'queue': 0}
         profile_count = 0
 
         # Debug counters
@@ -235,17 +289,29 @@ class Camera:
                 # Pre-process frame for direct rendering
                 try:
                     t3 = time.time()
-                    # Only flip rear camera (front camera should show normal view)
-                    if self.current_camera == 'rear':
+                    # Apply camera transforms (rotate then mirror)
+                    settings = self.camera_settings.get(self.current_camera, {})
+                    rotate = settings.get('rotate', 0)
+                    mirror = settings.get('mirror', False)
+
+                    # Apply rotation
+                    if rotate == 90:
+                        frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+                    elif rotate == 180:
+                        frame = cv2.rotate(frame, cv2.ROTATE_180)
+                    elif rotate == 270:
+                        frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+
+                    # Apply mirror (horizontal flip)
+                    if mirror:
                         frame = cv2.flip(frame, 1)
-                        profile_times['flip'] += (t3 - t2) * 1000
-                    else:
-                        # No flip for front camera
-                        profile_times['flip'] += 0  # Track as 0ms for profiling
+
+                    t3b = time.time()
+                    profile_times['transform'] += (t3b - t3) * 1000
 
                     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     t4 = time.time()
-                    profile_times['cvt'] += (t4 - t3) * 1000
+                    profile_times['cvt'] += (t4 - t3b) * 1000
 
                     # Resize using fastest interpolation
                     resized_frame = cv2.resize(
@@ -290,12 +356,12 @@ class Camera:
                         if profile_count > 0:
                             print(f"  Capture profile (avg ms): grab={profile_times['grab']/profile_count:.1f}, "
                                   f"retrieve={profile_times['retrieve']/profile_count:.1f}, "
-                                  f"flip={profile_times['flip']/profile_count:.1f}, "
+                                  f"transform={profile_times['transform']/profile_count:.1f}, "
                                   f"cvt={profile_times['cvt']/profile_count:.1f}, "
                                   f"resize={profile_times['resize']/profile_count:.1f}, "
                                   f"queue={profile_times['queue']/profile_count:.1f}")
                             # Reset profiling
-                            profile_times = {'grab': 0, 'retrieve': 0, 'flip': 0, 'cvt': 0, 'resize': 0, 'queue': 0}
+                            profile_times = {'grab': 0, 'retrieve': 0, 'transform': 0, 'cvt': 0, 'resize': 0, 'queue': 0}
                             profile_count = 0
                         thread_frame_count = 0
                         thread_start_time = time.time()

@@ -487,7 +487,7 @@ openTPT/
 - [ ] CopePilot integration
 - [ ] TPMS menu expansion - swap corners, view sensor data
 - [ ] Tyre temps menu - corner sensor details, full frame view for installation verification, flip inner/outer
-- [ ] Camera view options - mirror, rotate settings for front/rear cameras
+- [x] Camera view options - mirror, rotate settings for front/rear cameras
 - [ ] Units menu - °C/°F, PSI/BAR/kPa, km/h/mph switching
 - [ ] Alerts/Warnings menu - temperature/pressure thresholds for visual warnings
 - [ ] Recording settings - output directory, auto-start on motion detection
@@ -496,7 +496,7 @@ openTPT/
 - [x] System info - IP address, storage space, uptime, sensor status
 - [ ] Network/WiFi menu - connect for remote access
 - [ ] Calibration menu - IMU zero offset
-- [ ] Power menu - screen timeout, safe shutdown
+- [x] Power menu - screen timeout, safe shutdown
 - [ ] Track selection - for lap timing (requires GPS)
 - [ ] Config persistence - safely write settings to config file when changed
 - [ ] Installer improvements - add GPS UART setup (enable_uart=1) and NTP time sync configuration
