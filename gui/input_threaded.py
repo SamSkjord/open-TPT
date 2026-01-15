@@ -320,10 +320,10 @@ class InputHandlerThreaded:
     def check_input(self):
         """
         Check for button press events (called from main thread).
-        Returns the latest event or empty dict if none.
+        Merges all queued events to avoid losing button presses.
 
         Returns:
-            dict: Dictionary with events that occurred
+            dict: Dictionary with events that occurred (True if any event fired)
         """
         events = {
             "recording_toggle": False,
@@ -332,12 +332,13 @@ class InputHandlerThreaded:
             "view_mode": False,
         }
 
-        # Get latest event from queue (non-blocking)
+        # Merge all queued events (any True wins) to avoid losing button presses
         with self.event_lock:
-            if self.event_queue:
-                latest = self.event_queue[-1]
-                events.update(latest["events"])
-                self.event_queue.clear()  # Clear queue after reading
+            for event_entry in self.event_queue:
+                for key, value in event_entry["events"].items():
+                    if value:
+                        events[key] = True
+            self.event_queue.clear()
 
         return events
 

@@ -100,14 +100,14 @@ class PerformanceMonitor:
 
     def _check_performance_targets(self, render_time_ms: float, frame_time_ms: float):
         """Check if performance targets are being met."""
-        # Target: ≤ 12 ms/frame
-        if render_time_ms > 12.0:
+        # Target: ≤ 33 ms/frame (30 FPS)
+        if render_time_ms > 33.0:
             self.warnings.append({
                 "timestamp": time.time(),
                 "type": "RENDER_SLOW",
                 "value": render_time_ms,
-                "target": 12.0,
-                "message": f"Render time {render_time_ms:.2f}ms exceeds target 12ms"
+                "target": 33.0,
+                "message": f"Render time {render_time_ms:.2f}ms exceeds target 33ms"
             })
 
         # Target: 30-60 FPS (16.67-33.33 ms/frame)

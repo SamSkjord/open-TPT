@@ -978,16 +978,17 @@ class OpenTPT:
                 elif event.key == pygame.K_RIGHT:
                     self.input_handler.simulate_button_press(BUTTON_VIEW_MODE)
 
-                if event.type in (
-                    pygame.KEYDOWN,
-                    pygame.MOUSEBUTTONDOWN,
-                    pygame.MOUSEMOTION,
-                ):
-                    self.ui_last_interaction_time = time.time()
-                    if not self.input_handler.ui_manually_toggled:
-                        self.input_handler.ui_visible = True
-                        self.ui_fade_alpha = 255
-                        self.ui_fading = False
+            # Reset UI auto-hide timer on any user interaction
+            if event.type in (
+                pygame.KEYDOWN,
+                pygame.MOUSEBUTTONDOWN,
+                pygame.MOUSEMOTION,
+            ):
+                self.ui_last_interaction_time = time.time()
+                if not self.input_handler.ui_manually_toggled:
+                    self.input_handler.ui_visible = True
+                    self.ui_fade_alpha = 255
+                    self.ui_fading = False
 
     def _update_ui_visibility(self):
         """Update UI visibility based on timer and manual toggle state."""
@@ -1547,11 +1548,13 @@ class OpenTPT:
             # Render the telemetry page (default UI view)
             self._update_ui_visibility()
 
+            # Capture timestamp once for all stale data checks this frame
+            now = time.time()
+
             # Get brake temperatures (LOCK-FREE snapshot access)
             # Uses stale data cache to prevent flashing when display fps > data fps
             t0 = time.time()
             brake_temps = self.brakes.get_temps()
-            now = time.time()
 
             for position, data in brake_temps.items():
                 if isinstance(data, dict):
@@ -1565,7 +1568,6 @@ class OpenTPT:
 
                 # Mock data for testing dual-zone display
                 if BRAKE_DUAL_ZONE_MOCK:
-                    import math
                     t = now * 0.5  # Slow oscillation
                     base = 150 + 100 * math.sin(t)
                     inner = base + 30 * math.sin(t * 2)
@@ -1594,7 +1596,6 @@ class OpenTPT:
             # Get thermal camera data (LOCK-FREE snapshot access)
             # Uses stale data cache to prevent flashing when display fps > data fps
             t0 = time.time()
-            now = time.time()
             for position in ["FL", "FR", "RL", "RR"]:
                 thermal_data = self.thermal.get_thermal_data(position)
                 if thermal_data is not None:
@@ -1625,7 +1626,6 @@ class OpenTPT:
             # Uses stale data cache to prevent flashing when display fps > data fps
             if TOF_ENABLED:
                 t0 = time.time()
-                now = time.time()
                 for position in ["FL", "FR", "RL", "RR"]:
                     distance = self.thermal.get_tof_distance(position)
                     min_distance = self.thermal.get_tof_min_distance(position)

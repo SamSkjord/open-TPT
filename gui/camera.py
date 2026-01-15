@@ -488,7 +488,8 @@ class Camera:
             self.thread_running = False
             if self.capture_thread and self.capture_thread.is_alive():
                 self.capture_thread.join(timeout=1.0)
-            while not self.frame_queue.empty():
+            # Drain queue without TOCTOU race (don't check empty() before get())
+            while True:
                 try:
                     self.frame_queue.get_nowait()
                 except queue.Empty:

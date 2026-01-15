@@ -69,7 +69,7 @@ class BoundedQueueHardwareHandler:
         """Stop the hardware reading thread."""
         self.running = False
         if self.thread:
-            self.thread.join(timeout=1.0)
+            self.thread.join(timeout=5.0)  # Allow time for I2C operations to complete
         print(f"{self.__class__.__name__} worker thread stopped")
 
     def _worker_loop(self):
