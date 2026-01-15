@@ -56,6 +56,10 @@ from utils.config import (
     TOF_DISTANCE_MAX,
     # ROTATION,
 )
+from utils.settings import get_settings
+
+# Get settings singleton for unit preferences
+_settings = get_settings()
 
 
 # Unit conversion functions
@@ -786,19 +790,23 @@ class Display:
 
     def get_unit_strings(self):
         """
-        Get the current unit strings for display.
+        Get the current unit strings for display from persistent settings.
 
         Returns:
             tuple: (temp_unit_string, pressure_unit_string)
         """
-        if TEMP_UNIT == "F":
+        # Read from persistent settings (with config.py as defaults)
+        temp_setting = _settings.get("units.temp", TEMP_UNIT)
+        pressure_setting = _settings.get("units.pressure", PRESSURE_UNIT)
+
+        if temp_setting == "F":
             temp_unit = "°F"
         else:
             temp_unit = "°C"
 
-        if PRESSURE_UNIT == "BAR":
+        if pressure_setting == "BAR":
             pressure_unit = "BAR"
-        elif PRESSURE_UNIT == "KPA":
+        elif pressure_setting == "KPA":
             pressure_unit = "kPa"
         else:
             pressure_unit = "PSI"

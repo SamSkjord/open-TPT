@@ -21,7 +21,9 @@ from utils.config import (
     FONT_PATH,
     SCALE_X,
     SCALE_Y,
+    SPEED_UNIT,
 )
+from utils.settings import get_settings
 
 
 class GMeterDisplay:
@@ -69,10 +71,13 @@ class GMeterDisplay:
         # Peak tracking
         self.reset_peaks()
 
+        # Persistent settings for unit preferences
+        self._settings = get_settings()
+
         # Current G values (smoothed)
         self.current_lateral = 0.0
         self.current_longitudinal = 0.0
-        self.current_speed = 0  # km/h (placeholder for future OBD2/GPS)
+        self.current_speed_kmh = 0  # Always stored in km/h internally
 
         # Smoothing factor (0.0 = no smoothing, 1.0 = infinite smoothing)
         # 0.7 gives good balance between responsiveness and stability
@@ -370,18 +375,26 @@ class GMeterDisplay:
         screen.blit(text_peak_long, (x_pos, y_pos))
 
     def _draw_speed(self, screen):
-        """Draw speed (placeholder for future OBD2/GPS integration)."""
-        # Position for speed (bottom right)
-        x_pos = self.width - int(150 * SCALE_X)
+        """Draw speed with unit conversion based on user settings."""
+        # Get speed unit preference (check each frame for live updates)
+        speed_unit = self._settings.get("units.speed", SPEED_UNIT)
+
+        # Convert speed based on unit preference
+        if speed_unit == "MPH":
+            display_speed = int(self.current_speed_kmh * 0.621371)
+            unit_label = "mph"
+        else:
+            display_speed = int(self.current_speed_kmh)
+            unit_label = "km/h"
 
         # Speed display (xlarge font)
-        text_speed = self.font_xlarge.render(f"{self.current_speed}", True, WHITE)
+        text_speed = self.font_xlarge.render(f"{display_speed}", True, WHITE)
         speed_rect = text_speed.get_rect()
         speed_rect.bottomright = (self.width - int(20 * SCALE_X), self.height - int(80 * SCALE_Y))
         screen.blit(text_speed, speed_rect)
 
         # Label (smaller, below speed)
-        text_label = self.font_small.render("km/h", True, GREY)
+        text_label = self.font_small.render(unit_label, True, GREY)
         label_rect = text_label.get_rect()
         label_rect.topright = (self.width - int(20 * SCALE_X), speed_rect.bottom + int(5 * SCALE_Y))
         screen.blit(text_label, label_rect)
@@ -395,9 +408,9 @@ class GMeterDisplay:
 
     def set_speed(self, speed_kmh):
         """
-        Set the current speed (for future OBD2/GPS integration).
+        Set the current speed.
 
         Args:
-            speed_kmh: Speed in km/h
+            speed_kmh: Speed in km/h (always pass km/h, conversion handled in display)
         """
-        self.current_speed = speed_kmh
+        self.current_speed_kmh = speed_kmh

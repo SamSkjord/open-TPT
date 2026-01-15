@@ -32,6 +32,7 @@ from utils.config import (
     PRESSURE_FRONT_OPTIMAL,
     PRESSURE_REAR_OPTIMAL,
 )
+from utils.settings import get_settings
 
 
 class ScaleBars:
@@ -65,14 +66,23 @@ class ScaleBars:
         self.tyre_bar_x = DISPLAY_WIDTH - self.padding - self.bar_width
         self.tyre_bar_y = (DISPLAY_HEIGHT - self.bar_height) // 2
 
-        # Get unit strings based on configuration
-        self.temp_unit_str = "°F" if TEMP_UNIT == "F" else "°C"
-        if PRESSURE_UNIT == "BAR":
-            self.pressure_unit_str = "BAR"
-        elif PRESSURE_UNIT == "KPA":
-            self.pressure_unit_str = "kPa"
+        # Persistent settings for unit preferences
+        self._settings = get_settings()
+
+    def _get_temp_unit_str(self) -> str:
+        """Get temperature unit string from settings."""
+        temp_unit = self._settings.get("units.temp", TEMP_UNIT)
+        return "°F" if temp_unit == "F" else "°C"
+
+    def _get_pressure_unit_str(self) -> str:
+        """Get pressure unit string from settings."""
+        pressure_unit = self._settings.get("units.pressure", PRESSURE_UNIT)
+        if pressure_unit == "BAR":
+            return "BAR"
+        elif pressure_unit == "KPA":
+            return "kPa"
         else:
-            self.pressure_unit_str = "PSI"
+            return "PSI"
 
     def _create_brake_colormap(self):
         """Create a colormap for brake temperature scale."""
@@ -565,7 +575,7 @@ class ScaleBars:
         )
 
         # Add unit label
-        unit_text = self.font_small.render(self.pressure_unit_str, True, WHITE)
+        unit_text = self.font_small.render(self._get_pressure_unit_str(), True, WHITE)
         self.surface.blit(
             unit_text,
             (

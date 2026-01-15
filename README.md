@@ -510,7 +510,7 @@ openTPT/
 - [ ] Calibration menu - IMU zero offset
 - [x] Power menu - screen timeout, safe shutdown
 - [ ] Track selection - for lap timing (requires GPS)
-- [ ] Config persistence - safely write settings to config file when changed
+- [x] Config persistence - persistent settings via ~/.opentpt_settings.json
 - [ ] Installer improvements - add GPS UART setup (enable_uart=1) and NTP time sync configuration
 
 ## Documentation
