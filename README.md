@@ -491,6 +491,8 @@ openTPT/
 - [x] Adafruit NeoDriver - LED strip control (delta, overtake, shift, rainbow modes)
 - [x] MCP9601 Thermocouples - brake temperature sensors (per corner)
 - [ ] LTR-559 Auto brightness - ambient light sensor for automatic display brightness (enable/disable + offset settings)
+- [ ] Mini OLED display - secondary display for delta time and fuel data
+- [ ] I2C bus reorganisation - main bus for IO, mux ch0 for external display/IO, ch1-4 for corners, ch5 for engine sensors, ch6 reserved (pedal sensors etc)
 
 ### Software TODO
 - [x] Bluetooth audio menu - scan, pair, connect, disconnect, forget (requires PulseAudio)
@@ -516,6 +518,7 @@ openTPT/
 - [ ] Configurable OBD2 PIDs - move to config.py with key, mode, pid, bytes, formula, priority, smoothing; support Mode 22/UDS for manufacturer-specific data (brake pressures, boost, oil temp)
 
 - [ ] Lap corner analysis logging - per lap, per corner: min speeds, yaw acceleration (from lap-timing-system)
+- [ ] Pitlane timer - countdown/countup timer for pitlane speed limits and pit stop duration
 
 ### Bugs
 - [ ] Camera settings menu always opens on rear camera even when front camera is selected
