@@ -22,6 +22,15 @@ from utils.config import (
     BLACK,
     GREY,
     BUTTON_VIEW_MODE,
+    UI_PAGES,
+    # Threshold defaults
+    TYRE_TEMP_COLD,
+    TYRE_TEMP_OPTIMAL,
+    TYRE_TEMP_HOT,
+    BRAKE_TEMP_OPTIMAL,
+    BRAKE_TEMP_HOT,
+    PRESSURE_FRONT_OPTIMAL,
+    PRESSURE_REAR_OPTIMAL,
 )
 from utils.settings import get_settings
 
@@ -340,6 +349,7 @@ class MenuSystem:
         gps_handler=None,
         radar_handler=None,
         camera_handler=None,
+        lap_timing_handler=None,
     ):
         """
         Initialise the menu system.
@@ -353,6 +363,7 @@ class MenuSystem:
             gps_handler: GPS handler for speed and position
             radar_handler: Radar handler for Toyota radar
             camera_handler: Camera handler for camera settings
+            lap_timing_handler: Lap timing handler for track selection
         """
         self.tpms_handler = tpms_handler
         self.encoder_handler = encoder_handler
@@ -362,6 +373,7 @@ class MenuSystem:
         self.gps_handler = gps_handler
         self.radar_handler = radar_handler
         self.camera_handler = camera_handler
+        self.lap_timing_handler = lap_timing_handler
         self.current_menu: Optional[Menu] = None
         self.root_menu: Optional[Menu] = None
 
@@ -394,6 +406,20 @@ class MenuSystem:
         self.temp_unit = self._settings.get("units.temp", TEMP_UNIT)
         self.pressure_unit = self._settings.get("units.pressure", PRESSURE_UNIT)
         self.speed_unit = self._settings.get("units.speed", SPEED_UNIT)
+
+        # Threshold editing mode (stores key being edited, or None)
+        self.threshold_editing = None
+
+        # Threshold definitions: key -> (settings_key, default, min, max, step, label)
+        self.thresholds = {
+            "tyre_cold": ("thresholds.tyre.cold", TYRE_TEMP_COLD, 0, 100, 5, "Cold"),
+            "tyre_optimal": ("thresholds.tyre.optimal", TYRE_TEMP_OPTIMAL, 20, 150, 5, "Optimal"),
+            "tyre_hot": ("thresholds.tyre.hot", TYRE_TEMP_HOT, 50, 200, 5, "Hot"),
+            "brake_optimal": ("thresholds.brake.optimal", BRAKE_TEMP_OPTIMAL, 50, 400, 10, "Optimal"),
+            "brake_hot": ("thresholds.brake.hot", BRAKE_TEMP_HOT, 100, 500, 10, "Hot"),
+            "pressure_front": ("thresholds.pressure.front", PRESSURE_FRONT_OPTIMAL, 15, 50, 0.5, "Front"),
+            "pressure_rear": ("thresholds.pressure.rear", PRESSURE_REAR_OPTIMAL, 15, 50, 0.5, "Rear"),
+        }
 
         self._build_menus()
 
@@ -454,6 +480,67 @@ class MenuSystem:
             )
         )
         display_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+
+        # Pages submenu - toggle which UI pages are in the rotation
+        pages_menu = Menu("Pages")
+        # Dynamically add menu items for each available page
+        for page_config in UI_PAGES:
+            page_id = page_config["id"]
+            page_name = page_config["name"]
+            # Use default parameters to capture current values in closure
+            pages_menu.add_item(
+                MenuItem(
+                    page_name,
+                    dynamic_label=lambda pid=page_id, pname=page_name: self._get_page_enabled_label(pid, pname),
+                    action=lambda pid=page_id: self._toggle_page_enabled(pid),
+                )
+            )
+        pages_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+
+        # Lap Timing submenu
+        lap_timing_menu = Menu("Lap Timing")
+        lap_timing_menu.add_item(
+            MenuItem(
+                "Enabled",
+                dynamic_label=lambda: self._get_lap_timing_enabled_label(),
+                action=lambda: self._toggle_lap_timing_enabled(),
+            )
+        )
+        lap_timing_menu.add_item(
+            MenuItem(
+                "Auto-Detect",
+                dynamic_label=lambda: self._get_lap_timing_auto_detect_label(),
+                action=lambda: self._toggle_lap_timing_auto_detect(),
+            )
+        )
+        lap_timing_menu.add_item(
+            MenuItem(
+                "Select Track",
+                action=lambda: self._show_track_selection_menu(),
+            )
+        )
+        lap_timing_menu.add_item(
+            MenuItem(
+                "Current Track",
+                dynamic_label=lambda: self._get_current_track_label(),
+                enabled=False,
+            )
+        )
+        lap_timing_menu.add_item(
+            MenuItem(
+                "Best Lap",
+                dynamic_label=lambda: self._get_best_lap_label(),
+                enabled=False,
+            )
+        )
+        lap_timing_menu.add_item(
+            MenuItem(
+                "Clear Best Laps",
+                action=lambda: self._clear_best_laps(),
+            )
+        )
+        lap_timing_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        self.lap_timing_menu = lap_timing_menu
 
         # Light Strip submenu (NeoDriver)
         lights_menu = Menu("Light Strip")
@@ -587,6 +674,13 @@ class MenuSystem:
                 enabled=False,
             )
         )
+        gps_menu.add_item(
+            MenuItem(
+                "Update Rate",
+                dynamic_label=lambda: self._get_gps_update_rate_label(),
+                enabled=False,
+            )
+        )
         gps_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
 
         # IMU calibration submenu (numbered steps - keep order)
@@ -671,10 +765,81 @@ class MenuSystem:
         )
         units_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
 
+        # Thresholds submenu
+        thresholds_menu = Menu("Thresholds")
+
+        # Tyre temperature thresholds
+        tyre_thresh_menu = Menu("Tyre Temps")
+        tyre_thresh_menu.add_item(
+            MenuItem(
+                "Cold",
+                dynamic_label=lambda: self._get_threshold_label("tyre_cold"),
+                action=lambda: self._toggle_threshold_editing("tyre_cold"),
+            )
+        )
+        tyre_thresh_menu.add_item(
+            MenuItem(
+                "Optimal",
+                dynamic_label=lambda: self._get_threshold_label("tyre_optimal"),
+                action=lambda: self._toggle_threshold_editing("tyre_optimal"),
+            )
+        )
+        tyre_thresh_menu.add_item(
+            MenuItem(
+                "Hot",
+                dynamic_label=lambda: self._get_threshold_label("tyre_hot"),
+                action=lambda: self._toggle_threshold_editing("tyre_hot"),
+            )
+        )
+        tyre_thresh_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+
+        # Brake temperature thresholds
+        brake_thresh_menu = Menu("Brake Temps")
+        brake_thresh_menu.add_item(
+            MenuItem(
+                "Optimal",
+                dynamic_label=lambda: self._get_threshold_label("brake_optimal"),
+                action=lambda: self._toggle_threshold_editing("brake_optimal"),
+            )
+        )
+        brake_thresh_menu.add_item(
+            MenuItem(
+                "Hot",
+                dynamic_label=lambda: self._get_threshold_label("brake_hot"),
+                action=lambda: self._toggle_threshold_editing("brake_hot"),
+            )
+        )
+        brake_thresh_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+
+        # Pressure thresholds
+        pressure_thresh_menu = Menu("Pressures")
+        pressure_thresh_menu.add_item(
+            MenuItem(
+                "Front Optimal",
+                dynamic_label=lambda: self._get_threshold_label("pressure_front"),
+                action=lambda: self._toggle_threshold_editing("pressure_front"),
+            )
+        )
+        pressure_thresh_menu.add_item(
+            MenuItem(
+                "Rear Optimal",
+                dynamic_label=lambda: self._get_threshold_label("pressure_rear"),
+                action=lambda: self._toggle_threshold_editing("pressure_rear"),
+            )
+        )
+        pressure_thresh_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+
+        # Add submenus to thresholds menu
+        thresholds_menu.add_item(MenuItem("Tyre Temps", submenu=tyre_thresh_menu))
+        thresholds_menu.add_item(MenuItem("Brake Temps", submenu=brake_thresh_menu))
+        thresholds_menu.add_item(MenuItem("Pressures", submenu=pressure_thresh_menu))
+        thresholds_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+
         # System menu (alphabetical)
         system_menu = Menu("System")
         system_menu.add_item(MenuItem("Status", submenu=status_menu))
         system_menu.add_item(MenuItem("GPS Status", submenu=gps_menu))
+        system_menu.add_item(MenuItem("Thresholds", submenu=thresholds_menu))
         system_menu.add_item(MenuItem("Units", submenu=units_menu))
         system_menu.add_item(
             MenuItem(
@@ -709,7 +874,9 @@ class MenuSystem:
         self.root_menu.add_item(MenuItem("Bluetooth", submenu=bt_menu))
         self.root_menu.add_item(MenuItem("Camera", submenu=camera_menu))
         self.root_menu.add_item(MenuItem("Display", submenu=display_menu))
+        self.root_menu.add_item(MenuItem("Lap Timing", submenu=lap_timing_menu))
         self.root_menu.add_item(MenuItem("Light Strip", submenu=lights_menu))
+        self.root_menu.add_item(MenuItem("Pages", submenu=pages_menu))
         self.root_menu.add_item(MenuItem("Radar", submenu=radar_menu))
         self.root_menu.add_item(MenuItem("System", submenu=system_menu))
         self.root_menu.add_item(MenuItem("TPMS", submenu=tpms_menu))
@@ -719,13 +886,19 @@ class MenuSystem:
         bt_menu.parent = self.root_menu
         camera_menu.parent = self.root_menu
         display_menu.parent = self.root_menu
+        lap_timing_menu.parent = self.root_menu
         lights_menu.parent = self.root_menu
+        pages_menu.parent = self.root_menu
         radar_menu.parent = self.root_menu
         system_menu.parent = self.root_menu
         tpms_menu.parent = self.root_menu
         gps_menu.parent = system_menu
         imu_menu.parent = system_menu
         status_menu.parent = system_menu
+        thresholds_menu.parent = system_menu
+        tyre_thresh_menu.parent = thresholds_menu
+        brake_thresh_menu.parent = thresholds_menu
+        pressure_thresh_menu.parent = thresholds_menu
         units_menu.parent = system_menu
 
     def _get_brightness(self) -> float:
@@ -1329,6 +1502,7 @@ class MenuSystem:
         # Reset editing modes when navigating away
         self.volume_editing = False
         self.brightness_editing = False
+        self.threshold_editing = None
 
         if self.current_menu and self.current_menu.parent:
             self.current_menu.hide()
@@ -1431,6 +1605,16 @@ class MenuSystem:
         if not GPS_ENABLED:
             return "Port: Disabled"
         return f"{GPS_SERIAL_PORT} @ {GPS_BAUD_RATE}"
+
+    def _get_gps_update_rate_label(self) -> str:
+        """Get GPS update rate label."""
+        if not self.gps_handler:
+            return "Rate: --"
+        snapshot = self.gps_handler.get_snapshot()
+        if not snapshot or not snapshot.data:
+            return "Rate: --"
+        rate = snapshot.data.get("update_rate", 0)
+        return f"Rate: {rate:.1f} Hz"
 
     def _get_gps_antenna_label(self) -> str:
         """Get GPS antenna status label."""
@@ -1772,6 +1956,206 @@ class MenuSystem:
         unit_labels = {"KMH": "km/h", "MPH": "mph"}
         return f"Speed: {unit_labels[self.speed_unit]}"
 
+    # Threshold methods
+    def _get_threshold_value(self, key: str) -> float:
+        """Get current threshold value from settings."""
+        settings_key, default, _, _, _, _ = self.thresholds[key]
+        return self._settings.get(settings_key, default)
+
+    def _get_threshold_label(self, key: str) -> str:
+        """Get threshold label with editing indicator."""
+        _, _, _, _, step, label = self.thresholds[key]
+        val = self._get_threshold_value(key)
+        # Format based on step size (show decimal for pressure)
+        if step < 1:
+            val_str = f"{val:.1f}"
+        else:
+            val_str = f"{int(val)}"
+        if self.threshold_editing == key:
+            return f"[ {label}: {val_str} ]"
+        return f"{label}: {val_str}"
+
+    def _toggle_threshold_editing(self, key: str) -> str:
+        """Toggle threshold editing mode for a specific key."""
+        if self.threshold_editing == key:
+            # Exit editing mode
+            self.threshold_editing = None
+            _, _, _, _, _, label = self.thresholds[key]
+            return f"{label} saved"
+        else:
+            # Enter editing mode for this key
+            self.threshold_editing = key
+            return "Rotate to adjust, press to save"
+
+    def _adjust_threshold(self, key: str, delta: int):
+        """Adjust threshold value by encoder delta."""
+        settings_key, default, min_val, max_val, step, _ = self.thresholds[key]
+        current = self._get_threshold_value(key)
+        new_val = current + (delta * step)
+        # Clamp to valid range
+        new_val = max(min_val, min(max_val, new_val))
+        self._settings.set(settings_key, new_val)
+
+    # Page toggle methods
+    def _get_page_enabled_label(self, page_id: str, page_name: str) -> str:
+        """Get page enabled status label."""
+        # Find default from UI_PAGES config
+        default = True
+        for page_config in UI_PAGES:
+            if page_config["id"] == page_id:
+                default = page_config.get("default_enabled", True)
+                break
+
+        enabled = self._settings.get(f"pages.{page_id}.enabled", default)
+        return f"{page_name}: {'On' if enabled else 'Off'}"
+
+    def _toggle_page_enabled(self, page_id: str) -> str:
+        """Toggle page enabled state."""
+        # Find default and name from UI_PAGES config
+        default = True
+        page_name = page_id
+        for page_config in UI_PAGES:
+            if page_config["id"] == page_id:
+                default = page_config.get("default_enabled", True)
+                page_name = page_config.get("name", page_id)
+                break
+
+        current = self._settings.get(f"pages.{page_id}.enabled", default)
+        new_value = not current
+
+        # Check if this would disable the last page
+        if not new_value:
+            enabled_count = 0
+            for pc in UI_PAGES:
+                pid = pc["id"]
+                pdefault = pc.get("default_enabled", True)
+                if pid != page_id and self._settings.get(f"pages.{pid}.enabled", pdefault):
+                    enabled_count += 1
+            if enabled_count == 0:
+                return "Cannot disable last page"
+
+        self._settings.set(f"pages.{page_id}.enabled", new_value)
+        return f"{page_name} {'enabled' if new_value else 'disabled'}"
+
+    # Lap Timing methods
+    def _get_lap_timing_enabled_label(self) -> str:
+        """Get lap timing enabled status label."""
+        from utils.config import LAP_TIMING_ENABLED
+
+        enabled = self._settings.get("lap_timing.enabled", LAP_TIMING_ENABLED)
+        return f"Enabled: {'Yes' if enabled else 'No'}"
+
+    def _toggle_lap_timing_enabled(self) -> str:
+        """Toggle lap timing enabled state."""
+        from utils.config import LAP_TIMING_ENABLED
+
+        current = self._settings.get("lap_timing.enabled", LAP_TIMING_ENABLED)
+        new_value = not current
+        self._settings.set("lap_timing.enabled", new_value)
+        return f"Lap timing {'enabled' if new_value else 'disabled'}"
+
+    def _get_lap_timing_auto_detect_label(self) -> str:
+        """Get auto-detect status label."""
+        from utils.config import TRACK_AUTO_DETECT
+
+        enabled = self._settings.get("lap_timing.auto_detect", TRACK_AUTO_DETECT)
+        return f"Auto-Detect: {'Yes' if enabled else 'No'}"
+
+    def _toggle_lap_timing_auto_detect(self) -> str:
+        """Toggle track auto-detection."""
+        from utils.config import TRACK_AUTO_DETECT
+
+        current = self._settings.get("lap_timing.auto_detect", TRACK_AUTO_DETECT)
+        new_value = not current
+        self._settings.set("lap_timing.auto_detect", new_value)
+        return f"Auto-detect {'enabled' if new_value else 'disabled'}"
+
+    def _get_current_track_label(self) -> str:
+        """Get current track name label."""
+        if not self.lap_timing_handler:
+            return "Track: N/A"
+        snapshot = self.lap_timing_handler.get_snapshot()
+        if snapshot and snapshot.data:
+            track_name = snapshot.data.get("track_name")
+            if track_name:
+                # Truncate if too long
+                if len(track_name) > 20:
+                    track_name = track_name[:17] + "..."
+                return f"Track: {track_name}"
+        return "Track: None"
+
+    def _get_best_lap_label(self) -> str:
+        """Get best lap time label."""
+        if not self.lap_timing_handler:
+            return "Best: --:--.---"
+        snapshot = self.lap_timing_handler.get_snapshot()
+        if snapshot and snapshot.data:
+            best_lap = snapshot.data.get("best_lap_time")
+            if best_lap and best_lap > 0:
+                mins = int(best_lap // 60)
+                secs = best_lap % 60
+                return f"Best: {mins}:{secs:06.3f}"
+        return "Best: --:--.---"
+
+    def _clear_best_laps(self) -> str:
+        """Clear best lap times (both session and stored)."""
+        if not self.lap_timing_handler:
+            return "Lap timing not available"
+
+        # Clear session laps
+        self.lap_timing_handler.clear_laps()
+
+        # Clear stored best laps
+        try:
+            from utils.lap_timing_store import get_lap_timing_store
+            store = get_lap_timing_store()
+            count = store.clear_all_best_laps()
+            return f"Cleared {count} best lap(s)"
+        except Exception as e:
+            return f"Error: {e}"
+
+    def _show_track_selection_menu(self) -> str:
+        """Show submenu with nearby tracks to select."""
+        if not self.lap_timing_handler:
+            return "Lap timing not available"
+
+        nearby_tracks = self.lap_timing_handler.get_nearby_tracks()
+        if not nearby_tracks:
+            return "No tracks nearby (need GPS fix)"
+
+        # Build track selection submenu dynamically
+        track_menu = Menu("Select Track")
+        for track_info in nearby_tracks:
+            name = track_info["name"]
+            distance = track_info["distance_km"]
+            # Truncate long names
+            display_name = name[:18] if len(name) > 18 else name
+            label = f"{display_name} ({distance:.1f}km)"
+            track_menu.add_item(
+                MenuItem(
+                    label,
+                    action=lambda n=name: self._select_track(n),
+                )
+            )
+        track_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        track_menu.parent = self.lap_timing_menu
+
+        # Switch to track menu
+        self.current_menu.hide()
+        self.current_menu = track_menu
+        track_menu.show()
+        return ""
+
+    def _select_track(self, track_name: str) -> str:
+        """Select a specific track by name."""
+        if not self.lap_timing_handler:
+            return "Lap timing not available"
+        if self.lap_timing_handler.select_track_by_name(track_name):
+            # Disable auto-detect when manually selecting
+            self._settings.set("lap_timing.auto_detect", False)
+            return f"Selected: {track_name}"
+        return f"Failed to load: {track_name}"
+
     def show(self):
         """Show the root menu."""
         self.current_menu = self.root_menu
@@ -1786,6 +2170,7 @@ class MenuSystem:
         # Reset editing modes
         self.volume_editing = False
         self.brightness_editing = False
+        self.threshold_editing = None
 
         # Stop any active pairing
         self.stop_pairing()
@@ -1804,6 +2189,11 @@ class MenuSystem:
         if self.brightness_editing:
             # Adjust brightness instead of navigating
             self._adjust_brightness(delta)
+            return
+
+        if self.threshold_editing:
+            # Adjust threshold instead of navigating
+            self._adjust_threshold(self.threshold_editing, delta)
             return
 
         if self.current_menu:

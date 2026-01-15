@@ -58,6 +58,21 @@ class TelemetryFrame:
     # OBD2 data
     speed_kmh: Optional[float] = None
 
+    # GPS data
+    gps_latitude: Optional[float] = None
+    gps_longitude: Optional[float] = None
+    gps_speed_kmh: Optional[float] = None
+    gps_heading: Optional[float] = None
+
+    # Lap timing data
+    lap_number: Optional[int] = None
+    lap_time: Optional[float] = None
+    lap_delta: Optional[float] = None
+    sector: Optional[int] = None
+    sector_time: Optional[float] = None
+    track_position: Optional[float] = None
+    track_name: Optional[str] = None
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for CSV writing."""
         return {
@@ -93,6 +108,17 @@ class TelemetryFrame:
             'gyro_y': self.gyro_y,
             'gyro_z': self.gyro_z,
             'speed_kmh': self.speed_kmh,
+            'gps_latitude': self.gps_latitude,
+            'gps_longitude': self.gps_longitude,
+            'gps_speed_kmh': self.gps_speed_kmh,
+            'gps_heading': self.gps_heading,
+            'lap_number': self.lap_number,
+            'lap_time': self.lap_time,
+            'lap_delta': self.lap_delta,
+            'sector': self.sector,
+            'sector_time': self.sector_time,
+            'track_position': self.track_position,
+            'track_name': self.track_name,
         }
 
 

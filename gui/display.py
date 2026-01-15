@@ -240,10 +240,11 @@ class Display:
             return GREY
 
         # Determine which optimal pressure to use based on position
-        if position and position.startswith("F"):  # Front tire
-            optimal_pressure = PRESSURE_FRONT_OPTIMAL
-        else:  # Rear tire or position not specified
-            optimal_pressure = PRESSURE_REAR_OPTIMAL
+        front_optimal, rear_optimal = self.get_pressure_thresholds()
+        if position and position.startswith("F"):  # Front tyre
+            optimal_pressure = front_optimal
+        else:  # Rear tyre or position not specified
+            optimal_pressure = rear_optimal
 
         # Calculate low/high thresholds based on optimal pressure and offset
         pressure_low = optimal_pressure - PRESSURE_OFFSET
@@ -271,38 +272,41 @@ class Display:
         if temp is None:
             return GREY
 
-        if temp < TYRE_TEMP_COLD:
+        # Get thresholds from settings
+        tyre_cold, tyre_optimal, tyre_hot = self.get_tyre_thresholds()
+
+        if temp < tyre_cold:
             return BLUE  # Too cold
-        elif temp < TYRE_TEMP_OPTIMAL - TYRE_TEMP_OPTIMAL_RANGE:
+        elif temp < tyre_optimal - TYRE_TEMP_OPTIMAL_RANGE:
             # Between cold and optimal range lower bound - blue to green transition
-            ratio = (temp - TYRE_TEMP_COLD) / (
-                (TYRE_TEMP_OPTIMAL - TYRE_TEMP_OPTIMAL_RANGE) - TYRE_TEMP_COLD
+            ratio = (temp - tyre_cold) / (
+                (tyre_optimal - TYRE_TEMP_OPTIMAL_RANGE) - tyre_cold
             )
             r = 0
             g = int(255 * ratio)
             b = int(255 * (1 - ratio))
             return (r, g, b)
-        elif temp <= TYRE_TEMP_OPTIMAL + TYRE_TEMP_OPTIMAL_RANGE:
+        elif temp <= tyre_optimal + TYRE_TEMP_OPTIMAL_RANGE:
             return GREEN  # Within optimal range
-        elif temp < TYRE_TEMP_HOT:
+        elif temp < tyre_hot:
             # Between optimal range upper bound and hot - green to yellow/orange transition
-            ratio = (temp - (TYRE_TEMP_OPTIMAL + TYRE_TEMP_OPTIMAL_RANGE)) / (
-                TYRE_TEMP_HOT - (TYRE_TEMP_OPTIMAL + TYRE_TEMP_OPTIMAL_RANGE)
+            ratio = (temp - (tyre_optimal + TYRE_TEMP_OPTIMAL_RANGE)) / (
+                tyre_hot - (tyre_optimal + TYRE_TEMP_OPTIMAL_RANGE)
             )
             r = int(255 * ratio)
             g = 255
             b = 0
             return (r, g, b)
         elif (
-            temp < TYRE_TEMP_HOT + TYRE_TEMP_HOT_TO_BLACK
+            temp < tyre_hot + TYRE_TEMP_HOT_TO_BLACK
         ):  # Transition to black past HOT
             # Yellow to red to black transition
-            ratio = (temp - TYRE_TEMP_HOT) / TYRE_TEMP_HOT_TO_BLACK
-            if ratio < 0.5:  # First transition to full red (yellow→red)
+            ratio = (temp - tyre_hot) / TYRE_TEMP_HOT_TO_BLACK
+            if ratio < 0.5:  # First transition to full red (yellow->red)
                 r = 255
                 g = int(255 * (1 - ratio * 2))  # Decrease green
                 b = 0
-            else:  # Then transition to black (red→black)
+            else:  # Then transition to black (red->black)
                 adjusted_ratio = (ratio - 0.5) * 2  # Scale 0.5-1.0 to 0-1.0
                 r = int(255 * (1 - adjusted_ratio))  # Decrease red
                 g = 0
@@ -458,22 +462,26 @@ class Display:
         """Get colour for brake temperature."""
         if temp is None:
             return GREY
-        elif temp < BRAKE_TEMP_MIN:
+
+        # Get thresholds from settings
+        brake_optimal, brake_hot = self.get_brake_thresholds()
+
+        if temp < BRAKE_TEMP_MIN:
             return (0, 0, 255)
-        elif temp < BRAKE_TEMP_OPTIMAL - BRAKE_TEMP_OPTIMAL_RANGE:
+        elif temp < brake_optimal - BRAKE_TEMP_OPTIMAL_RANGE:
             ratio = (temp - BRAKE_TEMP_MIN) / (
-                (BRAKE_TEMP_OPTIMAL - BRAKE_TEMP_OPTIMAL_RANGE) - BRAKE_TEMP_MIN
+                (brake_optimal - BRAKE_TEMP_OPTIMAL_RANGE) - BRAKE_TEMP_MIN
             )
             return (0, int(ratio * 255), int(255 * (1 - ratio)))
-        elif temp <= BRAKE_TEMP_OPTIMAL + BRAKE_TEMP_OPTIMAL_RANGE:
+        elif temp <= brake_optimal + BRAKE_TEMP_OPTIMAL_RANGE:
             return (0, 255, 0)
-        elif temp < BRAKE_TEMP_HOT:
-            ratio = (temp - (BRAKE_TEMP_OPTIMAL + BRAKE_TEMP_OPTIMAL_RANGE)) / (
-                BRAKE_TEMP_HOT - (BRAKE_TEMP_OPTIMAL + BRAKE_TEMP_OPTIMAL_RANGE)
+        elif temp < brake_hot:
+            ratio = (temp - (brake_optimal + BRAKE_TEMP_OPTIMAL_RANGE)) / (
+                brake_hot - (brake_optimal + BRAKE_TEMP_OPTIMAL_RANGE)
             )
             return (int(ratio * 255), 255, 0)
-        elif temp < BRAKE_TEMP_HOT + BRAKE_TEMP_HOT_TO_BLACK:
-            ratio = (temp - BRAKE_TEMP_HOT) / BRAKE_TEMP_HOT_TO_BLACK
+        elif temp < brake_hot + BRAKE_TEMP_HOT_TO_BLACK:
+            ratio = (temp - brake_hot) / BRAKE_TEMP_HOT_TO_BLACK
             if ratio < 0.3:
                 return (255, int(255 * (1 - ratio / 0.3)), 0)
             else:
@@ -840,6 +848,40 @@ class Display:
         """
         _, pressure_unit = self.get_unit_strings()
         return pressure, pressure_unit
+
+    def get_tyre_thresholds(self):
+        """
+        Get tyre temperature thresholds from persistent settings.
+
+        Returns:
+            tuple: (cold, optimal, hot)
+        """
+        cold = _settings.get("thresholds.tyre.cold", TYRE_TEMP_COLD)
+        optimal = _settings.get("thresholds.tyre.optimal", TYRE_TEMP_OPTIMAL)
+        hot = _settings.get("thresholds.tyre.hot", TYRE_TEMP_HOT)
+        return cold, optimal, hot
+
+    def get_brake_thresholds(self):
+        """
+        Get brake temperature thresholds from persistent settings.
+
+        Returns:
+            tuple: (optimal, hot)
+        """
+        optimal = _settings.get("thresholds.brake.optimal", BRAKE_TEMP_OPTIMAL)
+        hot = _settings.get("thresholds.brake.hot", BRAKE_TEMP_HOT)
+        return optimal, hot
+
+    def get_pressure_thresholds(self):
+        """
+        Get pressure thresholds from persistent settings.
+
+        Returns:
+            tuple: (front_optimal, rear_optimal)
+        """
+        front = _settings.get("thresholds.pressure.front", PRESSURE_FRONT_OPTIMAL)
+        rear = _settings.get("thresholds.pressure.rear", PRESSURE_REAR_OPTIMAL)
+        return front, rear
 
     def draw_units_indicator(self):
         """Draw the current units in the lower right corner."""

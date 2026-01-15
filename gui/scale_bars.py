@@ -49,6 +49,13 @@ class ScaleBars:
         pygame.font.init()
         self.font_small = pygame.font.Font(FONT_PATH, FONT_SIZE_SMALL)
 
+        # Persistent settings for unit preferences (must be before colormap creation)
+        self._settings = get_settings()
+
+        # Cache threshold values to detect changes
+        self._cached_tyre_thresholds = None
+        self._cached_brake_thresholds = None
+
         # Create the brake temperature and tyre temperature colormaps
         self.brake_colormap = self._create_brake_colormap()
         self.tyre_colormap = self._create_tyre_colormap()
@@ -66,8 +73,37 @@ class ScaleBars:
         self.tyre_bar_x = DISPLAY_WIDTH - self.padding - self.bar_width
         self.tyre_bar_y = (DISPLAY_HEIGHT - self.bar_height) // 2
 
-        # Persistent settings for unit preferences
-        self._settings = get_settings()
+    def _get_tyre_thresholds(self):
+        """Get tyre temperature thresholds from settings."""
+        cold = self._settings.get("thresholds.tyre.cold", TYRE_TEMP_COLD)
+        optimal = self._settings.get("thresholds.tyre.optimal", TYRE_TEMP_OPTIMAL)
+        hot = self._settings.get("thresholds.tyre.hot", TYRE_TEMP_HOT)
+        return cold, optimal, hot
+
+    def _get_brake_thresholds(self):
+        """Get brake temperature thresholds from settings."""
+        optimal = self._settings.get("thresholds.brake.optimal", BRAKE_TEMP_OPTIMAL)
+        hot = self._settings.get("thresholds.brake.hot", BRAKE_TEMP_HOT)
+        return optimal, hot
+
+    def _get_pressure_thresholds(self):
+        """Get pressure thresholds from settings."""
+        front = self._settings.get("thresholds.pressure.front", PRESSURE_FRONT_OPTIMAL)
+        rear = self._settings.get("thresholds.pressure.rear", PRESSURE_REAR_OPTIMAL)
+        return front, rear
+
+    def _check_threshold_changes(self):
+        """Check if thresholds changed and regenerate colormaps if needed."""
+        tyre_thresholds = self._get_tyre_thresholds()
+        brake_thresholds = self._get_brake_thresholds()
+
+        if tyre_thresholds != self._cached_tyre_thresholds:
+            self._cached_tyre_thresholds = tyre_thresholds
+            self.tyre_colormap = self._create_tyre_colormap()
+
+        if brake_thresholds != self._cached_brake_thresholds:
+            self._cached_brake_thresholds = brake_thresholds
+            self.brake_colormap = self._create_brake_colormap()
 
     def _get_temp_unit_str(self) -> str:
         """Get temperature unit string from settings."""
@@ -89,20 +125,21 @@ class ScaleBars:
         colors = []
         steps = 200  # More steps for smoother gradient
 
+        # Get thresholds from settings
+        brake_optimal, brake_hot = self._get_brake_thresholds()
+
         # Calculate the extended temperature range
         min_temp = 0  # Start at 0°C
-        max_temp = (
-            BRAKE_TEMP_HOT + BRAKE_TEMP_HOT_TO_BLACK
-        )  # Range past the hot temperature
+        max_temp = brake_hot + BRAKE_TEMP_HOT_TO_BLACK  # Range past the hot temperature
 
         # Calculate normalized positions for key temperature points
         optimal_lower_norm = (
-            BRAKE_TEMP_OPTIMAL - BRAKE_TEMP_OPTIMAL_RANGE - min_temp
+            brake_optimal - BRAKE_TEMP_OPTIMAL_RANGE - min_temp
         ) / (max_temp - min_temp)
         optimal_upper_norm = (
-            BRAKE_TEMP_OPTIMAL + BRAKE_TEMP_OPTIMAL_RANGE - min_temp
+            brake_optimal + BRAKE_TEMP_OPTIMAL_RANGE - min_temp
         ) / (max_temp - min_temp)
-        hot_norm = (BRAKE_TEMP_HOT - min_temp) / (max_temp - min_temp)
+        hot_norm = (brake_hot - min_temp) / (max_temp - min_temp)
         # We don't have a danger level anymore, red starts at HOT
 
         # Black (0°C) to Blue (cold) - first 10% of the range
@@ -182,15 +219,18 @@ class ScaleBars:
         colors = []
         steps = 200  # More steps for smoother gradient
 
+        # Get thresholds from settings
+        tyre_cold, tyre_optimal, tyre_hot = self._get_tyre_thresholds()
+
         # Calculate the extended temperature range
         min_temp = 0  # Start at 0°C
-        max_temp = TYRE_TEMP_HOT + TYRE_TEMP_HOT_TO_BLACK  # Range past hot temperature
+        max_temp = tyre_hot + TYRE_TEMP_HOT_TO_BLACK  # Range past hot temperature
 
         # Calculate normalized positions for key temperature points
-        cold_norm = TYRE_TEMP_COLD / max_temp
-        optimal_lower_norm = (TYRE_TEMP_OPTIMAL - TYRE_TEMP_OPTIMAL_RANGE) / max_temp
-        optimal_upper_norm = (TYRE_TEMP_OPTIMAL + TYRE_TEMP_OPTIMAL_RANGE) / max_temp
-        hot_norm = TYRE_TEMP_HOT / max_temp
+        cold_norm = tyre_cold / max_temp
+        optimal_lower_norm = (tyre_optimal - TYRE_TEMP_OPTIMAL_RANGE) / max_temp
+        optimal_upper_norm = (tyre_optimal + TYRE_TEMP_OPTIMAL_RANGE) / max_temp
+        hot_norm = tyre_hot / max_temp
         # No danger level, red starts at HOT
 
         # Black (0°C) to Blue (cold)
@@ -275,18 +315,20 @@ class ScaleBars:
             # Draw horizontal line with the color
             pygame.draw.line(scale_surf, color, (0, y), (self.bar_width, y))
 
+        # Get thresholds from settings
+        brake_optimal, brake_hot = self._get_brake_thresholds()
+
         # Define temperature range in native unit (Celsius as defined in config)
         min_temp_c = 0  # Starting at 0°C
-        max_temp_c = (
-            BRAKE_TEMP_HOT + BRAKE_TEMP_HOT_TO_BLACK
-        )  # Range past hot temperature
+        max_temp_c = brake_hot + BRAKE_TEMP_HOT_TO_BLACK  # Range past hot temperature
         brake_min_c = BRAKE_TEMP_MIN
-        optimal_c = BRAKE_TEMP_OPTIMAL
-        optimal_plus_range_c = BRAKE_TEMP_OPTIMAL + BRAKE_TEMP_OPTIMAL_RANGE
-        hot_c = BRAKE_TEMP_HOT
+        optimal_c = brake_optimal
+        optimal_plus_range_c = brake_optimal + BRAKE_TEMP_OPTIMAL_RANGE
+        hot_c = brake_hot
 
         # Convert to display unit if needed
-        if TEMP_UNIT == "F":
+        temp_unit = self._settings.get("units.temp", TEMP_UNIT)
+        if temp_unit == "F":
             min_temp = (min_temp_c * 9 / 5) + 32
             max_temp = (max_temp_c * 9 / 5) + 32
             brake_temp_min = (brake_min_c * 9 / 5) + 32
@@ -362,33 +404,29 @@ class ScaleBars:
             # Draw horizontal line with the color
             pygame.draw.line(scale_surf, color, (0, y), (self.bar_width, y))
 
+        # Get thresholds from settings
+        tyre_cold, tyre_optimal, tyre_hot = self._get_tyre_thresholds()
+
         # Define temperature range in native unit (Celsius as defined in config)
         min_temp_c = 0  # Starting at 0°C
-        max_temp_c = (
-            TYRE_TEMP_HOT + TYRE_TEMP_HOT_TO_BLACK
-        )  # Range past hot temperature
-        cold_c = TYRE_TEMP_COLD
-        optimal_c = TYRE_TEMP_OPTIMAL
-        # optimal_minus_range_c = TYRE_TEMP_OPTIMAL - TYRE_TEMP_OPTIMAL_RANGE
-        # optimal_plus_range_c = TYRE_TEMP_OPTIMAL + TYRE_TEMP_OPTIMAL_RANGE
-        hot_c = TYRE_TEMP_HOT
+        max_temp_c = tyre_hot + TYRE_TEMP_HOT_TO_BLACK  # Range past hot temperature
+        cold_c = tyre_cold
+        optimal_c = tyre_optimal
+        hot_c = tyre_hot
 
         # Convert to display unit if needed
-        if TEMP_UNIT == "F":
+        temp_unit = self._settings.get("units.temp", TEMP_UNIT)
+        if temp_unit == "F":
             min_temp = (min_temp_c * 9 / 5) + 32
             max_temp = (max_temp_c * 9 / 5) + 32
             cold_temp = (cold_c * 9 / 5) + 32
             optimal_temp = (optimal_c * 9 / 5) + 32
-            # optimal_minus_range = (optimal_minus_range_c * 9 / 5) + 32
-            # optimal_plus_range = (optimal_plus_range_c * 9 / 5) + 32
             hot_temp = (hot_c * 9 / 5) + 32
         else:
             min_temp = min_temp_c
             max_temp = max_temp_c
             cold_temp = cold_c
             optimal_temp = optimal_c
-            # optimal_minus_range = optimal_minus_range_c
-            # optimal_plus_range = optimal_plus_range_c
             hot_temp = hot_c
 
         # Calculate positions for key temperatures using the native Celsius values
@@ -442,6 +480,9 @@ class ScaleBars:
 
     def draw_pressure_scale(self):
         """Draw the pressure scale showing front and rear optimal values."""
+        # Get pressure thresholds from settings
+        front_optimal, rear_optimal = self._get_pressure_thresholds()
+
         # Position the pressure scale in the center bottom of the screen
         scale_width = 200
         scale_height = 30
@@ -454,10 +495,10 @@ class ScaleBars:
         )
 
         # Calculate low and high pressures for front and rear
-        front_low = PRESSURE_FRONT_OPTIMAL - PRESSURE_OFFSET
-        front_high = PRESSURE_FRONT_OPTIMAL + PRESSURE_OFFSET
-        rear_low = PRESSURE_REAR_OPTIMAL - PRESSURE_OFFSET
-        rear_high = PRESSURE_REAR_OPTIMAL + PRESSURE_OFFSET
+        front_low = front_optimal - PRESSURE_OFFSET
+        front_high = front_optimal + PRESSURE_OFFSET
+        rear_low = rear_optimal - PRESSURE_OFFSET
+        rear_high = rear_optimal + PRESSURE_OFFSET
 
         # Find the overall lowest and highest values to determine the scale range
         low_pressure = min(front_low, rear_low)
@@ -471,7 +512,7 @@ class ScaleBars:
             (front_low - low_pressure) / pressure_range * scale_width
         )
         front_optimal_x = scale_x + int(
-            (PRESSURE_FRONT_OPTIMAL - low_pressure) / pressure_range * scale_width
+            (front_optimal - low_pressure) / pressure_range * scale_width
         )
         front_high_x = scale_x + int(
             (front_high - low_pressure) / pressure_range * scale_width
@@ -480,7 +521,7 @@ class ScaleBars:
             (rear_low - low_pressure) / pressure_range * scale_width
         )
         rear_optimal_x = scale_x + int(
-            (PRESSURE_REAR_OPTIMAL - low_pressure) / pressure_range * scale_width
+            (rear_optimal - low_pressure) / pressure_range * scale_width
         )
         rear_high_x = scale_x + int(
             (rear_high - low_pressure) / pressure_range * scale_width
@@ -558,10 +599,10 @@ class ScaleBars:
 
         # Add pressure labels
         front_text = self.font_small.render(
-            f"F: {PRESSURE_FRONT_OPTIMAL:.1f}±{PRESSURE_OFFSET:.1f}", True, WHITE
+            f"F: {front_optimal:.1f}±{PRESSURE_OFFSET:.1f}", True, WHITE
         )
         rear_text = self.font_small.render(
-            f"R: {PRESSURE_REAR_OPTIMAL:.1f}±{PRESSURE_OFFSET:.1f}", True, WHITE
+            f"R: {rear_optimal:.1f}±{PRESSURE_OFFSET:.1f}", True, WHITE
         )
 
         # Position labels
@@ -586,12 +627,18 @@ class ScaleBars:
 
     def render(self):
         """Render all scale bars."""
+        # Check if thresholds changed and regenerate colormaps if needed
+        self._check_threshold_changes()
+
         self.draw_brake_scale()
         self.draw_tyre_scale()
         # self.draw_pressure_scale()
 
     def render_to_surface(self, surface):
         """Render all scale bars to the provided surface."""
+        # Check if thresholds changed and regenerate colormaps if needed
+        self._check_threshold_changes()
+
         # Store original surface
         original_surface = self.surface
 

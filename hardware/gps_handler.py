@@ -20,6 +20,8 @@ MTK_BAUD_115200 = b"$PMTK251,115200*1F\r\n"
 MTK_UPDATE_1HZ = b"$PMTK220,1000*1F\r\n"
 MTK_UPDATE_5HZ = b"$PMTK220,200*2C\r\n"
 MTK_UPDATE_10HZ = b"$PMTK220,100*2F\r\n"
+# PMTK314: Enable RMC and GGA only (fields: GLL,RMC,VTG,GGA,GSA,GSV,...)
+MTK_NMEA_RMC_GGA = b"$PMTK314,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*28\r\n"
 MTK_DEFAULT_BAUD = 9600  # MTK3339 boots at 9600 baud
 
 
@@ -32,6 +34,9 @@ class GPSHandler(BoundedQueueHardwareHandler):
     - Position (lat/lon)
     - Fix status
     - UTC time
+
+    Parses GPGGA sentences for:
+    - Number of satellites in use
 
     Time sync is handled by chrony via PPS on /dev/pps0.
     """
@@ -108,6 +113,9 @@ class GPSHandler(BoundedQueueHardwareHandler):
                 data = self.serial_port.read(self.serial_port.in_waiting).decode('ascii', errors='ignore')
                 if '$GP' in data or '$GN' in data:
                     print(f"GPS: Already configured at {GPS_BAUD_RATE} baud")
+                    # Ensure RMC + GGA sentences are enabled
+                    self.serial_port.write(MTK_NMEA_RMC_GGA)
+                    time.sleep(0.1)
                     self.serial_port.timeout = 0.15
                     return
             self.serial_port.close()
@@ -125,6 +133,10 @@ class GPSHandler(BoundedQueueHardwareHandler):
 
             # Set 10Hz update rate first (while still at 9600 baud)
             self.serial_port.write(MTK_UPDATE_10HZ)
+            time.sleep(0.1)
+
+            # Enable RMC + GGA sentences (for satellite count)
+            self.serial_port.write(MTK_NMEA_RMC_GGA)
             time.sleep(0.1)
 
             # Set target baud rate
@@ -179,6 +191,8 @@ class GPSHandler(BoundedQueueHardwareHandler):
 
                                 # Publish after each RMC
                                 self._publish_data()
+                            elif line.startswith('$GPGGA') or line.startswith('$GNGGA'):
+                                self._parse_gga(line)
 
                         self.consecutive_errors = 0
 
@@ -281,6 +295,36 @@ class GPSHandler(BoundedQueueHardwareHandler):
             # Sync system time once on first valid fix
             if not self.time_synced and self.gps_date and self.gps_time:
                 self._sync_system_time()
+
+        except (ValueError, IndexError):
+            pass
+
+    def _parse_gga(self, sentence: str):
+        """
+        Parse GPGGA/GNGGA sentence for satellite count.
+
+        Format: $GPGGA,time,lat,N/S,lon,E/W,quality,num_sats,hdop,alt,M,geoid,M,...*checksum
+        Example: $GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,47.0,M,,*47
+        """
+        try:
+            # Verify checksum
+            if '*' not in sentence:
+                return
+            data_part, checksum = sentence.split('*')
+            calc_checksum = 0
+            for char in data_part[1:]:  # Skip $
+                calc_checksum ^= ord(char)
+            if f"{calc_checksum:02X}" != checksum.upper():
+                return
+
+            parts = data_part.split(',')
+            if len(parts) < 8:
+                return
+
+            # Field 7: Number of satellites in use
+            sats_str = parts[7]
+            if sats_str:
+                self.satellites = int(sats_str)
 
         except (ValueError, IndexError):
             pass

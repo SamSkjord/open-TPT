@@ -1,5 +1,37 @@
 # Changelog - openTPT
 
+## [v0.17.7] - 2026-01-15
+
+### Lap Timing Persistence & Page Toggle Menu 🏁
+
+#### ✨ New Features
+
+- **Lap timing persistence** - Best laps now saved to SQLite database
+  - Stores best lap times per track with sector splits
+  - Saves reference lap GPS traces for delta calculations
+  - Best lap loaded automatically when track is selected
+  - Data persists in `~/.opentpt/lap_timing/lap_timing.db`
+- **Pages menu** - Toggle UI pages on/off in rotation
+  - New Settings > Pages submenu
+  - Enable/disable Telemetry, G-Meter, Lap Timing pages
+  - Disabled pages skipped when cycling with page button
+  - At least one page must remain enabled
+  - Settings persist across restarts
+- **Extended telemetry recording** - Added GPS and lap timing fields
+  - GPS: latitude, longitude, speed, heading
+  - Lap timing: lap number, lap time, delta, sector, track position
+
+#### 🔄 Modified Files
+
+- `utils/lap_timing_store.py` - New SQLite storage for lap times
+- `utils/config.py` - Added UI_PAGES configuration
+- `gui/menu.py` - Added Pages submenu with toggle items
+- `main.py` - Dynamic page cycling based on enabled settings
+- `hardware/lap_timing_handler.py` - Integrated with persistent store
+- `utils/telemetry_recorder.py` - Extended TelemetryFrame with GPS/lap fields
+
+---
+
 ## [v0.17.6] - 2026-01-05
 
 ### Early Boot Splash Screen 🚀

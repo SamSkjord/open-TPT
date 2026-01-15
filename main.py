@@ -28,6 +28,7 @@ from hardware.neodriver_handler import NeoDriverHandler, NeoDriverMode, NeoDrive
 from gui.scale_bars import ScaleBars
 from gui.icon_handler import IconHandler
 from gui.gmeter import GMeterDisplay
+from gui.lap_timing_display import LapTimingDisplay
 from ui.widgets.horizontal_bar import HorizontalBar, DualDirectionBar
 
 # Import optimised TPMS handler
@@ -117,6 +118,8 @@ from utils.config import (
     TOF_ENABLED,
     # Brake dual-zone mock data for testing
     BRAKE_DUAL_ZONE_MOCK,
+    # UI Pages configuration
+    UI_PAGES,
 )
 
 # Import unified corner sensor handler
@@ -164,6 +167,17 @@ except ImportError:
     FORD_HYBRID_AVAILABLE = False
     FordHybridHandler = None
     FORD_HYBRID_ENABLED = False
+
+# Import Lap Timing handler (optional, for lap timing with GPS)
+try:
+    from hardware.lap_timing_handler import LapTimingHandler
+    from utils.config import LAP_TIMING_ENABLED
+    LAP_TIMING_AVAILABLE = True
+except ImportError as e:
+    LAP_TIMING_AVAILABLE = False
+    LapTimingHandler = None
+    LAP_TIMING_ENABLED = False
+    print(f"Lap timing not available: {e}")
 
 # Import performance monitoring
 try:
@@ -436,6 +450,8 @@ class OpenTPT:
         self.cached_brightness_surface = None
         self.last_brightness = DEFAULT_BRIGHTNESS
         self.last_ui_fade_alpha = 255
+        self.cached_ui_units = None  # Track units when UI surface was cached
+        self.cached_ui_thresholds = None  # Track thresholds when UI surface was cached
 
         # Performance monitoring
         self.perf_monitor = get_global_monitor() if PERFORMANCE_MONITORING else None
@@ -537,6 +553,7 @@ class OpenTPT:
         self.input_handler = None
         self.imu = None
         self.gmeter = GMeterDisplay()
+        self.lap_timing_display = LapTimingDisplay()
 
         # Status bars (top and bottom) - used across all pages
         self.status_bar_enabled = STATUS_BAR_ENABLED
@@ -581,7 +598,9 @@ class OpenTPT:
         # Categories: "camera" (rear/front cameras) or "ui" (telemetry/gmeter)
         self.current_category = "ui"  # Start with UI pages
         self.current_camera_page = "rear"  # Which camera view (rear/front)
-        self.current_ui_page = "telemetry"  # Which UI page (telemetry/gmeter)
+        # Set initial UI page to first enabled page
+        enabled_pages = self._get_enabled_pages()
+        self.current_ui_page = enabled_pages[0] if enabled_pages else "telemetry"
 
     def _show_splash(self, status_text, progress=None):
         """Show splash screen with optional progress bar."""
@@ -781,6 +800,22 @@ class OpenTPT:
         else:
             self.gps = None
 
+        # Initialise Lap Timing handler (optional, requires GPS)
+        self._show_splash("Initialising lap timing...", 0.80)
+        if LAP_TIMING_ENABLED and LAP_TIMING_AVAILABLE and LapTimingHandler and self.gps:
+            try:
+                self.lap_timing = LapTimingHandler(gps_handler=self.gps)
+                self.lap_timing.start()
+                self.lap_timing_display.set_handler(self.lap_timing)
+                print("Lap timing handler initialised")
+            except Exception as e:
+                print(f"Warning: Could not initialise lap timing: {e}")
+                self.lap_timing = None
+        else:
+            self.lap_timing = None
+            if LAP_TIMING_ENABLED and not self.gps:
+                print("Lap timing disabled: GPS required but not available")
+
         # Initialise Ford Hybrid handler (optional, for battery SOC)
         if FORD_HYBRID_ENABLED and FORD_HYBRID_AVAILABLE and FordHybridHandler:
             try:
@@ -806,6 +841,7 @@ class OpenTPT:
             gps_handler=self.gps,
             radar_handler=self.radar,
             camera_handler=self.camera,
+            lap_timing_handler=self.lap_timing,
         )
         print(f"[BOOT] menu init done t={time.time()-_boot_start:.1f}s", flush=True)
 
@@ -997,6 +1033,10 @@ class OpenTPT:
                 # G-meter page: Reset peak values
                 self.gmeter.reset_peaks()
                 print("G-meter peaks reset")
+            elif self.current_ui_page == "lap_timing":
+                # Lap timing page: Toggle between timer and map view
+                if self.lap_timing_display:
+                    self.lap_timing_display.toggle_view_mode()
 
     def _switch_view_mode(self):
         """Handle button 2: Switch between camera and UI categories."""
@@ -1016,6 +1056,19 @@ class OpenTPT:
         # Request LED update
         self.input_handler.request_led_update()
 
+    def _get_enabled_pages(self) -> list:
+        """Get list of enabled UI page IDs based on settings."""
+        from utils.settings import get_settings
+        settings = get_settings()
+        enabled = []
+        for page_config in UI_PAGES:
+            page_id = page_config["id"]
+            default = page_config.get("default_enabled", True)
+            if settings.get(f"pages.{page_id}.enabled", default):
+                enabled.append(page_id)
+        # Always return at least one page (fallback to telemetry)
+        return enabled if enabled else ["telemetry"]
+
     def _switch_within_category(self):
         """Handle button 3: Switch within current category."""
         if self.current_category == "camera":
@@ -1026,13 +1079,26 @@ class OpenTPT:
                 self.current_camera_page = self.camera.current_camera
                 print(f"Switched to {self.current_camera_page} camera")
         else:
-            # Switch between UI pages (telemetry ↔ gmeter)
-            if self.current_ui_page == "telemetry":
-                self.current_ui_page = "gmeter"
-                print("Switched to G-meter page")
+            # Switch between enabled UI pages
+            enabled_pages = self._get_enabled_pages()
+            if len(enabled_pages) > 1:
+                # Find current page index and cycle to next
+                try:
+                    current_index = enabled_pages.index(self.current_ui_page)
+                    next_index = (current_index + 1) % len(enabled_pages)
+                except ValueError:
+                    # Current page not in enabled list, go to first enabled
+                    next_index = 0
+                self.current_ui_page = enabled_pages[next_index]
+                # Get display name for logging
+                page_name = self.current_ui_page
+                for pc in UI_PAGES:
+                    if pc["id"] == self.current_ui_page:
+                        page_name = pc["name"]
+                        break
+                print(f"Switched to {page_name} page")
             else:
-                self.current_ui_page = "telemetry"
-                print("Switched to telemetry page")
+                print(f"Only one page enabled: {self.current_ui_page}")
 
         # Request LED update
         self.input_handler.request_led_update()
@@ -1380,9 +1446,22 @@ class OpenTPT:
                 # No OBD2 handler
                 self.bottom_bar.set_greyed_out(True)
 
-            # Update lap delta (simulated for testing)
-            test_delta = 5.0 * math.sin(time.time() * 0.1)
-            self.top_bar.set_value(test_delta)
+            # Update lap delta from lap timing handler
+            if self.lap_timing:
+                lap_data = self.lap_timing.get_data()
+                if lap_data and lap_data.get('track_detected'):
+                    # Real lap timing data available
+                    delta = lap_data.get('delta_seconds', 0.0)
+                    self.top_bar.set_value(delta)
+                    self.top_bar.set_greyed_out(False)
+                else:
+                    # No track detected yet
+                    self.top_bar.set_value(0.0)
+                    self.top_bar.set_greyed_out(True)
+            else:
+                # No lap timing handler
+                self.top_bar.set_value(0.0)
+                self.top_bar.set_greyed_out(True)
 
             # Update NeoDriver with lap delta (after top_bar value is set)
             if self.neodriver:
@@ -1423,6 +1502,11 @@ class OpenTPT:
             t0 = time.time()
             self.gmeter.draw(self.screen)
             render_times['gmeter'] = (time.time() - t0) * 1000
+        elif self.current_category == "ui" and self.current_ui_page == "lap_timing":
+            # Render lap timing page
+            t0 = time.time()
+            self.lap_timing_display.draw(self.screen)
+            render_times['lap_timing'] = (time.time() - t0) * 1000
         else:
             # Render the telemetry page (default UI view)
             self._update_ui_visibility()
@@ -1553,8 +1637,19 @@ class OpenTPT:
             # Create separate surface for UI elements that can fade (with caching)
             t0 = time.time()
             if self.input_handler.ui_visible or self.ui_fade_alpha > 0:
-                # Only recreate UI surface if it doesn't exist or fade alpha changed
-                if self.cached_ui_surface is None or self.last_ui_fade_alpha != self.ui_fade_alpha:
+                # Get current units and thresholds to check if cache needs invalidation
+                current_units = self.display.get_unit_strings()
+                current_thresholds = (
+                    self.display.get_tyre_thresholds(),
+                    self.display.get_brake_thresholds(),
+                    self.display.get_pressure_thresholds(),
+                )
+
+                # Recreate UI surface if it doesn't exist, fade alpha changed, units changed, or thresholds changed
+                if (self.cached_ui_surface is None or
+                        self.last_ui_fade_alpha != self.ui_fade_alpha or
+                        self.cached_ui_units != current_units or
+                        self.cached_ui_thresholds != current_thresholds):
                     ui_surface = pygame.Surface(
                         (DISPLAY_WIDTH, DISPLAY_HEIGHT), pygame.SRCALPHA
                     )
@@ -1572,9 +1667,11 @@ class OpenTPT:
                     # Apply fade alpha to all UI elements including the units indicator
                     ui_surface.set_alpha(self.ui_fade_alpha)
 
-                    # Cache the surface
+                    # Cache the surface, units, and thresholds
                     self.cached_ui_surface = ui_surface
                     self.last_ui_fade_alpha = self.ui_fade_alpha
+                    self.cached_ui_units = current_units
+                    self.cached_ui_thresholds = current_thresholds
 
                 # Blit the cached surface
                 self.screen.blit(self.cached_ui_surface, (0, 0))

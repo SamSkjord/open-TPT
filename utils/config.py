@@ -56,6 +56,15 @@ MEMORY_MONITORING_ENABLED = True  # Log detailed memory stats every 60 seconds
 # Thermal display settings
 THERMAL_STALE_TIMEOUT = 1.0  # Seconds to show last good data before showing offline
 
+# UI Page configuration
+# Available pages with their internal ID and display name
+# Pages can be enabled/disabled via settings (pages.<id>.enabled)
+UI_PAGES = [
+    {"id": "telemetry", "name": "Telemetry", "default_enabled": True},
+    {"id": "gmeter", "name": "G-Meter", "default_enabled": True},
+    {"id": "lap_timing", "name": "Lap Timing", "default_enabled": True},
+]
+
 # ==============================================================================
 # COLOURS & ASSETS
 # ==============================================================================
@@ -106,7 +115,9 @@ I2C_BUS = 1  # Default I2C bus on Raspberry Pi 4
 
 # TCA9548A I2C Multiplexer
 I2C_MUX_ADDRESS = 0x70  # TCA9548A default address
-I2C_MUX_RESET_PIN = 17  # GPIO pin for TCA9548A reset (active-low, uses internal pull-up)
+I2C_MUX_RESET_PIN = (
+    17  # GPIO pin for TCA9548A reset (active-low, uses internal pull-up)
+)
 I2C_MUX_RESET_FAILURES = 3  # Consecutive failures before triggering mux reset
 
 # I2C device addresses
@@ -140,10 +151,10 @@ CAMERA_FRONT_DEVICE = "/dev/video-front"  # or None for auto-detect
 # Camera transform settings
 # Mirror: horizontally flip the image (True = rear-view mirror effect)
 # Rotate: rotate image clockwise (0, 90, 180, 270 degrees)
-CAMERA_REAR_MIRROR = True   # Default True for rear-view mirror effect
-CAMERA_REAR_ROTATE = 0      # 0, 90, 180, 270 degrees
+CAMERA_REAR_MIRROR = True  # Default True for rear-view mirror effect
+CAMERA_REAR_ROTATE = 0  # 0, 90, 180, 270 degrees
 CAMERA_FRONT_MIRROR = False  # Default False for normal view
-CAMERA_FRONT_ROTATE = 0      # 0, 90, 180, 270 degrees
+CAMERA_FRONT_ROTATE = 0  # 0, 90, 180, 270 degrees
 
 # ==============================================================================
 # DISPLAY SCALING (computed at startup)
@@ -197,11 +208,15 @@ try:
             raw_height = display_config.get("height", REFERENCE_HEIGHT)
 
             # Validate dimensions
-            DISPLAY_WIDTH, DISPLAY_HEIGHT = validate_display_dimensions(raw_width, raw_height)
+            DISPLAY_WIDTH, DISPLAY_HEIGHT = validate_display_dimensions(
+                raw_width, raw_height
+            )
             print(f"Loaded display config: {DISPLAY_WIDTH}x{DISPLAY_HEIGHT}")
     else:
         # Create default config file if it doesn't exist
-        DISPLAY_WIDTH, DISPLAY_HEIGHT = validate_display_dimensions(REFERENCE_WIDTH, REFERENCE_HEIGHT)
+        DISPLAY_WIDTH, DISPLAY_HEIGHT = validate_display_dimensions(
+            REFERENCE_WIDTH, REFERENCE_HEIGHT
+        )
         default_config = {
             "width": DISPLAY_WIDTH,
             "height": DISPLAY_HEIGHT,
@@ -209,7 +224,9 @@ try:
         }
         with open(CONFIG_FILE, "w") as f:
             json.dump(default_config, f, indent=4)
-        print(f"Created default display config at {CONFIG_FILE}: {DISPLAY_WIDTH}x{DISPLAY_HEIGHT}")
+        print(
+            f"Created default display config at {CONFIG_FILE}: {DISPLAY_WIDTH}x{DISPLAY_HEIGHT}"
+        )
 except ValueError as e:
     # Validation error - use safe defaults
     print(f"Invalid display config: {e}. Using safe defaults.")
@@ -457,10 +474,10 @@ TOF_DISPLAY_POSITIONS = {
 
 # Distance thresholds for colour coding (in millimetres)
 # These define the colour transitions for ride height display
-TOF_DISTANCE_MIN = 50      # Minimum expected distance (very compressed)
+TOF_DISTANCE_MIN = 50  # Minimum expected distance (very compressed)
 TOF_DISTANCE_OPTIMAL = 120  # Optimal ride height (green)
-TOF_DISTANCE_RANGE = 20     # Range around optimal (±20mm = green zone)
-TOF_DISTANCE_MAX = 200      # Maximum expected distance (full extension)
+TOF_DISTANCE_RANGE = 20  # Range around optimal (±20mm = green zone)
+TOF_DISTANCE_MAX = 200  # Maximum expected distance (full extension)
 
 # ==============================================================================
 # PRESSURE SENSOR CONFIGURATION (TPMS)
@@ -523,9 +540,9 @@ IMU_SAMPLE_RATE = 50  # Hz - how often to read IMU data
 # IMU axis mapping - maps physical IMU axes to vehicle axes
 # Set based on how IMU is mounted in vehicle
 # Options: "x", "-x", "y", "-y", "z", "-z" (negative inverts axis)
-IMU_AXIS_LATERAL = "x"       # Vehicle left/right (positive = right)
+IMU_AXIS_LATERAL = "x"  # Vehicle left/right (positive = right)
 IMU_AXIS_LONGITUDINAL = "y"  # Vehicle forward/back (positive = forward/accel)
-IMU_AXIS_VERTICAL = "z"      # Vehicle up/down (positive = up)
+IMU_AXIS_VERTICAL = "z"  # Vehicle up/down (positive = up)
 
 # IMU calibration file (stores zero offsets for persistence)
 IMU_CALIBRATION_FILE = "config/imu_calibration.json"
@@ -625,7 +642,6 @@ RADAR_OVERTAKE_ARROW_DURATION = 1.0  # Duration to show arrow (seconds)
 # ==============================================================================
 
 # NeoKey 1x4 button mappings (inverted - board mounted upside down)
-BUTTON_BRIGHTNESS_CYCLE = 3  # Cycle through brightness presets (tap)
 BUTTON_RECORDING = 3  # Start/stop telemetry recording (hold for 1 second)
 BUTTON_PAGE_SETTINGS = 2  # Toggle page-specific settings (context-sensitive per page)
 BUTTON_CATEGORY_SWITCH = 1  # Switch within category (camera↔camera OR UI page↔UI page)
@@ -651,10 +667,34 @@ NEODRIVER_I2C_ADDRESS = 0x60  # Default NeoDriver address
 NEODRIVER_NUM_PIXELS = 9  # Number of NeoPixels in strip
 NEODRIVER_BRIGHTNESS = 0.3  # LED brightness (0.0-1.0)
 NEODRIVER_DEFAULT_MODE = "shift"  # off, delta, overtake, shift, rainbow
-NEODRIVER_DEFAULT_DIRECTION = "centre_out"  # left_right, right_left, centre_out, edges_in
+NEODRIVER_DEFAULT_DIRECTION = (
+    "centre_out"  # left_right, right_left, centre_out, edges_in
+)
 NEODRIVER_MAX_RPM = 7000  # Maximum RPM for shift light scale
 NEODRIVER_SHIFT_RPM = 6500  # RPM at which shift indicator flashes (redline)
-NEODRIVER_START_RPM = 3000  # RPM at which shift lights begin illuminating (0 = always on)
+NEODRIVER_START_RPM = (
+    3000  # RPM at which shift lights begin illuminating (0 = always on)
+)
+
+# ==============================================================================
+# LAP TIMING CONFIGURATION
+# ==============================================================================
+
+# Enable/disable lap timing system
+LAP_TIMING_ENABLED = True  # Set to False to disable lap timing
+
+# Track auto-detection
+TRACK_AUTO_DETECT = True  # Automatically detect track from GPS position
+TRACK_SEARCH_RADIUS_KM = 10.0  # Search radius for nearby tracks (kilometres)
+
+# Delta bar display range
+DELTA_BAR_RANGE = 10.0  # Maximum delta to display (seconds, +/-)
+
+# Lap timing data directory
+LAP_TIMING_DATA_DIR = os.path.expanduser("~/.opentpt/lap_timing")
+
+# Sector configuration
+LAP_TIMING_SECTOR_COUNT = 3  # Number of sectors per lap
 
 # ==============================================================================
 # HELPER FUNCTIONS
@@ -694,9 +734,7 @@ def apply_emissivity_correction(temp_celsius: float, emissivity: float) -> float
 
     # Validate emissivity is in valid range
     if not (0.0 < emissivity <= 1.0):
-        raise ValueError(
-            f"Emissivity {emissivity:.3f} must be in range (0.0, 1.0]"
-        )
+        raise ValueError(f"Emissivity {emissivity:.3f} must be in range (0.0, 1.0]")
 
     # No correction needed for perfect black body (using epsilon comparison for float)
     if abs(emissivity - 1.0) < 1e-9:
@@ -706,7 +744,7 @@ def apply_emissivity_correction(temp_celsius: float, emissivity: float) -> float
     temp_kelvin = temp_celsius + 273.15
 
     # Apply correction: T_actual = T_measured / ε^0.25
-    corrected_kelvin = temp_kelvin / (emissivity ** 0.25)
+    corrected_kelvin = temp_kelvin / (emissivity**0.25)
 
     # Convert back to Celsius
     corrected_celsius = corrected_kelvin - 273.15
