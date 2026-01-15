@@ -492,8 +492,8 @@ openTPT/
 - [ ] Alerts/Warnings menu - temperature/pressure thresholds for visual warnings
 - [ ] Recording settings - output directory, auto-start on motion detection
 - [ ] G-meter settings - reset peaks, max G range, history duration
-- [ ] Radar settings - enable/disable, sensitivity, overlay options, invert for upside-down mounting
-- [ ] System info - IP address, storage space, uptime, sensor status
+- [x] Radar settings - enable/disable, sensitivity, overlay options, invert for upside-down mounting
+- [x] System info - IP address, storage space, uptime, sensor status
 - [ ] Network/WiFi menu - connect for remote access
 - [ ] Calibration menu - IMU zero offset
 - [ ] Power menu - screen timeout, safe shutdown

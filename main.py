@@ -798,6 +798,7 @@ class OpenTPT:
             neodriver_handler=self.neodriver,
             imu_handler=self.imu,
             gps_handler=self.gps,
+            radar_handler=self.radar,
         )
         print(f"[BOOT] menu init done t={time.time()-_boot_start:.1f}s", flush=True)
 

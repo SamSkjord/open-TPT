@@ -165,7 +165,7 @@ class Menu:
         """Calculate maximum number of visible menu items."""
         menu_height = int(DISPLAY_HEIGHT * 0.7)
         title_area = 62  # Title + spacing
-        hint_area = 60   # Status + hint at bottom
+        hint_area = 30   # Status message area at bottom
         item_height = 40
         available_height = menu_height - title_area - hint_area
         return max(1, available_height // item_height)
@@ -263,7 +263,7 @@ class Menu:
 
         # Draw scroll indicator if needed
         if self.scroll_offset > 0:
-            arrow_up = self._font_hint.render("▲ more", True, GREY)
+            arrow_up = self._font_hint.render("more", True, GREY)
             surface.blit(arrow_up, (menu_x + menu_width - 80, item_start_y - 25))
 
         for display_idx, i in enumerate(range(self.scroll_offset, min(len(self.items), self.scroll_offset + max_visible))):
@@ -296,7 +296,7 @@ class Menu:
 
         # Draw scroll indicator if more items below
         if self.scroll_offset + max_visible < len(self.items):
-            arrow_down = self._font_hint.render("▼ more", True, GREY)
+            arrow_down = self._font_hint.render("more", True, GREY)
             last_item_y = item_start_y + (max_visible * item_height)
             surface.blit(arrow_down, (menu_x + menu_width - 80, last_item_y - 25))
 
@@ -304,15 +304,8 @@ class Menu:
         if self.status_message and (time.time() - self.status_time < self.status_duration):
             status_surface = self._font_hint.render(self.status_message, True, MENU_HEADER_COLOUR)
             status_x = menu_x + (menu_width - status_surface.get_width()) // 2
-            status_y = menu_y + menu_height - 35
+            status_y = menu_y + menu_height - 20
             surface.blit(status_surface, (status_x, status_y))
-
-        # Draw hint at bottom
-        hint_text = "Rotate: Navigate | Press: Select | Long Press: Back"
-        hint_surface = self._font_hint.render(hint_text, True, GREY)
-        hint_x = menu_x + (menu_width - hint_surface.get_width()) // 2
-        hint_y = menu_y + menu_height - 20
-        surface.blit(hint_surface, (hint_x, hint_y))
 
 
 class MenuSystem:
@@ -322,7 +315,7 @@ class MenuSystem:
     Manages the root menu and all submenus for openTPT.
     """
 
-    def __init__(self, tpms_handler=None, encoder_handler=None, input_handler=None, neodriver_handler=None, imu_handler=None, gps_handler=None):
+    def __init__(self, tpms_handler=None, encoder_handler=None, input_handler=None, neodriver_handler=None, imu_handler=None, gps_handler=None, radar_handler=None):
         """
         Initialise the menu system.
 
@@ -333,6 +326,7 @@ class MenuSystem:
             neodriver_handler: NeoDriver handler for LED strip control
             imu_handler: IMU handler for G-meter calibration
             gps_handler: GPS handler for speed and position
+            radar_handler: Radar handler for Toyota radar
         """
         self.tpms_handler = tpms_handler
         self.encoder_handler = encoder_handler
@@ -340,6 +334,7 @@ class MenuSystem:
         self.neodriver_handler = neodriver_handler
         self.imu_handler = imu_handler
         self.gps_handler = gps_handler
+        self.radar_handler = radar_handler
         self.current_menu: Optional[Menu] = None
         self.root_menu: Optional[Menu] = None
 
@@ -492,6 +487,54 @@ class MenuSystem:
         ))
         gps_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
 
+        # Radar submenu
+        radar_menu = Menu("Radar")
+        radar_menu.add_item(MenuItem(
+            "Enabled",
+            dynamic_label=lambda: self._get_radar_enabled_label(),
+            action=lambda: self._toggle_radar_enabled()
+        ))
+        radar_menu.add_item(MenuItem(
+            "Status",
+            dynamic_label=lambda: self._get_radar_status_label(),
+            enabled=False  # Info only
+        ))
+        radar_menu.add_item(MenuItem(
+            "Tracks",
+            dynamic_label=lambda: self._get_radar_tracks_label(),
+            enabled=False
+        ))
+        radar_menu.add_item(MenuItem(
+            "CAN Channel",
+            dynamic_label=lambda: self._get_radar_channel_label(),
+            enabled=False
+        ))
+        radar_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+
+        # System Status submenu
+        status_menu = Menu("System Status")
+        status_menu.add_item(MenuItem(
+            "IP Address",
+            dynamic_label=lambda: self._get_system_ip_label(),
+            enabled=False
+        ))
+        status_menu.add_item(MenuItem(
+            "Storage",
+            dynamic_label=lambda: self._get_system_storage_label(),
+            enabled=False
+        ))
+        status_menu.add_item(MenuItem(
+            "Uptime",
+            dynamic_label=lambda: self._get_system_uptime_label(),
+            enabled=False
+        ))
+        status_menu.add_item(MenuItem(
+            "Sensors",
+            dynamic_label=lambda: self._get_sensor_status_label(),
+            enabled=False
+        ))
+        status_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+
         # System menu
         system_menu = Menu("System")
         system_menu.add_item(MenuItem(
@@ -499,6 +542,7 @@ class MenuSystem:
             dynamic_label=lambda: f"Speed: {self._get_speed_source().upper()}",
             action=lambda: self._toggle_speed_source()
         ))
+        system_menu.add_item(MenuItem("Status", submenu=status_menu))
         system_menu.add_item(MenuItem("GPS Status", submenu=gps_menu))
         system_menu.add_item(MenuItem("IMU Calibration", submenu=imu_menu))
         system_menu.add_item(MenuItem("Shutdown", action=lambda: self._shutdown()))
@@ -511,6 +555,7 @@ class MenuSystem:
         self.root_menu.add_item(MenuItem("Bluetooth", submenu=bt_menu))
         self.root_menu.add_item(MenuItem("Display", submenu=display_menu))
         self.root_menu.add_item(MenuItem("Light Strip", submenu=lights_menu))
+        self.root_menu.add_item(MenuItem("Radar", submenu=radar_menu))
         self.root_menu.add_item(MenuItem("System", submenu=system_menu))
         self.root_menu.add_item(MenuItem("Back", action=lambda: self._close_menu()))
 
@@ -519,7 +564,9 @@ class MenuSystem:
         bt_menu.parent = self.root_menu
         display_menu.parent = self.root_menu
         lights_menu.parent = self.root_menu
+        radar_menu.parent = self.root_menu
         system_menu.parent = self.root_menu
+        status_menu.parent = system_menu
         imu_menu.parent = system_menu
         gps_menu.parent = system_menu
 
@@ -1291,6 +1338,122 @@ class MenuSystem:
         self.imu_handler.calibrate_set_lateral(axis_str)
         self.imu_cal_step = 'turn_done'
         return f"Lateral: {axis_str} - Done!"
+
+    # Radar methods
+    def _get_radar_enabled_label(self) -> str:
+        """Get radar enabled status label."""
+        if not self.radar_handler:
+            return "Enabled: N/A"
+        enabled = self.radar_handler.enabled
+        return f"Enabled: {'Yes' if enabled else 'No'}"
+
+    def _toggle_radar_enabled(self) -> str:
+        """Toggle radar enabled state."""
+        if not self.radar_handler:
+            return "Radar not available"
+        self.radar_handler.enabled = not self.radar_handler.enabled
+        return f"Radar {'enabled' if self.radar_handler.enabled else 'disabled'}"
+
+    def _get_radar_status_label(self) -> str:
+        """Get radar operational status."""
+        if not self.radar_handler:
+            return "Status: No handler"
+        if not self.radar_handler.enabled:
+            return "Status: Disabled"
+        if self.radar_handler.driver is None:
+            return "Status: No driver"
+        if self.radar_handler.running:
+            return "Status: Running"
+        return "Status: Stopped"
+
+    def _get_radar_tracks_label(self) -> str:
+        """Get current radar track count."""
+        if not self.radar_handler:
+            return "Tracks: --"
+        if not self.radar_handler.enabled:
+            return "Tracks: --"
+        tracks = self.radar_handler.get_tracks()
+        count = len(tracks) if tracks else 0
+        return f"Tracks: {count}"
+
+    def _get_radar_channel_label(self) -> str:
+        """Get radar CAN channel."""
+        if not self.radar_handler:
+            return "Channel: --"
+        return f"Channel: {self.radar_handler.radar_channel}"
+
+    # System Status methods
+    def _get_system_ip_label(self) -> str:
+        """Get system IP address."""
+        try:
+            result = subprocess.run(
+                ["hostname", "-I"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            ips = result.stdout.strip().split()
+            if ips:
+                return f"IP: {ips[0]}"
+            return "IP: Not connected"
+        except Exception:
+            return "IP: Unknown"
+
+    def _get_system_storage_label(self) -> str:
+        """Get system storage info."""
+        try:
+            result = subprocess.run(
+                ["df", "-h", "/"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            lines = result.stdout.strip().split('\n')
+            if len(lines) >= 2:
+                parts = lines[1].split()
+                if len(parts) >= 4:
+                    used = parts[2]
+                    avail = parts[3]
+                    return f"Storage: {used} / {avail} free"
+            return "Storage: Unknown"
+        except Exception:
+            return "Storage: Unknown"
+
+    def _get_system_uptime_label(self) -> str:
+        """Get system uptime."""
+        try:
+            result = subprocess.run(
+                ["uptime", "-p"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            uptime = result.stdout.strip()
+            # Shorten "up X hours, Y minutes" to fit menu
+            uptime = uptime.replace("up ", "").replace(" hours", "h").replace(" hour", "h")
+            uptime = uptime.replace(" minutes", "m").replace(" minute", "m")
+            uptime = uptime.replace(" days", "d").replace(" day", "d")
+            uptime = uptime.replace(",", "")
+            return f"Up: {uptime}"
+        except Exception:
+            return "Uptime: Unknown"
+
+    def _get_sensor_status_label(self) -> str:
+        """Get summary of active sensors."""
+        active = []
+        if self.tpms_handler:
+            active.append("TPMS")
+        if self.radar_handler and self.radar_handler.enabled:
+            active.append("Radar")
+        if self.imu_handler:
+            active.append("IMU")
+        if self.gps_handler:
+            active.append("GPS")
+        if self.neodriver_handler:
+            active.append("LED")
+        if active:
+            return f"Active: {', '.join(active)}"
+        return "Active: None"
 
     def show(self):
         """Show the root menu."""
