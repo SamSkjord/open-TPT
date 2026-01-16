@@ -97,10 +97,16 @@ except ImportError:
 # Import for GPIO (mux reset pin)
 try:
     import RPi.GPIO as GPIO
-
+    # lgpio is the backend for RPi.GPIO on newer Pi OS - need its error type
+    try:
+        import lgpio
+        GPIO_ERROR = (OSError, RuntimeError, lgpio.error)
+    except ImportError:
+        GPIO_ERROR = (OSError, RuntimeError)
     GPIO_AVAILABLE = True
 except ImportError:
     GPIO_AVAILABLE = False
+    GPIO_ERROR = (OSError, RuntimeError)
 
 
 class UnifiedCornerHandler(BoundedQueueHardwareHandler):
@@ -353,7 +359,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             GPIO.setup(I2C_MUX_RESET_PIN, GPIO.OUT, initial=GPIO.HIGH)
             self._mux_reset_available = True
             logger.info("Mux reset GPIO%d initialised", I2C_MUX_RESET_PIN)
-        except (OSError, ValueError, RuntimeError) as e:
+        except GPIO_ERROR as e:
             logger.error("Error initialising mux reset GPIO: %s", e)
 
     def _reset_i2c_mux(self):
@@ -377,7 +383,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
                 self._consecutive_failures[pos] = 0
 
             return True
-        except (OSError, RuntimeError) as e:
+        except GPIO_ERROR as e:
             logger.error("Error resetting mux: %s", e)
             return False
 
@@ -1163,7 +1169,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         if self._mux_reset_available and GPIO_AVAILABLE:
             try:
                 GPIO.cleanup(I2C_MUX_RESET_PIN)
-            except (OSError, RuntimeError):
+            except GPIO_ERROR:
                 pass  # Ignore cleanup errors
 
         # Close I2C bus
