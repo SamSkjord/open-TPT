@@ -282,10 +282,42 @@ git commit -m "Optimize thermal processing"  # wrong
 
 | Document | Purpose |
 |----------|---------|
-| `README.md` | Project overview |
-| `CHANGELOG.md` | Version history |
-| `QUICKSTART.md` | Quick commands |
-| `DEPLOYMENT.md` | Pi deployment |
+| `README.md` | Project overview, features, configuration |
+| `CHANGELOG.md` | Version history with detailed changes |
+| `QUICKSTART.md` | Quick commands for daily use |
+| `DEPLOYMENT.md` | Pi deployment and boot splash setup |
+| `CLAUDE.md` | AI assistant context (this file) |
+
+### Keeping Documentation Updated
+
+Documentation must be kept in sync with code changes:
+
+1. **CHANGELOG.md** - Update for every feature, fix, or significant change
+   - Group changes under version headers (e.g., `## [v0.17.9]`)
+   - Include: New Features, Improvements, Bug Fixes, Modified Files
+   - Be specific about what changed and why
+
+2. **README.md** - Update when adding/removing:
+   - Features or capabilities
+   - Hardware support
+   - Configuration options
+   - Project structure changes
+
+3. **QUICKSTART.md** - Update when changing:
+   - Common commands or workflows
+   - Hardware status
+   - Key configuration files
+
+4. **DEPLOYMENT.md** - Update when changing:
+   - Installation steps
+   - Boot/service configuration
+   - Deployment scripts or methods
+
+5. **CLAUDE.md** - Update when changing:
+   - Hardware configuration or status
+   - Directory structure
+   - I2C addresses or registers
+   - Key design patterns
 
 ---
 
@@ -297,3 +329,4 @@ git commit -m "Optimize thermal processing"  # wrong
 4. **Test on Pi** - Mock mode doesn't catch hardware issues
 5. **Bounded queues** - All hardware handlers must use them
 6. **Graceful degradation** - System works with missing hardware
+7. **Keep docs updated** - All changes should be reflected in documentation
