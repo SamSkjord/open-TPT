@@ -103,7 +103,10 @@ from utils.config import (
     SCALE_X,
     SCALE_Y,
     FONT_SIZE_SMALL,
+    FONT_SIZE_MEDIUM,
     FONT_PATH,
+    RED,
+    YELLOW,
     # Encoder configuration
     ENCODER_ENABLED,
     ENCODER_I2C_ADDRESS,
@@ -1155,6 +1158,50 @@ class OpenTPT:
         self.input_handler.recording = False
         logger.info("Recording discarded")
 
+    def _draw_fuel_warning(self):
+        """Draw fuel warning overlay on all pages when fuel is low."""
+        if not self.fuel_tracker:
+            return
+
+        fuel_state = self.fuel_tracker.get_state()
+        if not fuel_state.get('data_available'):
+            return
+
+        critical = fuel_state.get('critical_warning', False)
+        low = fuel_state.get('low_warning', False)
+
+        if not critical and not low:
+            return
+
+        # Lazy-init warning font
+        if not hasattr(self, '_fuel_warning_font'):
+            try:
+                self._fuel_warning_font = pygame.font.Font(FONT_PATH, FONT_SIZE_MEDIUM)
+            except Exception:
+                self._fuel_warning_font = pygame.font.SysFont("monospace", FONT_SIZE_MEDIUM)
+
+        fuel_percent = fuel_state.get('fuel_level_percent', 0) or 0
+
+        if critical:
+            # Flashing critical warning
+            if int(time.time() * 2) % 2 == 0:
+                warning_text = f"LOW FUEL {fuel_percent:.0f}%"
+                text = self._fuel_warning_font.render(warning_text, True, RED)
+                text_rect = text.get_rect(center=(DISPLAY_WIDTH // 2, DISPLAY_HEIGHT - int(60 * SCALE_Y)))
+                bg_rect = text_rect.inflate(int(20 * SCALE_X), int(10 * SCALE_Y))
+                pygame.draw.rect(self.screen, (40, 0, 0), bg_rect, border_radius=int(5 * SCALE_Y))
+                pygame.draw.rect(self.screen, RED, bg_rect, width=2, border_radius=int(5 * SCALE_Y))
+                self.screen.blit(text, text_rect)
+        elif low:
+            # Low fuel warning (same style as critical but yellow)
+            warning_text = f"LOW FUEL {fuel_percent:.0f}%"
+            text = self._fuel_warning_font.render(warning_text, True, YELLOW)
+            text_rect = text.get_rect(center=(DISPLAY_WIDTH // 2, DISPLAY_HEIGHT - int(60 * SCALE_Y)))
+            bg_rect = text_rect.inflate(int(20 * SCALE_X), int(10 * SCALE_Y))
+            pygame.draw.rect(self.screen, (40, 40, 0), bg_rect, border_radius=int(5 * SCALE_Y))
+            pygame.draw.rect(self.screen, YELLOW, bg_rect, width=2, border_radius=int(5 * SCALE_Y))
+            self.screen.blit(text, text_rect)
+
     def _record_telemetry_frame(self):
         """Record a single frame of telemetry data at configured rate."""
         if not self.recorder.is_recording():
@@ -1769,6 +1816,11 @@ class OpenTPT:
             self.top_bar.draw(self.screen)
             self.bottom_bar.draw(self.screen)
         render_times['status_bars'] = (time.time() - t0) * 1000
+
+        # Draw fuel warnings on all pages (except fuel page which has its own)
+        if self.fuel_tracker and self.current_ui_page != "fuel":
+            self._draw_fuel_warning()
+        render_times['fuel_warning'] = (time.time() - t0) * 1000
 
         # Apply brightness adjustment using BLEND_MULT (faster than alpha)
         t0 = time.time()

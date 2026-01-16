@@ -70,6 +70,10 @@ class FuelTracker:
         self._session_start_fuel_percent: Optional[float] = None
         self._session_start_time: Optional[float] = None
 
+        # Refuelling detection
+        self._refuel_threshold_percent = 5.0  # Fuel increase > 5% = refuel detected
+        self._last_raw_fuel_percent: Optional[float] = None
+
         # Last update timestamp
         self._last_update_time: float = 0.0
         self._data_available: bool = False
@@ -93,7 +97,8 @@ class FuelTracker:
         """
         Update fuel tracker with new OBD2 data.
 
-        Called each OBD2 poll cycle.
+        Called each OBD2 poll cycle. Detects refuelling events when fuel level
+        increases significantly.
 
         Args:
             fuel_level_percent: Fuel level as percentage (0-100), or None if unavailable
@@ -103,6 +108,14 @@ class FuelTracker:
 
         if fuel_level_percent is not None:
             self._data_available = True
+
+            # Detect refuelling: fuel level increased significantly
+            if self._last_raw_fuel_percent is not None:
+                fuel_increase = fuel_level_percent - self._last_raw_fuel_percent
+                if fuel_increase > self._refuel_threshold_percent:
+                    self._handle_refuel(fuel_level_percent, fuel_increase)
+
+            self._last_raw_fuel_percent = fuel_level_percent
 
             # Add to smoothing history
             self._fuel_level_history.append(fuel_level_percent)
@@ -125,6 +138,35 @@ class FuelTracker:
         # Fuel rate (optional, not smoothed as it's already instantaneous)
         self._fuel_rate_lph = fuel_rate_lph
 
+    def _handle_refuel(self, new_fuel_percent: float, increase: float):
+        """
+        Handle a detected refuelling event.
+
+        Resets lap tracking to prevent negative consumption calculations.
+
+        Args:
+            new_fuel_percent: The new fuel level after refuelling
+            increase: How much the fuel increased by (percentage points)
+        """
+        logger.info(
+            "Fuel: Refuel detected (+%.1f%%), resetting lap tracking. New level: %.1f%%",
+            increase, new_fuel_percent
+        )
+
+        # Clear smoothing history to respond quickly to new level
+        self._fuel_level_history.clear()
+        self._fuel_level_history.append(new_fuel_percent)
+
+        # Reset current lap start to new fuel level
+        # This prevents the current lap from showing negative consumption
+        self._current_lap_start_fuel = new_fuel_percent
+
+        # Update session start if fuel is now higher than session start
+        if (self._session_start_fuel_percent is not None and
+                new_fuel_percent > self._session_start_fuel_percent):
+            self._session_start_fuel_percent = new_fuel_percent
+            logger.debug("Fuel: Session start updated to %.1f%% after refuel", new_fuel_percent)
+
     def on_lap_start(self):
         """
         Called when a new lap starts.
@@ -133,6 +175,8 @@ class FuelTracker:
         """
         if self._fuel_level_percent is not None:
             self._current_lap_start_fuel = self._fuel_level_percent
+            # Also update raw tracking to prevent false refuel detection at lap boundaries
+            self._last_raw_fuel_percent = self._fuel_level_percent
             logger.debug("Lap started at %.1f%% fuel", self._fuel_level_percent)
 
     def on_lap_complete(self, lap_number: int, lap_time: float, avg_speed_kmh: float) -> Optional[float]:
