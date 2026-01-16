@@ -520,6 +520,7 @@ openTPT/
 - [ ] Lap corner analysis logging - per lap, per corner: min speeds, yaw acceleration (from lap-timing-system)
 - [ ] Pitlane timer - countdown/countup timer for pitlane speed limits and pit stop duration
 - [ ] Fuel tracking page - average fuel per lap, laps remaining, fuel used this session
+- [ ] Tyre temp graphs - show tyre temperature graphs on edges of track timer and camera views
 
 ### Bugs
 - [ ] Camera settings menu always opens on rear camera even when front camera is selected
