@@ -48,21 +48,42 @@
   - Replaced 18 broad `except Exception` catches with specific types in `unified_corner_handler.py`
   - Fixed boot profiling debug messages with meaningful labels (was `\1` control chars)
   - Removed unnecessary `sys.path` manipulation from hardware handlers
+- **ExponentialBackoff helper class** - Reusable backoff logic in `utils/hardware_base.py`
+  - Consistent backoff behaviour across all hardware handlers
+  - Configurable initial delay, multiplier, and max delay
 
 #### Bug Fixes
 
 - **Lap timing settings** - Fixed settings not persisting correctly
 - **Camera menu crash log** - Fixed race condition when writing crash logs
+- **FordHybridHandler import** - Fixed broken import path that prevented module loading
+- **SettingsManager singleton race condition** - Fixed double-checked locking pattern
+- **Deque access race conditions** - Added IndexError handling in `unified_corner_handler.py`
+  for thread-safe access to `tyre_queue`, `brake_queue`, `tof_queue`
+- **Resource cleanup leaks** - Fixed I2C and CAN bus cleanup:
+  - `unified_corner_handler.py`: Now closes `i2c_busio` in `stop()`
+  - `obd2_handler.py`: Shuts down CAN bus before reconnection attempts
+- **Settings file corruption** - Atomic writes via temp file + rename
+- **Missing UTF-8 encoding** - Added explicit encoding to file operations in
+  `settings.py` and `telemetry_recorder.py`
+- **British English violations** - Fixed `FPS_COUNTER_COLOR` → `FPS_COUNTER_COLOUR`,
+  "Colorkey" → "Colourkey", "Tire" → "Tyre" in docstrings
+- **Update rate calculation** - Fixed formula in `get_update_rate()` to correctly
+  calculate Hz from queue timestamps
 
 #### Modified Files
 
-- `hardware/obd2_handler.py` - Added fuel level PID reading
+- `hardware/obd2_handler.py` - Added fuel level PID reading, CAN bus cleanup on reconnect
+- `hardware/ford_hybrid_handler.py` - Fixed import path
+- `hardware/unified_corner_handler.py` - Specific exception types, thread-safe deque access, i2c_busio cleanup
 - `utils/fuel_tracker.py` - New fuel tracking module
-- `gui/display.py` - Temperature overlay rendering
+- `utils/hardware_base.py` - Frozen dataclass, ExponentialBackoff helper class
+- `utils/settings.py` - Thread-safe singleton, atomic writes, UTF-8 encoding
+- `utils/config.py` - British English: `FPS_COUNTER_COLOUR`
+- `utils/telemetry_recorder.py` - UTF-8 encoding
+- `gui/display.py` - Temperature overlay rendering, British English fixes
 - `gui/menu.py` - Fuel display mode menu, config reload
 - `main.py` - Fuel tracker integration, boot profiling labels
-- `utils/hardware_base.py` - Frozen dataclass for immutability
-- `hardware/unified_corner_handler.py` - Specific exception types, removed sys.path hack
 - `hardware/radar_handler.py` - Removed sys.path hack
 - `hardware/tpms_input_optimized.py` - Removed sys.path hack
 - Multiple modules - Logging improvements

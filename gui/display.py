@@ -48,7 +48,7 @@ from utils.config import (
     SCALE_Y,
     FPS_COUNTER_ENABLED,
     FPS_COUNTER_POSITION,
-    FPS_COUNTER_COLOR,
+    FPS_COUNTER_COLOUR,
     TOF_ENABLED,
     TOF_DISPLAY_POSITIONS,
     TOF_DISTANCE_MIN,
@@ -159,7 +159,7 @@ class Display:
             return new_surface
 
         except Exception as e:
-            logger.debug("Colorkey conversion failed: %s - using alpha blending", e)
+            logger.debug("Colourkey conversion failed: %s - using alpha blending", e)
             return surface
 
     def _create_thermal_colourmap(self):
@@ -201,7 +201,7 @@ class Display:
 
         Args:
             pressure: Pressure value in the current units (PSI, BAR, or KPA)
-            position: Tire position ('FL', 'FR', 'RL', 'RR') or None
+            position: Tyre position ('FL', 'FR', 'RL', 'RR') or None
 
         Returns:
             RGB colour tuple
@@ -1039,7 +1039,7 @@ class Display:
         else:
             fps_text = f"FPS: {fps:.1f}"
 
-        fps_surface = self.font_small.render(fps_text, True, FPS_COUNTER_COLOR)
+        fps_surface = self.font_small.render(fps_text, True, FPS_COUNTER_COLOUR)
 
         # Calculate position based on config
         padding = 10

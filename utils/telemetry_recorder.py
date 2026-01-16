@@ -249,7 +249,7 @@ class TelemetryRecorder:
             filepath = os.path.join(self.output_dir, self.temp_filename)
 
             try:
-                with open(filepath, 'w', newline='') as f:
+                with open(filepath, 'w', newline='', encoding='utf-8') as f:
                     # Get fieldnames from first frame
                     fieldnames = list(self.frames[0].to_dict().keys())
                     writer = csv.DictWriter(f, fieldnames=fieldnames)

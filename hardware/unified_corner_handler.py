@@ -1074,10 +1074,14 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
     # Public API - Tyre data access (backward compatible)
     def get_thermal_data(self, position: str) -> Optional[np.ndarray]:
         """Get thermal array for a tyre position."""
-        if not self.tyre_queue:
+        try:
+            if not self.tyre_queue:
+                return None
+            # Copy to avoid race with worker thread modifying deque
+            snapshot = self.tyre_queue[-1]
+        except IndexError:
             return None
 
-        snapshot = self.tyre_queue[-1]
         data = snapshot["data"].get(position)
 
         if data and "thermal_array" in data:
@@ -1087,19 +1091,23 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
 
     def get_zone_data(self, position: str) -> Optional[Dict]:
         """Get zone temperature data for a tyre position."""
-        if not self.tyre_queue:
+        try:
+            if not self.tyre_queue:
+                return None
+            snapshot = self.tyre_queue[-1]
+        except IndexError:
             return None
-
-        snapshot = self.tyre_queue[-1]
         return snapshot["data"].get(position)
 
     # Public API - Brake data access (backward compatible)
     def get_temps(self) -> Dict:
         """Get brake temperatures for all positions."""
-        if not self.brake_queue:
+        try:
+            if not self.brake_queue:
+                return {pos: {"temp": None} for pos in ["FL", "FR", "RL", "RR"]}
+            snapshot = self.brake_queue[-1]
+        except IndexError:
             return {pos: {"temp": None} for pos in ["FL", "FR", "RL", "RR"]}
-
-        snapshot = self.brake_queue[-1]
         return snapshot["data"]
 
     def get_brake_temp(self, position: str) -> Optional[float]:
@@ -1112,10 +1120,12 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
     # Public API - TOF distance data access
     def get_tof_distances(self) -> Dict:
         """Get TOF distances for all positions."""
-        if not self.tof_queue:
+        try:
+            if not self.tof_queue:
+                return {pos: {"distance": None} for pos in ["FL", "FR", "RL", "RR"]}
+            snapshot = self.tof_queue[-1]
+        except IndexError:
             return {pos: {"distance": None} for pos in ["FL", "FR", "RL", "RR"]}
-
-        snapshot = self.tof_queue[-1]
         return snapshot["data"]
 
     def get_tof_distance(self, position: str) -> Optional[float]:
@@ -1148,16 +1158,21 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
 
     def get_update_rate(self) -> float:
         """Calculate update rate from recent snapshots."""
-        if len(self.tyre_queue) < 2:
+        try:
+            if len(self.tyre_queue) < 2:
+                return 0.0
+            newest = self.tyre_queue[-1]["timestamp"]
+            oldest = self.tyre_queue[0]["timestamp"]
+        except (IndexError, KeyError):
             return 0.0
 
-        time_diff = self.tyre_queue[-1]["timestamp"] - self.tyre_queue[0]["timestamp"]
+        time_diff = newest - oldest
         if time_diff > 0:
-            return 1.0 / time_diff
+            return (len(self.tyre_queue) - 1) / time_diff
         return 0.0
 
     def stop(self):
-        """Stop the handler and clean up GPIO."""
+        """Stop the handler and clean up GPIO and I2C resources."""
         super().stop()
 
         # Clean up GPIO for mux reset pin
@@ -1167,9 +1182,15 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             except GPIO_ERROR:
                 pass  # Ignore cleanup errors
 
-        # Close I2C bus
+        # Close I2C buses
         if self.i2c_smbus:
             try:
                 self.i2c_smbus.close()
             except OSError:
                 pass
+
+        if self.i2c_busio:
+            try:
+                self.i2c_busio.deinit()
+            except Exception:
+                pass  # busio.I2C.deinit() may fail if already closed

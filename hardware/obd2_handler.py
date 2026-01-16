@@ -241,6 +241,13 @@ class OBD2Handler(BoundedQueueHardwareHandler):
             if self.consecutive_errors >= self.max_consecutive_errors:
                 if time.time() - self.last_reconnect_attempt >= self.reconnect_interval:
                     logger.info("OBD2: Attempting to reconnect...")
+                    # Shutdown old bus before creating new one
+                    if self.bus:
+                        try:
+                            self.bus.shutdown()
+                        except Exception:
+                            pass
+                        self.bus = None
                     self._initialise()
                     self.last_reconnect_attempt = time.time()
                     if not self.hardware_available:

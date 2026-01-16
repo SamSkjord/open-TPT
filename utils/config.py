@@ -39,7 +39,7 @@ FPS_COUNTER_ENABLED = False  # Show FPS counter on screen
 FPS_COUNTER_POSITION = (
     "top-right"  # Options: "top-left", "top-right", "bottom-left", "bottom-right"
 )
-FPS_COUNTER_COLOR = (0, 255, 0)  # RGB colour (default: green)
+FPS_COUNTER_COLOUR = (0, 255, 0)  # RGB colour (default: green)
 
 # Status bar configuration
 STATUS_BAR_HEIGHT = 20  # Height of status bars in pixels (scaled)

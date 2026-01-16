@@ -24,6 +24,73 @@ class HardwareSnapshot:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
+class ExponentialBackoff:
+    """
+    Exponential backoff tracker for hardware retry logic.
+
+    Provides consistent backoff behaviour across all hardware handlers.
+    Usage:
+        backoff = ExponentialBackoff()
+        if backoff.should_skip():
+            return  # Still in backoff period
+        try:
+            # attempt operation
+            backoff.reset()  # Success - reset backoff
+        except SomeError:
+            backoff.record_failure()  # Apply backoff
+    """
+
+    def __init__(
+        self,
+        initial_delay: float = 1.0,
+        multiplier: float = 2.0,
+        max_delay: float = 64.0,
+    ):
+        """
+        Initialise backoff tracker.
+
+        Args:
+            initial_delay: Initial backoff delay in seconds
+            multiplier: Multiplier for each consecutive failure
+            max_delay: Maximum backoff delay in seconds
+        """
+        self.initial_delay = initial_delay
+        self.multiplier = multiplier
+        self.max_delay = max_delay
+        self._delay = 0.0
+        self._backoff_until = 0.0
+        self._consecutive_failures = 0
+
+    def should_skip(self) -> bool:
+        """Check if operation should be skipped due to backoff."""
+        return time.time() < self._backoff_until
+
+    def record_failure(self):
+        """Record a failure and apply exponential backoff."""
+        self._consecutive_failures += 1
+        if self._delay == 0.0:
+            self._delay = self.initial_delay
+        else:
+            self._delay = min(self._delay * self.multiplier, self.max_delay)
+        self._backoff_until = time.time() + self._delay
+
+    def reset(self):
+        """Reset backoff state after successful operation."""
+        self._delay = 0.0
+        self._backoff_until = 0.0
+        self._consecutive_failures = 0
+
+    @property
+    def consecutive_failures(self) -> int:
+        """Get the number of consecutive failures."""
+        return self._consecutive_failures
+
+    @property
+    def current_delay(self) -> float:
+        """Get the current backoff delay in seconds."""
+        return self._delay
+
+
 class BoundedQueueHardwareHandler:
     """
     Base class for hardware handlers implementing bounded queue pattern.

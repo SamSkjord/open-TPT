@@ -35,11 +35,11 @@ class SettingsManager:
 
     def __new__(cls):
         """Singleton pattern - only one settings manager instance."""
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    cls._instance = super().__new__(cls)
-                    cls._instance._initialised = False
+        with cls._lock:
+            if cls._instance is None:
+                instance = super().__new__(cls)
+                instance._initialised = False
+                cls._instance = instance  # Assign only after fully initialised
         return cls._instance
 
     def __init__(self):
@@ -57,7 +57,7 @@ class SettingsManager:
         """Load settings from JSON file."""
         try:
             if os.path.exists(self._file_path):
-                with open(self._file_path, 'r') as f:
+                with open(self._file_path, 'r', encoding='utf-8') as f:
                     self._settings = json.load(f)
                 logger.info("Settings loaded from %s", self._file_path)
             else:
@@ -83,11 +83,14 @@ class SettingsManager:
             logger.error("Failed to remove corrupt settings file: %s", e)
 
     def _save(self):
-        """Save settings to JSON file."""
+        """Save settings to JSON file atomically."""
         with self._save_lock:
             try:
-                with open(self._file_path, 'w') as f:
+                # Write to temp file first, then rename for atomic operation
+                temp_path = self._file_path + '.tmp'
+                with open(temp_path, 'w', encoding='utf-8') as f:
                     json.dump(self._settings, f, indent=2)
+                os.replace(temp_path, self._file_path)
             except Exception as e:
                 logger.warning("Could not save settings: %s", e)
 
