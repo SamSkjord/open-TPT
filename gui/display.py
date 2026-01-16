@@ -83,6 +83,9 @@ class Display:
         # Initialise colour maps for thermal display
         self.colourmap = self._create_thermal_colourmap()
 
+        # Cache for brake surfaces to avoid allocation in render loop
+        self._brake_surface_cache: dict = {}
+
         # Try loading the overlay mask from both the configured path and the root directory
         try:
             original_overlay = pygame.image.load(OVERLAY_PATH).convert_alpha()
@@ -420,8 +423,12 @@ class Display:
             left_colour = inner_colour
             right_colour = outer_colour
 
-        # Create surface for gradient
-        brake_surface = pygame.Surface((width, height), pygame.SRCALPHA)
+        # Get or create cached surface for this size (avoids allocation every frame)
+        cache_key = (width, height)
+        brake_surface = self._brake_surface_cache.get(cache_key)
+        if brake_surface is None:
+            brake_surface = pygame.Surface((width, height), pygame.SRCALPHA)
+            self._brake_surface_cache[cache_key] = brake_surface
 
         # Draw in 3 sections: left (40%), blend (20%), right (40%)
         left_width = int(width * 0.4)

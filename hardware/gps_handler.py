@@ -122,8 +122,15 @@ class GPSHandler(BoundedQueueHardwareHandler):
                     self.serial_port.timeout = 0.15
                     return
             self.serial_port.close()
+            self.serial_port = None
         except Exception:
-            pass
+            # Clean up on any error
+            if self.serial_port:
+                try:
+                    self.serial_port.close()
+                except Exception:
+                    pass
+                self.serial_port = None
 
         # Connect at default 9600 baud to send configuration
         try:
@@ -152,6 +159,7 @@ class GPSHandler(BoundedQueueHardwareHandler):
 
             time.sleep(0.1)
             self.serial_port.close()
+            self.serial_port = None
 
             # Reconnect at new baud rate
             time.sleep(0.1)
@@ -164,6 +172,13 @@ class GPSHandler(BoundedQueueHardwareHandler):
 
         except Exception as e:
             logger.warning("GPS: Configuration failed: %s", e)
+            # Clean up any open port before fallback
+            if self.serial_port:
+                try:
+                    self.serial_port.close()
+                except Exception:
+                    pass
+                self.serial_port = None
             # Fall back to trying target baud rate anyway
             self.serial_port = serial.Serial(
                 port=GPS_SERIAL_PORT,

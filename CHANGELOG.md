@@ -70,18 +70,23 @@
   "Colorkey" → "Colourkey", "Tire" → "Tyre" in docstrings
 - **Update rate calculation** - Fixed formula in `get_update_rate()` to correctly
   calculate Hz from queue timestamps
+- **GPS serial port leak** - Fixed resource leak in `_configure_mtk3339()` when
+  exceptions occur during baud rate configuration
+- **Brake surface allocation** - Cached brake gradient surfaces to avoid
+  `pygame.Surface()` allocation every frame in render loop
 
 #### Modified Files
 
 - `hardware/obd2_handler.py` - Added fuel level PID reading, CAN bus cleanup on reconnect
 - `hardware/ford_hybrid_handler.py` - Fixed import path
 - `hardware/unified_corner_handler.py` - Specific exception types, thread-safe deque access, i2c_busio cleanup
+- `hardware/gps_handler.py` - Fixed serial port leak in MTK3339 configuration
 - `utils/fuel_tracker.py` - New fuel tracking module
 - `utils/hardware_base.py` - Frozen dataclass, ExponentialBackoff helper class
 - `utils/settings.py` - Thread-safe singleton, atomic writes, UTF-8 encoding
 - `utils/config.py` - British English: `FPS_COUNTER_COLOUR`
 - `utils/telemetry_recorder.py` - UTF-8 encoding
-- `gui/display.py` - Temperature overlay rendering, British English fixes
+- `gui/display.py` - Temperature overlay rendering, British English fixes, brake surface caching
 - `gui/menu.py` - Fuel display mode menu, config reload
 - `main.py` - Fuel tracker integration, boot profiling labels
 - `hardware/radar_handler.py` - Removed sys.path hack
