@@ -286,7 +286,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             try:
                 self.i2c_smbus = SMBus(1)
                 logger.info("I2C bus (smbus2) initialised for Pico sensors")
-            except Exception as e:
+            except (OSError, ValueError) as e:
                 logger.error("Error initialising smbus2: %s", e)
 
         # Initialise I2C bus for MLX sensors (busio)
@@ -294,7 +294,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             try:
                 self.i2c_busio = busio.I2C(board.SCL, board.SDA)
                 logger.info("I2C bus (busio) initialised")
-            except Exception as e:
+            except (OSError, ValueError, RuntimeError) as e:
                 logger.error("Error initialising busio: %s", e)
 
         # Initialise I2C multiplexer
@@ -306,7 +306,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
                 logger.info("I2C multiplexer initialised at 0x%02X", I2C_MUX_ADDRESS)
                 # Initialise mux reset GPIO if available
                 self._init_mux_reset()
-            except Exception as e:
+            except (OSError, ValueError, RuntimeError) as e:
                 logger.error("Error initialising mux: %s", e)
 
         # Initialise ADC if any brake uses ADC
@@ -337,7 +337,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
                         self.adc_channels[position] = AnalogIn(self.ads, channel)
 
             logger.info("ADS1115 initialised (brake ADC sensors: %s)", list(self.adc_channels.keys()))
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError) as e:
             logger.error("Error initialising ADS1115: %s", e)
 
     def _init_mux_reset(self):
@@ -353,7 +353,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             GPIO.setup(I2C_MUX_RESET_PIN, GPIO.OUT, initial=GPIO.HIGH)
             self._mux_reset_available = True
             logger.info("Mux reset GPIO%d initialised", I2C_MUX_RESET_PIN)
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError) as e:
             logger.error("Error initialising mux reset GPIO: %s", e)
 
     def _reset_i2c_mux(self):
@@ -377,7 +377,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
                 self._consecutive_failures[pos] = 0
 
             return True
-        except Exception as e:
+        except (OSError, RuntimeError) as e:
             logger.error("Error resetting mux: %s", e)
             return False
 
@@ -463,7 +463,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
                 self.tyre_mlx_sensors[position] = sensor
                 self.tyre_mlx_ema[position] = temp
                 logger.info("Tyre MLX90614: %.1fC", temp)
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError) as e:
             logger.error("Tyre MLX90614 error: %s", e)
 
     def _init_brake_mlx90614(self, position: str, channel: int):
@@ -479,7 +479,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             if temp is not None:
                 self.brake_mlx_sensors[position] = sensor
                 logger.info("Brake MLX90614: %.1fC", temp)
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError) as e:
             logger.error("Brake MLX90614 error: %s", e)
 
     def _init_brake_mcp9601(self, position: str, channel: int):
@@ -502,7 +502,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             if temp is not None:
                 self.brake_mcp_sensors[position]["inner"] = inner_sensor
                 logger.info("Brake MCP9601 inner (0x%02X): %.1fC", inner_addr, temp)
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError) as e:
             logger.error("Brake MCP9601 inner error: %s", e)
 
         # Try outer sensor if dual zone enabled
@@ -514,7 +514,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
                 if temp is not None:
                     self.brake_mcp_sensors[position]["outer"] = outer_sensor
                     logger.info("Brake MCP9601 outer (0x%02X): %.1fC", outer_addr, temp)
-            except Exception as e:
+            except (OSError, ValueError, RuntimeError) as e:
                 logger.error("Brake MCP9601 outer error: %s", e)
 
     def _test_pico_sensor(self, position: str, channel: int):
@@ -529,7 +529,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             # Try to read firmware version
             fw_ver = self.i2c_smbus.read_byte_data(self.PICO_I2C_ADDR, 0x00)
             logger.info("Pico sensor (FW v%d)", fw_ver)
-        except Exception as e:
+        except OSError as e:
             logger.error("No Pico sensor: %s", e)
 
     def _init_tof_sensor(self, position: str, channel: int):
@@ -549,7 +549,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
                 logger.info("TOF VL53L0X: %dmm", distance)
             else:
                 logger.error("TOF VL53L0X: Invalid reading")
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError) as e:
             logger.error("TOF VL53L0X error: %s", e)
 
     def _reinit_tof_sensor(self, position: str) -> bool:
@@ -592,7 +592,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
                 logger.info("TOF %s: Reinitialised after %d attempts", position, self._tof_reinit_count[position])
                 return True
 
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError) as e:
             # Log only at key intervals
             if self._tof_reinit_count[position] in (1, 3, 10, 50) or self._tof_reinit_count[position] % 100 == 0:
                 logger.error("TOF %s: Reinit failed (%d): %s", position, self._tof_reinit_count[position], e)
@@ -929,7 +929,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
                         temp = sensors["inner"].temperature
                         if temp is not None and -40 <= temp <= 800:
                             inner_temp = temp
-                    except Exception:
+                    except OSError:
                         pass
 
                 # Read outer sensor
@@ -938,7 +938,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
                         temp = sensors["outer"].temperature
                         if temp is not None and -40 <= temp <= 800:
                             outer_temp = temp
-                    except Exception:
+                    except OSError:
                         pass
 
             # Reset backoff if we got any reading
@@ -1063,8 +1063,8 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             if failures >= I2C_MUX_RESET_FAILURES:
                 self._reinit_tof_sensor(position)
 
-        except Exception as e:
-            # Catch any other exceptions
+        except (OSError, ValueError, RuntimeError) as e:
+            # Catch I2C and library exceptions
             logger.error("TOF %s: unexpected error: %s: %s", position, type(e).__name__, e)
 
         # Return last known value on error for smoother display
@@ -1163,12 +1163,12 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         if self._mux_reset_available and GPIO_AVAILABLE:
             try:
                 GPIO.cleanup(I2C_MUX_RESET_PIN)
-            except Exception:
+            except (OSError, RuntimeError):
                 pass  # Ignore cleanup errors
 
         # Close I2C bus
         if self.i2c_smbus:
             try:
                 self.i2c_smbus.close()
-            except Exception:
+            except OSError:
                 pass

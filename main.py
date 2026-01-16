@@ -530,7 +530,7 @@ class OpenTPT:
             self.screen.fill((0, 0, 0))
             pygame.display.flip()
             time.sleep(0.05)
-        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
+        logger.debug("display wakeup done t=%.1fs", time.time()-_boot_start)
 
         # Show splash screen immediately
         self._show_splash("Loading...")
@@ -668,19 +668,19 @@ class OpenTPT:
 
         # Initialise camera (with optional radar)
         self._show_splash("Initialising cameras...", 0.15)
-        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
+        logger.debug("camera init start t=%.1fs", time.time()-_boot_start)
         self.camera = Camera(self.screen, radar_handler=self.radar)
-        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
+        logger.debug("camera init done t=%.1fs", time.time()-_boot_start)
 
         # Initialise input handler (NeoKey)
         self._show_splash("Initialising buttons...", 0.25)
-        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
+        logger.debug("input init start t=%.1fs", time.time()-_boot_start)
         self.input_handler = InputHandler(self.camera)
-        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
+        logger.debug("input init done t=%.1fs", time.time()-_boot_start)
 
         # Initialise encoder input handler (optional)
         self._show_splash("Initialising encoder...", 0.35)
-        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
+        logger.debug("encoder init start t=%.1fs", time.time()-_boot_start)
         self.encoder = None
         if ENCODER_ENABLED:
             try:
@@ -698,11 +698,11 @@ class OpenTPT:
             except (IOError, OSError, RuntimeError, ValueError) as e:
                 logger.warning("Could not initialise encoder: %s", e)
                 self.encoder = None
-        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
+        logger.debug("encoder init done t=%.1fs", time.time()-_boot_start)
 
         # Initialise NeoDriver LED strip (optional)
         self._show_splash("Initialising LED strip...", 0.45)
-        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
+        logger.debug("neodriver init start t=%.1fs", time.time()-_boot_start)
         self.neodriver = None
         if NEODRIVER_ENABLED:
             try:
@@ -742,14 +742,14 @@ class OpenTPT:
             except (IOError, OSError, RuntimeError, ValueError) as e:
                 logger.warning("Could not initialise NeoDriver: %s", e)
                 self.neodriver = None
-        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
+        logger.debug("neodriver init done t=%.1fs", time.time()-_boot_start)
 
         # Create hardware handlers
         self._show_splash("Initialising sensors...", 0.55)
         self.tpms = TPMSHandler()
-        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
+        logger.debug("tpms init done t=%.1fs", time.time()-_boot_start)
         self.corner_sensors = UnifiedCornerHandler()  # Unified tyre+brake handler
-        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
+        logger.debug("corner sensors init done t=%.1fs", time.time()-_boot_start)
 
         # Aliases for backward compatibility
         self.thermal = self.corner_sensors  # Tyre data access
@@ -757,7 +757,7 @@ class OpenTPT:
 
         # Initialise IMU handler (optional, for G-meter)
         self._show_splash("Initialising IMU...", 0.65)
-        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
+        logger.debug("imu init start t=%.1fs", time.time()-_boot_start)
         if IMU_ENABLED and IMU_AVAILABLE and IMUHandler:
             try:
                 self.imu = IMUHandler()
@@ -767,7 +767,7 @@ class OpenTPT:
                 logger.warning("Could not initialise IMU: %s", e)
                 self.imu = None
 
-        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
+        logger.debug("imu init done t=%.1fs", time.time()-_boot_start)
 
         # Initialise OBD2 handler (optional, for vehicle speed)
         self._show_splash("Initialising OBD2...", 0.75)
@@ -835,11 +835,11 @@ class OpenTPT:
                 self.ford_hybrid = None
         else:
             self.ford_hybrid = None
-        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
+        logger.debug("ford hybrid init done t=%.1fs", time.time()-_boot_start)
 
         # Initialise menu system
         self._show_splash("Initialising menu...", 0.85)
-        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
+        logger.debug("menu init start t=%.1fs", time.time()-_boot_start)
         self.menu = MenuSystem(
             tpms_handler=self.tpms,
             encoder_handler=self.encoder,
@@ -851,22 +851,22 @@ class OpenTPT:
             camera_handler=self.camera,
             lap_timing_handler=self.lap_timing,
         )
-        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
+        logger.debug("menu init done t=%.1fs", time.time()-_boot_start)
 
         # Start monitoring threads
         self._show_splash("Starting threads...", 0.95)
-        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
+        logger.debug("threads starting t=%.1fs", time.time()-_boot_start)
         self.input_handler.start()  # Start NeoKey polling thread
         if self.encoder:
             self.encoder.start()  # Start encoder polling thread
         self.tpms.start()
         self.corner_sensors.start()
         self._show_splash("Ready!", 1.0)
-        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
+        logger.debug("threads started t=%.1fs", time.time()-_boot_start)
 
     def run(self):
         """Run the main application loop."""
-        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
+        logger.debug("run loop start t=%.1fs", time.time()-_boot_start)
         self.running = True
         loop_times = {}
         first_frame = True
@@ -881,14 +881,14 @@ class OpenTPT:
                 self._handle_events()
                 loop_times['events'] = (time.time() - t0) * 1000
                 if first_frame:
-                    logger.debug("\1 t=%.1fs", time.time()-_boot_start)
+                    logger.debug("first frame events t=%.1fs", time.time()-_boot_start)
 
                 # Update hardware (camera frame, input states, etc.)
                 t0 = time.time()
                 self._update_hardware()
                 loop_times['hardware'] = (time.time() - t0) * 1000
                 if first_frame:
-                    logger.debug("\1 t=%.1fs", time.time()-_boot_start)
+                    logger.debug("first frame hardware t=%.1fs", time.time()-_boot_start)
 
                 # Render the screen (with performance monitoring)
                 if self.perf_monitor:
@@ -899,16 +899,16 @@ class OpenTPT:
                 loop_times['render'] = (time.time() - t0) * 1000
                 boot_frame_count += 1
                 if first_frame:
-                    logger.debug("\1 t=%.1fs", time.time()-_boot_start)
+                    logger.debug("first frame render t=%.1fs", time.time()-_boot_start)
                     first_frame = False
                 elif boot_frame_count == 10:
-                    logger.debug("\1 t=%.1fs", time.time()-_boot_start)
+                    logger.debug("10 frames t=%.1fs", time.time()-_boot_start)
                 elif boot_frame_count == 60:
-                    logger.debug("\1 t=%.1fs", time.time()-_boot_start)
+                    logger.debug("60 frames t=%.1fs", time.time()-_boot_start)
                 elif boot_frame_count == 300:
-                    logger.debug("\1 t=%.1fs", time.time()-_boot_start)
+                    logger.debug("300 frames t=%.1fs", time.time()-_boot_start)
                 elif boot_frame_count == 600:
-                    logger.debug("\1 t=%.1fs", time.time()-_boot_start)
+                    logger.debug("600 frames t=%.1fs", time.time()-_boot_start)
 
                 if self.perf_monitor:
                     self.perf_monitor.end_render()

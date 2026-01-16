@@ -44,6 +44,9 @@
   - Consolidated unit conversion functions
   - Removed dead code and unused imports
   - Fixed crash log race condition
+  - Added `frozen=True` to `HardwareSnapshot` dataclass for true immutability
+  - Replaced 18 broad `except Exception` catches with specific types in `unified_corner_handler.py`
+  - Fixed boot profiling debug messages with meaningful labels (was `\1` control chars)
 
 #### Bug Fixes
 
@@ -56,7 +59,9 @@
 - `utils/fuel_tracker.py` - New fuel tracking module
 - `gui/display.py` - Temperature overlay rendering
 - `gui/menu.py` - Fuel display mode menu, config reload
-- `main.py` - Fuel tracker integration
+- `main.py` - Fuel tracker integration, boot profiling labels
+- `utils/hardware_base.py` - Frozen dataclass for immutability
+- `hardware/unified_corner_handler.py` - Specific exception types
 - Multiple modules - Logging improvements
 
 ---

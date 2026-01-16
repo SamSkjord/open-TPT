@@ -13,7 +13,7 @@ import time
 logger = logging.getLogger('openTPT.hardware')
 
 
-@dataclass
+@dataclass(frozen=True)
 class HardwareSnapshot:
     """
     Immutable snapshot of hardware data for lock-free access.
