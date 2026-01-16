@@ -172,7 +172,7 @@ class NeoDriverHandler:
             return
 
         self.running = True
-        self._do_startup_animation = False  # Disabled for faster boot
+        self._do_startup_animation = True
         self.thread = threading.Thread(target=self._update_loop, daemon=True)
         self.thread.start()
         logger.info("NeoDriver update thread started")
