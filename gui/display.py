@@ -44,8 +44,6 @@ from utils.config import (
     PRESSURE_UNIT,
     DISPLAY_WIDTH,
     DISPLAY_HEIGHT,
-    REFERENCE_WIDTH,
-    REFERENCE_HEIGHT,
     SCALE_X,
     SCALE_Y,
     FPS_COUNTER_ENABLED,

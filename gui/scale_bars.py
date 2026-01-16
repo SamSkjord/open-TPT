@@ -8,8 +8,6 @@ import numpy as np
 from utils.config import (
     DISPLAY_WIDTH,
     DISPLAY_HEIGHT,
-    REFERENCE_WIDTH,
-    REFERENCE_HEIGHT,
     SCALE_X,
     SCALE_Y,
     TYRE_TEMP_COLD,

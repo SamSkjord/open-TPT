@@ -63,8 +63,6 @@ except ImportError:
 from utils.config import (
     DISPLAY_WIDTH,
     DISPLAY_HEIGHT,
-    REFERENCE_WIDTH,
-    REFERENCE_HEIGHT,
     FPS_TARGET,
     DEFAULT_BRIGHTNESS,
     TEMP_UNIT,

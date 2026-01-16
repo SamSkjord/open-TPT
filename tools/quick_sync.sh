@@ -10,7 +10,8 @@ PI_HOST=${1:-pi@raspberrypi.local}
 REMOTE_PATH=/home/pi/open-TPT
 
 # Sync project files (excludes .git, scratch, caches)
-rsync -avz --progress \
+# --delete removes files on remote that no longer exist locally
+rsync -avz --progress --delete \
     --exclude='.git/' \
     --exclude='__pycache__/' \
     --exclude='scratch/' \
@@ -20,6 +21,7 @@ rsync -avz --progress \
     --exclude='.venv/' \
     --exclude='.claude/' \
     --exclude='*.webp' \
+    --exclude='assets/tracks/' \
     ./ "${PI_HOST}:${REMOTE_PATH}/"
 
 echo ""

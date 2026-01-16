@@ -15,7 +15,6 @@ Organised into logical sections:
 10. Helper Functions
 """
 
-import json
 import logging
 import os
 
@@ -28,11 +27,6 @@ logger = logging.getLogger('openTPT.config')
 # Reference resolution for scaling (default 800x480)
 REFERENCE_WIDTH = 800
 REFERENCE_HEIGHT = 480
-
-# Display config file path
-CONFIG_FILE = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "display_config.json"
-)
 
 # Frame rate and brightness
 FPS_TARGET = 60  # Increased to allow higher camera FPS
@@ -164,121 +158,14 @@ CAMERA_FRONT_ROTATE = 0  # 0, 90, 180, 270 degrees
 # DISPLAY SCALING (computed at startup)
 # ==============================================================================
 
-
-def validate_display_dimensions(width, height):
-    """
-    Validate display dimensions for security and sanity.
-
-    Args:
-        width: Display width in pixels
-        height: Display height in pixels
-
-    Returns:
-        tuple: (validated_width, validated_height)
-
-    Raises:
-        ValueError: If dimensions are invalid
-    """
-    # Check types
-    if not isinstance(width, (int, float)):
-        raise ValueError(f"Display width must be numeric, got {type(width).__name__}")
-    if not isinstance(height, (int, float)):
-        raise ValueError(f"Display height must be numeric, got {type(height).__name__}")
-
-    # Convert to int
-    width = int(width)
-    height = int(height)
-
-    # Validate ranges (reasonable display sizes)
-    # Min: QVGA (320x240), Max: 8K (7680x4320)
-    if not (320 <= width <= 7680):
-        raise ValueError(f"Display width {width} out of valid range (320-7680)")
-    if not (240 <= height <= 4320):
-        raise ValueError(f"Display height {height} out of valid range (240-4320)")
-
-    # Check for potential division by zero
-    if width == 0 or height == 0:
-        raise ValueError("Display dimensions cannot be zero")
-
-    return width, height
-
-
-# Load display dimensions from config file
-try:
-    if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, "r") as f:
-            display_config = json.load(f)
-            raw_width = display_config.get("width", REFERENCE_WIDTH)
-            raw_height = display_config.get("height", REFERENCE_HEIGHT)
-
-            # Validate dimensions
-            DISPLAY_WIDTH, DISPLAY_HEIGHT = validate_display_dimensions(
-                raw_width, raw_height
-            )
-            logger.info("Loaded display config: %dx%d", DISPLAY_WIDTH, DISPLAY_HEIGHT)
-    else:
-        # Create default config file if it doesn't exist
-        DISPLAY_WIDTH, DISPLAY_HEIGHT = validate_display_dimensions(
-            REFERENCE_WIDTH, REFERENCE_HEIGHT
-        )
-        default_config = {
-            "width": DISPLAY_WIDTH,
-            "height": DISPLAY_HEIGHT,
-            "notes": "Default resolution. Change values to match your HDMI display resolution.",
-        }
-        with open(CONFIG_FILE, "w") as f:
-            json.dump(default_config, f, indent=4)
-        logger.info("Created default display config at %s: %dx%d",
-                   CONFIG_FILE, DISPLAY_WIDTH, DISPLAY_HEIGHT)
-except ValueError as e:
-    # Validation error - use safe defaults
-    logger.warning("Invalid display config: %s. Using safe defaults.", e)
-    DISPLAY_WIDTH = REFERENCE_WIDTH
-    DISPLAY_HEIGHT = REFERENCE_HEIGHT
-except Exception as e:
-    # Other errors (file I/O, JSON parsing, etc.)
-    logger.warning("Error loading display config: %s. Using reference values.", e)
-    DISPLAY_WIDTH = REFERENCE_WIDTH
-    DISPLAY_HEIGHT = REFERENCE_HEIGHT
+# Display dimensions (Waveshare 1024x600 HDMI)
+# Change these values to match your display resolution
+DISPLAY_WIDTH = 1024
+DISPLAY_HEIGHT = 600
 
 # Calculate scaling factors based on reference resolution
 SCALE_X = DISPLAY_WIDTH / REFERENCE_WIDTH
 SCALE_Y = DISPLAY_HEIGHT / REFERENCE_HEIGHT
-
-
-def reload_display_config():
-    """
-    Reload and validate display configuration from file.
-
-    Returns validated (width, height) tuple. Does NOT update module globals
-    since display dimensions are used to calculate positions, font sizes, etc.
-    at import time. A full application restart is required for changes to
-    take effect.
-
-    Returns:
-        tuple: (width, height) if valid, or (REFERENCE_WIDTH, REFERENCE_HEIGHT) on error
-
-    Raises:
-        ValueError: If dimensions are invalid (caught internally, logged)
-    """
-    try:
-        if os.path.exists(CONFIG_FILE):
-            with open(CONFIG_FILE, "r") as f:
-                display_config = json.load(f)
-                raw_width = display_config.get("width", REFERENCE_WIDTH)
-                raw_height = display_config.get("height", REFERENCE_HEIGHT)
-                width, height = validate_display_dimensions(raw_width, raw_height)
-                logger.debug("Reloaded display config: %dx%d", width, height)
-                return width, height
-        else:
-            logger.warning("Display config file not found: %s", CONFIG_FILE)
-            return REFERENCE_WIDTH, REFERENCE_HEIGHT
-    except ValueError as e:
-        logger.warning("Invalid display config on reload: %s", e)
-        return REFERENCE_WIDTH, REFERENCE_HEIGHT
-    except Exception as e:
-        logger.warning("Error reloading display config: %s", e)
-        return REFERENCE_WIDTH, REFERENCE_HEIGHT
 
 
 def scale_position(pos):
