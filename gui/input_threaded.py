@@ -3,9 +3,12 @@ Threaded input module for openTPT.
 Handles NeoKey 1x4 keypad input in a background thread to prevent I2C blocking.
 """
 
+import logging
 import time
 import threading
 from collections import deque
+
+logger = logging.getLogger('openTPT.input')
 
 # Import board only if available
 try:
@@ -97,7 +100,7 @@ class InputHandlerThreaded:
     def initialise(self, max_retries: int = 3):
         """Initialise the NeoKey device with retry logic."""
         if not NEOKEY_AVAILABLE:
-            print("Warning: NeoKey library not available - input disabled")
+            logger.warning("NeoKey library not available - input disabled")
             return
 
         for attempt in range(max_retries):
@@ -111,32 +114,32 @@ class InputHandlerThreaded:
 
                 # Set initial LED brightness based on default
                 self._update_leds()
-                print("NeoKey 1x4 initialised successfully")
+                logger.info("NeoKey 1x4 initialised successfully")
                 return
 
             except (IOError, OSError, RuntimeError, ValueError) as e:
-                print(f"NeoKey init attempt {attempt + 1}/{max_retries} failed: {e}")
+                logger.warning("NeoKey init attempt %d/%d failed: %s", attempt + 1, max_retries, e)
                 self.neokey = None
 
-        print("Warning: NeoKey not detected after retries")
+        logger.warning("NeoKey not detected after retries")
 
     def start(self):
         """Start the background polling thread."""
         if self.thread and self.thread.is_alive():
-            print("Warning: NeoKey thread already running")
+            logger.warning("NeoKey thread already running")
             return
 
         self.running = True
         self.thread = threading.Thread(target=self._poll_loop, daemon=True)
         self.thread.start()
-        print("NeoKey polling thread started")
+        logger.info("NeoKey polling thread started")
 
     def stop(self):
         """Stop the background polling thread."""
         self.running = False
         if self.thread:
             self.thread.join(timeout=2.0)
-        print("NeoKey polling thread stopped")
+        logger.info("NeoKey polling thread stopped")
 
     def _poll_loop(self):
         """Background thread that polls the NeoKey."""
@@ -160,13 +163,13 @@ class InputHandlerThreaded:
                 # I2C errors are common due to bus contention
                 self.consecutive_errors += 1
                 if self.consecutive_errors == 3:
-                    print(f"NeoKey: I2C errors ({e}), will retry silently")
+                    logger.warning("NeoKey: I2C errors (%s), will retry silently", e)
                 # Back off slightly on errors
                 time.sleep(0.05)
             except Exception as e:
                 self.consecutive_errors += 1
                 if self.consecutive_errors <= 3:
-                    print(f"Error in NeoKey poll loop: {e}")
+                    logger.error("Error in NeoKey poll loop: %s", e)
 
             # Sleep to maintain poll rate
             elapsed = time.time() - start_time
@@ -288,10 +291,12 @@ class InputHandlerThreaded:
 
     @recording.setter
     def recording(self, value):
-        """Set recording state and force LED update (thread-safe)."""
+        """Set recording state and request LED update (thread-safe)."""
         with self._state_lock:
             self._recording = value
-        self._update_leds()
+        # Use request mechanism instead of calling _update_leds() directly
+        # to avoid race condition (LED update happens in background thread)
+        self.request_led_update()
 
     @property
     def ui_visible(self):
@@ -414,6 +419,6 @@ class InputHandlerThreaded:
             # Set all keys to dim red
             for i in range(4):
                 self.neokey.pixels[i] = (32, 0, 0)  # Dim red color
-            print("NeoKey LEDs set to shutdown state")
+            logger.info("NeoKey LEDs set to shutdown state")
         except Exception as e:
-            print(f"Error setting shutdown LEDs: {e}")
+            logger.error("Error setting shutdown LEDs: %s", e)

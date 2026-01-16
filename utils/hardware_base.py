@@ -3,11 +3,14 @@ Base class for hardware handlers with optimised bounded queue architecture.
 Implements lock-free data snapshots for render path per system plan.
 """
 
+import logging
 import threading
 import queue
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 import time
+
+logger = logging.getLogger('openTPT.hardware')
 
 
 @dataclass
@@ -68,14 +71,14 @@ class BoundedQueueHardwareHandler:
         self.running = True
         self.thread = threading.Thread(target=self._worker_loop, daemon=True)
         self.thread.start()
-        print(f"{self.__class__.__name__} worker thread started")
+        logger.info("%s worker thread started", self.__class__.__name__)
 
     def stop(self):
         """Stop the hardware reading thread."""
         self.running = False
         if self.thread:
             self.thread.join(timeout=5.0)  # Allow time for I2C operations to complete
-        print(f"{self.__class__.__name__} worker thread stopped")
+        logger.info("%s worker thread stopped", self.__class__.__name__)
 
     def _worker_loop(self):
         """
@@ -126,10 +129,11 @@ class BoundedQueueHardwareHandler:
         drop_log_elapsed = current_time - self._last_drop_log_time
         if drop_log_elapsed >= 60.0:
             if self._frames_dropped > 0:
-                print(
-                    f"[WARNING] {self.__class__.__name__}: "
-                    f"{self._frames_dropped} frames dropped in last 60s "
-                    f"(total: {self._frames_dropped_total})"
+                logger.warning(
+                    "%s: %d frames dropped in last 60s (total: %d)",
+                    self.__class__.__name__,
+                    self._frames_dropped,
+                    self._frames_dropped_total
                 )
             self._frames_dropped = 0
             self._last_drop_log_time = current_time

@@ -4,7 +4,8 @@ openTPT - Open Tyre Pressure and Temperature Telemetry
 A modular GUI system for live racecar telemetry using Raspberry Pi 4
 """
 _boot_start = __import__('time').time()
-print(f"[BOOT] Python started", flush=True)
+_boot_logger = __import__('logging').getLogger('openTPT.boot')
+_boot_logger.debug("Python started")
 
 import os
 import sys
@@ -13,9 +14,18 @@ import math
 import argparse
 import subprocess
 import gc
+import logging
 import pygame
 import numpy as np
 import pygame.time as pgtime
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    datefmt='%H:%M:%S'
+)
+logger = logging.getLogger('openTPT')
 
 # Import GUI modules
 # from gui.template import Template
@@ -33,7 +43,7 @@ from ui.widgets.horizontal_bar import HorizontalBar, DualDirectionBar
 
 # Import optimised TPMS handler
 from hardware.tpms_input_optimized import TPMSHandler
-print("Using optimised TPMS handler with bounded queues")
+logger.info("Using optimised TPMS handler with bounded queues")
 
 # Import telemetry recorder
 from utils.telemetry_recorder import TelemetryRecorder, TelemetryFrame
@@ -126,7 +136,7 @@ from utils.config import (
 # Reads all sensors per mux channel to eliminate I2C bus contention
 # Supports: Tyres (Pico, MLX90614), Brakes (ADC, MLX90614, OBD)
 from hardware.unified_corner_handler import UnifiedCornerHandler
-print("Using unified corner handler (eliminates I2C bus contention)")
+logger.info("Using unified corner handler (eliminates I2C bus contention)")
 
 # Import IMU handler (optional, for G-meter)
 try:
@@ -177,7 +187,7 @@ except ImportError as e:
     LAP_TIMING_AVAILABLE = False
     LapTimingHandler = None
     LAP_TIMING_ENABLED = False
-    print(f"Lap timing not available: {e}")
+    logger.warning("Lap timing not available: %s", e)
 
 # Import performance monitoring
 try:
@@ -185,7 +195,7 @@ try:
     PERFORMANCE_MONITORING = True
 except ImportError:
     PERFORMANCE_MONITORING = False
-    print("Warning: Performance monitoring not available")
+    logger.warning("Performance monitoring not available")
 
 
 # Unit conversion functions
@@ -484,11 +494,11 @@ class OpenTPT:
         self.last_recording_time = 0.0
         self.recording_interval = 1.0 / RECORDING_RATE_HZ  # 10 Hz = 0.1s interval
 
-        print("Starting openTPT...")
+        logger.info("Starting openTPT...")
 
         # Check power status at startup (non-blocking, logged for later review)
         throttled, has_issues, message = check_power_status()
-        print(message)
+        logger.info(message)
         # Don't sleep on power issues - boot fast, user can check logs
 
         # Initialise pygame and display
@@ -501,7 +511,7 @@ class OpenTPT:
         """Initialise pygame and the display."""
         # Initialise pygame
         pygame.init()
-        print(f"[BOOT] pygame.init() done t={time.time()-_boot_start:.1f}s", flush=True)
+        logger.debug("pygame.init() done t=%.1fs", time.time()-_boot_start)
 
         # Start with an appropriate display mode for Raspberry Pi
         # Use a window for development, fullscreen for deployment
@@ -514,12 +524,12 @@ class OpenTPT:
                     (DISPLAY_WIDTH, DISPLAY_HEIGHT), pygame.FULLSCREEN
                 )
             except pygame.error:
-                print("Fullscreen mode failed, falling back to windowed mode")
+                logger.warning("Fullscreen mode failed, falling back to windowed mode")
                 self.screen = pygame.display.set_mode((DISPLAY_WIDTH, DISPLAY_HEIGHT))
 
         pygame.display.set_caption("openTPT")
         self.clock = pygame.time.Clock()
-        print(f"[BOOT] display ready t={time.time()-_boot_start:.1f}s", flush=True)
+        logger.debug("display ready t=%.1fs", time.time()-_boot_start)
 
         # Hide mouse cursor after display is initialised
         pygame.mouse.set_visible(False)
@@ -529,7 +539,7 @@ class OpenTPT:
             subprocess.run(['pkill', '-9', 'fbi'], capture_output=True)
         except (subprocess.SubprocessError, OSError, FileNotFoundError):
             pass  # Ignore - fbi may not be running or pkill may not exist
-        print(f"[BOOT] fbi killed t={time.time()-_boot_start:.1f}s", flush=True)
+        logger.debug("fbi killed t=%.1fs", time.time()-_boot_start)
 
         # Force display to wake up - clear and flip multiple times
         # KMS/DRM sometimes needs multiple frames to "activate"
@@ -537,7 +547,7 @@ class OpenTPT:
             self.screen.fill((0, 0, 0))
             pygame.display.flip()
             time.sleep(0.05)
-        print(f"[BOOT] display wakeup done t={time.time()-_boot_start:.1f}s", flush=True)
+        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
 
         # Show splash screen immediately
         self._show_splash("Loading...")
@@ -668,26 +678,26 @@ class OpenTPT:
                     enabled=radar_enabled,
                 )
                 self.radar.start()
-                print("Radar overlay enabled")
+                logger.info("Radar overlay enabled")
             except (IOError, OSError, RuntimeError, ValueError) as e:
-                print(f"Warning: Could not initialise radar: {e}")
+                logger.warning("Could not initialise radar: %s", e)
                 self.radar = None
 
         # Initialise camera (with optional radar)
         self._show_splash("Initialising cameras...", 0.15)
-        print(f"[BOOT] camera init start t={time.time()-_boot_start:.1f}s", flush=True)
+        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
         self.camera = Camera(self.screen, radar_handler=self.radar)
-        print(f"[BOOT] camera init done t={time.time()-_boot_start:.1f}s", flush=True)
+        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
 
         # Initialise input handler (NeoKey)
         self._show_splash("Initialising buttons...", 0.25)
-        print(f"[BOOT] neokey init start t={time.time()-_boot_start:.1f}s", flush=True)
+        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
         self.input_handler = InputHandler(self.camera)
-        print(f"[BOOT] neokey init done t={time.time()-_boot_start:.1f}s", flush=True)
+        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
 
         # Initialise encoder input handler (optional)
         self._show_splash("Initialising encoder...", 0.35)
-        print(f"[BOOT] encoder init start t={time.time()-_boot_start:.1f}s", flush=True)
+        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
         self.encoder = None
         if ENCODER_ENABLED:
             try:
@@ -698,18 +708,18 @@ class OpenTPT:
                     brightness_step=ENCODER_BRIGHTNESS_STEP,
                 )
                 if self.encoder.is_available():
-                    print("Encoder input handler initialised")
+                    logger.info("Encoder input handler initialised")
                 else:
-                    print("Warning: Encoder not detected")
+                    logger.warning("Encoder not detected")
                     self.encoder = None
             except (IOError, OSError, RuntimeError, ValueError) as e:
-                print(f"Warning: Could not initialise encoder: {e}")
+                logger.warning("Could not initialise encoder: %s", e)
                 self.encoder = None
-        print(f"[BOOT] encoder init done t={time.time()-_boot_start:.1f}s", flush=True)
+        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
 
         # Initialise NeoDriver LED strip (optional)
         self._show_splash("Initialising LED strip...", 0.45)
-        print(f"[BOOT] neodriver init start t={time.time()-_boot_start:.1f}s", flush=True)
+        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
         self.neodriver = None
         if NEODRIVER_ENABLED:
             try:
@@ -742,21 +752,21 @@ class OpenTPT:
                 )
                 if self.neodriver.is_available():
                     self.neodriver.start()
-                    print(f"NeoDriver initialised with {NEODRIVER_NUM_PIXELS} pixels, mode: {NEODRIVER_DEFAULT_MODE}")
+                    logger.info("NeoDriver initialised with %d pixels, mode: %s", NEODRIVER_NUM_PIXELS, NEODRIVER_DEFAULT_MODE)
                 else:
-                    print("Warning: NeoDriver not detected")
+                    logger.warning("NeoDriver not detected")
                     self.neodriver = None
             except (IOError, OSError, RuntimeError, ValueError) as e:
-                print(f"Warning: Could not initialise NeoDriver: {e}")
+                logger.warning("Could not initialise NeoDriver: %s", e)
                 self.neodriver = None
-        print(f"[BOOT] neodriver init done t={time.time()-_boot_start:.1f}s", flush=True)
+        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
 
         # Create hardware handlers
         self._show_splash("Initialising sensors...", 0.55)
         self.tpms = TPMSHandler()
-        print(f"[BOOT] corner sensors init start t={time.time()-_boot_start:.1f}s", flush=True)
+        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
         self.corner_sensors = UnifiedCornerHandler()  # Unified tyre+brake handler
-        print(f"[BOOT] corner sensors init done t={time.time()-_boot_start:.1f}s", flush=True)
+        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
 
         # Aliases for backward compatibility
         self.thermal = self.corner_sensors  # Tyre data access
@@ -764,26 +774,26 @@ class OpenTPT:
 
         # Initialise IMU handler (optional, for G-meter)
         self._show_splash("Initialising IMU...", 0.65)
-        print(f"[BOOT] IMU init start t={time.time()-_boot_start:.1f}s", flush=True)
+        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
         if IMU_ENABLED and IMU_AVAILABLE and IMUHandler:
             try:
                 self.imu = IMUHandler()
                 self.imu.start()
-                print("IMU handler initialised for G-meter")
+                logger.info("IMU handler initialised for G-meter")
             except (IOError, OSError, RuntimeError, ValueError) as e:
-                print(f"Warning: Could not initialise IMU: {e}")
+                logger.warning("Could not initialise IMU: %s", e)
                 self.imu = None
 
-        print(f"[BOOT] IMU init done t={time.time()-_boot_start:.1f}s", flush=True)
+        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
 
         # Initialise OBD2 handler (optional, for vehicle speed)
         self._show_splash("Initialising OBD2...", 0.75)
         if OBD_ENABLED and OBD2_AVAILABLE and OBD2Handler:
             try:
                 self.obd2 = OBD2Handler()
-                print("OBD2 handler initialised for vehicle speed")
+                logger.info("OBD2 handler initialised for vehicle speed")
             except (IOError, OSError, RuntimeError, ValueError) as e:
-                print(f"Warning: Could not initialise OBD2: {e}")
+                logger.warning("Could not initialise OBD2: %s", e)
                 self.obd2 = None
         else:
             self.obd2 = None
@@ -793,9 +803,9 @@ class OpenTPT:
         if GPS_ENABLED and GPS_AVAILABLE and GPSHandler:
             try:
                 self.gps = GPSHandler()
-                print("GPS handler initialised for speed")
+                logger.info("GPS handler initialised for speed")
             except (IOError, OSError, RuntimeError, ValueError) as e:
-                print(f"Warning: Could not initialise GPS: {e}")
+                logger.warning("Could not initialise GPS: %s", e)
                 self.gps = None
         else:
             self.gps = None
@@ -807,31 +817,31 @@ class OpenTPT:
                 self.lap_timing = LapTimingHandler(gps_handler=self.gps)
                 self.lap_timing.start()
                 self.lap_timing_display.set_handler(self.lap_timing)
-                print("Lap timing handler initialised")
+                logger.info("Lap timing handler initialised")
             except (IOError, OSError, RuntimeError, ValueError) as e:
-                print(f"Warning: Could not initialise lap timing: {e}")
+                logger.warning("Could not initialise lap timing: %s", e)
                 self.lap_timing = None
         else:
             self.lap_timing = None
             if LAP_TIMING_ENABLED and not self.gps:
-                print("Lap timing disabled: GPS required but not available")
+                logger.warning("Lap timing disabled: GPS required but not available")
 
         # Initialise Ford Hybrid handler (optional, for battery SOC)
         if FORD_HYBRID_ENABLED and FORD_HYBRID_AVAILABLE and FordHybridHandler:
             try:
                 self.ford_hybrid = FordHybridHandler()
                 self.ford_hybrid.initialise()
-                print("Ford Hybrid handler initialised for battery SOC")
+                logger.info("Ford Hybrid handler initialised for battery SOC")
             except (IOError, OSError, RuntimeError, ValueError) as e:
-                print(f"Warning: Could not initialise Ford Hybrid: {e}")
+                logger.warning("Could not initialise Ford Hybrid: %s", e)
                 self.ford_hybrid = None
         else:
             self.ford_hybrid = None
-        print(f"[BOOT] handlers init done t={time.time()-_boot_start:.1f}s", flush=True)
+        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
 
         # Initialise menu system
         self._show_splash("Initialising menu...", 0.85)
-        print(f"[BOOT] menu init start t={time.time()-_boot_start:.1f}s", flush=True)
+        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
         self.menu = MenuSystem(
             tpms_handler=self.tpms,
             encoder_handler=self.encoder,
@@ -843,22 +853,22 @@ class OpenTPT:
             camera_handler=self.camera,
             lap_timing_handler=self.lap_timing,
         )
-        print(f"[BOOT] menu init done t={time.time()-_boot_start:.1f}s", flush=True)
+        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
 
         # Start monitoring threads
         self._show_splash("Starting threads...", 0.95)
-        print(f"[BOOT] threads start t={time.time()-_boot_start:.1f}s", flush=True)
+        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
         self.input_handler.start()  # Start NeoKey polling thread
         if self.encoder:
             self.encoder.start()  # Start encoder polling thread
         self.tpms.start()
         self.corner_sensors.start()
         self._show_splash("Ready!", 1.0)
-        print(f"[BOOT] init complete t={time.time()-_boot_start:.1f}s", flush=True)
+        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
 
     def run(self):
         """Run the main application loop."""
-        print(f"[BOOT] run() start t={time.time()-_boot_start:.1f}s", flush=True)
+        logger.debug("\1 t=%.1fs", time.time()-_boot_start)
         self.running = True
         loop_times = {}
         first_frame = True
@@ -873,14 +883,14 @@ class OpenTPT:
                 self._handle_events()
                 loop_times['events'] = (time.time() - t0) * 1000
                 if first_frame:
-                    print(f"[BOOT] first events t={time.time()-_boot_start:.1f}s", flush=True)
+                    logger.debug("\1 t=%.1fs", time.time()-_boot_start)
 
                 # Update hardware (camera frame, input states, etc.)
                 t0 = time.time()
                 self._update_hardware()
                 loop_times['hardware'] = (time.time() - t0) * 1000
                 if first_frame:
-                    print(f"[BOOT] first hardware t={time.time()-_boot_start:.1f}s", flush=True)
+                    logger.debug("\1 t=%.1fs", time.time()-_boot_start)
 
                 # Render the screen (with performance monitoring)
                 if self.perf_monitor:
@@ -891,16 +901,16 @@ class OpenTPT:
                 loop_times['render'] = (time.time() - t0) * 1000
                 boot_frame_count += 1
                 if first_frame:
-                    print(f"[BOOT] first render t={time.time()-_boot_start:.1f}s", flush=True)
+                    logger.debug("\1 t=%.1fs", time.time()-_boot_start)
                     first_frame = False
                 elif boot_frame_count == 10:
-                    print(f"[BOOT] frame 10 t={time.time()-_boot_start:.1f}s", flush=True)
+                    logger.debug("\1 t=%.1fs", time.time()-_boot_start)
                 elif boot_frame_count == 60:
-                    print(f"[BOOT] frame 60 t={time.time()-_boot_start:.1f}s", flush=True)
+                    logger.debug("\1 t=%.1fs", time.time()-_boot_start)
                 elif boot_frame_count == 300:
-                    print(f"[BOOT] frame 300 t={time.time()-_boot_start:.1f}s", flush=True)
+                    logger.debug("\1 t=%.1fs", time.time()-_boot_start)
                 elif boot_frame_count == 600:
-                    print(f"[BOOT] frame 600 (GUI stable) t={time.time()-_boot_start:.1f}s", flush=True)
+                    logger.debug("\1 t=%.1fs", time.time()-_boot_start)
 
                 if self.perf_monitor:
                     self.perf_monitor.end_render()
@@ -919,25 +929,24 @@ class OpenTPT:
                 # Print loop profiling every 60 frames
                 loop_times['total'] = (time.time() - loop_start) * 1000
                 if self.frame_count % 60 == 1:
-                    print(f"\nLoop profile (ms): TOTAL={loop_times['total']:.1f}")
+                    logger.debug("Loop profile (ms): TOTAL=%.1f", loop_times['total'])
                     for key in ['events', 'hardware', 'render', 'clock_tick']:
                         val = loop_times.get(key, 0)
                         pct = (val / loop_times['total'] * 100) if loop_times['total'] > 0 else 0
-                        print(f"  {key:15s}: {val:6.2f}ms ({pct:5.1f}%)")
+                        logger.debug("  %15s: %6.2fms (%5.1f%%)", key, val, pct)
 
                 # Ensure mouse cursor stays hidden (some systems may reset it)
                 if pygame.mouse.get_visible():
                     pygame.mouse.set_visible(False)
 
         except KeyboardInterrupt:
-            print("\nExiting gracefully...")
+            logger.info("Exiting gracefully...")
         except Exception as e:
             import traceback
             import sys
 
-            print(f"Error in main loop: {e}")
-            print("Full traceback:")
-            traceback.print_exc()
+            logger.error("Error in main loop: %s", e)
+            logger.error("Full traceback:", exc_info=True)
             sys.stdout.flush()
             sys.stderr.flush()
             # Also write to file for persistent debugging
@@ -951,7 +960,7 @@ class OpenTPT:
                     traceback.print_exc(file=f)
                 # Set restrictive permissions (owner read/write only)
                 os.chmod(crash_log_path, stat.S_IRUSR | stat.S_IWUSR)
-                print(f"Crash log written to {crash_log_path}")
+                logger.info("Crash log written to %s", crash_log_path)
             except (IOError, OSError):
                 pass  # Can't write crash log - filesystem issue
         finally:
@@ -1039,7 +1048,7 @@ class OpenTPT:
             elif self.current_ui_page == "gmeter":
                 # G-meter page: Reset peak values
                 self.gmeter.reset_peaks()
-                print("G-meter peaks reset")
+                logger.info("G-meter peaks reset")
             elif self.current_ui_page == "lap_timing":
                 # Lap timing page: Toggle between timer and map view
                 if self.lap_timing_display:
@@ -1052,13 +1061,13 @@ class OpenTPT:
             # Deactivate camera
             if self.camera.is_active():
                 self.camera.toggle()  # Turn off camera
-            print(f"Switched to UI pages (current: {self.current_ui_page})")
+            logger.debug("Switched to UI pages (current: %s)", self.current_ui_page)
         else:
             self.current_category = "camera"
             # Activate camera if not already active
             if not self.camera.is_active():
                 self.camera.toggle()  # Turn on camera
-            print(f"Switched to camera pages (current: {self.current_camera_page})")
+            logger.debug("Switched to camera pages (current: %s)", self.current_camera_page)
 
         # Request LED update
         self.input_handler.request_led_update()
@@ -1084,7 +1093,7 @@ class OpenTPT:
                 self.camera.switch_camera()
                 # Update tracking of which camera is active
                 self.current_camera_page = self.camera.current_camera
-                print(f"Switched to {self.current_camera_page} camera")
+                logger.debug("Switched to %s camera", self.current_camera_page)
         else:
             # Switch between enabled UI pages
             enabled_pages = self._get_enabled_pages()
@@ -1103,9 +1112,9 @@ class OpenTPT:
                     if pc["id"] == self.current_ui_page:
                         page_name = pc["name"]
                         break
-                print(f"Switched to {page_name} page")
+                logger.debug("Switched to %s page", page_name)
             else:
-                print(f"Only one page enabled: {self.current_ui_page}")
+                logger.debug("Only one page enabled: %s", self.current_ui_page)
 
         # Request LED update
         self.input_handler.request_led_update()
@@ -1134,14 +1143,14 @@ class OpenTPT:
         filepath = self.recorder.save()
         self.input_handler.recording = False
         if filepath:
-            print(f"Recording saved to {filepath}")
+            logger.info("Recording saved to %s", filepath)
 
     def _recording_delete(self):
         """Delete recording without saving."""
         self.recorder.stop_recording()
         self.recorder.discard()
         self.input_handler.recording = False
-        print("Recording discarded")
+        logger.info("Recording discarded")
 
     def _record_telemetry_frame(self):
         """Record a single frame of telemetry data at configured rate."""
@@ -1284,9 +1293,9 @@ class OpenTPT:
             # Count objects after GC
             obj_count_after = len(gc.get_objects())
 
-            print(f"GC: Collected {collected} objects, "
-                  f"{obj_count_before} → {obj_count_after} objects "
-                  f"({obj_count_before - obj_count_after} freed)")
+            logger.debug("GC: Collected %d objects, %d -> %d objects (%d freed)",
+                         collected, obj_count_before, obj_count_after,
+                         obj_count_before - obj_count_after)
 
         # Clear cached pygame surfaces periodically (every 10 minutes)
         # This prevents GPU memory buildup from cached surfaces
@@ -1294,7 +1303,7 @@ class OpenTPT:
             self.last_surface_clear = current_time
             self.cached_ui_surface = None
             self.cached_brightness_surface = None
-            print(f"Memory: Cleared cached pygame surfaces (frame {self.frame_count})")
+            logger.debug("Memory: Cleared cached pygame surfaces (frame %d)", self.frame_count)
 
         # Periodic voltage monitoring (every 60 seconds)
         if current_time - self.last_voltage_check >= self.voltage_check_interval:
@@ -1303,10 +1312,10 @@ class OpenTPT:
 
             # Only log if there are new issues or critical issues
             if has_issues and (throttled & 0xF):  # Current issues (bits 0-3)
-                print(message)
+                logger.warning(message)
             elif has_issues and not self.voltage_warning_shown:
                 # Historical issues only - log once
-                print(message)
+                logger.info(message)
                 self.voltage_warning_shown = True
 
             # Collect and log detailed memory statistics if enabled
@@ -1348,12 +1357,12 @@ class OpenTPT:
                             mem_msg += f" | Objects={current_count}"
                         self.last_object_count = current_count
 
-                    print(mem_msg)
+                    logger.debug(mem_msg)
 
                     # Log object type profiling on separate line for easy grepping
                     if 'top_object_types' in stats:
                         top_types = ', '.join([f"{name}:{count}" for name, count in stats['top_object_types']])
-                        print(f"PROFILE: Top objects: {top_types}")
+                        logger.debug("PROFILE: Top objects: %s", top_types)
 
                         # Show which types are growing the most
                         if self.last_top_types:
@@ -1366,13 +1375,13 @@ class OpenTPT:
                                     growing_types.append(f"{name}:+{delta}")
 
                             if growing_types:
-                                print(f"PROFILE: Growing: {', '.join(growing_types)}")
+                                logger.debug("PROFILE: Growing: %s", ', '.join(growing_types))
 
                         # Update last_top_types
                         self.last_top_types = dict(stats['top_object_types'])
 
                 elif stats and 'error' in stats:
-                    print(f"MEMORY: Collection error: {stats['error']}")
+                    logger.warning("MEMORY: Collection error: %s", stats['error'])
 
         # Update NeoDriver with OBD2 RPM data
         if self.neodriver and self.obd2:
@@ -1776,10 +1785,10 @@ class OpenTPT:
         # Print profiling every 60 frames
         total_render = (time.time() - t_start) * 1000
         if self.frame_count % 60 == 0:
-            print(f"\nRender profile (ms): TOTAL={total_render:.1f}")
+            logger.debug("Render profile (ms): TOTAL=%.1f", total_render)
             for key, val in sorted(render_times.items(), key=lambda x: -x[1]):
                 pct = (val / total_render * 100) if total_render > 0 else 0
-                print(f"  {key:15s}: {val:6.2f}ms ({pct:5.1f}%)")
+                logger.debug("  %15s: %6.2fms (%5.1f%%)", key, val, pct)
 
     def _calculate_fps(self):
         """Calculate and update the FPS value."""
@@ -1807,7 +1816,7 @@ class OpenTPT:
         # Print performance summary periodically
         if current_time - self.last_perf_summary >= self.perf_summary_interval:
             self.last_perf_summary = current_time
-            print("\n" + self.perf_monitor.get_performance_summary())
+            logger.debug(self.perf_monitor.get_performance_summary())
 
             # Print brake temps (useful for thermocouple debugging)
             brake_temps = self.brakes.get_temps()
@@ -1820,18 +1829,18 @@ class OpenTPT:
                 if inner is not None or outer is not None:
                     parts = []
                     if inner is not None:
-                        parts.append(f"inner={inner:.1f}°C")
+                        parts.append(f"inner={inner:.1f}C")
                     if outer is not None:
-                        parts.append(f"outer={outer:.1f}°C")
+                        parts.append(f"outer={outer:.1f}C")
                     brake_lines.append(f"  {pos}: {', '.join(parts)}")
                 elif temp is not None:
-                    brake_lines.append(f"  {pos}: {temp:.1f}°C")
+                    brake_lines.append(f"  {pos}: {temp:.1f}C")
             if brake_lines:
-                print("Brake temps:\n" + "\n".join(brake_lines))
+                logger.debug("Brake temps:\n%s", "\n".join(brake_lines))
 
     def _cleanup(self):
         """Clean up resources before exiting."""
-        print("Shutting down openTPT...")
+        logger.info("Shutting down openTPT...")
 
         # Set NeoKey LEDs to dim red for shutdown state
         if self.input_handler:
@@ -1849,27 +1858,27 @@ class OpenTPT:
 
         # Stop IMU if enabled
         if self.imu:
-            print("Stopping IMU...")
+            logger.debug("Stopping IMU...")
             self.imu.stop()
 
         # Stop OBD2 if enabled
         if self.obd2:
-            print("Stopping OBD2...")
+            logger.debug("Stopping OBD2...")
             self.obd2.cleanup()
 
         # Stop GPS if enabled
         if self.gps:
-            print("Stopping GPS...")
+            logger.debug("Stopping GPS...")
             self.gps.stop()
 
         # Stop Ford Hybrid if enabled
         if self.ford_hybrid:
-            print("Stopping Ford Hybrid...")
+            logger.debug("Stopping Ford Hybrid...")
             self.ford_hybrid.cleanup()
 
         # Stop radar if enabled
         if self.radar:
-            print("Stopping radar...")
+            logger.debug("Stopping radar...")
             self.radar.stop()
 
         # Close camera
@@ -1879,7 +1888,7 @@ class OpenTPT:
         # Quit pygame
         pygame.quit()
 
-        print("Shutdown complete")
+        logger.info("Shutdown complete")
 
 
 def parse_args():

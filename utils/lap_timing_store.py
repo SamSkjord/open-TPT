@@ -6,12 +6,15 @@ in SQLite database for persistence across restarts.
 """
 
 import json
+import logging
 import os
 import sqlite3
 import threading
 import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
+
+logger = logging.getLogger('openTPT.lap_timing')
 
 
 # Default data directory
@@ -79,9 +82,9 @@ class LapTimingStore:
         """Create data directory if it doesn't exist."""
         try:
             os.makedirs(LAP_TIMING_DATA_DIR, exist_ok=True)
-            print(f"Lap timing data directory: {LAP_TIMING_DATA_DIR}")
+            logger.info("Lap timing data directory: %s", LAP_TIMING_DATA_DIR)
         except Exception as e:
-            print(f"Warning: Could not create lap timing data directory: {e}")
+            logger.warning("Could not create lap timing data directory: %s", e)
 
     def _init_database(self):
         """Initialise the SQLite database with required tables."""
@@ -143,10 +146,10 @@ class LapTimingStore:
 
                 conn.commit()
                 conn.close()
-                print(f"Lap timing database initialised: {self._db_path}")
+                logger.info("Lap timing database initialised: %s", self._db_path)
 
             except Exception as e:
-                print(f"Warning: Could not initialise lap timing database: {e}")
+                logger.warning("Could not initialise lap timing database: %s", e)
 
     def record_lap(self, lap: LapRecord) -> bool:
         """
@@ -194,13 +197,13 @@ class LapTimingStore:
                         VALUES (?, ?, ?, ?)
                     ''', (lap.track_name, lap.lap_time, lap.timestamp, sectors_json))
                     is_new_best = True
-                    print(f"New best lap for {lap.track_name}: {lap.format_time()}")
+                    logger.info("New best lap for %s: %s", lap.track_name, lap.format_time())
 
                 conn.commit()
                 conn.close()
 
             except Exception as e:
-                print(f"Warning: Could not record lap: {e}")
+                logger.warning("Could not record lap: %s", e)
 
         return is_new_best
 
@@ -236,7 +239,7 @@ class LapTimingStore:
                     )
 
             except Exception as e:
-                print(f"Warning: Could not get best lap: {e}")
+                logger.warning("Could not get best lap: %s", e)
 
         return None
 
@@ -271,7 +274,7 @@ class LapTimingStore:
                 conn.close()
 
             except Exception as e:
-                print(f"Warning: Could not get best laps: {e}")
+                logger.warning("Could not get best laps: %s", e)
 
         return result
 
@@ -299,12 +302,12 @@ class LapTimingStore:
                 conn.close()
 
                 if deleted:
-                    print(f"Cleared best lap for {track_name}")
+                    logger.info("Cleared best lap for %s", track_name)
 
                 return deleted
 
             except Exception as e:
-                print(f"Warning: Could not clear best lap: {e}")
+                logger.warning("Could not clear best lap: %s", e)
                 return False
 
     def clear_all_best_laps(self) -> int:
@@ -324,11 +327,11 @@ class LapTimingStore:
                 conn.commit()
                 conn.close()
 
-                print(f"Cleared {deleted} best lap records")
+                logger.info("Cleared %d best lap records", deleted)
                 return deleted
 
             except Exception as e:
-                print(f"Warning: Could not clear best laps: {e}")
+                logger.warning("Could not clear best laps: %s", e)
                 return 0
 
     def save_reference_lap(
@@ -366,11 +369,11 @@ class LapTimingStore:
 
                 conn.commit()
                 conn.close()
-                print(f"Saved reference lap for {track_name}: {len(gps_trace)} points")
+                logger.info("Saved reference lap for %s: %d points", track_name, len(gps_trace))
                 return True
 
             except Exception as e:
-                print(f"Warning: Could not save reference lap: {e}")
+                logger.warning("Could not save reference lap: %s", e)
                 return False
 
     def get_reference_lap(self, track_name: str) -> Optional[ReferenceLap]:
@@ -404,7 +407,7 @@ class LapTimingStore:
                     )
 
             except Exception as e:
-                print(f"Warning: Could not get reference lap: {e}")
+                logger.warning("Could not get reference lap: %s", e)
 
         return None
 
@@ -452,7 +455,7 @@ class LapTimingStore:
                 conn.close()
 
             except Exception as e:
-                print(f"Warning: Could not get recent laps: {e}")
+                logger.warning("Could not get recent laps: %s", e)
 
         return result
 
@@ -495,7 +498,7 @@ class LapTimingStore:
                 conn.close()
 
             except Exception as e:
-                print(f"Warning: Could not get track stats: {e}")
+                logger.warning("Could not get track stats: %s", e)
 
         return stats
 
