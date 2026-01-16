@@ -425,19 +425,32 @@ openTPT/
 │   ├── display.py                       # Draw pressure, temps, heatmaps
 │   ├── camera.py                        # Rear-view USB camera with radar overlay
 │   ├── radar_overlay.py                 # Radar track rendering
-│   ├── input.py                         # NeoKey 1x4 (brightness + camera toggle)
+│   ├── input_threaded.py                # NeoKey 1x4 (brightness + camera toggle)
+│   ├── encoder_input.py                 # Rotary encoder with menu navigation
+│   ├── menu.py                          # On-screen menu system
+│   ├── gmeter.py                        # G-meter display with IMU
+│   ├── fuel_display.py                  # Fuel tracking display
+│   ├── lap_timing_display.py            # Lap timing display
 │   ├── icon_handler.py                  # Icon rendering
 │   └── scale_bars.py                    # Temperature/pressure scale bars
 ├── hardware/
 │   ├── unified_corner_handler.py        # Unified handler for all tyre sensors
 │   ├── tpms_input_optimized.py          # TPMS with bounded queues
 │   ├── mlx90614_handler.py              # MLX90614 single-point IR sensors
-│   ├── radar_handler.py                 # Toyota radar CAN handler (optional)
+│   ├── radar_handler.py                 # Toyota radar CAN handler
+│   ├── obd2_handler.py                  # OBD2/CAN vehicle data
+│   ├── gps_handler.py                   # GPS serial NMEA parsing
+│   ├── imu_handler.py                   # ICM-20649 IMU for G-meter
+│   ├── neodriver_handler.py             # NeoDriver LED strip
+│   ├── lap_timing_handler.py            # Lap timing logic
 │   └── i2c_mux.py                       # TCA9548A Mux control
 ├── utils/
 │   ├── config.py                        # Hardware constants, defaults
-│   ├── settings.py                      # Persistent user settings (~/.opentpt_settings.json)
+│   ├── settings.py                      # Persistent user settings
 │   ├── hardware_base.py                 # Bounded queue base class
+│   ├── fuel_tracker.py                  # Fuel consumption tracking
+│   ├── lap_timing_store.py              # SQLite lap time persistence
+│   ├── telemetry_recorder.py            # CSV telemetry recording
 │   └── performance.py                   # Performance monitoring
 └── scratch/
     └── sources/                         # Source code for external libraries

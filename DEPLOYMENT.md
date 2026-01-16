@@ -392,14 +392,14 @@ The deployment script automatically excludes:
 - `*.psd` - Photoshop source files
 - `venv/`, `.venv/` - Virtual environments
 
-Edit `deploy_to_pi.sh` to customize exclusions.
+Edit `tools/quick_sync.sh` to customize exclusions.
 
 ## Deployment Checklist
 
 Before deploying to production:
 
 - [ ] Test on Mac with mock mode: `./main.py --windowed`
-- [ ] Deploy to Pi: `./deploy_to_pi.sh pi@192.168.199.246`
+- [ ] Deploy to Pi: `./tools/quick_sync.sh pi@192.168.199.246`
 - [ ] Test with actual hardware connected
 - [ ] Verify all sensors reporting correctly
 - [ ] Check performance summary meets targets
@@ -581,7 +581,7 @@ sudo journalctl -u openTPT.service -f
 ## Update Workflow
 
 1. Develop and test on Mac
-2. Deploy to Pi: `./deploy_to_pi.sh pi@192.168.199.246`
+2. Deploy to Pi: `./tools/quick_sync.sh pi@192.168.199.246`
 3. Test on Pi
 4. If production, restart service:
    ```bash

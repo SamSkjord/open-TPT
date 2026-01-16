@@ -70,7 +70,7 @@ ssh pi@192.168.199.246 "sudo systemctl status openTPT.service"
 | File | Purpose |
 |------|---------|
 | `utils/config.py` | All system constants, positions, thresholds |
-| `display_config.json` | Display resolution settings |
+| `utils/settings.py` | Persistent user settings (~/.opentpt_settings.json) |
 | `/etc/udev/rules.d/99-camera-names.rules` | Camera device naming (auto-installed) |
 | `/etc/udev/rules.d/80-can-persistent-names.rules` | CAN bus naming (auto-installed) |
 
