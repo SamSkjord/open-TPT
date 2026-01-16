@@ -3,8 +3,11 @@ I2C Multiplexer module for openTPT.
 Handles TCA9548A I2C multiplexer for accessing multiple MLX90640 thermal cameras.
 """
 
+import logging
 import time
 from utils.config import I2C_MUX_ADDRESS, I2C_BUS
+
+logger = logging.getLogger('openTPT.i2c_mux')
 
 # Import for actual I2C hardware
 try:
@@ -31,19 +34,21 @@ class I2CMux:
 
                 # Verify multiplexer is present
                 if self.verify_multiplexer():
-                    print(
-                        f"I2C multiplexer initialised at address 0x{I2C_MUX_ADDRESS:02X}"
+                    logger.info(
+                        "I2C multiplexer initialised at address 0x%02X",
+                        I2C_MUX_ADDRESS
                     )
                 else:
-                    print(
-                        f"Warning: I2C multiplexer not responding at address 0x{I2C_MUX_ADDRESS:02X}"
+                    logger.warning(
+                        "I2C multiplexer not responding at address 0x%02X",
+                        I2C_MUX_ADDRESS
                     )
                     self.i2c = None
             except Exception as e:
-                print(f"Warning: Error initialising I2C multiplexer: {e}")
+                logger.warning("Error initialising I2C multiplexer: %s", e)
                 self.i2c = None
         else:
-            print("Warning: I2C libraries not available - I2C multiplexing disabled")
+            logger.warning("I2C libraries not available - I2C multiplexing disabled")
 
     def verify_multiplexer(self):
         """Verify the multiplexer is present and responding."""
@@ -75,7 +80,7 @@ class I2CMux:
             return False
 
         if not (0 <= channel <= 7):
-            print(f"Invalid channel: {channel}. Must be 0-7.")
+            logger.warning("Invalid channel: %s. Must be 0-7.", channel)
             return False
 
         try:
@@ -92,7 +97,7 @@ class I2CMux:
             time.sleep(0.15)
             return True
         except Exception as e:
-            print(f"Error selecting channel {channel}: {e}")
+            logger.warning("Error selecting channel %s: %s", channel, e)
             return False
 
     def deselect_all(self):
@@ -112,7 +117,7 @@ class I2CMux:
             time.sleep(0.05)
             return True
         except Exception as e:
-            print(f"Error deselecting all channels: {e}")
+            logger.warning("Error deselecting all channels: %s", e)
             return False
 
     def get_active_channel(self):
@@ -141,7 +146,7 @@ class I2CMux:
         time.sleep(0.1)
 
         for channel in range(8):
-            print(f"Scanning channel {channel}...")
+            logger.debug("Scanning channel %s...", channel)
 
             if self.select_channel(channel):
                 # Allow more time for the channel to switch and stabilize
@@ -180,19 +185,19 @@ class I2CMux:
                     if 0x33 not in channel_devices:
                         if self.check_mlx90640_presence():
                             channel_devices.append(0x33)
-                            print(f"  MLX90640 detected at 0x33 via specific check")
+                            logger.debug("MLX90640 detected at 0x33 via specific check")
 
                     if channel_devices:
                         devices_found[channel] = channel_devices
-                        print(
-                            f"  Found devices at addresses: "
-                            + ", ".join([f"0x{addr:02X}" for addr in channel_devices])
+                        logger.debug(
+                            "Found devices at addresses: %s",
+                            ", ".join(["0x%02X" % addr for addr in channel_devices])
                         )
                     else:
-                        print(f"  No devices found")
+                        logger.debug("No devices found")
 
                 except Exception as e:
-                    print(f"  Error scanning: {e}")
+                    logger.debug("Error scanning: %s", e)
 
         # Deselect all channels when done
         self.deselect_all()
@@ -245,35 +250,35 @@ class I2CMux:
         Debug function to check the status of all channels.
         """
         if not self.i2c:
-            print("I2C multiplexer not available")
+            logger.debug("I2C multiplexer not available")
             return
 
-        print("\n=== I2C Multiplexer Debug ===")
-        print(f"Multiplexer address: 0x{self.mux_address:02X}")
+        logger.debug("=== I2C Multiplexer Debug ===")
+        logger.debug("Multiplexer address: 0x%02X", self.mux_address)
 
         # Check if multiplexer responds
         if self.verify_multiplexer():
-            print("Multiplexer is responding")
+            logger.debug("Multiplexer is responding")
         else:
-            print("ERROR: Multiplexer not responding!")
+            logger.warning("Multiplexer not responding!")
             return
 
         # Try each channel
         for channel in range(8):
-            print(f"\nChannel {channel}:")
+            logger.debug("Channel %s:", channel)
             if self.select_channel(channel):
-                print("  Channel selected successfully")
+                logger.debug("  Channel selected successfully")
 
                 # Extra delay for stability
                 time.sleep(0.5)
 
                 # Try to detect MLX90640 specifically
                 if self.check_mlx90640_presence():
-                    print("  MLX90640 detected!")
+                    logger.debug("  MLX90640 detected!")
                 else:
-                    print("  No MLX90640 found")
+                    logger.debug("  No MLX90640 found")
             else:
-                print("  ERROR: Failed to select channel")
+                logger.warning("  Failed to select channel %s", channel)
 
         self.deselect_all()
-        print("\n=== Debug Complete ===\n")
+        logger.debug("=== Debug Complete ===")

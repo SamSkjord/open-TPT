@@ -3,11 +3,14 @@ Rotary Encoder Input Handler for openTPT.
 Handles Adafruit I2C QT Rotary Encoder with NeoPixel in a background thread.
 """
 
-import time
+import logging
 import threading
+import time
 from collections import deque
 from dataclasses import dataclass
 from typing import Optional, Callable
+
+logger = logging.getLogger('openTPT.encoder')
 
 from utils.config import DEFAULT_BRIGHTNESS
 from utils.settings import get_settings
@@ -115,7 +118,7 @@ class EncoderInputHandler:
     def _initialise(self, max_retries: int = 3) -> bool:
         """Initialise the encoder hardware with retry logic."""
         if not ENCODER_AVAILABLE:
-            print("Warning: Encoder library not available - encoder disabled")
+            logger.warning("Encoder library not available - encoder disabled")
             return False
 
         for attempt in range(max_retries):
@@ -128,7 +131,7 @@ class EncoderInputHandler:
 
                 # Get firmware version
                 product_id = (self.seesaw.get_version() >> 16) & 0xFFFF
-                print(f"Encoder seesaw product ID: {product_id}")
+                logger.debug("Encoder seesaw product ID: %d", product_id)
 
                 # Initialise encoder
                 self.encoder = rotaryio.IncrementalEncoder(self.seesaw)
@@ -144,36 +147,36 @@ class EncoderInputHandler:
                 self.pixel_colour = (0, 0, 0)  # Off - reserved for error feedback
                 self._update_pixel()
 
-                print(f"Encoder initialised at 0x{self.i2c_address:02X}")
+                logger.info("Encoder initialised at 0x%02X", self.i2c_address)
                 return True
 
             except Exception as e:
-                print(f"Encoder init attempt {attempt + 1}/{max_retries} failed: {e}")
+                logger.debug("Encoder init attempt %d/%d failed: %s", attempt + 1, max_retries, e)
                 self.seesaw = None
                 self.encoder = None
                 self.button = None
                 self.pixel = None
 
-        print("Warning: Encoder not detected after retries")
+        logger.warning("Encoder not detected after retries")
         return False
 
     def start(self):
         """Start the background polling thread."""
         if self.thread and self.thread.is_alive():
-            print("Warning: Encoder thread already running")
+            logger.warning("Encoder thread already running")
             return
 
         self.running = True
         self.thread = threading.Thread(target=self._poll_loop, daemon=True)
         self.thread.start()
-        print("Encoder polling thread started")
+        logger.info("Encoder polling thread started")
 
     def stop(self):
         """Stop the background polling thread."""
         self.running = False
         if self.thread:
             self.thread.join(timeout=2.0)
-        print("Encoder polling thread stopped")
+        logger.info("Encoder polling thread stopped")
 
     def _poll_loop(self):
         """Background thread that polls the encoder."""
@@ -197,13 +200,13 @@ class EncoderInputHandler:
                 # I2C errors are common due to bus contention
                 self.consecutive_errors += 1
                 if self.consecutive_errors == 3:
-                    print(f"Encoder: I2C errors ({e}), will retry silently")
+                    logger.debug("Encoder: I2C errors (%s), will retry silently", e)
                 # Back off slightly on errors
                 time.sleep(0.05)
             except Exception as e:
                 self.consecutive_errors += 1
                 if self.consecutive_errors <= 3:
-                    print(f"Error in encoder poll loop: {e}")
+                    logger.debug("Error in encoder poll loop: %s", e)
 
             # Maintain poll rate
             elapsed = time.time() - start_time
@@ -302,7 +305,7 @@ class EncoderInputHandler:
         # Cap delta to prevent I2C noise causing large jumps
         capped_delta = max(-3, min(3, delta))
         if abs(delta) > 3:
-            print(f"Warning: Encoder delta {delta} capped to {capped_delta}")
+            logger.debug("Encoder delta %d capped to %d", delta, capped_delta)
 
         new_brightness = self.brightness + (capped_delta * self.brightness_step)
         self.set_brightness(new_brightness)
@@ -354,7 +357,7 @@ class EncoderInputHandler:
         try:
             self.pixel[0] = self.pixel_colour
         except Exception as e:
-            print(f"Error updating encoder pixel: {e}")
+            logger.debug("Error updating encoder pixel: %s", e)
 
     def is_available(self) -> bool:
         """Check if encoder hardware is available."""

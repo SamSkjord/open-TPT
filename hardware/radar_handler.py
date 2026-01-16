@@ -5,10 +5,13 @@ Uses bounded queues and lock-free snapshots per system plan.
 Based on toyota_radar_driver from scratch/sources/uvc-radar-overlay
 """
 
-import time
-import sys
+import logging
 import os
+import sys
+import time
 from typing import Dict, Optional, List
+
+logger = logging.getLogger('openTPT.radar')
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -26,7 +29,7 @@ except ImportError:
         RADAR_AVAILABLE = True
     except ImportError:
         RADAR_AVAILABLE = False
-        print("Warning: toyota_radar_driver not available")
+        logger.warning("toyota_radar_driver not available")
         # Create mock classes for type hints
         class RadarTrack:
             pass
@@ -96,7 +99,7 @@ class RadarHandlerOptimised(BoundedQueueHardwareHandler):
     def _initialise_radar(self) -> bool:
         """Initialise the Toyota radar driver."""
         if not RADAR_AVAILABLE:
-            print("Warning: Toyota radar driver not available")
+            logger.warning("Toyota radar driver not available")
             self.enabled = False
             return False
 
@@ -120,11 +123,11 @@ class RadarHandlerOptimised(BoundedQueueHardwareHandler):
 
             # Initialise driver
             self.driver = ToyotaRadarDriver(self.config)
-            print("Toyota radar driver initialised")
+            logger.info("Toyota radar driver initialised")
             return True
 
         except Exception as e:
-            print(f"Error initialising radar: {e}")
+            logger.warning("Error initialising radar: %s", e)
             self.driver = None
             self.enabled = False
             return False
@@ -132,21 +135,21 @@ class RadarHandlerOptimised(BoundedQueueHardwareHandler):
     def start(self):
         """Start the radar driver and worker thread."""
         if not self.enabled or not self.driver:
-            print("Radar not enabled or not initialised")
+            logger.debug("Radar not enabled or not initialised")
             return False
 
         try:
             # Start radar driver
             self.driver.start()
-            print("Radar driver started")
+            logger.info("Radar driver started")
 
             # Start worker thread
             super().start()
-            print("Radar worker thread started")
+            logger.info("Radar worker thread started")
             return True
 
         except Exception as e:
-            print(f"Error starting radar: {e}")
+            logger.warning("Error starting radar: %s", e)
             self.enabled = False
             return False
 
@@ -159,9 +162,9 @@ class RadarHandlerOptimised(BoundedQueueHardwareHandler):
         if self.driver:
             try:
                 self.driver.stop()
-                print("Radar driver stopped")
+                logger.info("Radar driver stopped")
             except Exception as e:
-                print(f"Error stopping radar: {e}")
+                logger.debug("Error stopping radar: %s", e)
 
     def _worker_loop(self):
         """
@@ -171,7 +174,7 @@ class RadarHandlerOptimised(BoundedQueueHardwareHandler):
         read_interval = 0.05  # 20 Hz reading
         last_read = 0
 
-        print("Radar worker thread running")
+        logger.debug("Radar worker thread running")
 
         while self.running:
             current_time = time.time()
@@ -204,7 +207,7 @@ class RadarHandlerOptimised(BoundedQueueHardwareHandler):
             if len(tracks) > 0 and not hasattr(self, '_last_track_log'):
                 self._last_track_log = 0
             if len(tracks) > 0 and time.time() - getattr(self, '_last_track_log', 0) > 5.0:
-                print(f"Radar: Receiving {len(tracks)} tracks")
+                logger.debug("Radar: Receiving %d tracks", len(tracks))
                 self._last_track_log = time.time()
 
             for track_id, track in tracks.items():

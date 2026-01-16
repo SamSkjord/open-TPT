@@ -3,10 +3,13 @@ Optimised TPMS Input Handler for openTPT.
 Uses bounded queues and lock-free snapshots per system plan.
 """
 
+import logging
+import os
+import sys
 import threading
 import time
-import sys
-import os
+
+logger = logging.getLogger('openTPT.tpms')
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -19,7 +22,7 @@ try:
     TPMS_AVAILABLE = True
 except ImportError:
     TPMS_AVAILABLE = False
-    print("Warning: TPMS library not available")
+    logger.warning("TPMS library not available")
 
 
 class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
@@ -95,7 +98,7 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
     def _initialise_device(self) -> bool:
         """Initialise the TPMS device and register callbacks."""
         if not TPMS_AVAILABLE:
-            print("Warning: TPMS library not available")
+            logger.warning("TPMS library not available")
             return False
 
         try:
@@ -113,15 +116,15 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
 
             # Connect to device
             if self.tpms_device.connect():
-                print("TPMS device initialised and connected")
+                logger.info("TPMS device initialised and connected")
                 self.tpms_device.query_sensor_ids()
                 return True
             else:
-                print("Failed to connect to TPMS device")
+                logger.warning("Failed to connect to TPMS device")
                 return False
 
         except (OSError, IOError, RuntimeError, ValueError) as e:
-            print(f"Error initialising TPMS: {e}")
+            logger.warning("Error initialising TPMS: %s", e)
             self.tpms_device = None
             return False
 
@@ -164,7 +167,7 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
             return
 
         pos_code = self.position_map[position]
-        print(f"TPMS pairing complete for {pos_code}: ID {tyre_id}")
+        logger.info("TPMS pairing complete for %s: ID %s", pos_code, tyre_id)
 
     def _worker_loop(self):
         """
@@ -174,7 +177,7 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
         check_interval = 1.0  # Check for timeouts every second
         last_check = 0
 
-        print("TPMS worker thread running")
+        logger.debug("TPMS worker thread running")
 
         while self.running:
             current_time = time.time()
@@ -258,9 +261,9 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
         if self.tpms_device:
             try:
                 self.tpms_device.disconnect()
-                print("TPMS device disconnected")
+                logger.info("TPMS device disconnected")
             except (OSError, IOError, RuntimeError) as e:
-                print(f"Error disconnecting TPMS: {e}")
+                logger.warning("Error disconnecting TPMS: %s", e)
 
     # Pairing methods (passthrough to device)
     def pair_sensor(self, position_code: str) -> bool:
@@ -289,7 +292,7 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
 
             return self.tpms_device.pair_sensor(reverse_map[position_code])
         except (OSError, IOError, RuntimeError, ValueError) as e:
-            print(f"Error pairing sensor: {e}")
+            logger.warning("Error pairing sensor: %s", e)
             return False
 
     def stop_pairing(self) -> bool:
@@ -300,7 +303,7 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
         try:
             return self.tpms_device.stop_pairing()
         except (OSError, IOError, RuntimeError) as e:
-            print(f"Error stopping pairing: {e}")
+            logger.warning("Error stopping pairing: %s", e)
             return False
 
 

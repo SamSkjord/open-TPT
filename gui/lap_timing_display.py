@@ -4,9 +4,12 @@ Shows current lap time, last lap, best lap, and sector times.
 Toggle between timer view and map view with BUTTON_PAGE_SETTINGS.
 """
 
-import pygame
-import time
+import logging
 import math
+import time
+import pygame
+
+logger = logging.getLogger('openTPT.lap_timing_display')
 from utils.config import (
     DISPLAY_WIDTH,
     DISPLAY_HEIGHT,
@@ -71,7 +74,7 @@ class LapTimingDisplay:
             self.font_medium = pygame.font.Font(FONT_PATH, FONT_SIZE_MEDIUM)
             self.font_small = pygame.font.Font(FONT_PATH, FONT_SIZE_SMALL)
         except (pygame.error, FileNotFoundError, IOError, OSError) as e:
-            print(f"Error loading fonts: {e}")
+            logger.warning("Error loading fonts: %s", e)
             self.font_huge = pygame.font.SysFont("monospace", int(FONT_SIZE_LARGE * 3))
             self.font_xlarge = pygame.font.SysFont("monospace", int(FONT_SIZE_LARGE * 1.8))
             self.font_large = pygame.font.SysFont("monospace", FONT_SIZE_LARGE)
@@ -93,10 +96,10 @@ class LapTimingDisplay:
         """Toggle between timer and map view modes."""
         if self.view_mode == self.VIEW_TIMER:
             self.view_mode = self.VIEW_MAP
-            print("Lap timing: Switched to map view")
+            logger.debug("Lap timing: Switched to map view")
         else:
             self.view_mode = self.VIEW_TIMER
-            print("Lap timing: Switched to timer view")
+            logger.debug("Lap timing: Switched to timer view")
 
     def _format_time(self, seconds, show_sign=False):
         """

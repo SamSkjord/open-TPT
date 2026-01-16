@@ -418,7 +418,7 @@ class InputHandlerThreaded:
         try:
             # Set all keys to dim red
             for i in range(4):
-                self.neokey.pixels[i] = (32, 0, 0)  # Dim red color
+                self.neokey.pixels[i] = (32, 0, 0)  # Dim red colour
             logger.info("NeoKey LEDs set to shutdown state")
         except Exception as e:
             logger.error("Error setting shutdown LEDs: %s", e)

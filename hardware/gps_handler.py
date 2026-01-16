@@ -4,12 +4,15 @@ Reads NMEA data directly from serial at 10Hz for accurate data logging.
 PPS signal provides nanosecond time sync via chrony independently.
 """
 
+import logging
 import time
 import serial
 from typing import Optional
 
 from utils.hardware_base import BoundedQueueHardwareHandler
 from utils.config import GPS_ENABLED, GPS_SERIAL_PORT, GPS_BAUD_RATE
+
+logger = logging.getLogger('openTPT.gps')
 
 # MTK3339 PMTK commands for configuration
 # Checksum is XOR of all characters between $ and * (exclusive)
@@ -72,7 +75,7 @@ class GPSHandler(BoundedQueueHardwareHandler):
             self._initialise()
             self.start()
         else:
-            print("GPS disabled in config")
+            logger.info("GPS disabled in config")
 
     def _initialise(self):
         """Initialise serial connection to GPS and configure MTK3339."""
@@ -87,18 +90,18 @@ class GPSHandler(BoundedQueueHardwareHandler):
                     baudrate=GPS_BAUD_RATE,
                     timeout=0.15
                 )
-                print(f"GPS: Connected to {GPS_SERIAL_PORT} at {GPS_BAUD_RATE} baud")
+                logger.info("GPS: Connected to %s at %s baud", GPS_SERIAL_PORT, GPS_BAUD_RATE)
 
             self.hardware_available = True
             self.consecutive_errors = 0
         except Exception as e:
-            print(f"GPS: Failed to initialise: {e}")
+            logger.warning("GPS: Failed to initialise: %s", e)
             self.serial_port = None
             self.hardware_available = False
 
     def _configure_mtk3339(self):
         """Configure MTK3339 GPS module for higher baud rate and 10Hz updates."""
-        print(f"GPS: Configuring MTK3339 for {GPS_BAUD_RATE} baud / 10Hz...")
+        logger.info("GPS: Configuring MTK3339 for %s baud / 10Hz...", GPS_BAUD_RATE)
 
         # First, try connecting at the target baud rate (in case already configured)
         try:
@@ -112,7 +115,7 @@ class GPSHandler(BoundedQueueHardwareHandler):
             if self.serial_port.in_waiting > 0:
                 data = self.serial_port.read(self.serial_port.in_waiting).decode('ascii', errors='ignore')
                 if '$GP' in data or '$GN' in data:
-                    print(f"GPS: Already configured at {GPS_BAUD_RATE} baud")
+                    logger.info("GPS: Already configured at %s baud", GPS_BAUD_RATE)
                     # Ensure RMC + GGA sentences are enabled
                     self.serial_port.write(MTK_NMEA_RMC_GGA)
                     time.sleep(0.1)
@@ -157,10 +160,10 @@ class GPSHandler(BoundedQueueHardwareHandler):
                 baudrate=GPS_BAUD_RATE,
                 timeout=0.15
             )
-            print(f"GPS: Configured to {GPS_BAUD_RATE} baud / 10Hz")
+            logger.info("GPS: Configured to %s baud / 10Hz", GPS_BAUD_RATE)
 
         except Exception as e:
-            print(f"GPS: Configuration failed: {e}")
+            logger.warning("GPS: Configuration failed: %s", e)
             # Fall back to trying target baud rate anyway
             self.serial_port = serial.Serial(
                 port=GPS_SERIAL_PORT,
@@ -212,9 +215,9 @@ class GPSHandler(BoundedQueueHardwareHandler):
             except serial.SerialException as e:
                 self.consecutive_errors += 1
                 if self.consecutive_errors == 3:
-                    print(f"GPS: Serial error: {e}")
+                    logger.warning("GPS: Serial error: %s", e)
                 elif self.consecutive_errors >= self.max_consecutive_errors:
-                    print("GPS: Too many errors, attempting reconnect...")
+                    logger.warning("GPS: Too many errors, attempting reconnect...")
                     self._initialise()
                     self.consecutive_errors = 0
                 time.sleep(0.1)
@@ -222,7 +225,7 @@ class GPSHandler(BoundedQueueHardwareHandler):
             except Exception as e:
                 self.consecutive_errors += 1
                 if self.consecutive_errors == 3:
-                    print(f"GPS: Error: {e}")
+                    logger.warning("GPS: Error: %s", e)
                 time.sleep(0.1)
 
     def _parse_rmc(self, sentence: str):
@@ -342,13 +345,13 @@ class GPSHandler(BoundedQueueHardwareHandler):
                 timeout=5
             )
             if result.returncode == 0:
-                print(f"GPS: System time set to {datetime_str} UTC")
+                logger.info("GPS: System time set to %s UTC", datetime_str)
                 self.time_synced = True
             else:
-                print(f"GPS: Time sync failed: {result.stderr.decode()}")
+                logger.warning("GPS: Time sync failed: %s", result.stderr.decode())
                 self.time_synced = True  # Don't retry
         except Exception as e:
-            print(f"GPS: Time sync error: {e}")
+            logger.warning("GPS: Time sync error: %s", e)
             self.time_synced = True  # Don't retry
 
     def _publish_data(self):
@@ -391,4 +394,4 @@ class GPSHandler(BoundedQueueHardwareHandler):
                 self.serial_port.close()
             except Exception:
                 pass
-        print("GPS handler stopped")
+        logger.info("GPS handler stopped")

@@ -3,8 +3,11 @@ Template module for openTPT.
 Handles loading and rendering of the static GUI Template.
 """
 
+import logging
 import os
 import pygame
+
+logger = logging.getLogger('openTPT.template')
 from utils.config import TEMPLATE_PATH, DISPLAY_WIDTH, DISPLAY_HEIGHT
 
 
@@ -34,13 +37,13 @@ class Template:
                     self.Template_image = pygame.transform.scale(
                         self.Template_image, (DISPLAY_WIDTH, DISPLAY_HEIGHT)
                     )
-                print(f"Template loaded successfully: {TEMPLATE_PATH}")
+                logger.info("Template loaded successfully: %s", TEMPLATE_PATH)
             else:
-                print(f"Warning: Template file not found at {TEMPLATE_PATH}")
+                logger.warning("Template file not found at %s", TEMPLATE_PATH)
                 # Create a basic placeholder Template
                 self.create_placeholder_Template()
         except Exception as e:
-            print(f"Error loading Template: {e}")
+            logger.warning("Error loading Template: %s", e)
             # Create a basic placeholder Template on error
             self.create_placeholder_Template()
 
@@ -83,7 +86,7 @@ class Template:
             self.Template_image, (80, 80, 80, 180), car_rect, border_radius=15
         )
 
-        print("Created placeholder Template")
+        logger.debug("Created placeholder Template")
 
     def render(self):
         """Render the Template onto the provided surface."""

@@ -5,11 +5,14 @@ Integrates lap-timing-system components with BoundedQueueHardwareHandler pattern
 Consumes GPS data via lock-free snapshots and publishes lap timing data for display.
 """
 
+import logging
 import time
 import os
 from typing import Optional, List, Dict, Any
 
 from utils.hardware_base import BoundedQueueHardwareHandler
+
+logger = logging.getLogger('openTPT.lap_timing')
 from utils.config import (
     LAP_TIMING_ENABLED,
     TRACK_AUTO_DETECT,
@@ -28,7 +31,7 @@ try:
     from lap_timing.data.track_selector import TrackSelector
     LAP_TIMING_AVAILABLE = True
 except ImportError as e:
-    print(f"Lap timing modules not available: {e}")
+    logger.warning("Lap timing modules not available: %s", e)
     LAP_TIMING_AVAILABLE = False
 
 
@@ -98,7 +101,7 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
     def _initialise(self):
         """Initialise lap timing components."""
         if not LAP_TIMING_AVAILABLE:
-            print("Lap timing: Modules not available")
+            logger.warning("Lap timing: Modules not available")
             return
 
         try:
@@ -108,12 +111,12 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
 
             if os.path.exists(tracks_db_path) or os.path.exists(racelogic_db_path):
                 self.track_selector = TrackSelector()
-                print("Lap timing: Track selector initialised")
+                logger.info("Lap timing: Track selector initialised")
             else:
-                print(f"Lap timing: Track databases not found at {LAP_TIMING_DATA_DIR}")
+                logger.warning("Lap timing: Track databases not found at %s", LAP_TIMING_DATA_DIR)
 
         except Exception as e:
-            print(f"Lap timing: Initialisation error: {e}")
+            logger.warning("Lap timing: Initialisation error: %s", e)
 
     def set_track(self, track: Track):
         """
@@ -142,7 +145,7 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
         self.sector_start_time = None
 
         self.track_detected = True
-        print(f"Lap timing: Track set to '{track.name}' ({track.length:.0f}m)")
+        logger.info("Lap timing: Track set to '%s' (%.0fm)", track.name, track.length)
 
         # Load stored best lap for this track
         self._load_best_lap_from_store()
@@ -177,9 +180,9 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
             except Exception as e:
                 self.consecutive_errors += 1
                 if self.consecutive_errors == 3:
-                    print(f"Lap timing: Error: {e}")
+                    logger.warning("Lap timing: Error: %s", e)
                 elif self.consecutive_errors >= self.max_consecutive_errors:
-                    print("Lap timing: Too many errors, resetting...")
+                    logger.warning("Lap timing: Too many errors, resetting...")
                     self.consecutive_errors = 0
                 time.sleep(0.1)
 
@@ -209,18 +212,18 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
             if nearby:
                 # Load the closest track directly (already sorted by distance)
                 track_info = nearby[0]
-                print(f"Lap timing: Found {len(nearby)} nearby track(s), selecting closest: {track_info.name}")
+                logger.info("Lap timing: Found %d nearby track(s), selecting closest: %s", len(nearby), track_info.name)
 
                 if track_info.kmz_path:
                     from lap_timing.data.track_loader import load_track_from_kmz
                     track = load_track_from_kmz(track_info.kmz_path)
                     if track:
                         self.set_track(track)
-                        print(f"Lap timing: Auto-detected track: {track.name}")
+                        logger.info("Lap timing: Auto-detected track: %s", track.name)
                 else:
-                    print(f"Lap timing: KMZ file not found for {track_info.name}")
+                    logger.warning("Lap timing: KMZ file not found for %s", track_info.name)
         except Exception as e:
-            print(f"Lap timing: Auto-detect error: {e}")
+            logger.warning("Lap timing: Auto-detect error: %s", e)
             self.auto_detect_enabled = False  # Disable after error
 
     def _process_gps_point(self, gps_point: GPSPoint):
@@ -281,7 +284,7 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
             if self.best_lap is None or lap.duration < self.best_lap.duration:
                 self.best_lap = lap
                 self.delta_calculator.set_reference_lap(lap)
-                print(f"Lap timing: New best lap: {self._format_time(lap.duration)}")
+                logger.info("Lap timing: New best lap: %s", self._format_time(lap.duration))
 
             # Update best sector times
             for i, sector_time in enumerate(self.sector_times):
@@ -289,7 +292,7 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
                     if self.best_sector_times[i] is None or sector_time < self.best_sector_times[i]:
                         self.best_sector_times[i] = sector_time
 
-            print(f"Lap timing: Lap {self.current_lap_number} - {self._format_time(lap.duration)}")
+            logger.info("Lap timing: Lap %d - %s", self.current_lap_number, self._format_time(lap.duration))
 
             # Record lap to persistent store
             self._record_lap_to_store(lap)
@@ -447,7 +450,7 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
                         gps_trace
                     )
         except Exception as e:
-            print(f"Lap timing: Error recording lap to store: {e}")
+            logger.warning("Lap timing: Error recording lap to store: %s", e)
 
     def _load_best_lap_from_store(self):
         """Load best lap from persistent store for current track."""
@@ -459,9 +462,9 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
             best_record = store.get_best_lap(self.track.name)
             if best_record:
                 self.stored_best_lap_time = best_record.lap_time
-                print(f"Lap timing: Loaded stored best lap for {self.track.name}: {best_record.format_time()}")
+                logger.info("Lap timing: Loaded stored best lap for %s: %s", self.track.name, best_record.format_time())
         except Exception as e:
-            print(f"Lap timing: Error loading best lap from store: {e}")
+            logger.warning("Lap timing: Error loading best lap from store: %s", e)
 
     # Convenience methods for display
     def get_current_lap_time(self) -> Optional[float]:
@@ -504,7 +507,7 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
         self.best_sector_times = [None] * self.sector_count
         if self.delta_calculator:
             self.delta_calculator.clear_reference()
-        print("Lap timing: Laps cleared")
+        logger.info("Lap timing: Laps cleared")
 
     def get_nearby_tracks(self) -> List[Dict[str, Any]]:
         """
@@ -539,7 +542,7 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
                 for t in nearby
             ]
         except Exception as e:
-            print(f"Lap timing: Error getting nearby tracks: {e}")
+            logger.warning("Lap timing: Error getting nearby tracks: %s", e)
             return []
 
     def select_track_by_name(self, track_name: str) -> bool:
@@ -561,9 +564,9 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
                         track = load_track_from_kmz(track_info['kmz_path'])
                         if track:
                             self.set_track(track)
-                            print(f"Lap timing: Selected track: {track.name}")
+                            logger.info("Lap timing: Selected track: %s", track.name)
                             return True
                     except Exception as e:
-                        print(f"Lap timing: Error loading track: {e}")
+                        logger.warning("Lap timing: Error loading track: %s", e)
                         return False
         return False

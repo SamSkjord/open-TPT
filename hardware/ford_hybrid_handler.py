@@ -4,10 +4,13 @@ Reads Ford-specific PIDs from the hybrid battery control module.
 """
 
 import can
+import logging
 import struct
 import threading
 import time
 from collections import deque
+
+logger = logging.getLogger('openTPT.ford_hybrid')
 from hardware.hardware_handler_base import BoundedQueueHardwareHandler
 from utils.config import FORD_HYBRID_ENABLED, FORD_HYBRID_CHANNEL, FORD_HYBRID_BITRATE
 
@@ -58,12 +61,12 @@ class FordHybridHandler(BoundedQueueHardwareHandler):
     def initialise(self):
         """Initialise CAN bus connection to Ford hybrid module."""
         if not self.enabled:
-            print("Ford Hybrid handler disabled in config")
+            logger.debug("Ford Hybrid handler disabled in config")
             self.hardware_available = False
             return
 
         try:
-            print(f"Initialising Ford Hybrid on {self.channel} at {self.bitrate} bps...")
+            logger.info("Initialising Ford Hybrid on %s at %d bps...", self.channel, self.bitrate)
 
             # Create CAN bus interface
             self.bus = can.interface.Bus(
@@ -73,13 +76,13 @@ class FordHybridHandler(BoundedQueueHardwareHandler):
             )
 
             self.hardware_available = True
-            print(f"Ford Hybrid initialised on {self.channel}")
+            logger.info("Ford Hybrid initialised on %s", self.channel)
 
             # Start worker thread
             self.start()
 
         except Exception as e:
-            print(f"Failed to initialise Ford Hybrid: {e}")
+            logger.warning("Failed to initialise Ford Hybrid: %s", e)
             self.hardware_available = False
             self.bus = None
 
@@ -218,7 +221,7 @@ class FordHybridHandler(BoundedQueueHardwareHandler):
 
                 except Exception as e:
                     if self.running:
-                        print(f"Ford Hybrid PID read error: {e}")
+                        logger.debug("Ford Hybrid PID read error: %s", e)
 
                 # Move to next PID
                 pid_index = (pid_index + 1) % len(pids_to_read)
@@ -247,4 +250,4 @@ class FordHybridHandler(BoundedQueueHardwareHandler):
             except Exception:
                 pass
             self.bus = None
-        print("Ford Hybrid handler stopped")
+        logger.info("Ford Hybrid handler stopped")

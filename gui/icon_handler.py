@@ -2,8 +2,11 @@
 Handles loading and rendering of PNG icons on the interface.
 """
 
+import logging
 import os
 import pygame
+
+logger = logging.getLogger('openTPT.icons')
 from utils.config import (
     TYRE_ICON_PATH,
     BRAKE_ICON_PATH,
@@ -43,12 +46,12 @@ class IconHandler:
                         image = pygame.transform.scale(image, ICON_SIZE)
 
                     self.icons[name] = image
-                    print(f"Loaded icon: {name} from {path}")
+                    logger.debug("Loaded icon: %s from %s", name, path)
                 else:
-                    print(f"Warning: Icon file not found at {path}")
+                    logger.warning("Icon file not found at %s", path)
                     self.icons[name] = None
             except Exception as e:
-                print(f"Error loading icon {name} from {path}: {e}")
+                logger.warning("Error loading icon %s from %s: %s", name, path, e)
                 self.icons[name] = None
 
     def render_icon(self, name, position=None):
@@ -79,7 +82,7 @@ class IconHandler:
             self.surface.blit(self.icons[name], position)
             return True
         except Exception as e:
-            print(f"Error rendering icon {name}: {e}")
+            logger.debug("Error rendering icon %s: %s", name, e)
             return False
 
     def render_all(self):
@@ -116,10 +119,10 @@ class IconHandler:
                 self.icons[name] = image
                 return True
             else:
-                print(f"Warning: Icon file not found during reload: {path}")
+                logger.warning("Icon file not found during reload: %s", path)
                 return False
         except Exception as e:
-            print(f"Error reloading icon {name} from {path}: {e}")
+            logger.warning("Error reloading icon %s from %s: %s", name, path, e)
             return False
 
     def render_to_surface(self, surface):

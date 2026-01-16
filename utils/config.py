@@ -15,8 +15,11 @@ Organised into logical sections:
 10. Helper Functions
 """
 
-import os
 import json
+import logging
+import os
+
+logger = logging.getLogger('openTPT.config')
 
 # ==============================================================================
 # DISPLAY & UI SETTINGS
@@ -211,7 +214,7 @@ try:
             DISPLAY_WIDTH, DISPLAY_HEIGHT = validate_display_dimensions(
                 raw_width, raw_height
             )
-            print(f"Loaded display config: {DISPLAY_WIDTH}x{DISPLAY_HEIGHT}")
+            logger.info("Loaded display config: %dx%d", DISPLAY_WIDTH, DISPLAY_HEIGHT)
     else:
         # Create default config file if it doesn't exist
         DISPLAY_WIDTH, DISPLAY_HEIGHT = validate_display_dimensions(
@@ -224,17 +227,16 @@ try:
         }
         with open(CONFIG_FILE, "w") as f:
             json.dump(default_config, f, indent=4)
-        print(
-            f"Created default display config at {CONFIG_FILE}: {DISPLAY_WIDTH}x{DISPLAY_HEIGHT}"
-        )
+        logger.info("Created default display config at %s: %dx%d",
+                   CONFIG_FILE, DISPLAY_WIDTH, DISPLAY_HEIGHT)
 except ValueError as e:
     # Validation error - use safe defaults
-    print(f"Invalid display config: {e}. Using safe defaults.")
+    logger.warning("Invalid display config: %s. Using safe defaults.", e)
     DISPLAY_WIDTH = REFERENCE_WIDTH
     DISPLAY_HEIGHT = REFERENCE_HEIGHT
 except Exception as e:
     # Other errors (file I/O, JSON parsing, etc.)
-    print(f"Error loading display config: {e}. Using reference values.")
+    logger.warning("Error loading display config: %s. Using reference values.", e)
     DISPLAY_WIDTH = REFERENCE_WIDTH
     DISPLAY_HEIGHT = REFERENCE_HEIGHT
 

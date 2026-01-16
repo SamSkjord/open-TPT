@@ -6,10 +6,13 @@ Uses MLX90614 non-contact IR sensors (one per tyre) via I2C multiplexer.
 Much simpler than MLX90640 - single temperature point instead of 24x32 thermal image.
 """
 
+import logging
 import time
 import threading
 import numpy as np
 from hardware.i2c_mux import I2CMux
+
+logger = logging.getLogger('openTPT.mlx90614')
 
 # Import for actual I2C hardware
 try:
@@ -85,7 +88,7 @@ class MLX90614Handler:
             try:
                 # Create I2C bus
                 self.i2c = busio.I2C(board.SCL, board.SDA)
-                print("I2C bus initialised for MLX90614 sensors")
+                logger.info("I2C bus initialised for MLX90614 sensors")
 
                 # Create mux instance
                 self.mux = I2CMux()
@@ -93,36 +96,36 @@ class MLX90614Handler:
                 # Initialise sensors
                 self.initialise()
             except Exception as e:
-                print(f"Error setting up I2C for MLX90614: {e}")
+                logger.warning("Error setting up I2C for MLX90614: %s", e)
         else:
-            print("Warning: MLX90614 library not available (install adafruit-circuitpython-mlx90614)")
+            logger.warning("MLX90614 library not available (install adafruit-circuitpython-mlx90614)")
 
     def initialise(self):
         """Initialise MLX90614 sensors on each multiplexer channel."""
         if not MLX90614_AVAILABLE:
-            print("Warning: MLX90614 library not available")
+            logger.warning("MLX90614 library not available")
             return False
 
         if not self.i2c:
-            print("Error: I2C bus not initialised")
+            logger.warning("I2C bus not initialised")
             return False
 
         try:
             # Check if multiplexer is available
             if not self.mux or not self.mux.is_available():
-                print("Error: I2C multiplexer not available. Cannot initialise MLX90614 sensors.")
+                logger.warning("I2C multiplexer not available. Cannot initialise MLX90614 sensors.")
                 return False
 
-            print("\nDetecting MLX90614 sensors on multiplexer channels...")
+            logger.info("Detecting MLX90614 sensors on multiplexer channels...")
 
             successful_inits = 0
 
             for position, channel in self.position_to_channel.items():
-                print(f"\nChecking {position} on channel {channel}...")
+                logger.debug("Checking %s on channel %s...", position, channel)
 
                 # Select the channel
                 if not self.mux.select_channel(channel):
-                    print(f"  Failed to select channel {channel}")
+                    logger.debug("Failed to select channel %s", channel)
                     continue
 
                 # Give time for channel to stabilize
@@ -137,28 +140,26 @@ class MLX90614Handler:
                     test_temp = sensor.object_temperature
 
                     if test_temp is not None:
-                        print(f"  [OK] MLX90614 found at 0x{self.MLX90614_ADDR:02X}")
-                        print(f"    Object temp: {test_temp:.1f}°C")
+                        logger.info("MLX90614 found at 0x%02X for %s", self.MLX90614_ADDR, position)
+                        logger.debug("Object temp for %s: %.1f C", position, test_temp)
 
                         self.sensors[position] = sensor
                         successful_inits += 1
                     else:
-                        print(f"  [ERROR] No valid reading from channel {channel}")
+                        logger.debug("No valid reading from channel %s", channel)
 
                 except Exception as e:
-                    print(f"  [ERROR] No MLX90614 found on channel {channel}: {e}")
+                    logger.debug("No MLX90614 found on channel %s: %s", channel, e)
 
             # Reset multiplexer
             self.mux.deselect_all()
 
-            print(f"\nSuccessfully initialised {successful_inits}/{len(self.position_to_channel)} MLX90614 sensors")
+            logger.info("Successfully initialised %s/%s MLX90614 sensors", successful_inits, len(self.position_to_channel))
 
             return successful_inits > 0
 
         except Exception as e:
-            print(f"Error initializing MLX90614 sensors: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.warning("Error initialising MLX90614 sensors: %s", e, exc_info=True)
             return False
 
     def start(self):
@@ -170,7 +171,7 @@ class MLX90614Handler:
         self.thread = threading.Thread(target=self._read_temp_loop)
         self.thread.daemon = True
         self.thread.start()
-        print("MLX90614 reading thread started")
+        logger.info("MLX90614 reading thread started")
 
     def stop(self):
         """Stop the temperature sensor reading thread."""
@@ -232,7 +233,7 @@ class MLX90614Handler:
                         self.thermal_data[position] = None
 
             except Exception as e:
-                print(f"Error reading MLX90614 for {position}: {e}")
+                logger.debug("Error reading MLX90614 for %s: %s", position, e)
                 # Set this position's data to None on error
                 with self.lock:
                     self.point_temps[position] = None

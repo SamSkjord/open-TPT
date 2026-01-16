@@ -49,16 +49,16 @@ class ScaleBars:
         pygame.font.init()
         self.font_small = pygame.font.Font(FONT_PATH, FONT_SIZE_SMALL)
 
-        # Persistent settings for unit preferences (must be before colormap creation)
+        # Persistent settings for unit preferences (must be before colourmap creation)
         self._settings = get_settings()
 
         # Cache threshold values to detect changes
         self._cached_tyre_thresholds = None
         self._cached_brake_thresholds = None
 
-        # Create the brake temperature and tyre temperature colormaps
-        self.brake_colormap = self._create_brake_colormap()
-        self.tyre_colormap = self._create_tyre_colormap()
+        # Create the brake temperature and tyre temperature colourmaps
+        self.brake_colourmap = self._create_brake_colourmap()
+        self.tyre_colourmap = self._create_tyre_colourmap()
 
         # Scale bars dimensions and positions - apply scaling
         self.bar_width = int(30 * SCALE_X)
@@ -93,17 +93,17 @@ class ScaleBars:
         return front, rear
 
     def _check_threshold_changes(self):
-        """Check if thresholds changed and regenerate colormaps if needed."""
+        """Check if thresholds changed and regenerate colourmaps if needed."""
         tyre_thresholds = self._get_tyre_thresholds()
         brake_thresholds = self._get_brake_thresholds()
 
         if tyre_thresholds != self._cached_tyre_thresholds:
             self._cached_tyre_thresholds = tyre_thresholds
-            self.tyre_colormap = self._create_tyre_colormap()
+            self.tyre_colourmap = self._create_tyre_colourmap()
 
         if brake_thresholds != self._cached_brake_thresholds:
             self._cached_brake_thresholds = brake_thresholds
-            self.brake_colormap = self._create_brake_colormap()
+            self.brake_colourmap = self._create_brake_colourmap()
 
     def _get_temp_unit_str(self) -> str:
         """Get temperature unit string from settings."""
@@ -120,9 +120,9 @@ class ScaleBars:
         else:
             return "PSI"
 
-    def _create_brake_colormap(self):
-        """Create a colormap for brake temperature scale."""
-        colors = []
+    def _create_brake_colourmap(self):
+        """Create a colourmap for brake temperature scale."""
+        colours = []
         steps = 200  # More steps for smoother gradient
 
         # Get thresholds from settings
@@ -149,7 +149,7 @@ class ScaleBars:
             r = 0
             g = 0
             b = int(factor * 255)  # 0 to 255 (black to blue)
-            colors.append((r, g, b))
+            colours.append((r, g, b))
 
         # Blue to Green (cold to optimal lower bound)
         blue_to_green_steps = int(steps * optimal_lower_norm) - cold_steps
@@ -161,7 +161,7 @@ class ScaleBars:
             r = 0
             g = int(factor * 255)  # G increases to 255
             b = int(255 - factor * 255)  # B decreases to 0
-            colors.append((r, g, b))
+            colours.append((r, g, b))
 
         # Green plateau within optimal range
         green_plateau_steps = int(steps * (optimal_upper_norm - optimal_lower_norm))
@@ -169,7 +169,7 @@ class ScaleBars:
             green_plateau_steps = 10
 
         for i in range(green_plateau_steps):
-            colors.append((0, 255, 0))  # Stay green within optimal range
+            colours.append((0, 255, 0))  # Stay green within optimal range
 
         # Green to Yellow/Orange - from optimal upper bound to hot
         green_to_yellow_steps = int(steps * (hot_norm - optimal_upper_norm))
@@ -181,7 +181,7 @@ class ScaleBars:
             r = int(factor * 255)  # R increases to 255
             g = 255  # G stays at 255
             b = 0  # B stays at 0
-            colors.append((r, g, b))
+            colours.append((r, g, b))
 
         # Yellow to Red (at hot temperature)
         yellow_to_red_steps = int(steps * 0.1)  # 10% of total steps
@@ -193,10 +193,10 @@ class ScaleBars:
             r = 255  # R stays at 255
             g = int(255 * (1 - factor))  # G decreases from 255 to 0
             b = 0  # B stays at 0
-            colors.append((r, g, b))
+            colours.append((r, g, b))
 
         # Red to Black (after hot temperature)
-        remaining_steps = steps - len(colors)
+        remaining_steps = steps - len(colours)
         if remaining_steps <= 0:
             remaining_steps = 10
 
@@ -205,18 +205,18 @@ class ScaleBars:
             r = int(255 * (1 - factor))  # R decreases from 255 to 0
             g = 0  # G stays at 0
             b = 0  # B stays at 0
-            colors.append((r, g, b))
+            colours.append((r, g, b))
 
-        # Create a PyGame Surface with the colormap
-        colormap_surf = pygame.Surface((1, len(colors)))
-        for i, color in enumerate(colors):
-            colormap_surf.set_at((0, i), color)
+        # Create a PyGame Surface with the colourmap
+        colourmap_surf = pygame.Surface((1, len(colours)))
+        for i, colour in enumerate(colours):
+            colourmap_surf.set_at((0, i), colour)
 
-        return colormap_surf
+        return colourmap_surf
 
-    def _create_tyre_colormap(self):
-        """Create a colormap for tyre temperature scale."""
-        colors = []
+    def _create_tyre_colourmap(self):
+        """Create a colourmap for tyre temperature scale."""
+        colours = []
         steps = 200  # More steps for smoother gradient
 
         # Get thresholds from settings
@@ -240,7 +240,7 @@ class ScaleBars:
             r = 0
             g = 0
             b = int(factor * 255)  # 0 to 255 (black to blue)
-            colors.append((r, g, b))
+            colours.append((r, g, b))
 
         # Blue to Green (cold to optimal lower bound)
         blue_to_green_steps = int(steps * (optimal_lower_norm - cold_norm))
@@ -249,7 +249,7 @@ class ScaleBars:
             r = 0
             g = int(factor * 255)  # G increases to 255
             b = int(255 - factor * 200)  # B decreases from 255 to ~50
-            colors.append((r, g, b))
+            colours.append((r, g, b))
 
         # Green plateau within optimal range
         green_plateau_steps = int(steps * (optimal_upper_norm - optimal_lower_norm))
@@ -257,7 +257,7 @@ class ScaleBars:
             green_plateau_steps = 10
 
         for i in range(green_plateau_steps):
-            colors.append((0, 255, 0))  # Stay green within optimal range
+            colours.append((0, 255, 0))  # Stay green within optimal range
 
         # Green to Yellow/Orange (optimal upper bound to hot)
         green_to_yellow_steps = int(steps * (hot_norm - optimal_upper_norm))
@@ -266,7 +266,7 @@ class ScaleBars:
             r = int(factor * 255)  # R increases to 255
             g = 255  # G stays at 255
             b = 0  # B stays at 0
-            colors.append((r, g, b))
+            colours.append((r, g, b))
 
         # Yellow to Red (at hot temperature)
         yellow_to_red_steps = int(steps * 0.1)  # 10% of total steps
@@ -278,10 +278,10 @@ class ScaleBars:
             r = 255  # R stays at 255
             g = int(255 * (1 - factor))  # G decreases from 255 to 0
             b = 0  # B stays at 0
-            colors.append((r, g, b))
+            colours.append((r, g, b))
 
         # Red to Black (configured range after hot temperature)
-        remaining_steps = steps - len(colors)
+        remaining_steps = steps - len(colours)
         if remaining_steps <= 0:
             remaining_steps = 10
 
@@ -290,14 +290,14 @@ class ScaleBars:
             r = int(255 * (1 - factor))  # R decreases from 255 to 0
             g = 0  # G stays at 0
             b = 0  # B stays at 0
-            colors.append((r, g, b))
+            colours.append((r, g, b))
 
-        # Create a PyGame Surface with the colormap
-        colormap_surf = pygame.Surface((1, len(colors)))
-        for i, color in enumerate(colors):
-            colormap_surf.set_at((0, i), color)
+        # Create a PyGame Surface with the colourmap
+        colourmap_surf = pygame.Surface((1, len(colours)))
+        for i, colour in enumerate(colours):
+            colourmap_surf.set_at((0, i), colour)
 
-        return colormap_surf
+        return colourmap_surf
 
     def draw_brake_scale(self):
         """Draw the brake temperature scale bar on the left side."""
@@ -306,14 +306,14 @@ class ScaleBars:
 
         # Draw the gradient
         for y in range(self.bar_height):
-            # Map y position to color index (inverted, so higher temps at top)
-            color_idx = int(
-                (1.0 - y / self.bar_height) * (self.brake_colormap.get_height() - 1)
+            # Map y position to colour index (inverted, so higher temps at top)
+            colour_idx = int(
+                (1.0 - y / self.bar_height) * (self.brake_colourmap.get_height() - 1)
             )
-            color = self.brake_colormap.get_at((0, color_idx))
+            colour = self.brake_colourmap.get_at((0, colour_idx))
 
-            # Draw horizontal line with the color
-            pygame.draw.line(scale_surf, color, (0, y), (self.bar_width, y))
+            # Draw horizontal line with the colour
+            pygame.draw.line(scale_surf, colour, (0, y), (self.bar_width, y))
 
         # Get thresholds from settings
         brake_optimal, brake_hot = self._get_brake_thresholds()
@@ -344,7 +344,7 @@ class ScaleBars:
             hot_temp = hot_c
 
         # Calculate vertical positions for key temperatures using the native Celsius values
-        # for position calculations (to match colormap) but display the converted values
+        # for position calculations (to match colourmap) but display the converted values
         min_pos = int(
             self.bar_height
             * (1 - (brake_min_c - min_temp_c) / (max_temp_c - min_temp_c))
@@ -395,14 +395,14 @@ class ScaleBars:
 
         # Draw the gradient
         for y in range(self.bar_height):
-            # Map y position to color index (inverted, so higher temps at top)
-            color_idx = int(
-                (1.0 - y / self.bar_height) * (self.tyre_colormap.get_height() - 1)
+            # Map y position to colour index (inverted, so higher temps at top)
+            colour_idx = int(
+                (1.0 - y / self.bar_height) * (self.tyre_colourmap.get_height() - 1)
             )
-            color = self.tyre_colormap.get_at((0, color_idx))
+            colour = self.tyre_colourmap.get_at((0, colour_idx))
 
-            # Draw horizontal line with the color
-            pygame.draw.line(scale_surf, color, (0, y), (self.bar_width, y))
+            # Draw horizontal line with the colour
+            pygame.draw.line(scale_surf, colour, (0, y), (self.bar_width, y))
 
         # Get thresholds from settings
         tyre_cold, tyre_optimal, tyre_hot = self._get_tyre_thresholds()
@@ -430,7 +430,7 @@ class ScaleBars:
             hot_temp = hot_c
 
         # Calculate positions for key temperatures using the native Celsius values
-        # for position calculations (to match colormap) but display the converted values
+        # for position calculations (to match colourmap) but display the converted values
         cold_pos = int(
             self.bar_height * (1 - (cold_c - min_temp_c) / (max_temp_c - min_temp_c))
         )
@@ -528,7 +528,7 @@ class ScaleBars:
         )
         high_x = scale_x + scale_width
 
-        # Draw colored sections
+        # Draw coloured sections
         # Front ranges
         # 1. From front_low to front_optimal (yellow)
         pygame.draw.rect(
@@ -627,7 +627,7 @@ class ScaleBars:
 
     def render(self):
         """Render all scale bars."""
-        # Check if thresholds changed and regenerate colormaps if needed
+        # Check if thresholds changed and regenerate colourmaps if needed
         self._check_threshold_changes()
 
         self.draw_brake_scale()
@@ -636,7 +636,7 @@ class ScaleBars:
 
     def render_to_surface(self, surface):
         """Render all scale bars to the provided surface."""
-        # Check if thresholds changed and regenerate colormaps if needed
+        # Check if thresholds changed and regenerate colourmaps if needed
         self._check_threshold_changes()
 
         # Store original surface

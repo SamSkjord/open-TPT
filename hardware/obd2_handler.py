@@ -3,11 +3,14 @@ OBD2 Handler for openTPT telemetry.
 Polls vehicle data via CAN bus using standard OBD2 PIDs.
 """
 
+import logging
 import time
 from collections import deque
 from typing import Optional, Dict, Any
 
 from utils.hardware_base import BoundedQueueHardwareHandler
+
+logger = logging.getLogger('openTPT.obd2')
 from utils.config import OBD_CHANNEL, OBD_ENABLED, OBD_BITRATE
 
 # Try to import CAN library
@@ -16,7 +19,7 @@ try:
     CAN_AVAILABLE = True
 except ImportError:
     CAN_AVAILABLE = False
-    print("Warning: python-can not available (running without OBD2)")
+    logger.warning("python-can not available (running without OBD2)")
 
 # OBD2 standard IDs
 OBD_REQUEST_ID = 0x7DF  # Broadcast request ID
@@ -97,12 +100,12 @@ class OBD2Handler(BoundedQueueHardwareHandler):
             self._initialise()
             self.start()
         else:
-            print("OBD2 disabled in config")
+            logger.info("OBD2 disabled in config")
 
     def _initialise(self):
         """Initialise the CAN bus connection."""
         if not CAN_AVAILABLE:
-            print("OBD2: python-can not available (mock mode)")
+            logger.debug("OBD2: python-can not available (mock mode)")
             self.hardware_available = False
             return
 
@@ -114,11 +117,11 @@ class OBD2Handler(BoundedQueueHardwareHandler):
             )
             self.hardware_available = True
             self.consecutive_errors = 0
-            print(f"OBD2: Initialised on {self.channel} at {self.bitrate} bps")
+            logger.info("OBD2: Initialised on %s at %s bps", self.channel, self.bitrate)
 
         except Exception as e:
-            print(f"OBD2: Failed to initialise on {self.channel}: {e}")
-            print(f"OBD2: Make sure interface is up: sudo ip link set {self.channel} up type can bitrate {self.bitrate}")
+            logger.warning("OBD2: Failed to initialise on %s: %s", self.channel, e)
+            logger.debug("OBD2: Make sure interface is up: sudo ip link set %s up type can bitrate %s", self.channel, self.bitrate)
             self.bus = None
             self.hardware_available = False
 
@@ -171,7 +174,7 @@ class OBD2Handler(BoundedQueueHardwareHandler):
             # Timeout
             self.pid_failures[pid] = self.pid_failures.get(pid, 0) + 1
             if self.pid_failures[pid] == self.pid_max_failures:
-                print(f"OBD2: PID 0x{pid:02X} not responding - disabled")
+                logger.debug("OBD2: PID 0x%02X not responding - disabled", pid)
             return None
 
         except Exception:
@@ -213,7 +216,7 @@ class OBD2Handler(BoundedQueueHardwareHandler):
                 # Negative response
                 if msg.data[1] == 0x7F and msg.data[2] == 0x22:
                     self.soc_read_attempts = self.soc_max_failures
-                    print("OBD2: Ford Mode 22 SOC not supported")
+                    logger.debug("OBD2: Ford Mode 22 SOC not supported")
                     return None
 
             self.soc_read_attempts += 1
@@ -233,7 +236,7 @@ class OBD2Handler(BoundedQueueHardwareHandler):
             # Reconnection logic
             if self.consecutive_errors >= self.max_consecutive_errors:
                 if time.time() - self.last_reconnect_attempt >= self.reconnect_interval:
-                    print("OBD2: Attempting to reconnect...")
+                    logger.info("OBD2: Attempting to reconnect...")
                     self._initialise()
                     self.last_reconnect_attempt = time.time()
                     if not self.hardware_available:
@@ -300,9 +303,9 @@ class OBD2Handler(BoundedQueueHardwareHandler):
             except Exception as e:
                 self.consecutive_errors += 1
                 if self.consecutive_errors == 1:
-                    print(f"OBD2: Error polling: {e}")
+                    logger.warning("OBD2: Error polling: %s", e)
                 elif self.consecutive_errors == self.max_consecutive_errors:
-                    print(f"OBD2: {self.max_consecutive_errors} consecutive errors - connection lost")
+                    logger.warning("OBD2: %s consecutive errors - connection lost", self.max_consecutive_errors)
 
             # Maintain poll rate
             elapsed = time.time() - start_time
@@ -330,4 +333,4 @@ class OBD2Handler(BoundedQueueHardwareHandler):
             try:
                 self.bus.shutdown()
             except Exception as e:
-                print(f"OBD2: Error during cleanup: {e}")
+                logger.warning("OBD2: Error during cleanup: %s", e)

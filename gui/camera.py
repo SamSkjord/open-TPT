@@ -498,7 +498,14 @@ class Camera:
             self.thread_running = False
             if self.capture_thread and self.capture_thread.is_alive():
                 self.capture_thread.join(timeout=1.0)
-            # Drain queue without TOCTOU race (don't check empty() before get())
+                # Check if thread actually stopped
+                if self.capture_thread.is_alive():
+                    logger.warning("Camera capture thread did not stop within timeout")
+                    # Don't drain queue if thread still running (would race)
+                    self.capture_thread = None
+                    self.frame = None
+                    return
+            # Thread stopped - safe to drain queue
             while True:
                 try:
                     self.frame_queue.get_nowait()
@@ -565,10 +572,10 @@ class Camera:
         for y in range(0, mock_height, grid_size):
             for x in range(0, mock_width, grid_size):
                 if (x // grid_size + y // grid_size) % 2 == 0:
-                    color = (0, 0, 128)
+                    colour = (0, 0, 128)
                 else:
-                    color = (0, 0, 64)
-                frame[y : y + grid_size, x : x + grid_size] = color
+                    colour = (0, 0, 64)
+                frame[y : y + grid_size, x : x + grid_size] = colour
 
         # Add moving element
         t = int(time.time() * 2) % mock_width

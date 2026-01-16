@@ -10,10 +10,13 @@ Supports multiple display modes:
 - Rainbow: Test/demo mode
 """
 
-import time
+import logging
 import threading
+import time
 from enum import Enum
 from typing import Optional, Tuple, List
+
+logger = logging.getLogger('openTPT.neodriver')
 
 # Import board only if available
 try:
@@ -120,7 +123,7 @@ class NeoDriverHandler:
     def _initialise(self, max_retries: int = 3) -> bool:
         """Initialise the NeoDriver hardware with retry logic."""
         if not NEODRIVER_AVAILABLE:
-            print("Warning: NeoDriver library not available - LED strip disabled")
+            logger.warning("NeoDriver library not available - LED strip disabled")
             return False
 
         for attempt in range(max_retries):
@@ -133,7 +136,7 @@ class NeoDriverHandler:
 
                 # Get firmware version
                 product_id = (self.seesaw.get_version() >> 16) & 0xFFFF
-                print(f"NeoDriver seesaw product ID: {product_id}")
+                logger.info("NeoDriver seesaw product ID: %s", product_id)
 
                 # Small delay before NeoPixel init to let seesaw settle
                 time.sleep(0.1)
@@ -151,28 +154,28 @@ class NeoDriverHandler:
                 self.pixels.fill((0, 0, 0))
                 self.pixels.show()
 
-                print(f"NeoDriver initialised at 0x{self.i2c_address:02X} with {self.num_pixels} pixels")
+                logger.info("NeoDriver initialised at 0x%02X with %s pixels", self.i2c_address, self.num_pixels)
                 return True
 
             except Exception as e:
-                print(f"NeoDriver init attempt {attempt + 1}/{max_retries} failed: {e}")
+                logger.warning("NeoDriver init attempt %s/%s failed: %s", attempt + 1, max_retries, e)
                 self.seesaw = None
                 self.pixels = None
 
-        print("Warning: NeoDriver not detected after retries")
+        logger.warning("NeoDriver not detected after retries")
         return False
 
     def start(self):
         """Start the background update thread."""
         if self.thread and self.thread.is_alive():
-            print("Warning: NeoDriver thread already running")
+            logger.warning("NeoDriver thread already running")
             return
 
         self.running = True
         self._do_startup_animation = False  # Disabled for faster boot
         self.thread = threading.Thread(target=self._update_loop, daemon=True)
         self.thread.start()
-        print("NeoDriver update thread started")
+        logger.info("NeoDriver update thread started")
 
     def _startup_animation(self):
         """Play startup animation: rainbow sweep on then off."""
@@ -206,7 +209,7 @@ class NeoDriverHandler:
             time.sleep(0.1)
 
         except Exception as e:
-            print(f"NeoDriver startup animation error: {e}")
+            logger.debug("NeoDriver startup animation error: %s", e)
 
     def stop(self):
         """Stop the background update thread."""
@@ -219,7 +222,7 @@ class NeoDriverHandler:
             self.pixels.fill((0, 0, 0))
             self.pixels.show()
 
-        print("NeoDriver update thread stopped")
+        logger.info("NeoDriver update thread stopped")
 
     def _update_loop(self):
         """Background thread that updates the LED strip."""
@@ -241,11 +244,11 @@ class NeoDriverHandler:
                 # I2C errors are common due to bus contention - only log after threshold
                 consecutive_errors += 1
                 if consecutive_errors == 3:
-                    print(f"NeoDriver: I2C errors ({e}), will retry silently")
+                    logger.debug("NeoDriver: I2C errors (%s), will retry silently", e)
                 # Back off slightly on errors
                 time.sleep(0.05)
             except Exception as e:
-                print(f"Error in NeoDriver update loop: {e}")
+                logger.warning("Error in NeoDriver update loop: %s", e)
 
             # Maintain update rate
             elapsed = time.time() - start_time

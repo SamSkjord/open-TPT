@@ -3,8 +3,11 @@ G-meter display for openTPT.
 Shows real-time lateral and longitudinal G-forces with peak tracking.
 """
 
-import pygame
+import logging
 import math
+import pygame
+
+logger = logging.getLogger('openTPT.gmeter')
 from utils.config import (
     DISPLAY_WIDTH,
     DISPLAY_HEIGHT,
@@ -57,7 +60,7 @@ class GMeterDisplay:
             self.font_medium = pygame.font.Font(FONT_PATH, FONT_SIZE_MEDIUM)
             self.font_small = pygame.font.Font(FONT_PATH, FONT_SIZE_SMALL)
         except Exception as e:
-            print(f"Error loading Noto Sans fonts: {e}")
+            logger.warning("Error loading Noto Sans fonts: %s", e)
             self.font_xxlarge = pygame.font.SysFont(
                 "monospace", int(FONT_SIZE_LARGE * 2.5)
             )
@@ -191,8 +194,8 @@ class GMeterDisplay:
         for i in range(1, num_circles + 1):
             g_value = i * 0.5
             radius = int(self.radius * (g_value / self.max_g))
-            color = GREY if i % 2 == 0 else (64, 64, 64)  # Alternate shading
-            pygame.draw.circle(screen, color, (self.center_x, self.center_y), radius, 1)
+            colour = GREY if i % 2 == 0 else (64, 64, 64)  # Alternate shading
+            pygame.draw.circle(screen, colour, (self.center_x, self.center_y), radius, 1)
 
         # Draw outer circle (boundary)
         pygame.draw.circle(
@@ -289,12 +292,12 @@ class GMeterDisplay:
             # Calculate alpha based on age (newer = brighter)
             alpha = int(255 * (1.0 - age / self.trail_duration))
             # Fade from red to dark red
-            color = (alpha, 0, 0)
+            colour = (alpha, 0, 0)
             # Draw trail point
             if i < len(self.trail_history) - 1:
                 # Draw line to next point
                 next_x, next_y, _ = self.trail_history[i + 1]
-                pygame.draw.line(screen, color, (x, y), (next_x, next_y), 2)
+                pygame.draw.line(screen, colour, (x, y), (next_x, next_y), 2)
 
         # Draw current indicator as filled circle with outline (always bright)
         pygame.draw.circle(screen, RED, (indicator_x, indicator_y), int(8 * SCALE_X))
@@ -319,10 +322,10 @@ class GMeterDisplay:
         y_pos = self.height - int(450 * SCALE_Y)  # Same Y as speed
 
         # Combined G (large, 1 decimal) - RED if disconnected, WHITE if connected
-        combined_color = WHITE if imu_connected else RED
+        combined_colour = WHITE if imu_connected else RED
 
         # Render the combined G reading
-        full_text = self.font_xlarge.render(f"{combined_g:.1f}g", True, combined_color)
+        full_text = self.font_xlarge.render(f"{combined_g:.1f}g", True, combined_colour)
 
         # Draw at specified position
         screen.blit(full_text, (x_pos, y_pos))

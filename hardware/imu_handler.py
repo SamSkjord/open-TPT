@@ -3,6 +3,7 @@ IMU Handler for openTPT G-meter.
 Supports multiple IMU types with configurable sensor selection.
 """
 
+import logging
 import time
 import numpy as np
 from dataclasses import dataclass
@@ -10,6 +11,8 @@ from typing import Optional
 from collections import deque
 
 from utils.hardware_base import BoundedQueueHardwareHandler
+
+logger = logging.getLogger('openTPT.imu')
 from utils.config import (
     IMU_TYPE,
     IMU_ENABLED,
@@ -29,7 +32,7 @@ try:
     BOARD_AVAILABLE = True
 except ImportError:
     BOARD_AVAILABLE = False
-    print("Warning: board/busio not available (running in mock mode)")
+    logger.warning("board/busio not available (running in mock mode)")
 
 # IMU library imports based on sensor type
 ICM20649_AVAILABLE = False
@@ -127,7 +130,7 @@ class IMUHandler(BoundedQueueHardwareHandler):
             self._initialise()
             self.start()  # Always start thread, will use mock data if hardware unavailable
         else:
-            print("IMU disabled in config")
+            logger.info("IMU disabled in config")
 
     def _parse_axis(self, axis_str: str) -> tuple:
         """Parse axis string like 'x', '-y', 'z' into (index, sign)."""
@@ -152,7 +155,7 @@ class IMUHandler(BoundedQueueHardwareHandler):
     def _initialise(self):
         """Initialise the IMU sensor based on configured type."""
         if not BOARD_AVAILABLE:
-            print("IMU: Running in mock mode (no hardware)")
+            logger.info("Running in mock mode (no hardware)")
             self.imu = None
             self.hardware_available = False
             return
@@ -166,14 +169,14 @@ class IMUHandler(BoundedQueueHardwareHandler):
                 self.imu.accelerometer_range = adafruit_icm20x.AccelRange.RANGE_30G
                 self.hardware_available = True
                 self.consecutive_errors = 0
-                print(f"IMU: Initialised ICM-20649 at 0x{IMU_I2C_ADDRESS:02x} (±30g range)")
+                logger.info("Initialised ICM-20649 at 0x%02x (+/-30g range)", IMU_I2C_ADDRESS)
 
             elif self.imu_type == "MPU6050" and MPU6050_AVAILABLE:
                 self.imu = MPU6050(i2c, address=IMU_I2C_ADDRESS)
                 # MPU6050 max range is ±16g
                 self.hardware_available = True
                 self.consecutive_errors = 0
-                print(f"IMU: Initialised MPU-6050 at 0x{IMU_I2C_ADDRESS:02x} (±16g range)")
+                logger.info("Initialised MPU-6050 at 0x%02x (+/-16g range)", IMU_I2C_ADDRESS)
 
             elif self.imu_type == "LSM6DS3" and LSM6DS3_AVAILABLE:
                 self.imu = adafruit_lsm6ds.LSM6DS3(i2c, address=IMU_I2C_ADDRESS)
@@ -181,7 +184,7 @@ class IMUHandler(BoundedQueueHardwareHandler):
                 self.imu.accelerometer_range = adafruit_lsm6ds.AccelRange.RANGE_16G
                 self.hardware_available = True
                 self.consecutive_errors = 0
-                print(f"IMU: Initialised LSM6DS3 at 0x{IMU_I2C_ADDRESS:02x} (±16g range)")
+                logger.info("Initialised LSM6DS3 at 0x%02x (+/-16g range)", IMU_I2C_ADDRESS)
 
             elif self.imu_type == "ADXL345" and ADXL345_AVAILABLE:
                 self.imu = adafruit_adxl34x.ADXL345(i2c, address=IMU_I2C_ADDRESS)
@@ -189,17 +192,17 @@ class IMUHandler(BoundedQueueHardwareHandler):
                 self.imu.range = adafruit_adxl34x.Range.RANGE_16_G
                 self.hardware_available = True
                 self.consecutive_errors = 0
-                print(f"IMU: Initialised ADXL345 at 0x{IMU_I2C_ADDRESS:02x} (±16g range)")
+                logger.info("Initialised ADXL345 at 0x%02x (+/-16g range)", IMU_I2C_ADDRESS)
 
             else:
-                print(f"IMU: Unsupported or unavailable IMU type '{self.imu_type}'")
-                print(f"Available: ICM20649={ICM20649_AVAILABLE}, MPU6050={MPU6050_AVAILABLE}, "
-                      f"LSM6DS3={LSM6DS3_AVAILABLE}, ADXL345={ADXL345_AVAILABLE}")
+                logger.warning("Unsupported or unavailable IMU type '%s'", self.imu_type)
+                logger.debug("Available: ICM20649=%s, MPU6050=%s, LSM6DS3=%s, ADXL345=%s",
+                             ICM20649_AVAILABLE, MPU6050_AVAILABLE, LSM6DS3_AVAILABLE, ADXL345_AVAILABLE)
                 self.imu = None
                 self.hardware_available = False
 
         except Exception as e:
-            print(f"IMU: Failed to initialise {self.imu_type}: {e}")
+            logger.warning("Failed to initialise %s: %s", self.imu_type, e)
             self.imu = None
             self.hardware_available = False
 
@@ -214,7 +217,7 @@ class IMUHandler(BoundedQueueHardwareHandler):
             if self.consecutive_errors >= self.max_consecutive_errors:
                 current_time = time.time()
                 if current_time - self.last_reconnect_attempt >= self.reconnect_interval:
-                    print("IMU: Attempting to reconnect...")
+                    logger.debug("Attempting to reconnect...")
                     self._initialise()
                     self.last_reconnect_attempt = current_time
                     # If reconnection failed, continue to next iteration
@@ -279,14 +282,14 @@ class IMUHandler(BoundedQueueHardwareHandler):
             except Exception as e:
                 self.consecutive_errors += 1
 
-                # Only print error message after multiple consecutive failures to reduce log spam
+                # Only log error message after multiple consecutive failures to reduce log spam
                 # Single errors are common due to I2C bus contention and recover immediately
                 if self.consecutive_errors == 3:
-                    print(f"IMU: Error reading sensor: {e}")
+                    logger.debug("Error reading sensor: %s", e)
                 elif self.consecutive_errors == self.max_consecutive_errors:
-                    print(f"IMU: {self.max_consecutive_errors} consecutive errors - hardware may be disconnected")
+                    logger.warning("%s consecutive errors - hardware may be disconnected", self.max_consecutive_errors)
                 elif self.consecutive_errors % 100 == 0:
-                    print(f"IMU: Still experiencing errors ({self.consecutive_errors} total)")
+                    logger.debug("Still experiencing errors (%s total)", self.consecutive_errors)
 
                 # Skip this read - don't publish anything on error
                 # This prevents stale/invalid data from being displayed
@@ -319,9 +322,9 @@ class IMUHandler(BoundedQueueHardwareHandler):
                     self._axis_map['longitudinal'] = self._parse_axis(cal['axis_longitudinal'])
                 if 'axis_vertical' in cal:
                     self._axis_map['vertical'] = self._parse_axis(cal['axis_vertical'])
-                print(f"IMU: Loaded calibration from {IMU_CALIBRATION_FILE}")
+                logger.info("Loaded calibration from %s", IMU_CALIBRATION_FILE)
         except Exception as e:
-            print(f"IMU: Could not load calibration: {e}")
+            logger.debug("Could not load calibration: %s", e)
 
     def _save_calibration(self):
         """Save calibration to JSON file."""
@@ -339,10 +342,10 @@ class IMUHandler(BoundedQueueHardwareHandler):
             }
             with open(IMU_CALIBRATION_FILE, 'w') as f:
                 json.dump(cal, f, indent=2)
-            print(f"IMU: Saved calibration to {IMU_CALIBRATION_FILE}")
+            logger.info("Saved calibration to %s", IMU_CALIBRATION_FILE)
             return True
         except Exception as e:
-            print(f"IMU: Could not save calibration: {e}")
+            logger.warning("Could not save calibration: %s", e)
             return False
 
     def _axis_to_str(self, axis_tuple: tuple) -> str:
@@ -451,4 +454,4 @@ class IMUHandler(BoundedQueueHardwareHandler):
         self.peak_lateral = 0.0
         self.peak_longitudinal = 0.0
         self.peak_combined = 0.0
-        print("IMU: Peak values reset")
+        logger.info("Peak values reset")

@@ -3,8 +3,11 @@ Display module for openTPT.
 Handles rendering of dynamic telemetry data on the display.
 """
 
+import logging
 import pygame
 import numpy as np
+
+logger = logging.getLogger('openTPT.display')
 from utils.config import (
     TPMS_POSITIONS,
     FONT_SIZE_LARGE,
@@ -79,41 +82,41 @@ class Display:
         self.font_small = pygame.font.Font(FONT_PATH, FONT_SIZE_SMALL)
         self.font_medarge = pygame.font.Font(FONT_PATH, FONT_SIZE_MEDARGE)
 
-        # Initialise color maps for thermal display
-        self.colormap = self._create_thermal_colormap()
+        # Initialise colour maps for thermal display
+        self.colourmap = self._create_thermal_colourmap()
 
         # Try loading the overlay mask from both the configured path and the root directory
         try:
             original_overlay = pygame.image.load(OVERLAY_PATH).convert_alpha()
-            print(f"Loaded overlay mask from {OVERLAY_PATH}")
+            logger.info("Loaded overlay mask from %s", OVERLAY_PATH)
 
             # Scale the overlay to match the current display dimensions
             scaled = pygame.transform.scale(
                 original_overlay, (DISPLAY_WIDTH, DISPLAY_HEIGHT)
             )
-            self.overlay_mask = self._convert_to_colorkey(scaled)
+            self.overlay_mask = self._convert_to_colourkey(scaled)
         except pygame.error:
             # Try loading from root directory as fallback
             try:
                 original_overlay = pygame.image.load("overlay.png").convert_alpha()
-                print("Loaded overlay mask from root directory")
+                logger.info("Loaded overlay mask from root directory")
 
                 # Scale the overlay to match the current display dimensions
                 scaled = pygame.transform.scale(
                     original_overlay, (DISPLAY_WIDTH, DISPLAY_HEIGHT)
                 )
-                self.overlay_mask = self._convert_to_colorkey(scaled)
+                self.overlay_mask = self._convert_to_colourkey(scaled)
             except pygame.error as e:
-                print(f"ERROR: Failed to load overlay mask: {e}")
+                logger.error("Failed to load overlay mask: %s", e)
                 # Create a placeholder transparent overlay
                 self.overlay_mask = pygame.Surface(
                     (DISPLAY_WIDTH, DISPLAY_HEIGHT), pygame.SRCALPHA
                 )
 
-    def _convert_to_colorkey(self, surface: pygame.Surface) -> pygame.Surface:
+    def _convert_to_colourkey(self, surface: pygame.Surface) -> pygame.Surface:
         """
-        Convert RGBA surface to colorkey for faster blitting.
-        If alpha is mostly binary (0 or 255), use colorkey.
+        Convert RGBA surface to colourkey for faster blitting.
+        If alpha is mostly binary (0 or 255), use colourkey.
         Otherwise keep alpha blending.
         """
         import pygame.surfarray as surfarray
@@ -128,23 +131,23 @@ class Display:
             non_binary = ((sample > 10) & (sample < 245)).any()
 
             if non_binary:
-                print("Overlay has gradient alpha - using alpha blending")
+                logger.debug("Overlay has gradient alpha - using alpha blending")
                 del pixels
                 del alpha
                 return surface
 
-            # Alpha is binary - convert to colorkey using numpy (fast)
-            print("Overlay has binary alpha - converting to colorkey (faster)")
+            # Alpha is binary - convert to colourkey using numpy (fast)
+            logger.debug("Overlay has binary alpha - converting to colourkey (faster)")
 
-            colorkey = (255, 0, 255)  # Magenta
+            colourkey = (255, 0, 255)  # Magenta
             new_surface = pygame.Surface(surface.get_size())
             new_pixels = surfarray.pixels3d(new_surface)
 
             # Create mask where alpha > 127
             mask = alpha > 127
 
-            # Set transparent pixels to colorkey
-            new_pixels[~mask] = colorkey
+            # Set transparent pixels to colourkey
+            new_pixels[~mask] = colourkey
 
             # Copy opaque pixels
             new_pixels[mask] = pixels[mask]
@@ -153,57 +156,57 @@ class Display:
             del pixels
             del alpha
 
-            new_surface.set_colorkey(colorkey)
+            new_surface.set_colourkey(colourkey)
             new_surface = new_surface.convert()
             return new_surface
 
         except Exception as e:
-            print(f"Colorkey conversion failed: {e} - using alpha blending")
+            logger.debug("Colorkey conversion failed: %s - using alpha blending", e)
             return surface
 
-    def _create_thermal_colormap(self):
-        """Create a colormap for thermal imaging."""
-        # Create a colormap from blue (cold) to red (hot)
-        colors = []
+    def _create_thermal_colourmap(self):
+        """Create a colourmap for thermal imaging."""
+        # Create a colourmap from blue (cold) to red (hot)
+        colours = []
 
         # Blue to green (cold to optimal)
         for i in range(64):
             r = int((i / 64) * 255)
             g = int((i / 64) * 255)
             b = 255 - int((i / 64) * 128)
-            colors.append((r, g, b))
+            colours.append((r, g, b))
 
         # Green to yellow (optimal to hot)
         for i in range(64):
             r = int(128 + (i / 64) * 127)
             g = 255
             b = int(128 - (i / 64) * 128)
-            colors.append((r, g, b))
+            colours.append((r, g, b))
 
         # Yellow to red (hot to danger)
         for i in range(64):
             r = 255
             g = 255 - int((i / 64) * 255)
             b = 0
-            colors.append((r, g, b))
+            colours.append((r, g, b))
 
-        # Create a PyGame Surface with the colormap
-        colormap_surf = pygame.Surface((192, 1))
-        for i, color in enumerate(colors):
-            colormap_surf.set_at((i, 0), color)
+        # Create a PyGame Surface with the colourmap
+        colourmap_surf = pygame.Surface((192, 1))
+        for i, colour in enumerate(colours):
+            colourmap_surf.set_at((i, 0), colour)
 
-        return colormap_surf
+        return colourmap_surf
 
-    def get_color_for_pressure(self, pressure, position=None):
+    def get_colour_for_pressure(self, pressure, position=None):
         """
-        Get the color for a given pressure value.
+        Get the colour for a given pressure value.
 
         Args:
             pressure: Pressure value in the current units (PSI, BAR, or KPA)
             position: Tire position ('FL', 'FR', 'RL', 'RR') or None
 
         Returns:
-            RGB color tuple
+            RGB colour tuple
         """
         if pressure is None:
             return GREY
@@ -228,15 +231,15 @@ class Display:
         else:  # Between optimal and high
             return GREEN  # Optimal
 
-    def get_color_for_temp(self, temp):
+    def get_colour_for_temp(self, temp):
         """
-        Get the color for a given temperature value.
+        Get the colour for a given temperature value.
 
         Args:
             temp: Temperature value in the current units (C or F)
 
         Returns:
-            RGB color tuple
+            RGB colour tuple
         """
         if temp is None:
             return GREY
@@ -302,15 +305,15 @@ class Display:
         pressure_pos = TPMS_POSITIONS[position]["pressure"]
         temp_pos = TPMS_POSITIONS[position]["temp"]
 
-        # Render pressure with appropriate color (passing position to determine front/rear)
-        pressure_color = self.get_color_for_pressure(pressure, position)
+        # Render pressure with appropriate colour (passing position to determine front/rear)
+        pressure_colour = self.get_colour_for_pressure(pressure, position)
 
         # Handle None pressure value
         if pressure is None:
-            pressure_text = self.font_medarge.render("--", True, pressure_color)
+            pressure_text = self.font_medarge.render("--", True, pressure_colour)
         else:
             pressure_text = self.font_medarge.render(
-                f"{pressure:.1f}", True, pressure_color
+                f"{pressure:.1f}", True, pressure_colour
             )
 
         # Create a rect for the text with center at pressure_pos
@@ -319,12 +322,12 @@ class Display:
         # Blit using the rect instead of the position directly
         self.surface.blit(pressure_text, pressure_rect)
 
-        # Render temperature with appropriate color (if you want to enable this)
-        # temp_color = self.get_color_for_temp(temp)
+        # Render temperature with appropriate colour (if you want to enable this)
+        # temp_colour = self.get_colour_for_temp(temp)
         # if temp is None:
-        #     temp_text = self.font_large.render("--", True, temp_color)
+        #     temp_text = self.font_large.render("--", True, temp_colour)
         # else:
-        #     temp_text = self.font_large.render(f"{temp:.1f}", True, temp_color)
+        #     temp_text = self.font_large.render(f"{temp:.1f}", True, temp_colour)
         # temp_rect = temp_text.get_rect(center=temp_pos)
         # self.surface.blit(temp_text, temp_rect)
 
@@ -333,17 +336,17 @@ class Display:
             # Position status text above the pressure reading
             status_pos = (pressure_pos[0], pressure_pos[1] - FONT_SIZE_LARGE // 2 - 5)
 
-            # Choose color based on status
+            # Choose colour based on status
             if status in ["NO_SIGNAL", "NO_DEVICE", "TIMEOUT"]:
-                status_color = GREY
+                status_colour = GREY
             elif status in ["LEAKING", "ERROR"]:
-                status_color = RED
+                status_colour = RED
             elif status == "LOW_BATTERY":
-                status_color = YELLOW
+                status_colour = YELLOW
             else:
-                status_color = RED  # Default for unknown statuses
+                status_colour = RED  # Default for unknown statuses
 
-            status_text = self.font_small.render(status, True, status_color)
+            status_text = self.font_small.render(status, True, status_colour)
             status_rect = status_text.get_rect(center=status_pos)
             self.surface.blit(status_text, status_rect)
 
@@ -378,14 +381,14 @@ class Display:
         else:
             # Single zone: use temp (or inner if only inner available)
             single_temp = temp if temp is not None else inner_temp
-            color = self._get_brake_color(single_temp)
+            colour = self._get_brake_colour(single_temp)
             rect = pygame.Rect(
                 pos[0] - rect_width // 2,
                 pos[1] - rect_height // 2,
                 rect_width,
                 rect_height,
             )
-            pygame.draw.rect(self.surface, color, rect, border_radius=3)
+            pygame.draw.rect(self.surface, colour, rect, border_radius=3)
 
             # Overlay temperature text when UI is visible
             if show_text and single_temp is not None:
@@ -405,19 +408,19 @@ class Display:
     def _draw_brake_dual_zone(self, pos, width, height, inner_temp, outer_temp,
                               position, show_text=False):
         """Draw dual-zone brake heatmap with gradient blend in middle."""
-        inner_color = self._get_brake_color(inner_temp)
-        outer_color = self._get_brake_color(outer_temp)
+        inner_colour = self._get_brake_colour(inner_temp)
+        outer_colour = self._get_brake_colour(outer_temp)
 
         # For left-side brakes (FL, RL): inner is on right, outer on left
         # For right-side brakes (FR, RR): inner is on left, outer on right
         is_left_side = position in ["FL", "RL"]
 
         if is_left_side:
-            left_color = outer_color
-            right_color = inner_color
+            left_colour = outer_colour
+            right_colour = inner_colour
         else:
-            left_color = inner_color
-            right_color = outer_color
+            left_colour = inner_colour
+            right_colour = outer_colour
 
         # Create surface for gradient
         brake_surface = pygame.Surface((width, height), pygame.SRCALPHA)
@@ -428,18 +431,18 @@ class Display:
         right_width = width - left_width - blend_width
 
         # Left section (solid colour)
-        pygame.draw.rect(brake_surface, left_color, (0, 0, left_width, height))
+        pygame.draw.rect(brake_surface, left_colour, (0, 0, left_width, height))
 
         # Right section (solid colour)
-        pygame.draw.rect(brake_surface, right_color, (left_width + blend_width, 0, right_width, height))
+        pygame.draw.rect(brake_surface, right_colour, (left_width + blend_width, 0, right_width, height))
 
         # Blend section (gradient)
         for x in range(blend_width):
             ratio = x / blend_width
             blended = (
-                int(left_color[0] * (1 - ratio) + right_color[0] * ratio),
-                int(left_color[1] * (1 - ratio) + right_color[1] * ratio),
-                int(left_color[2] * (1 - ratio) + right_color[2] * ratio),
+                int(left_colour[0] * (1 - ratio) + right_colour[0] * ratio),
+                int(left_colour[1] * (1 - ratio) + right_colour[1] * ratio),
+                int(left_colour[2] * (1 - ratio) + right_colour[2] * ratio),
             )
             pygame.draw.line(brake_surface, blended, (left_width + x, 0), (left_width + x, height - 1))
 
@@ -482,7 +485,7 @@ class Display:
                     text_rect = text_surface.get_rect(center=(text_x, text_y))
                     self.surface.blit(text_surface, text_rect)
 
-    def _get_brake_color(self, temp):
+    def _get_brake_colour(self, temp):
         """Get colour for brake temperature."""
         if temp is None:
             return GREY
@@ -532,8 +535,8 @@ class Display:
         # Get position
         pos = TOF_DISPLAY_POSITIONS[position]
 
-        # Determine color based on current distance
-        color = self._get_tof_color(distance)
+        # Determine colour based on current distance
+        colour = self._get_tof_colour(distance)
 
         # Format current distance text
         if distance is None:
@@ -542,7 +545,7 @@ class Display:
             distance_text = f"{int(distance)}"
 
         # Render the current distance value
-        text_surface = self.font_medium.render(distance_text, True, color)
+        text_surface = self.font_medium.render(distance_text, True, colour)
         text_rect = text_surface.get_rect(center=pos)
         self.surface.blit(text_surface, text_rect)
 
@@ -556,16 +559,16 @@ class Display:
         min_y = label_y + label_surface.get_height() + 4
         if min_distance is None:
             min_text = "min: --"
-            min_color = GREY
+            min_colour = GREY
         else:
             min_text = f"min: {int(min_distance)}"
-            min_color = self._get_tof_color(min_distance)
+            min_colour = self._get_tof_colour(min_distance)
 
-        min_surface = self.font_small.render(min_text, True, min_color)
+        min_surface = self.font_small.render(min_text, True, min_colour)
         min_rect = min_surface.get_rect(center=(pos[0], min_y))
         self.surface.blit(min_surface, min_rect)
 
-    def _get_tof_color(self, distance):
+    def _get_tof_colour(self, distance):
         """
         Get colour for TOF distance based on ride height thresholds.
 
@@ -612,7 +615,7 @@ class Display:
     def draw_thermal_image(self, position, thermal_data, show_text=False):
         """
         Draw thermal camera image for a tyre, divided into inner, middle, and outer sections
-        with colored blocks representing temperature averages.
+        with coloured blocks representing temperature averages.
 
         Args:
             position: String key for tyre position (FL, FR, RL, RR)
@@ -641,7 +644,8 @@ class Display:
         else:
             # Validate thermal data shape (MLX90640 is 24x32)
             if thermal_data.shape != (24, 32):
-                print(f"Warning: Invalid thermal data shape {thermal_data.shape} for {position}, expected (24, 32)")
+                logger.warning("Invalid thermal data shape %s for %s, expected (24, 32)",
+                              thermal_data.shape, position)
                 # Draw grey sections if data is invalid
                 for i in range(3):
                     x_offset = i * section_width_px
@@ -668,7 +672,7 @@ class Display:
             # Determine section layout based on position (left or right side)
             is_right_side = position in ["FR", "RR"]
 
-            # Draw each section as a color block
+            # Draw each section as a colour block
             sections = [
                 (inner_section, inner_temp, 0),
                 (middle_section, middle_temp, section_width_px),
@@ -681,9 +685,9 @@ class Display:
 
             # Draw each section
             for section_data, avg_temp, x_offset in sections:
-                color = self._get_heat_color(avg_temp)
+                colour = self._get_heat_colour(avg_temp)
                 rect = pygame.Rect(x_offset, 0, section_width_px, section_height_px)
-                pygame.draw.rect(thermal_surface, color, rect)
+                pygame.draw.rect(thermal_surface, colour, rect)
 
             # Overlay temperature text on each zone when UI is visible
             if show_text:
@@ -729,7 +733,8 @@ class Display:
         if thermal_data is not None:
             # Validate shape again before processing sections (defensive programming)
             if thermal_data.shape != (24, 32):
-                print(f"Warning: Skipping text labels - invalid thermal data shape {thermal_data.shape} for {position}")
+                logger.warning("Skipping text labels - invalid thermal data shape %s for %s",
+                              thermal_data.shape, position)
                 return
 
             # Calculate temperatures again for text labels
@@ -772,11 +777,11 @@ class Display:
                 # Position text centered under each section
                 text_x = pos[0] + (i * text_spacing) + (text_spacing // 2)
 
-                # Get color based on temperature
-                text_color = self.get_color_for_temp(temp)
+                # Get colour based on temperature
+                text_colour = self.get_colour_for_temp(temp)
 
                 # Render text
-                text = section_font.render(f"{label}: {temp:.1f}", True, text_color)
+                text = section_font.render(f"{label}: {temp:.1f}", True, text_colour)
                 text_rect = text.get_rect(center=(text_x, text_y))
                 # self.surface.blit(text, text_rect)
 
@@ -829,18 +834,18 @@ class Display:
 
                 pygame.draw.polygon(self.surface, RED, chevron_points)
 
-    def _get_heat_color(self, temp):
+    def _get_heat_colour(self, temp):
         """
-        Get a color on a heat scale from blue (cold) to red (hot) based on temperature.
+        Get a colour on a heat scale from blue (cold) to red (hot) based on temperature.
 
         Args:
             temp: Temperature value in current unit
 
         Returns:
-            tuple: RGB color value
+            tuple: RGB colour value
         """
-        # Use the color_for_temp function to maintain consistency
-        return self.get_color_for_temp(temp)
+        # Use the colour_for_temp function to maintain consistency
+        return self.get_colour_for_temp(temp)
 
     def get_unit_strings(self):
         """
