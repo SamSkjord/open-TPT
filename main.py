@@ -607,8 +607,6 @@ class OpenTPT:
             splash_path = os.path.join(os.path.dirname(__file__), "assets", "splash.png")
             if os.path.exists(splash_path):
                 splash_img = pygame.image.load(splash_path)
-                # Rotate 90° clockwise for display orientation
-                splash_img = pygame.transform.rotate(splash_img, -90)
                 # Scale to fit screen while maintaining aspect ratio
                 img_rect = splash_img.get_rect()
                 scale = min(DISPLAY_WIDTH / img_rect.width, DISPLAY_HEIGHT / img_rect.height) * 0.6
