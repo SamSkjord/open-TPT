@@ -1557,6 +1557,9 @@ class OpenTPT:
             # Capture timestamp once for all stale data checks this frame
             now = time.time()
 
+            # Show temps overlay when UI is visible (matches scale bar visibility)
+            show_zone_temps = self.input_handler.ui_visible or self.ui_fade_alpha > 0
+
             # Get brake temperatures (LOCK-FREE snapshot access)
             # Uses stale data cache to prevent flashing when display fps > data fps
             t0 = time.time()
@@ -1585,18 +1588,22 @@ class OpenTPT:
                     self._brake_cache[position] = {
                         "temp": temp, "inner": inner, "outer": outer, "timestamp": now
                     }
-                    self.display.draw_brake_temp(position, temp, inner, outer)
+                    self.display.draw_brake_temp(position, temp, inner, outer,
+                                                 show_zone_temps)
                 elif position in self._brake_cache:
                     # No fresh data - use cache if within timeout
                     cache = self._brake_cache[position]
                     if now - cache["timestamp"] < THERMAL_STALE_TIMEOUT:
                         self.display.draw_brake_temp(
-                            position, cache.get("temp"), cache.get("inner"), cache.get("outer")
+                            position, cache.get("temp"), cache.get("inner"),
+                            cache.get("outer"), show_zone_temps
                         )
                     else:
-                        self.display.draw_brake_temp(position, None)
+                        self.display.draw_brake_temp(position, None,
+                                                     show_text=show_zone_temps)
                 else:
-                    self.display.draw_brake_temp(position, None)
+                    self.display.draw_brake_temp(position, None,
+                                                 show_text=show_zone_temps)
             render_times['brakes'] = (time.time() - t0) * 1000
 
             # Get thermal camera data (LOCK-FREE snapshot access)
@@ -1607,16 +1614,16 @@ class OpenTPT:
                 if thermal_data is not None:
                     # Fresh data - update cache and display
                     self._thermal_cache[position] = {"data": thermal_data, "timestamp": now}
-                    self.display.draw_thermal_image(position, thermal_data)
+                    self.display.draw_thermal_image(position, thermal_data, show_zone_temps)
                 elif position in self._thermal_cache:
                     # No fresh data - use cache if within timeout
                     cache = self._thermal_cache[position]
                     if now - cache["timestamp"] < THERMAL_STALE_TIMEOUT:
-                        self.display.draw_thermal_image(position, cache["data"])
+                        self.display.draw_thermal_image(position, cache["data"], show_zone_temps)
                     else:
-                        self.display.draw_thermal_image(position, None)
+                        self.display.draw_thermal_image(position, None, show_zone_temps)
                 else:
-                    self.display.draw_thermal_image(position, None)
+                    self.display.draw_thermal_image(position, None, show_zone_temps)
             render_times['thermal'] = (time.time() - t0) * 1000
 
             t0 = time.time()

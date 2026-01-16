@@ -378,7 +378,8 @@ class Display:
             status_rect = status_text.get_rect(center=status_pos)
             self.surface.blit(status_text, status_rect)
 
-    def draw_brake_temp(self, position, temp, inner_temp=None, outer_temp=None):
+    def draw_brake_temp(self, position, temp, inner_temp=None, outer_temp=None,
+                        show_text=False):
         """
         Draw brake temperature visualisation as a colour scale.
 
@@ -389,6 +390,7 @@ class Display:
             temp: Single temperature or average (backward compatible)
             inner_temp: Inner pad temperature (optional)
             outer_temp: Outer pad temperature (optional)
+            show_text: If True, overlay temperature values on the display
         """
         if position not in BRAKE_POSITIONS:
             return
@@ -402,7 +404,8 @@ class Display:
 
         if has_dual:
             # Dual-zone: draw split rectangle with gradient blend
-            self._draw_brake_dual_zone(pos, rect_width, rect_height, inner_temp, outer_temp, position)
+            self._draw_brake_dual_zone(pos, rect_width, rect_height, inner_temp,
+                                       outer_temp, position, show_text)
         else:
             # Single zone: use temp (or inner if only inner available)
             single_temp = temp if temp is not None else inner_temp
@@ -415,7 +418,23 @@ class Display:
             )
             pygame.draw.rect(self.surface, color, rect, border_radius=3)
 
-    def _draw_brake_dual_zone(self, pos, width, height, inner_temp, outer_temp, position):
+            # Overlay temperature text when UI is visible
+            if show_text and single_temp is not None:
+                temp_str = f"{single_temp:.0f}"
+                # Render black outline
+                outline_surface = self.font_small.render(temp_str, True, (0, 0, 0))
+                outline_rect = outline_surface.get_rect(center=pos)
+                for dx, dy in [(-1, -1), (-1, 0), (-1, 1), (0, -1),
+                               (0, 1), (1, -1), (1, 0), (1, 1)]:
+                    self.surface.blit(outline_surface,
+                                      (outline_rect.x + dx, outline_rect.y + dy))
+                # Render white text on top
+                text_surface = self.font_small.render(temp_str, True, (255, 255, 255))
+                text_rect = text_surface.get_rect(center=pos)
+                self.surface.blit(text_surface, text_rect)
+
+    def _draw_brake_dual_zone(self, pos, width, height, inner_temp, outer_temp,
+                              position, show_text=False):
         """Draw dual-zone brake heatmap with gradient blend in middle."""
         inner_color = self._get_brake_color(inner_temp)
         outer_color = self._get_brake_color(outer_temp)
@@ -456,7 +475,43 @@ class Display:
             pygame.draw.line(brake_surface, blended, (left_width + x, 0), (left_width + x, height - 1))
 
         # Blit to main surface
-        self.surface.blit(brake_surface, (pos[0] - width // 2, pos[1] - height // 2))
+        brake_x = pos[0] - width // 2
+        brake_y = pos[1] - height // 2
+        self.surface.blit(brake_surface, (brake_x, brake_y))
+
+        # Overlay temperature text when UI is visible (stacked vertically, offset to sides)
+        if show_text:
+            # Stack outer temp above, inner temp below centre with more separation
+            line_height = self.font_small.get_height()
+            outer_y = pos[1] - line_height // 2 - 6
+            inner_y = pos[1] + line_height // 2 + 6
+
+            # Offset temps towards their respective sides (within brake box)
+            # Left-side brakes: outer on left, inner on right
+            # Right-side brakes: inner on left, outer on right
+            x_offset = width // 5
+            if is_left_side:
+                outer_x = pos[0] - x_offset
+                inner_x = pos[0] + x_offset
+            else:
+                outer_x = pos[0] + x_offset
+                inner_x = pos[0] - x_offset
+
+            for temp, text_x, text_y in [(outer_temp, outer_x, outer_y),
+                                          (inner_temp, inner_x, inner_y)]:
+                if temp is not None:
+                    temp_str = f"{temp:.0f}"
+                    # Render black outline
+                    outline_surface = self.font_small.render(temp_str, True, (0, 0, 0))
+                    outline_rect = outline_surface.get_rect(center=(text_x, text_y))
+                    for dx, dy in [(-1, -1), (-1, 0), (-1, 1), (0, -1),
+                                   (0, 1), (1, -1), (1, 0), (1, 1)]:
+                        self.surface.blit(outline_surface,
+                                          (outline_rect.x + dx, outline_rect.y + dy))
+                    # Render white text on top
+                    text_surface = self.font_small.render(temp_str, True, (255, 255, 255))
+                    text_rect = text_surface.get_rect(center=(text_x, text_y))
+                    self.surface.blit(text_surface, text_rect)
 
     def _get_brake_color(self, temp):
         """Get colour for brake temperature."""
@@ -585,7 +640,7 @@ class Display:
         # Beyond max (fully extended) - yellow/orange
         return YELLOW
 
-    def draw_thermal_image(self, position, thermal_data):
+    def draw_thermal_image(self, position, thermal_data, show_text=False):
         """
         Draw thermal camera image for a tyre, divided into inner, middle, and outer sections
         with colored blocks representing temperature averages.
@@ -593,6 +648,7 @@ class Display:
         Args:
             position: String key for tyre position (FL, FR, RL, RR)
             thermal_data: 2D numpy array of temperatures or None if no data available
+            show_text: If True, overlay temperature values on each zone
         """
         if position not in MLX_POSITIONS:
             return
@@ -659,6 +715,27 @@ class Display:
                 color = self._get_heat_color(avg_temp)
                 rect = pygame.Rect(x_offset, 0, section_width_px, section_height_px)
                 pygame.draw.rect(thermal_surface, color, rect)
+
+            # Overlay temperature text on each zone when UI is visible
+            if show_text:
+                for section_data, avg_temp, x_offset in sections:
+                    temp_str = f"{avg_temp:.1f}"
+                    # Centre text within the zone
+                    text_x = x_offset + (section_width_px // 2)
+                    text_y = section_height_px // 2
+
+                    # Render black outline (8 directions)
+                    outline_surface = self.font_small.render(temp_str, True, (0, 0, 0))
+                    outline_rect = outline_surface.get_rect(center=(text_x, text_y))
+                    for dx, dy in [(-1, -1), (-1, 0), (-1, 1), (0, -1),
+                                   (0, 1), (1, -1), (1, 0), (1, 1)]:
+                        thermal_surface.blit(outline_surface,
+                                             (outline_rect.x + dx, outline_rect.y + dy))
+
+                    # Render white text on top
+                    text_surface = self.font_small.render(temp_str, True, (255, 255, 255))
+                    text_rect = text_surface.get_rect(center=(text_x, text_y))
+                    thermal_surface.blit(text_surface, text_rect)
 
         # Always draw vertical lines at fixed intervals
         pygame.draw.line(
