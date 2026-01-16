@@ -176,10 +176,13 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             "RR": None,
         }
 
-        # Separate queues for tyre and brake data
+        # Separate queues for each data type (tyres, brakes, TOF).
+        # Note: We use our own deques instead of the parent's single data_queue
+        # because we have three independent data streams that consumers access
+        # separately via get_thermal_data(), get_brake_data(), get_tof_data().
         self.tyre_queue = deque(maxlen=2)
         self.brake_queue = deque(maxlen=2)
-        self.tof_queue = deque(maxlen=2)  # TOF distance data
+        self.tof_queue = deque(maxlen=2)
 
         # EMA state for TOF distance smoothing
         self.tof_ema_state = {
