@@ -431,6 +431,39 @@ The script automatically:
 - Configures openTPT to start at `sysinit.target` (before network)
 - Installs boot splash service (displays `assets/splash.png` immediately)
 
+### Boot Splash Services
+
+Two services work together to provide seamless splash screen display:
+
+**1. fbi-splash.service** (`config/boot/fbi-splash.service`)
+
+Displays `assets/splash.png` using framebuffer image viewer (fbi) as early as possible during boot. This runs before the main application starts.
+
+```bash
+# Install/update the service
+sudo cp /home/pi/open-TPT/config/boot/fbi-splash.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable fbi-splash.service
+```
+
+Key features:
+- Waits up to 5 seconds for `/dev/fb0` to become available
+- Uses `--rotate 3` for correct display orientation (270 degrees)
+- Runs at `sysinit.target` for earliest possible display
+
+**2. openTPT.service** (`openTPT.service`)
+
+The main application service starts after fbi-splash and kills the fbi process once pygame has initialised the display, providing a seamless transition.
+
+Service chain: `sysinit.target` -> `fbi-splash.service` -> `openTPT.service`
+
+**Customising the splash image:**
+
+Replace `assets/splash.png` with your own image. The image should be:
+- PNG format
+- Portrait orientation (will be rotated 270 degrees for landscape display)
+- Recommended size: 600x1024 pixels
+
 After reboot, verify boot time:
 ```bash
 systemd-analyze                              # Total boot time
