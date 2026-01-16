@@ -5,13 +5,17 @@ Automatically detects nearby tracks from SQLite databases with spatial indexing
 and selects the appropriate one based on current GPS position.
 """
 
+import logging
 import os
 import sqlite3
-from typing import List, Optional
 from dataclasses import dataclass
+from typing import List, Optional
+
+from lap_timing import config
 from lap_timing.data.track_loader import Track, load_track_from_kmz
 from lap_timing.utils.geometry import haversine_distance
-from lap_timing import config
+
+logger = logging.getLogger('openTPT.lap_timing.track_selector')
 
 
 # =============================================================================
@@ -163,9 +167,10 @@ class TrackSelector:
         self.has_racelogic_db = os.path.exists(self.racelogic_db_path)
 
         if not self.has_custom_db and not self.has_racelogic_db:
-            print(f"Warning: No track databases found")
-            print(f"  Custom: {self.tracks_db_path}")
-            print(f"  RaceLogic: {self.racelogic_db_path}")
+            logger.warning(
+                "No track databases found (Custom: %s, RaceLogic: %s)",
+                self.tracks_db_path, self.racelogic_db_path
+            )
 
     def _query_database(
         self,
@@ -238,7 +243,7 @@ class TrackSelector:
             conn.close()
 
         except (sqlite3.Error, IOError, OSError) as e:
-            print(f"Warning: Error querying {db_path}: {e}")
+            logger.warning("Error querying %s: %s", db_path, e)
 
         return results
 
@@ -330,35 +335,41 @@ class TrackSelector:
         nearby = self.find_nearby_tracks(lat, lon, max_distance_km)
 
         if len(nearby) == 0:
-            print(f"No tracks found within {max_distance_km or config.TRACK_SEARCH_RADIUS_KM}km "
-                  f"of position ({lat:.6f}, {lon:.6f})")
+            logger.info(
+                "No tracks found within %dkm of position (%.6f, %.6f)",
+                max_distance_km or config.TRACK_SEARCH_RADIUS_KM, lat, lon
+            )
             return None
 
         if len(nearby) == 1 and auto_select:
             track_info = nearby[0]
-            print(f"Auto-selected: {track_info.name}")
-            if track_info.country:
-                print(f"  Country: {track_info.country}")
-            print(f"  Distance: {track_info.distance_to_sf/1000:.2f}km from S/F line")
+            country_str = f" ({track_info.country})" if track_info.country else ""
+            logger.info(
+                "Auto-selected: %s%s, %.2fkm from S/F line",
+                track_info.name, country_str, track_info.distance_to_sf / 1000
+            )
 
             if track_info.kmz_path:
                 return load_track_from_kmz(track_info.kmz_path)
             else:
-                print(f"  Warning: KMZ file not found for {track_info.name}")
+                logger.warning("KMZ file not found for %s", track_info.name)
                 return None
 
         # Multiple tracks found - ask user to select
-        print(f"\nFound {len(nearby)} tracks within "
-              f"{max_distance_km or config.TRACK_SEARCH_RADIUS_KM}km:\n")
+        logger.info(
+            "Found %d tracks within %dkm",
+            len(nearby), max_distance_km or config.TRACK_SEARCH_RADIUS_KM
+        )
 
         for i, track_info in enumerate(nearby, 1):
             source_tag = f"[{track_info.source}]"
             country_str = f" ({track_info.country})" if track_info.country else ""
-            print(f"{i}. {track_info.name}{country_str} {source_tag}")
-            print(f"   Distance: {track_info.distance_to_sf/1000:.2f}km")
-            if track_info.length:
-                print(f"   Length: {track_info.length}m")
-            print()
+            length_str = f", {track_info.length}m" if track_info.length else ""
+            logger.info(
+                "  %d. %s%s %s - %.2fkm%s",
+                i, track_info.name, country_str, source_tag,
+                track_info.distance_to_sf / 1000, length_str
+            )
 
         # Get user selection
         while True:
@@ -366,26 +377,26 @@ class TrackSelector:
                 choice = input(f"Select track (1-{len(nearby)}, or 0 to cancel): ").strip()
 
                 if choice == "0":
-                    print("Track selection cancelled")
+                    logger.info("Track selection cancelled")
                     return None
 
                 idx = int(choice) - 1
                 if 0 <= idx < len(nearby):
                     selected = nearby[idx]
-                    print(f"\nSelected: {selected.name}")
+                    logger.info("Selected: %s", selected.name)
 
                     if selected.kmz_path:
                         return load_track_from_kmz(selected.kmz_path)
                     else:
-                        print(f"Warning: KMZ file not found for {selected.name}")
+                        logger.warning("KMZ file not found for %s", selected.name)
                         return None
                 else:
-                    print(f"Please enter a number between 1 and {len(nearby)}")
+                    logger.info("Please enter a number between 1 and %d", len(nearby))
 
             except ValueError:
-                print("Please enter a valid number")
+                logger.info("Please enter a valid number")
             except KeyboardInterrupt:
-                print("\nTrack selection cancelled")
+                logger.info("Track selection cancelled")
                 return None
 
     def get_track_by_name(self, track_name: str) -> Optional[Track]:
@@ -423,7 +434,7 @@ class TrackSelector:
                 if row:
                     kmz_path = self._find_kmz_file(row['name'], row['country'], source)
                     if kmz_path:
-                        print(f"Loading: {row['name']}")
+                        logger.info("Loading: %s", row['name'])
                         conn.close()
                         return load_track_from_kmz(kmz_path)
 
@@ -442,22 +453,22 @@ class TrackSelector:
                         source
                     )
                     if kmz_path:
-                        print(f"Loading: {matches[0]['name']}")
+                        logger.info("Loading: %s", matches[0]['name'])
                         return load_track_from_kmz(kmz_path)
                 elif len(matches) > 1:
-                    print(f"Multiple tracks match '{track_name}':")
+                    logger.info("Multiple tracks match '%s':", track_name)
                     for m in matches[:10]:
                         country_str = f" ({m['country']})" if m['country'] else ""
-                        print(f"  - {m['name']}{country_str}")
+                        logger.info("  - %s%s", m['name'], country_str)
                     if len(matches) > 10:
-                        print(f"  ... and {len(matches) - 10} more")
-                    print("\nPlease be more specific")
+                        logger.info("  ... and %d more", len(matches) - 10)
+                    logger.info("Please be more specific")
                     return None
 
             except (sqlite3.Error, IOError, OSError) as e:
-                print(f"Warning: Error searching {db_path}: {e}")
+                logger.warning("Error searching %s: %s", db_path, e)
 
-        print(f"No track found matching '{track_name}'")
+        logger.info("No track found matching '%s'", track_name)
         return None
 
     def list_all_tracks(self, country: str = None):
@@ -490,20 +501,20 @@ class TrackSelector:
                 conn.close()
 
                 if tracks:
-                    print(f"\n{source.upper()} Tracks ({len(tracks)}):")
+                    logger.info("%s Tracks (%d):", source.upper(), len(tracks))
                     current_country = None
                     for t in tracks:
                         if t['country'] != current_country:
                             current_country = t['country']
-                            print(f"\n  {current_country or 'Unknown'}:")
-                        print(f"    - {t['name']}")
+                            logger.info("  %s:", current_country or 'Unknown')
+                        logger.info("    - %s", t['name'])
 
                 total += len(tracks)
 
             except (sqlite3.Error, IOError, OSError) as e:
-                print(f"Warning: Error listing tracks from {db_path}: {e}")
+                logger.warning("Error listing tracks from %s: %s", db_path, e)
 
-        print(f"\nTotal: {total} tracks")
+        logger.info("Total: %d tracks", total)
 
     def get_database_stats(self) -> dict:
         """Get statistics about the track databases."""
@@ -536,6 +547,6 @@ class TrackSelector:
                 conn.close()
 
             except (sqlite3.Error, IOError, OSError) as e:
-                print(f"Warning: Error getting stats from {db_path}: {e}")
+                logger.warning("Error getting stats from %s: %s", db_path, e)
 
         return stats

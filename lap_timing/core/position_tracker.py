@@ -4,20 +4,23 @@ Position tracker - maps GPS coordinates to track positions.
 Uses KD-tree spatial indexing for O(log n) lookups.
 """
 
-from typing import Optional
+import logging
+import math
 from dataclasses import dataclass
+from typing import Optional
+
 from lap_timing.data.models import GPSPoint, TrackPosition
 from lap_timing.data.track_loader import Track, TrackPoint
 from lap_timing.utils.geometry import haversine_distance
-import math
 
+logger = logging.getLogger('openTPT.lap_timing.position')
 
 try:
     from scipy.spatial import cKDTree
     HAS_SCIPY = True
 except ImportError:
     HAS_SCIPY = False
-    print("Warning: scipy not available, falling back to linear search")
+    logger.warning("scipy not available, falling back to linear search")
 
 
 @dataclass
