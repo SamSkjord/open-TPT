@@ -47,6 +47,7 @@
   - Added `frozen=True` to `HardwareSnapshot` dataclass for true immutability
   - Replaced 18 broad `except Exception` catches with specific types in `unified_corner_handler.py`
   - Fixed boot profiling debug messages with meaningful labels (was `\1` control chars)
+  - Removed unnecessary `sys.path` manipulation from hardware handlers
 
 #### Bug Fixes
 
@@ -61,7 +62,9 @@
 - `gui/menu.py` - Fuel display mode menu, config reload
 - `main.py` - Fuel tracker integration, boot profiling labels
 - `utils/hardware_base.py` - Frozen dataclass for immutability
-- `hardware/unified_corner_handler.py` - Specific exception types
+- `hardware/unified_corner_handler.py` - Specific exception types, removed sys.path hack
+- `hardware/radar_handler.py` - Removed sys.path hack
+- `hardware/tpms_input_optimized.py` - Removed sys.path hack
 - Multiple modules - Logging improvements
 
 ---

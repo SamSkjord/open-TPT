@@ -4,15 +4,10 @@ Uses bounded queues and lock-free snapshots per system plan.
 """
 
 import logging
-import os
-import sys
 import threading
 import time
 
 logger = logging.getLogger('openTPT.tpms')
-
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.hardware_base import BoundedQueueHardwareHandler
 

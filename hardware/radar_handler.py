@@ -6,15 +6,10 @@ Based on toyota_radar_driver from scratch/sources/uvc-radar-overlay
 """
 
 import logging
-import os
-import sys
 import time
 from typing import Dict, Optional, List
 
 logger = logging.getLogger('openTPT.radar')
-
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.hardware_base import BoundedQueueHardwareHandler
 

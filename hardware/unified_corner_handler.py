@@ -6,17 +6,12 @@ Supports multiple sensor types for both tyres and brakes.
 
 import logging
 import time
-import sys
-import os
 import threading
 import numpy as np
 from typing import Optional, Dict, Any
 from collections import deque
 
 logger = logging.getLogger('openTPT.hardware.corners')
-
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.hardware_base import BoundedQueueHardwareHandler
 from utils.config import (
