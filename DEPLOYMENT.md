@@ -448,7 +448,7 @@ sudo systemctl enable fbi-splash.service
 
 Key features:
 - Waits up to 5 seconds for `/dev/fb0` to become available
-- Uses pre-rotated image (`splash-rotated.png`) for correct display orientation
+- Uses `assets/splash.png` (landscape 800x480)
 - Runs at `sysinit.target` for earliest possible display
 
 **2. openTPT.service** (`openTPT.service`)
@@ -459,13 +459,9 @@ Service chain: `sysinit.target` -> `fbi-splash.service` -> `openTPT.service`
 
 **Customising the splash image:**
 
-The boot splash uses `assets/splash-rotated.png` which is pre-rotated for the landscape display. To create a new splash:
-
-1. Create your image at 1024x600 pixels in landscape orientation
-2. Rotate it 90 degrees clockwise and save as `splash-rotated.png`
-3. Or use ImageMagick: `convert splash.png -rotate 270 splash-rotated.png`
-
-Note: fbi's `--rotate` only works with JPEG, so PNG images must be pre-rotated.
+Replace `assets/splash.png` with your own image. It should be:
+- PNG format, landscape orientation
+- 800x480 or 1024x600 pixels (will be auto-scaled)
 
 After reboot, verify boot time:
 ```bash
