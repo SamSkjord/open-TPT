@@ -3,11 +3,14 @@ Camera module for openTPT.
 Handles rear-view camera display and toggling.
 """
 
+import logging
 import pygame
 import numpy as np
 import time
 import threading
 import queue
+
+logger = logging.getLogger('openTPT.camera')
 
 # Debug flag - set to True for verbose camera logging (impacts performance)
 DEBUG_CAMERA = False
@@ -70,9 +73,9 @@ class Camera:
                     camera_fov=106.0,  # Adjust based on your camera
                     mirror_output=True,  # Match camera mirroring
                 )
-                print("Radar overlay enabled for rear camera")
+                logger.info("Radar overlay enabled for rear camera")
             except ImportError as e:
-                print(f"Warning: Could not load radar overlay: {e}")
+                logger.warning("Could not load radar overlay: %s", e)
 
         # Threading related attributes
         self.frame_queue = queue.Queue(maxsize=2)  # Small queue for maximum performance
@@ -176,7 +179,7 @@ class Camera:
         # Release old camera to free up the device
         old_camera = self.current_camera
         if self.cameras[old_camera]:
-            print(f"Releasing {old_camera} camera")
+            logger.info("Releasing %s camera", old_camera)
             self.cameras[old_camera].release()
             self.cameras[old_camera] = None
 
@@ -188,14 +191,14 @@ class Camera:
 
         # Initialise new camera
         camera_device = f"/dev/video-{self.current_camera}"
-        print(f"Initializing {self.current_camera} camera at {camera_device}")
+        logger.info("Initialising %s camera at %s", self.current_camera, camera_device)
         if not self.initialise(camera_device=camera_device):
             # Failed to initialise new camera, try to restore old one
-            print(f"Failed to initialise {self.current_camera} camera")
+            logger.error("Failed to initialise %s camera", self.current_camera)
             self.current_camera = old_camera
             old_device = f"/dev/video-{old_camera}"
             if self.initialise(camera_device=old_device):
-                print(f"Restored {old_camera} camera")
+                logger.info("Restored %s camera", old_camera)
                 if was_active:
                     self._start_capture_thread()
             return False
@@ -204,30 +207,31 @@ class Camera:
         if was_active:
             self._start_capture_thread()
 
-        print(f"Switched to {self.current_camera} camera")
+        logger.info("Switched to %s camera", self.current_camera)
         return True
 
     def _start_capture_thread(self):
         """Start the capture thread."""
         if not self.thread_running and CV2_AVAILABLE and self.camera:
             if DEBUG_CAMERA:
-                print(f"DEBUG: Starting capture thread for {self.current_camera} camera")
-                print(f"DEBUG: Camera object exists: {self.camera is not None}")
-                print(f"DEBUG: Camera is opened: {self.camera.isOpened() if self.camera else False}")
+                logger.debug("Starting capture thread for %s camera", self.current_camera)
+                logger.debug("Camera object exists: %s", self.camera is not None)
+                logger.debug("Camera is opened: %s", self.camera.isOpened() if self.camera else False)
             self.thread_running = True
             self.capture_thread = threading.Thread(
                 target=self._capture_thread_function, daemon=True
             )
             self.capture_thread.start()
         elif DEBUG_CAMERA:
-            print(f"DEBUG: Cannot start capture thread - thread_running={self.thread_running}, CV2={CV2_AVAILABLE}, camera={self.camera is not None}")
+            logger.debug("Cannot start capture thread - thread_running=%s, CV2=%s, camera=%s",
+                        self.thread_running, CV2_AVAILABLE, self.camera is not None)
 
     def _capture_thread_function(self):
         """Thread function that continuously captures frames from the camera."""
-        print(f"Camera capture thread started for {self.current_camera} camera")
+        logger.info("Camera capture thread started for %s camera", self.current_camera)
         if DEBUG_CAMERA:
-            print(f"DEBUG: Thread running flag: {self.thread_running}")
-            print(f"DEBUG: Camera object: {self.camera}")
+            logger.debug("Thread running flag: %s", self.thread_running)
+            logger.debug("Camera object: %s", self.camera)
 
         # Set camera properties for maximum performance
         self.camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
@@ -245,15 +249,15 @@ class Camera:
         except (ImportError, OSError, PermissionError):
             pass
 
-        print(
-            f"Camera configured: {self.camera_width}x{self.camera_height} @ {self.camera_fps}fps"
-        )
+        logger.info("Camera configured: %dx%d @ %dfps",
+                    self.camera_width, self.camera_height, self.camera_fps)
         actual_fps = self.camera.get(cv2.CAP_PROP_FPS)
         actual_width = self.camera.get(cv2.CAP_PROP_FRAME_WIDTH)
         actual_height = self.camera.get(cv2.CAP_PROP_FRAME_HEIGHT)
         actual_fourcc = int(self.camera.get(cv2.CAP_PROP_FOURCC))
         fourcc_str = "".join([chr((actual_fourcc >> 8 * i) & 0xFF) for i in range(4)])
-        print(f"Actual settings: {actual_width:.0f}x{actual_height:.0f} @ {actual_fps}fps, codec: {fourcc_str}")
+        logger.info("Actual settings: %.0fx%.0f @ %sfps, codec: %s",
+                   actual_width, actual_height, actual_fps, fourcc_str)
 
         # Pre-calculate scaling factors
         scale = min(
@@ -279,7 +283,7 @@ class Camera:
 
         # Thread loop - continuously capture frames as fast as possible
         if DEBUG_CAMERA:
-            print(f"DEBUG: Entering capture loop for {self.current_camera} camera")
+            logger.debug("Entering capture loop for %s camera", self.current_camera)
         while self.thread_running:
             if not self.camera.isOpened():
                 self.error_message = "Camera disconnected"
@@ -358,19 +362,22 @@ class Camera:
                     thread_frame_count += 1
                     profile_count += 1
                     thread_elapsed = time.time() - thread_start_time
-                    if thread_elapsed >= 5.0:  # Print every 5 seconds
+                    if thread_elapsed >= 5.0:  # Log every 5 seconds
                         capture_fps = thread_frame_count / thread_elapsed
-                        print(f"{self.current_camera.capitalize()} camera capture FPS: {capture_fps:.1f}")
+                        logger.info("%s camera capture FPS: %.1f", self.current_camera.capitalize(), capture_fps)
                         if DEBUG_CAMERA:
-                            print(f"DEBUG: Grab stats - Success: {grab_success_count}, Fail: {grab_fail_count}, Retrieve fail: {retrieve_fail_count}")
-                            # Print profiling info
+                            logger.debug("Grab stats - Success: %d, Fail: %d, Retrieve fail: %d",
+                                        grab_success_count, grab_fail_count, retrieve_fail_count)
+                            # Log profiling info
                             if profile_count > 0:
-                                print(f"  Capture profile (avg ms): grab={profile_times['grab']/profile_count:.1f}, "
-                                      f"retrieve={profile_times['retrieve']/profile_count:.1f}, "
-                                      f"transform={profile_times['transform']/profile_count:.1f}, "
-                                      f"cvt={profile_times['cvt']/profile_count:.1f}, "
-                                      f"resize={profile_times['resize']/profile_count:.1f}, "
-                                      f"queue={profile_times['queue']/profile_count:.1f}")
+                                logger.debug("Capture profile (avg ms): grab=%.1f, retrieve=%.1f, "
+                                            "transform=%.1f, cvt=%.1f, resize=%.1f, queue=%.1f",
+                                            profile_times['grab']/profile_count,
+                                            profile_times['retrieve']/profile_count,
+                                            profile_times['transform']/profile_count,
+                                            profile_times['cvt']/profile_count,
+                                            profile_times['resize']/profile_count,
+                                            profile_times['queue']/profile_count)
                         # Reset counters (always, to prevent overflow)
                         grab_success_count = 0
                         grab_fail_count = 0
@@ -381,15 +388,16 @@ class Camera:
                         thread_start_time = time.time()
 
                 except Exception as e:
-                    print(f"Error processing frame: {e}")
+                    logger.warning("Error processing frame: %s", e)
                     continue
             else:
                 grab_fail_count += 1
                 continue
 
-        print(f"Camera capture thread stopped for {self.current_camera} camera")
+        logger.info("Camera capture thread stopped for %s camera", self.current_camera)
         if DEBUG_CAMERA:
-            print(f"DEBUG: Final stats - Grab success: {grab_success_count}, Grab fail: {grab_fail_count}, Retrieve fail: {retrieve_fail_count}")
+            logger.debug("Final stats - Grab success: %d, Grab fail: %d, Retrieve fail: %d",
+                        grab_success_count, grab_fail_count, retrieve_fail_count)
 
     def initialise(self, camera_index=None, camera_device=None):
         """
@@ -400,7 +408,7 @@ class Camera:
         """
         if not CV2_AVAILABLE:
             self.error_message = "OpenCV (cv2) not available - camera disabled"
-            print(self.error_message)
+            logger.warning(self.error_message)
             return False
 
         try:
@@ -415,7 +423,7 @@ class Camera:
             if camera_device:
                 # Use specific device path (e.g., /dev/video-rear)
                 camera_to_open = camera_device
-                print(f"Trying camera device: {camera_device}")
+                logger.debug("Trying camera device: %s", camera_device)
             elif camera_index is not None:
                 camera_to_open = camera_index
             else:
@@ -425,7 +433,7 @@ class Camera:
                 if test_camera.isOpened():
                     test_camera.release()
                     camera_to_open = named_device
-                    print(f"Found {self.current_camera} camera at {named_device}")
+                    logger.info("Found %s camera at %s", self.current_camera, named_device)
                 else:
                     # Fall back to auto-detect by index
                     for idx in range(6):  # Try indices 0-5
@@ -433,18 +441,18 @@ class Camera:
                         if test_camera.isOpened():
                             test_camera.release()
                             camera_to_open = idx
-                            print(f"Auto-detected camera at index {idx}")
+                            logger.info("Auto-detected camera at index %d", idx)
                             break
 
             if camera_to_open is None:
                 self.error_message = f"No {self.current_camera} camera found"
-                print(self.error_message)
+                logger.warning(self.error_message)
                 return False
 
             # Use device path directly - udev symlinks provide deterministic identification
             # OpenCV will handle the symlink resolution internally
             if DEBUG_CAMERA:
-                print(f"DEBUG: Opening camera at {camera_to_open}")
+                logger.debug("Opening camera at %s", camera_to_open)
 
             # Open camera without explicit backend specification, let OpenCV choose best one
             self.camera = cv2.VideoCapture(camera_to_open)
@@ -460,11 +468,12 @@ class Camera:
             self.camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
 
             self.error_message = None
-            print(f"Camera initialised successfully at index {camera_index}")
+            logger.info("Camera initialised successfully at index %s", camera_index)
             return True
 
         except Exception as e:
             self.error_message = f"Camera init error: {str(e)}"
+            logger.warning("Camera initialisation failed: %s", e)
             return False
 
     def toggle(self):
@@ -646,6 +655,7 @@ class Camera:
                 del self.display_array
                 self.display_array = None
             self.error_message = f"Render error: {str(e)}"
+            logger.warning("Camera render error: %s", e)
             return False
 
     def is_active(self):

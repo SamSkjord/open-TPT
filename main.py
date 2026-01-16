@@ -921,15 +921,19 @@ class OpenTPT:
             sys.stderr.flush()
             # Also write to file for persistent debugging
             try:
-                import os
                 import stat
-                # Write to user home directory for better security
+                # Write to user home directory with restrictive permissions
+                # Use os.open() to create file with correct permissions atomically
+                # (avoids race condition where file is briefly world-readable)
                 crash_log_path = os.path.expanduser("~/opentpt_crash.log")
-                with open(crash_log_path, "w") as f:
+                fd = os.open(
+                    crash_log_path,
+                    os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+                    stat.S_IRUSR | stat.S_IWUSR
+                )
+                with os.fdopen(fd, 'w') as f:
                     f.write(f"Error: {e}\n\n")
                     traceback.print_exc(file=f)
-                # Set restrictive permissions (owner read/write only)
-                os.chmod(crash_log_path, stat.S_IRUSR | stat.S_IWUSR)
                 logger.info("Crash log written to %s", crash_log_path)
             except (IOError, OSError):
                 pass  # Can't write crash log - filesystem issue

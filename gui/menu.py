@@ -3,6 +3,7 @@ Menu System for openTPT.
 Provides a navigable menu overlay for settings and configuration.
 """
 
+import logging
 import pygame
 import re
 import time
@@ -10,6 +11,8 @@ import subprocess
 import threading
 from typing import List, Optional, Callable, Any
 from dataclasses import dataclass, field
+
+logger = logging.getLogger('openTPT.menu')
 
 from utils.config import (
     DISPLAY_WIDTH,
@@ -214,6 +217,7 @@ class Menu:
                 if isinstance(result, str):
                     self.set_status(result)
             except Exception as e:
+                logger.debug("Menu action failed: %s", e)
                 self.set_status(f"Error: {e}")
 
         return None
@@ -951,7 +955,8 @@ class MenuSystem:
                 ["which", "pulseaudio"], capture_output=True, timeout=5
             )
             return result.returncode == 0
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to check PulseAudio: %s", e)
             return False
 
     # Light Strip (NeoDriver) methods
@@ -1035,6 +1040,7 @@ class MenuSystem:
             else:
                 return f"Failed to start pairing {position}"
         except Exception as e:
+            logger.debug("TPMS pairing failed: %s", e)
             return f"Error: {e}"
 
     def stop_pairing(self):
@@ -1099,6 +1105,7 @@ class MenuSystem:
                 if self.current_menu:
                     self.current_menu.set_status("Scan complete")
             except Exception as e:
+                logger.debug("Bluetooth scan failed: %s", e)
                 if self.current_menu:
                     self.current_menu.set_status(f"Scan error: {e}")
 
@@ -1132,7 +1139,8 @@ class MenuSystem:
                         if mac not in paired and not self._is_mac_address(name):
                             devices.append((mac, name))
             return devices
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to get unpaired BT devices: %s", e)
             return []
 
     def _get_bt_paired_devices_raw(self) -> list:
@@ -1152,7 +1160,8 @@ class MenuSystem:
                     if len(parts) >= 3:
                         devices.append((parts[1], parts[2]))
             return devices
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to get paired BT devices: %s", e)
             return []
 
     def _get_bt_paired_devices(self) -> list:
@@ -1194,7 +1203,8 @@ class MenuSystem:
                             seen_macs.add(mac)
 
             return devices
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to get BT paired/trusted devices: %s", e)
             return []
 
     def _get_bt_connected_device(self) -> tuple:
@@ -1212,7 +1222,8 @@ class MenuSystem:
                 if "Connected: yes" in result.stdout:
                     return (mac, name)
             return None
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to get connected BT device: %s", e)
             return None
 
     def _get_bt_status_label(self) -> str:
@@ -1278,6 +1289,7 @@ class MenuSystem:
         except subprocess.TimeoutExpired:
             return "Connection timed out"
         except Exception as e:
+            logger.debug("Bluetooth connect failed: %s", e)
             return f"Error: {e}"
 
     def _play_bt_test_sound(self):
@@ -1303,8 +1315,8 @@ class MenuSystem:
                     capture_output=True,
                     timeout=2,
                 )
-            except Exception:
-                pass  # Silent fail - audio test is optional
+            except Exception as e:
+                logger.debug("Audio test failed: %s", e)
 
         # Run in background to not block menu
         threading.Thread(target=do_play, daemon=True).start()
@@ -1327,7 +1339,8 @@ class MenuSystem:
                 if match:
                     return int(match.group(1))
             return 50  # Default
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to get BT volume: %s", e)
             return 50
 
     def _bt_volume_adjust(self, delta: int) -> str:
@@ -1338,6 +1351,7 @@ class MenuSystem:
             self._run_pactl(["set-sink-volume", "@DEFAULT_SINK@", f"{new_vol}%"])
             return f"Volume: {new_vol}%"
         except Exception as e:
+            logger.debug("Volume adjust failed: %s", e)
             return f"Error: {e}"
 
     def _show_bt_pair_menu(self) -> str:
@@ -1410,6 +1424,7 @@ class MenuSystem:
         except subprocess.TimeoutExpired:
             return "Pairing timed out"
         except Exception as e:
+            logger.debug("Bluetooth pairing failed: %s", e)
             return f"Error: {e}"
 
     def _bt_disconnect(self) -> str:
@@ -1430,6 +1445,7 @@ class MenuSystem:
                 return f"Disconnected from {name}"
             return "Disconnect requested"
         except Exception as e:
+            logger.debug("Bluetooth disconnect failed: %s", e)
             return f"Error: {e}"
 
     def _show_bt_forget_menu(self) -> str:
@@ -1469,6 +1485,7 @@ class MenuSystem:
                 return f"Forgot {name}"
             return f"Failed to forget {name}"
         except Exception as e:
+            logger.debug("Bluetooth forget device failed: %s", e)
             return f"Error: {e}"
 
     def _bt_refresh_services(self) -> str:
@@ -1489,6 +1506,7 @@ class MenuSystem:
                 if self.current_menu:
                     self.current_menu.set_status("BT services refreshed")
             except Exception as e:
+                logger.debug("Bluetooth refresh services failed: %s", e)
                 if self.current_menu:
                     self.current_menu.set_status(f"Refresh failed: {e}")
 
@@ -1870,7 +1888,8 @@ class MenuSystem:
             if ips:
                 return f"IP: {ips[0]}"
             return "IP: Not connected"
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to get IP address: %s", e)
             return "IP: Unknown"
 
     def _get_system_storage_label(self) -> str:
@@ -1887,7 +1906,8 @@ class MenuSystem:
                     avail = parts[3]
                     return f"Storage: {used} / {avail} free"
             return "Storage: Unknown"
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to get storage info: %s", e)
             return "Storage: Unknown"
 
     def _get_system_uptime_label(self) -> str:
@@ -1905,7 +1925,8 @@ class MenuSystem:
             uptime = uptime.replace(" days", "d").replace(" day", "d")
             uptime = uptime.replace(",", "")
             return f"Up: {uptime}"
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to get uptime: %s", e)
             return "Uptime: Unknown"
 
     def _get_sensor_status_label(self) -> str:
@@ -2126,6 +2147,7 @@ class MenuSystem:
             count = store.clear_all_best_laps()
             return f"Cleared {count} best lap(s)"
         except Exception as e:
+            logger.debug("Failed to clear best laps: %s", e)
             return f"Error: {e}"
 
     def _show_track_selection_menu(self) -> str:
