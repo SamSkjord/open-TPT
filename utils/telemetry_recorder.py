@@ -3,13 +3,16 @@ Telemetry Recorder for openTPT.
 Records sensor data to CSV files for later analysis.
 """
 
-import os
 import csv
+import logging
+import os
 import time
 import threading
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, field
+
+logger = logging.getLogger('openTPT.telemetry')
 
 
 @dataclass
@@ -187,14 +190,14 @@ class TelemetryRecorder:
             # Generate temp filename based on start time
             dt = datetime.fromtimestamp(self.start_time)
             self.temp_filename = dt.strftime("telemetry_%Y%m%d_%H%M%S.csv")
-            print(f"Recording started: {self.temp_filename}")
+            logger.info("Recording started: %s", self.temp_filename)
 
     def stop_recording(self):
         """Stop the current recording session."""
         with self.lock:
             self.recording = False
             duration = time.time() - self.start_time if self.start_time else 0
-            print(f"Recording stopped: {len(self.frames)} frames, {duration:.1f}s")
+            logger.info("Recording stopped: %d frames, %.1fs", len(self.frames), duration)
 
     def is_recording(self) -> bool:
         """Check if currently recording."""
@@ -232,7 +235,7 @@ class TelemetryRecorder:
         """
         with self.lock:
             if not self.frames:
-                print("No frames to save")
+                logger.warning("No frames to save")
                 return None
 
             filepath = os.path.join(self.output_dir, self.temp_filename)
@@ -247,12 +250,12 @@ class TelemetryRecorder:
                     for frame in self.frames:
                         writer.writerow(frame.to_dict())
 
-                print(f"Saved {len(self.frames)} frames to {filepath}")
+                logger.info("Saved %d frames to %s", len(self.frames), filepath)
                 self._clear()
                 return filepath
 
             except (IOError, OSError, KeyError, TypeError) as e:
-                print(f"Error saving telemetry: {e}")
+                logger.error("Error saving telemetry: %s", e)
                 self._clear()  # Clear frames even on error to prevent stale data
                 return None
 
@@ -261,7 +264,7 @@ class TelemetryRecorder:
         with self.lock:
             frame_count = len(self.frames)
             self._clear()
-            print(f"Discarded {frame_count} frames")
+            logger.info("Discarded %d frames", frame_count)
 
     def _clear(self):
         """Clear recording data."""

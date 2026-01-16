@@ -245,6 +245,41 @@ SCALE_X = DISPLAY_WIDTH / REFERENCE_WIDTH
 SCALE_Y = DISPLAY_HEIGHT / REFERENCE_HEIGHT
 
 
+def reload_display_config():
+    """
+    Reload and validate display configuration from file.
+
+    Returns validated (width, height) tuple. Does NOT update module globals
+    since display dimensions are used to calculate positions, font sizes, etc.
+    at import time. A full application restart is required for changes to
+    take effect.
+
+    Returns:
+        tuple: (width, height) if valid, or (REFERENCE_WIDTH, REFERENCE_HEIGHT) on error
+
+    Raises:
+        ValueError: If dimensions are invalid (caught internally, logged)
+    """
+    try:
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, "r") as f:
+                display_config = json.load(f)
+                raw_width = display_config.get("width", REFERENCE_WIDTH)
+                raw_height = display_config.get("height", REFERENCE_HEIGHT)
+                width, height = validate_display_dimensions(raw_width, raw_height)
+                logger.debug("Reloaded display config: %dx%d", width, height)
+                return width, height
+        else:
+            logger.warning("Display config file not found: %s", CONFIG_FILE)
+            return REFERENCE_WIDTH, REFERENCE_HEIGHT
+    except ValueError as e:
+        logger.warning("Invalid display config on reload: %s", e)
+        return REFERENCE_WIDTH, REFERENCE_HEIGHT
+    except Exception as e:
+        logger.warning("Error reloading display config: %s", e)
+        return REFERENCE_WIDTH, REFERENCE_HEIGHT
+
+
 def scale_position(pos):
     """Scale a position tuple (x, y) according to the current display resolution."""
     return (int(pos[0] * SCALE_X), int(pos[1] * SCALE_Y))

@@ -1,12 +1,22 @@
 """
 Persistent settings manager for openTPT.
 Stores user preferences in a JSON file that persists across restarts.
+
+Settings file location:
+    Linux/Pi: ~/.opentpt_settings.json (typically /home/pi/.opentpt_settings.json)
+    macOS: ~/.opentpt_settings.json
+
+If the settings file is corrupt (invalid JSON), it will be deleted and
+defaults will be used. A warning is logged on startup in this case.
 """
 
 import json
+import logging
 import os
 import threading
 from typing import Any, Optional
+
+logger = logging.getLogger('openTPT.settings')
 
 # Default settings file location
 SETTINGS_FILE = os.path.expanduser("~/.opentpt_settings.json")
@@ -49,16 +59,28 @@ class SettingsManager:
             if os.path.exists(self._file_path):
                 with open(self._file_path, 'r') as f:
                     self._settings = json.load(f)
-                print(f"Settings loaded from {self._file_path}")
+                logger.info("Settings loaded from %s", self._file_path)
             else:
-                print(f"No settings file found, using defaults")
+                logger.debug("No settings file found, using defaults")
                 self._settings = {}
         except json.JSONDecodeError as e:
-            print(f"Warning: Invalid settings file, using defaults: {e}")
+            logger.warning(
+                "Corrupt settings file deleted, using defaults: %s", e
+            )
+            self._delete_corrupt_file()
             self._settings = {}
         except Exception as e:
-            print(f"Warning: Could not load settings: {e}")
+            logger.warning("Could not load settings: %s", e)
             self._settings = {}
+
+    def _delete_corrupt_file(self):
+        """Delete a corrupt settings file."""
+        try:
+            if os.path.exists(self._file_path):
+                os.remove(self._file_path)
+                logger.info("Removed corrupt settings file: %s", self._file_path)
+        except OSError as e:
+            logger.error("Failed to remove corrupt settings file: %s", e)
 
     def _save(self):
         """Save settings to JSON file."""
@@ -67,7 +89,7 @@ class SettingsManager:
                 with open(self._file_path, 'w') as f:
                     json.dump(self._settings, f, indent=2)
             except Exception as e:
-                print(f"Warning: Could not save settings: {e}")
+                logger.warning("Could not save settings: %s", e)
 
     def get(self, key: str, default: Any = None) -> Any:
         """
