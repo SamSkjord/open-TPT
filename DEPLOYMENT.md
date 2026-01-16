@@ -551,9 +551,14 @@ systemd-analyze blame                        # Service times
 systemd-analyze critical-chain openTPT.service  # Critical path
 ```
 
-**Note**: WiFi is disabled at boot for speed. To enable manually:
+**WiFi Power Save**: Disable WiFi power save mode to prevent intermittent connectivity drops:
 ```bash
-sudo systemctl start wpa_supplicant
+# Create config to disable power save permanently
+echo -e "[connection]\nwifi.powersave = 2" | sudo tee /etc/NetworkManager/conf.d/wifi-powersave.conf
+sudo systemctl restart NetworkManager
+
+# Verify
+sudo iw dev wlan0 get power_save  # Should show "off"
 ```
 
 ## Systemd Service (Production)

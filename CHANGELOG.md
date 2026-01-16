@@ -74,6 +74,13 @@
   exceptions occur during baud rate configuration
 - **Brake surface allocation** - Cached brake gradient surfaces to avoid
   `pygame.Surface()` allocation every frame in render loop
+- **WiFi connectivity drops** - Disabled WiFi power save mode which was
+  causing intermittent connection losses
+
+#### Improvements
+
+- **NeoDriver startup animation** - Re-enabled rainbow sweep animation on boot
+  for visual feedback that LED strip is working
 
 #### Modified Files
 
@@ -81,6 +88,7 @@
 - `hardware/ford_hybrid_handler.py` - Fixed import path
 - `hardware/unified_corner_handler.py` - Specific exception types, thread-safe deque access, i2c_busio cleanup
 - `hardware/gps_handler.py` - Fixed serial port leak in MTK3339 configuration
+- `hardware/neodriver_handler.py` - Re-enabled startup animation
 - `utils/fuel_tracker.py` - New fuel tracking module
 - `utils/hardware_base.py` - Frozen dataclass, ExponentialBackoff helper class
 - `utils/settings.py` - Thread-safe singleton, atomic writes, UTF-8 encoding
