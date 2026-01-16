@@ -72,6 +72,11 @@ class TelemetryFrame:
     brake_pressure_input_bar: Optional[float] = None
     brake_pressure_output_bar: Optional[float] = None
 
+    # Fuel tracking data
+    fuel_level_percent: Optional[float] = None
+    fuel_rate_lph: Optional[float] = None
+    fuel_consumption_lap_litres: Optional[float] = None
+
     # GPS data
     gps_latitude: Optional[float] = None
     gps_longitude: Optional[float] = None
@@ -133,6 +138,9 @@ class TelemetryFrame:
             'battery_soc': self.battery_soc,
             'brake_pressure_input_bar': self.brake_pressure_input_bar,
             'brake_pressure_output_bar': self.brake_pressure_output_bar,
+            'fuel_level_percent': self.fuel_level_percent,
+            'fuel_rate_lph': self.fuel_rate_lph,
+            'fuel_consumption_lap_litres': self.fuel_consumption_lap_litres,
             'gps_latitude': self.gps_latitude,
             'gps_longitude': self.gps_longitude,
             'gps_speed_kmh': self.gps_speed_kmh,

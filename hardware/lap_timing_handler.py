@@ -45,15 +45,17 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
     - Publishes results for lock-free render access
     """
 
-    def __init__(self, gps_handler):
+    def __init__(self, gps_handler, fuel_tracker=None):
         """
         Initialise lap timing handler.
 
         Args:
             gps_handler: GPSHandler instance to consume GPS data from
+            fuel_tracker: Optional FuelTracker instance for fuel consumption tracking
         """
         super().__init__(queue_depth=2)
         self.gps_handler = gps_handler
+        self.fuel_tracker = fuel_tracker
         self.enabled = LAP_TIMING_ENABLED and LAP_TIMING_AVAILABLE
 
         # Track and timing state
@@ -86,6 +88,9 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
 
         # Current GPS position (for map view)
         self.current_gps_point: Optional[GPSPoint] = None
+
+        # Fuel tracking state
+        self._lap_start_fuel_percent: Optional[float] = None
 
         # Track auto-detection
         self.track_detected = False
@@ -277,6 +282,20 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
                 lap.max_speed = max(speeds)
                 lap.avg_speed = sum(speeds) / len(speeds)
 
+            # Track fuel consumption if fuel tracker is available
+            if self.fuel_tracker:
+                fuel_state = self.fuel_tracker.get_state()
+                lap.fuel_at_start_percent = self._lap_start_fuel_percent
+                lap.fuel_at_end_percent = fuel_state.get('fuel_level_percent')
+
+                # Calculate fuel used this lap
+                fuel_used = self.fuel_tracker.on_lap_complete(
+                    lap_number=lap.lap_number,
+                    lap_time=lap.duration,
+                    avg_speed_kmh=lap.avg_speed * 3.6  # m/s to km/h
+                )
+                lap.fuel_used_litres = fuel_used
+
             self.laps.append(lap)
             self.last_lap = lap
 
@@ -304,6 +323,13 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
         self.current_sector = 0
         self.sector_times = [None] * self.sector_count
         self.sector_start_time = crossing_time
+
+        # Notify fuel tracker of new lap start
+        if self.fuel_tracker:
+            fuel_state = self.fuel_tracker.get_state()
+            # Store the fuel at start for the next lap's record
+            self._lap_start_fuel_percent = fuel_state.get('fuel_level_percent')
+            self.fuel_tracker.on_lap_start()
 
     def _update_sector(self, gps_point: GPSPoint):
         """Update sector timing based on current position."""

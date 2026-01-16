@@ -34,7 +34,9 @@ PID_VEHICLE_SPEED = 0x0D  # Vehicle speed: A (km/h)
 PID_INTAKE_TEMP = 0x0F    # Intake air temp: A - 40 (C)
 PID_MAF = 0x10            # Mass air flow: ((A * 256) + B) / 100 (g/s)
 PID_THROTTLE = 0x11       # Throttle position: A * 100 / 255 (%)
+PID_FUEL_LEVEL = 0x2F     # Fuel tank level input: A * 100 / 255 (%)
 PID_OIL_TEMP = 0x5C       # Engine oil temp: A - 40 (C) - not always supported
+PID_FUEL_RATE = 0x5E      # Engine fuel rate: ((A*256)+B) / 20 (L/h) - not always supported
 
 # Ford Mode 22 (UDS) DIDs
 FORD_DID_SOC = 0x4801  # HV Battery State of Charge
@@ -77,6 +79,8 @@ class OBD2Handler(BoundedQueueHardwareHandler):
             'battery_soc': None,
             'brake_pressure_input_bar': None,
             'brake_pressure_output_bar': None,
+            'fuel_level_percent': None,
+            'fuel_rate_lph': None,
         }
 
         # Smoothing histories
@@ -93,7 +97,7 @@ class OBD2Handler(BoundedQueueHardwareHandler):
         self.soc_max_failures = 5
 
         # Low-priority PID rotation
-        self.low_priority_pids = [PID_COOLANT_TEMP, PID_OIL_TEMP, PID_INTAKE_TEMP, PID_INTAKE_MAP, PID_MAF]
+        self.low_priority_pids = [PID_COOLANT_TEMP, PID_OIL_TEMP, PID_INTAKE_TEMP, PID_INTAKE_MAP, PID_MAF, PID_FUEL_LEVEL, PID_FUEL_RATE]
         self.low_priority_index = 0
 
         if self.enabled:
@@ -290,6 +294,10 @@ class OBD2Handler(BoundedQueueHardwareHandler):
                                 self.current_data['boost_kpa'] = result[0] - 101
                             elif pid == PID_MAF and len(result) >= 2:
                                 self.current_data['maf_gs'] = ((result[0] * 256) + result[1]) / 100
+                            elif pid == PID_FUEL_LEVEL:
+                                self.current_data['fuel_level_percent'] = result[0] * 100 / 255
+                            elif pid == PID_FUEL_RATE and len(result) >= 2:
+                                self.current_data['fuel_rate_lph'] = ((result[0] * 256) + result[1]) / 20
 
                     # Ford SOC (if supported)
                     if self.soc_read_attempts < self.soc_max_failures:

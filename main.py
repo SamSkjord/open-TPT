@@ -38,6 +38,7 @@ from gui.scale_bars import ScaleBars
 from gui.icon_handler import IconHandler
 from gui.gmeter import GMeterDisplay
 from gui.lap_timing_display import LapTimingDisplay
+from gui.fuel_display import FuelDisplay
 from ui.widgets.horizontal_bar import HorizontalBar, DualDirectionBar
 
 # Import optimised TPMS handler
@@ -189,6 +190,17 @@ except ImportError as e:
     LapTimingHandler = None
     LAP_TIMING_ENABLED = False
     logger.warning("Lap timing not available: %s", e)
+
+# Import Fuel Tracker (optional, for fuel consumption tracking)
+try:
+    from utils.fuel_tracker import FuelTracker
+    from utils.config import FUEL_TRACKING_ENABLED
+    FUEL_TRACKING_AVAILABLE = True
+except ImportError as e:
+    FUEL_TRACKING_AVAILABLE = False
+    FuelTracker = None
+    FUEL_TRACKING_ENABLED = False
+    logger.warning("Fuel tracking not available: %s", e)
 
 # Import performance monitoring
 try:
@@ -534,6 +546,8 @@ class OpenTPT:
         self.imu = None
         self.gmeter = GMeterDisplay()
         self.lap_timing_display = LapTimingDisplay()
+        self.fuel_display = FuelDisplay()
+        self.fuel_tracker = None
 
         # Status bars (top and bottom) - used across all pages
         self.status_bar_enabled = STATUS_BAR_ENABLED
@@ -780,11 +794,26 @@ class OpenTPT:
         else:
             self.gps = None
 
+        # Initialise Fuel Tracker (optional, requires OBD2)
+        self._show_splash("Initialising fuel tracking...", 0.79)
+        if FUEL_TRACKING_ENABLED and FUEL_TRACKING_AVAILABLE and FuelTracker and self.obd2:
+            try:
+                self.fuel_tracker = FuelTracker()
+                self.fuel_display.set_tracker(self.fuel_tracker)
+                logger.info("Fuel tracker initialised")
+            except (IOError, OSError, RuntimeError, ValueError) as e:
+                logger.warning("Could not initialise fuel tracker: %s", e)
+                self.fuel_tracker = None
+        else:
+            self.fuel_tracker = None
+            if FUEL_TRACKING_ENABLED and not self.obd2:
+                logger.debug("Fuel tracking disabled: OBD2 required but not available")
+
         # Initialise Lap Timing handler (optional, requires GPS)
         self._show_splash("Initialising lap timing...", 0.80)
         if LAP_TIMING_ENABLED and LAP_TIMING_AVAILABLE and LapTimingHandler and self.gps:
             try:
-                self.lap_timing = LapTimingHandler(gps_handler=self.gps)
+                self.lap_timing = LapTimingHandler(gps_handler=self.gps, fuel_tracker=self.fuel_tracker)
                 self.lap_timing.start()
                 self.lap_timing_display.set_handler(self.lap_timing)
                 logger.info("Lap timing handler initialised")
@@ -1248,6 +1277,14 @@ class OpenTPT:
                 frame.track_position = lap_data.get("track_position")
                 frame.track_name = lap_data.get("track_name")
 
+        # Fuel tracking data
+        if self.fuel_tracker:
+            fuel_state = self.fuel_tracker.get_state()
+            if fuel_state.get('data_available'):
+                frame.fuel_level_percent = fuel_state.get('fuel_level_percent')
+                frame.fuel_rate_lph = fuel_state.get('fuel_rate_lph')
+                frame.fuel_consumption_lap_litres = fuel_state.get('current_lap_consumption_litres')
+
         self.recorder.record_frame(frame)
 
     def _update_hardware(self):
@@ -1362,6 +1399,15 @@ class OpenTPT:
             obd_data = self.obd2.get_data()
             if obd_data and 'rpm' in obd_data:
                 self.neodriver.set_rpm(obd_data['rpm'])
+
+        # Update fuel tracker with OBD2 fuel data
+        if self.fuel_tracker and self.obd2:
+            obd_data = self.obd2.get_data()
+            if obd_data:
+                self.fuel_tracker.update(
+                    fuel_level_percent=obd_data.get('fuel_level_percent'),
+                    fuel_rate_lph=obd_data.get('fuel_rate_lph')
+                )
 
         # Check for NeoKey inputs (non-blocking, handled by background thread)
         input_events = self.input_handler.check_input()
@@ -1533,6 +1579,11 @@ class OpenTPT:
             t0 = time.time()
             self.lap_timing_display.draw(self.screen)
             render_times['lap_timing'] = (time.time() - t0) * 1000
+        elif self.current_category == "ui" and self.current_ui_page == "fuel":
+            # Render fuel tracking page
+            t0 = time.time()
+            self.fuel_display.draw(self.screen)
+            render_times['fuel'] = (time.time() - t0) * 1000
         else:
             # Render the telemetry page (default UI view)
             self._update_ui_visibility()

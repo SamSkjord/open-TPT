@@ -51,6 +51,10 @@ class Lap:
     is_valid: bool = True
     max_speed: float = 0.0
     avg_speed: float = 0.0
+    # Fuel tracking
+    fuel_used_litres: Optional[float] = None
+    fuel_at_start_percent: Optional[float] = None
+    fuel_at_end_percent: Optional[float] = None
 
 
 @dataclass

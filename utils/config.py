@@ -66,6 +66,7 @@ UI_PAGES = [
     {"id": "telemetry", "name": "Telemetry", "default_enabled": True},
     {"id": "gmeter", "name": "G-Meter", "default_enabled": True},
     {"id": "lap_timing", "name": "Lap Timing", "default_enabled": True},
+    {"id": "fuel", "name": "Fuel", "default_enabled": True},
 ]
 
 # ==============================================================================
@@ -763,6 +764,28 @@ LAP_TIMING_DATA_DIR = os.path.expanduser("~/.opentpt/lap_timing")
 
 # Sector configuration
 LAP_TIMING_SECTOR_COUNT = 3  # Number of sectors per lap
+
+# ==============================================================================
+# FUEL TRACKING CONFIGURATION
+# ==============================================================================
+
+# Enable/disable fuel tracking system
+FUEL_TRACKING_ENABLED = True  # Set to False to disable fuel tracking
+
+# Default fuel tank capacity (user-settable via settings menu)
+# This value is used when no user preference is stored
+FUEL_TANK_CAPACITY_LITRES_DEFAULT = 50.0
+
+# Fuel warning thresholds (percentage of tank capacity)
+FUEL_LOW_THRESHOLD_PERCENT = 20.0      # Yellow warning threshold
+FUEL_CRITICAL_THRESHOLD_PERCENT = 10.0  # Red warning threshold
+
+# Smoothing for fuel level readings (number of samples to average)
+# Higher values = smoother but slower response
+FUEL_SMOOTHING_SAMPLES = 5
+
+# Number of laps to average for consumption estimate
+FUEL_LAP_HISTORY_COUNT = 5
 
 # ==============================================================================
 # HELPER FUNCTIONS
