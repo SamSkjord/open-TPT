@@ -187,14 +187,8 @@ class LapTimingDisplay:
         # Centre message
         text = "Waiting for track..."
         text_surface = self.font_large.render(text, True, self.colour_no_data)
-        text_rect = text_surface.get_rect(center=(self.width // 2, self.height // 2 - 30))
+        text_rect = text_surface.get_rect(center=(self.width // 2, self.height // 2))
         screen.blit(text_surface, text_rect)
-
-        # Sub-message
-        sub_text = "Drive near a known track to auto-detect"
-        sub_surface = self.font_small.render(sub_text, True, self.colour_no_data)
-        sub_rect = sub_surface.get_rect(center=(self.width // 2, self.height // 2 + 20))
-        screen.blit(sub_surface, sub_rect)
 
     def _draw_header(self, screen, track_name, lap_number, best_lap_time):
         """Draw header with track name, lap number, and best lap."""

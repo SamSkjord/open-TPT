@@ -74,6 +74,11 @@ class FuelTracker:
         self._refuel_threshold_percent = 5.0  # Fuel increase > 5% = refuel detected
         self._last_raw_fuel_percent: Optional[float] = None
 
+        # Distance-based tracking (for non-lap mode)
+        self._session_distance_km: float = 0.0
+        self._last_speed_kmh: Optional[float] = None
+        self._last_distance_update: Optional[float] = None
+
         # Last update timestamp
         self._last_update_time: float = 0.0
         self._data_available: bool = False
@@ -93,7 +98,8 @@ class FuelTracker:
             self._settings.set("fuel.tank_capacity_litres", value)
             logger.info("Fuel tank capacity set to %.1fL", value)
 
-    def update(self, fuel_level_percent: Optional[float], fuel_rate_lph: Optional[float] = None):
+    def update(self, fuel_level_percent: Optional[float], fuel_rate_lph: Optional[float] = None,
+               speed_kmh: Optional[float] = None):
         """
         Update fuel tracker with new OBD2 data.
 
@@ -103,8 +109,22 @@ class FuelTracker:
         Args:
             fuel_level_percent: Fuel level as percentage (0-100), or None if unavailable
             fuel_rate_lph: Fuel consumption rate in L/h (optional, not all vehicles support)
+            speed_kmh: Current speed in km/h for distance tracking
         """
-        self._last_update_time = time.time()
+        current_time = time.time()
+        self._last_update_time = current_time
+
+        # Update distance tracking
+        if speed_kmh is not None and speed_kmh >= 0:
+            if self._last_distance_update is not None and self._last_speed_kmh is not None:
+                # Calculate distance travelled since last update
+                time_delta_hours = (current_time - self._last_distance_update) / 3600
+                # Use average of last and current speed for better accuracy
+                avg_speed = (self._last_speed_kmh + speed_kmh) / 2
+                distance_km = avg_speed * time_delta_hours
+                self._session_distance_km += distance_km
+            self._last_speed_kmh = speed_kmh
+            self._last_distance_update = current_time
 
         if fuel_level_percent is not None:
             self._data_available = True
@@ -315,6 +335,46 @@ class FuelTracker:
             return None
         return (self._fuel_level_percent / 100.0) * self._tank_capacity
 
+    def get_session_fuel_used_litres(self) -> Optional[float]:
+        """Get fuel used since session start in litres."""
+        if self._session_start_fuel_percent is None or self._fuel_level_percent is None:
+            return None
+        fuel_used_percent = self._session_start_fuel_percent - self._fuel_level_percent
+        if fuel_used_percent < 0:
+            return 0.0
+        return (fuel_used_percent / 100.0) * self._tank_capacity
+
+    def get_session_distance_km(self) -> float:
+        """Get distance travelled since session start in km."""
+        return self._session_distance_km
+
+    def get_consumption_per_100km(self) -> Optional[float]:
+        """Get fuel consumption in L/100km based on session data."""
+        fuel_used = self.get_session_fuel_used_litres()
+        if fuel_used is None or fuel_used <= 0 or self._session_distance_km < 1.0:
+            return None
+        return (fuel_used / self._session_distance_km) * 100
+
+    def get_estimated_range_km(self) -> Optional[float]:
+        """Get estimated remaining range in km based on consumption rate."""
+        consumption_per_100km = self.get_consumption_per_100km()
+        fuel_remaining = self.get_fuel_level_litres()
+
+        if consumption_per_100km is None or consumption_per_100km <= 0 or fuel_remaining is None:
+            # Try using fuel rate and current speed instead
+            if self._fuel_rate_lph and self._fuel_rate_lph > 0 and self._last_speed_kmh and self._last_speed_kmh > 0:
+                hours_remaining = fuel_remaining / self._fuel_rate_lph if fuel_remaining else 0
+                return hours_remaining * self._last_speed_kmh
+            return None
+
+        return (fuel_remaining / consumption_per_100km) * 100
+
+    def get_session_duration_min(self) -> Optional[float]:
+        """Get session duration in minutes."""
+        if self._session_start_time is None:
+            return None
+        return (time.time() - self._session_start_time) / 60
+
     def get_state(self) -> Dict[str, Any]:
         """
         Get current fuel state for display.
@@ -366,6 +426,14 @@ class FuelTracker:
                 if self._session_start_fuel_percent is not None and self._fuel_level_percent is not None
                 else None
             ),
+
+            # Distance-based metrics (for non-lap mode)
+            'session_fuel_used_litres': self.get_session_fuel_used_litres(),
+            'session_distance_km': self._session_distance_km,
+            'session_duration_min': self.get_session_duration_min(),
+            'consumption_per_100km': self.get_consumption_per_100km(),
+            'estimated_range_km': self.get_estimated_range_km(),
+            'current_speed_kmh': self._last_speed_kmh,
         }
 
     def reset_lap_history(self):
@@ -378,5 +446,7 @@ class FuelTracker:
         """Reset session tracking (keeps lap history)."""
         self._session_start_fuel_percent = self._fuel_level_percent
         self._session_start_time = time.time()
+        self._session_distance_km = 0.0
+        self._last_distance_update = None
         logger.info("Fuel: Session reset at %.1f%%",
                     self._fuel_level_percent if self._fuel_level_percent else 0)

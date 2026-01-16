@@ -543,6 +543,12 @@ class MenuSystem:
                 action=lambda: self._clear_best_laps(),
             )
         )
+        lap_timing_menu.add_item(
+            MenuItem(
+                "Clear Track",
+                action=lambda: self._clear_current_track(),
+            )
+        )
         lap_timing_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
         self.lap_timing_menu = lap_timing_menu
 
@@ -2087,6 +2093,11 @@ class MenuSystem:
         current = self._settings.get("lap_timing.enabled", LAP_TIMING_ENABLED)
         new_value = not current
         self._settings.set("lap_timing.enabled", new_value)
+
+        # Clear track when disabling
+        if not new_value and self.lap_timing_handler:
+            self.lap_timing_handler.clear_track()
+
         return f"Lap timing {'enabled' if new_value else 'disabled'}"
 
     def _get_lap_timing_auto_detect_label(self) -> str:
@@ -2104,6 +2115,17 @@ class MenuSystem:
         new_value = not current
         self._settings.set("lap_timing.auto_detect", new_value)
         return f"Auto-detect {'enabled' if new_value else 'disabled'}"
+
+    def _clear_current_track(self) -> str:
+        """Clear the currently loaded track."""
+        if not self.lap_timing_handler:
+            return "Lap timing not available"
+
+        if self.lap_timing_handler.track is None:
+            return "No track loaded"
+
+        self.lap_timing_handler.clear_track()
+        return "Track cleared"
 
     def _get_current_track_label(self) -> str:
         """Get current track name label."""

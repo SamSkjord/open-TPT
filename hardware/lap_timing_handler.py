@@ -19,6 +19,7 @@ from utils.config import (
     TRACK_SEARCH_RADIUS_KM,
     LAP_TIMING_DATA_DIR,
 )
+from utils.settings import get_settings
 from utils.lap_timing_store import get_lap_timing_store, LapRecord
 
 # Import lap timing components
@@ -56,7 +57,11 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
         super().__init__(queue_depth=2)
         self.gps_handler = gps_handler
         self.fuel_tracker = fuel_tracker
-        self.enabled = LAP_TIMING_ENABLED and LAP_TIMING_AVAILABLE
+        self._settings = get_settings()
+
+        # Check settings for enabled state, fallback to config
+        settings_enabled = self._settings.get("lap_timing.enabled", LAP_TIMING_ENABLED)
+        self.enabled = settings_enabled and LAP_TIMING_AVAILABLE
 
         # Track and timing state
         self.track: Optional[Track] = None
@@ -92,9 +97,9 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
         # Fuel tracking state
         self._lap_start_fuel_percent: Optional[float] = None
 
-        # Track auto-detection
+        # Track auto-detection - read from settings, fallback to config
         self.track_detected = False
-        self.auto_detect_enabled = TRACK_AUTO_DETECT
+        self.auto_detect_enabled = self._settings.get("lap_timing.auto_detect", TRACK_AUTO_DETECT)
 
         # Error tracking
         self.consecutive_errors = 0
@@ -155,6 +160,31 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
         # Load stored best lap for this track
         self._load_best_lap_from_store()
 
+    def clear_track(self):
+        """Clear the current track and reset lap timing state."""
+        self.track = None
+        self.lap_detector = None
+        self.position_tracker = None
+        self.delta_calculator = None
+        self.track_detected = False
+
+        # Reset lap state
+        self.current_lap_number = 0
+        self.current_lap_start_time = None
+        self.current_lap_points = []
+        self.laps = []
+        self.best_lap = None
+        self.last_lap = None
+        self.stored_best_lap_time = None
+        self.current_sector = 0
+        self.sector_times = [None] * self.sector_count
+        self.sector_start_time = None
+        self.best_sector_times = [None] * self.sector_count
+        self.current_delta = None
+        self.current_position = None
+
+        logger.info("Lap timing: Track cleared")
+
     def _worker_loop(self):
         """Background thread for lap timing calculations."""
         while self.running:
@@ -165,6 +195,11 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
                 if gps_snapshot and gps_snapshot.data.get('has_fix'):
                     # Convert to lap timing GPSPoint
                     gps_point = self._convert_gps_point(gps_snapshot)
+
+                    # Check settings for auto-detect (allows live toggle)
+                    self.auto_detect_enabled = self._settings.get(
+                        "lap_timing.auto_detect", TRACK_AUTO_DETECT
+                    )
 
                     # Auto-detect track if enabled and not yet detected
                     if self.auto_detect_enabled and not self.track_detected:

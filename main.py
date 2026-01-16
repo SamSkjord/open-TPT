@@ -1453,8 +1453,13 @@ class OpenTPT:
             if obd_data:
                 self.fuel_tracker.update(
                     fuel_level_percent=obd_data.get('fuel_level_percent'),
-                    fuel_rate_lph=obd_data.get('fuel_rate_lph')
+                    fuel_rate_lph=obd_data.get('fuel_rate_lph'),
+                    speed_kmh=obd_data.get('obd_speed_kmh')
                 )
+            # Update fuel display mode based on lap timing state
+            lap_timing_active = (self.lap_timing is not None and
+                                 self.lap_timing.track is not None)
+            self.fuel_display.set_lap_timing_active(lap_timing_active)
 
         # Check for NeoKey inputs (non-blocking, handled by background thread)
         input_events = self.input_handler.check_input()
