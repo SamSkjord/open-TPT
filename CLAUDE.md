@@ -1,6 +1,6 @@
 # Claude Context - openTPT Project
 
-**Version:** 0.17.1 | **Updated:** 2025-12-03
+**Version:** 0.17.9 | **Updated:** 2026-01-16
 
 ---
 
@@ -23,7 +23,7 @@
 ## Critical Conventions
 
 ### British English - NON-NEGOTIABLE
-| ✅ Use | ❌ Never |
+| Use | Never |
 |--------|---------|
 | Tyre | Tire |
 | Optimised | Optimized |
@@ -52,15 +52,17 @@
 | Service | `openTPT.service` |
 
 ### Hardware Status
-- ✅ TPMS: 4/4 sensors (FL, FR, RL, RR)
-- ✅ Multi-Camera: Dual USB (`/dev/video-rear`, `/dev/video-front`)
-- ✅ NeoKey 1x4: Physical buttons
-- ✅ Rotary Encoder: I2C QT with NeoPixel (0x36)
-- ✅ Pico Thermal: 1/4 MLX90640 (FL)
-- ❌ TOF Distance: Disabled (VL53L0X unreliable for ride height)
-- ✅ Brake Temps: FL (MCP9601 dual 0x65/0x66), FR (ADC) - rear disabled
-- ✅ Toyota Radar: can_b1_0 (keep-alive), can_b1_1 (tracks)
-- ✅ OBD2: Ford Mode 22 HV Battery SOC (DID 0x4801)
+- TPMS: 4/4 sensors (FL, FR, RL, RR)
+- Multi-Camera: Dual USB (`/dev/video-rear`, `/dev/video-front`)
+- NeoKey 1x4: Physical buttons
+- Rotary Encoder: I2C QT with NeoPixel (0x36)
+- Pico Thermal: 1/4 MLX90640 (FL)
+- TOF Distance: Disabled (VL53L0X unreliable for ride height)
+- Brake Temps: FL (MCP9601 dual 0x65/0x66), FR (ADC) - rear disabled
+- Toyota Radar: can_b1_0 (keep-alive), can_b1_1 (tracks)
+- OBD2: Speed, RPM, fuel level, Ford Mode 22 HV Battery SOC
+- GPS: PA1616S at 10Hz (serial /dev/ttyS0) for lap timing
+- NeoDriver: I2C LED strip at 0x60 (shift/delta/overtake modes)
 
 ---
 
@@ -70,17 +72,25 @@
 openTPT/
 ├── main.py                          # Entry point
 ├── gui/
-│   ├── display.py                   # Rendering
+│   ├── display.py                   # Rendering + temperature overlays
 │   ├── camera.py                    # Multi-camera + radar overlay
+│   ├── menu.py                      # On-screen menu system
 │   └── radar_overlay.py             # Radar visualisation
 ├── hardware/
 │   ├── unified_corner_handler.py    # All tyre sensors
 │   ├── tpms_input_optimized.py      # TPMS (tpms>=2.1.0)
 │   ├── radar_handler.py             # Toyota radar
-│   └── obd2_handler.py              # OBD2/CAN
+│   ├── obd2_handler.py              # OBD2/CAN
+│   ├── gps_handler.py               # GPS serial NMEA parsing
+│   ├── neodriver_handler.py         # NeoDriver LED strip
+│   └── lap_timing_handler.py        # Lap timing logic
 ├── utils/
 │   ├── config.py                    # ALL configuration
-│   └── hardware_base.py             # Bounded queue base class
+│   ├── settings.py                  # Persistent user settings
+│   ├── hardware_base.py             # Bounded queue base class
+│   ├── fuel_tracker.py              # Fuel consumption tracking
+│   ├── lap_timing_store.py          # SQLite lap time persistence
+│   └── telemetry_recorder.py        # CSV telemetry recording
 └── opendbc/*.dbc                    # CAN message definitions
 ```
 
@@ -93,10 +103,12 @@ openTPT/
 |---------|--------|---------|
 | `0x08` | Pico | MLX90640 thermal slave (per corner) |
 | `0x29` | VL53L0X | TOF distance (per corner) |
+| `0x30` | NeoKey | 1x4 button input with NeoPixels |
+| `0x36` | Seesaw | Rotary encoder with NeoPixel |
 | `0x48` | ADS1115 | ADC for brake IR sensors |
 | `0x5A` | MLX90614 | Single-point IR (per corner) |
+| `0x60` | NeoDriver | I2C to NeoPixel LED strip |
 | `0x65/0x66` | MCP9601 | Thermocouple (inner/outer brake) |
-| `0x36` | Seesaw | Rotary encoder with NeoPixel |
 | `0x68` | ICM20649 | IMU for G-meter |
 | `0x70` | TCA9548A | I2C mux (8 channels) |
 
@@ -215,18 +227,35 @@ All settings in `utils/config.py`:
 ## Subsystem Quick Reference
 
 ### Multi-Camera (v0.8)
-- Two USB cameras via udev rules (USB port → device name)
+- Two USB cameras via udev rules (USB port to device name)
 - Freeze-frame transitions (no checkerboard)
 - Radar overlay on rear camera only
 
 ### Toyota Radar (v0.10)
 - can_b1_1: Track data (RX), can_b1_0: Keep-alive (TX)
-- Chevrons: 🟢 safe, 🟡 moderate, 🔴 rapid approach, 🔵 overtaking
+- Chevrons: green safe, yellow moderate, red rapid approach, blue overtaking
 - Requires `cantools` package
 
+### GPS and Lap Timing (v0.17)
+- PA1616S GPS at 10Hz via /dev/ttyS0
+- PPS time sync via chrony
+- Lap times persisted to SQLite (`~/.opentpt/lap_timing/lap_timing.db`)
+- Best lap loaded automatically when track selected
+
+### Fuel Tracking (v0.17.9)
+- OBD2 fuel level PID 0x2F
+- Average consumption per lap calculation
+- Refuelling detection with session reset
+- Configurable warning/critical thresholds
+
+### NeoDriver LED Strip (v0.17.2)
+- I2C address 0x60, configurable pixel count
+- Modes: shift (RPM), delta (lap time), overtake (radar), off
+- Direction: centre-out, edges-in, left-to-right, right-to-left
+
 ### Brake Emissivity
-- MLX90614/ADC sensors use ε=1.0 default
-- Software correction: `T_actual = T_measured / ε^0.25`
+- MLX90614/ADC sensors use e=1.0 default
+- Software correction: `T_actual = T_measured / e^0.25`
 - Configure per corner in `BRAKE_ROTOR_EMISSIVITY`
 - Cast iron oxidised: 0.95, machined: 0.60-0.70
 
@@ -236,8 +265,8 @@ All settings in `utils/config.py`:
 
 ```bash
 # British English in commits
-git commit -m "Optimise thermal processing"  # ✅
-git commit -m "Optimize thermal processing"  # ❌
+git commit -m "Optimise thermal processing"  # correct
+git commit -m "Optimize thermal processing"  # wrong
 ```
 
 ### Before Committing
@@ -257,7 +286,6 @@ git commit -m "Optimize thermal processing"  # ❌
 | `CHANGELOG.md` | Version history |
 | `QUICKSTART.md` | Quick commands |
 | `DEPLOYMENT.md` | Pi deployment |
-| `WAVESHARE_DUAL_CAN_HAT_SETUP.md` | CAN configuration |
 
 ---
 

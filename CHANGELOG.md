@@ -1,5 +1,66 @@
 # Changelog - openTPT
 
+## [v0.17.9] - 2026-01-16
+
+### Fuel Tracking, Temperature Overlays & Code Quality
+
+#### New Features
+
+- **Fuel tracking with OBD2 integration** - Real-time fuel monitoring for hybrid vehicles
+  - Reads fuel level from OBD2 (standard PID 0x2F)
+  - Average fuel consumption per lap calculation
+  - Estimated laps remaining based on consumption rate
+  - Fuel used this session tracking
+- **Fuel display modes** - Multiple visualisation options
+  - Percentage mode: current fuel level as percentage
+  - Laps remaining mode: estimated laps until empty
+  - Consumption mode: average litres per lap
+- **Refuelling detection** - Automatic session reset on fuel increase
+  - Detects when fuel level increases (refuelling)
+  - Resets session fuel tracking after pit stop
+  - Configurable threshold to avoid false triggers
+- **Global fuel warnings** - Visual alerts for low fuel
+  - Warning threshold configurable (default 10%)
+  - Critical threshold configurable (default 5%)
+  - Status bar colour changes to indicate fuel state
+- **Temperature overlays on tyre zones** - Visual temp display on heatmaps
+  - Shows numeric temperature values on left/centre/right zones
+  - Colour-coded text based on temperature thresholds
+  - Also added to brake temperature displays
+- **Config reload functionality** - Hot-reload settings without restart
+  - Reload configuration from menu
+  - Validates settings before applying
+  - Logs changes for debugging
+
+#### Improvements
+
+- **Comprehensive logging** - Replaced print statements with proper logging
+  - All modules now use Python logging framework
+  - Consistent log levels (DEBUG, INFO, WARNING, ERROR)
+  - Improved log messages with context
+  - Fixed British spelling throughout
+- **Code quality improvements**
+  - Fixed race condition in recording setter
+  - Consolidated unit conversion functions
+  - Removed dead code and unused imports
+  - Fixed crash log race condition
+
+#### Bug Fixes
+
+- **Lap timing settings** - Fixed settings not persisting correctly
+- **Camera menu crash log** - Fixed race condition when writing crash logs
+
+#### Modified Files
+
+- `hardware/obd2_handler.py` - Added fuel level PID reading
+- `utils/fuel_tracker.py` - New fuel tracking module
+- `gui/display.py` - Temperature overlay rendering
+- `gui/menu.py` - Fuel display mode menu, config reload
+- `main.py` - Fuel tracker integration
+- Multiple modules - Logging improvements
+
+---
+
 ## [v0.17.8] - 2026-01-15
 
 ### Expanded OBD2 Telemetry Logging
@@ -35,7 +96,7 @@
 
 ### Lap Timing Persistence & Page Toggle Menu
 
-#### ✨ New Features
+#### New Features
 
 - **Lap timing persistence** - Best laps now saved to SQLite database
   - Stores best lap times per track with sector splits
@@ -52,7 +113,7 @@
   - GPS: latitude, longitude, speed, heading
   - Lap timing: lap number, lap time, delta, sector, track position
 
-#### 🔄 Modified Files
+#### Modified Files
 
 - `utils/lap_timing_store.py` - New SQLite storage for lap times
 - `utils/config.py` - Added UI_PAGES configuration
@@ -65,9 +126,9 @@
 
 ## [v0.17.6] - 2026-01-05
 
-### Early Boot Splash Screen 🚀
+### Early Boot Splash Screen
 
-#### ✨ New Features
+#### New Features
 
 - **fbi boot splash** - Framebuffer splash appears ~4 seconds into boot
   - Uses fbi to display splash.png before Python/pygame loads
@@ -75,7 +136,7 @@
   - Seamless handoff: main.py kills fbi when pygame display is ready
 - **Faster visual feedback** - Reduces blank screen time during boot
 
-#### 🔄 Modified Files
+#### Modified Files
 
 - `config/boot/fbi-splash.service` - New systemd service for early splash
 - `main.py` - Kill fbi process after pygame display initialises
@@ -85,9 +146,9 @@
 
 ## [v0.17.5] - 2025-12-11
 
-### Shift Light Start Threshold & Ford Hybrid PID Tester 🚦
+### Shift Light Start Threshold & Ford Hybrid PID Tester
 
-#### ✨ New Features
+#### New Features
 
 - **Shift light start RPM** - Lights stay off at idle, illuminate only above threshold
   - New `NEODRIVER_START_RPM` config (default 3000)
@@ -98,7 +159,7 @@
   - Tests all 14 Ford Hybrid UDS PIDs (Mode 0x22)
   - Real-time display and CSV logging
 
-#### 🔄 Modified Files
+#### Modified Files
 
 - `hardware/neodriver_handler.py` - Added start_rpm parameter and threshold logic
 - `main.py` - Pass NEODRIVER_START_RPM to handler
@@ -109,9 +170,9 @@
 
 ## [v0.17.4] - 2025-12-03
 
-### I2C Resilience & Delta Mode Improvements 🔧
+### I2C Resilience & Delta Mode Improvements
 
-#### ✨ New Features
+#### New Features
 
 - **Delta mode improvements** - Non-linear scale and corrected colours
   - Thresholds: 0.1s, 0.5s, 1.0s, 5.0s for progressive display
@@ -119,7 +180,7 @@
 - **Symmetrical light animations** - Centre-out and edges-in now light in proper pairs
 - **Brightness sync** - Light strip brightness follows display brightness setting
 
-#### 🐛 Bug Fixes
+#### Bug Fixes
 
 - **I2C retry logic** - All seesaw devices now retry on init failure
   - Encoder, NeoKey, NeoDriver all have 3 retry attempts with delays
@@ -127,11 +188,11 @@
 - **Delta value wiring** - Fixed timing: delta now read after value is set
 - **Light Strip menu** - Mode and Direction are now proper submenus
 
-#### ❌ Removed
+#### Removed
 
 - **TOF distance sensors** - Disabled VL53L0X ride height measurement (unreliable)
 
-#### 🔄 Modified Files
+#### Modified Files
 
 - `gui/encoder_input.py` - Init retry logic, silent I2C error handling
 - `gui/input_threaded.py` - NeoKey init retry logic, silent error handling
@@ -144,9 +205,9 @@
 
 ## [v0.17.3] - 2025-12-03
 
-### NeoDriver Menu & OBD2 RPM 🎛️
+### NeoDriver Menu & OBD2 RPM
 
-#### ✨ New Features
+#### New Features
 
 - **Light Strip settings menu** - Configure mode and direction from Settings menu
   - Mode selection: Shift, Delta, Overtake, Off
@@ -159,7 +220,7 @@
   - Edges In: grow from edges toward centre
   - Left to Right / Right to Left: linear fill
 
-#### 🔄 Modified Files
+#### Modified Files
 
 - `gui/menu.py` - Light Strip submenu with mode/direction settings
 - `hardware/obd2_handler.py` - Added RPM reading (PID 0x0C)
@@ -171,9 +232,9 @@
 
 ## [v0.17.2] - 2025-12-03
 
-### NeoDriver LED Strip Support 💡
+### NeoDriver LED Strip Support
 
-#### ✨ New Features
+#### New Features
 
 - **Adafruit NeoDriver support** - I2C to NeoPixel driver at 0x60
   - Multiple display modes: off, delta, overtake, shift, rainbow
@@ -185,11 +246,11 @@
   - Rainbow mode: test/demo animation
   - Startup animation: rainbow sweep on/off
 
-#### 🐛 Bug Fixes
+#### Bug Fixes
 
 - **NeoDriver init retry** - Added retry logic with delays for I2C bus contention during startup
 
-#### 🔄 Modified Files
+#### Modified Files
 
 - `hardware/neodriver_handler.py` - New NeoDriver handler
 - `utils/config.py` - NeoDriver configuration options
@@ -199,9 +260,9 @@
 
 ## [v0.17.1] - 2025-12-03
 
-### Menu Scrolling & Encoder-Based Settings 🎚️
+### Menu Scrolling & Encoder-Based Settings
 
-#### ✨ New Features
+#### New Features
 
 - **Menu scrolling** - Long menus now scroll automatically
   - Auto-scroll keeps selection visible as you navigate
@@ -220,13 +281,13 @@
   - Rotate encoder to adjust brightness
   - Click again to save
 
-#### 🐛 Bug Fixes
+#### Bug Fixes
 
 - **PulseAudio access** - Volume commands now use `XDG_RUNTIME_DIR=/run/user/1000` to access user session
 - **Connect menu** - Now shows both paired AND trusted devices (some devices lose pairing but keep trust)
 - **Brightness sync** - Menu brightness changes now sync to display handler
 
-#### 🔄 Modified Files
+#### Modified Files
 
 - `gui/menu.py` - Menu scrolling, encoder volume/brightness editing, trusted device support
 - `main.py` - Pass input_handler to MenuSystem for brightness sync
@@ -235,9 +296,9 @@
 
 ## [v0.17.0] - 2025-12-02
 
-### Telemetry Recording, Bluetooth Audio & Encoder Fixes 📊🎵
+### Telemetry Recording, Bluetooth Audio & Encoder Fixes
 
-#### ✨ New Features
+#### New Features
 
 - **Telemetry recording** - Record sensor data to CSV files
   - Hold button 0 for 1 second to start/stop recording
@@ -260,7 +321,7 @@
   - PulseAudio dependency check with "! Install pulseaudio" warning if missing
   - D-Bus policy for pi user to access A2DP audio profiles
 
-#### 🐛 Bug Fixes
+#### Bug Fixes
 
 - **Encoder brightness sync** - Encoder now starts at DEFAULT_BRIGHTNESS (0.8) instead of hardcoded 0.5
 - **Encoder I2C stability** - Added protection against spurious rotation events
@@ -271,11 +332,11 @@
 - **Status bar brightness** - SOC and lap delta bars now affected by brightness dimming
 - **Bluetooth audio permissions** - D-Bus policy allows pi user to access A2DP profiles
 
-#### 🔄 New Files
+#### New Files
 
 - `utils/telemetry_recorder.py` - TelemetryRecorder class and TelemetryFrame dataclass
 
-#### 🔄 Modified Files
+#### Modified Files
 
 - `main.py` - Recording integration, telemetry frame capture
 - `gui/input_threaded.py` - Recording button hold detection, LED feedback
@@ -289,9 +350,9 @@
 
 ## [v0.16.0] - 2025-12-02
 
-### Rotary Encoder Input & Menu System 🎛️
+### Rotary Encoder Input & Menu System
 
-#### ✨ New Features
+#### New Features
 
 - **Rotary encoder support** - Adafruit I2C QT Rotary Encoder with NeoPixel
   - Rotation controls brightness (default mode)
@@ -312,12 +373,12 @@
 - **Bluetooth audio pairing** - Scan and connect Bluetooth devices
   - Uses system `bluetoothctl` for pairing
 
-#### 🔄 New Files
+#### New Files
 
 - `gui/encoder_input.py` - Threaded encoder handler with event queue
 - `gui/menu.py` - Menu system with hierarchical navigation
 
-#### 🔄 Modified Files
+#### Modified Files
 
 - `main.py` - Integrated encoder and menu system
 - `utils/config.py` - Added encoder configuration
@@ -327,9 +388,9 @@
 
 ## [v0.15.3] - 2025-12-01
 
-### TPMS Library Update 🛞
+### TPMS Library Update
 
-#### ✨ Improvements
+#### Improvements
 
 - **Updated to TPMS library v2.1.0** - Library now uses British spelling throughout
   - `TirePosition` → `TyrePosition`
@@ -338,7 +399,7 @@
 
 - **Added TPMS to requirements.txt** - `tpms>=2.1.0` now explicitly listed
 
-#### 🔄 Modified Files
+#### Modified Files
 
 - `hardware/tpms_input_optimized.py` - Updated imports and method calls to use British spelling
 - `requirements.txt` - Added TPMS dependency
@@ -347,9 +408,9 @@
 
 ## [v0.15.2] - 2025-11-26
 
-### Bug Fixes & Stability Improvements 🐛
+### Bug Fixes & Stability Improvements
 
-#### 🔧 Bug Fixes
+#### Bug Fixes
 
 - **Fixed intermittent "invalid color argument" crash** - Added None checks to colour calculations:
   - `gui/display.py`: `get_color_for_temp()` now returns GREY for None values
@@ -358,13 +419,13 @@
 
 - **Improved crash logging** - Full traceback now written to `/tmp/opentpt_crash.log` on crash for easier debugging
 
-#### ✨ Improvements
+#### Improvements
 
 - **Reduced IMU log spam** - IMU I2C errors now only logged after 3+ consecutive failures (was 1)
   - Single errors from I2C bus contention are common and recover immediately
   - Prevents log flooding while still reporting persistent issues
 
-#### 🔄 Modified Files
+#### Modified Files
 
 - `main.py` - Added crash log file output
 - `gui/display.py` - Added None check to `get_color_for_temp()`
@@ -375,9 +436,9 @@
 
 ## [v0.15] - 2025-11-23
 
-### Configuration File Reorganisation 📋
+### Configuration File Reorganisation
 
-#### ✨ Improvements
+#### Improvements
 
 - **Logical section grouping** - Config file reorganised into 10 clear sections:
   1. Display & UI Settings
@@ -403,7 +464,7 @@
 
 - **Module docstring** - Added table of contents listing all sections
 
-#### 🔄 Modified Files
+#### Modified Files
 
 - `utils/config.py` - Complete reorganisation (no functional changes)
 
@@ -411,9 +472,9 @@
 
 ## [v0.14] - 2025-11-22
 
-### MCP9601 Thermocouple Brake Sensors 🌡️
+### MCP9601 Thermocouple Brake Sensors
 
-#### ✨ New Features
+#### New Features
 
 - **MCP9601 thermocouple support** - K-type thermocouple amplifiers for brake temperature
   - Supports dual sensors per corner (inner and outer brake pads)
@@ -429,7 +490,7 @@
 - **Independent backoff per sensor type** - Extended from v0.13
   - Tyre, brake, and TOF sensors each have fully separate backoff tracking
 
-#### ⚙️ Configuration
+#### Configuration
 
 New settings in `utils/config.py`:
 - `BRAKE_SENSOR_TYPES` - Now supports "mcp9601" option
@@ -448,9 +509,9 @@ pip3 install --break-system-packages adafruit-circuitpython-mcp9600
 
 ## [v0.13] - 2025-11-22
 
-### VL53L0X TOF Distance Sensors 📏
+### VL53L0X TOF Distance Sensors
 
-#### ✨ New Features
+#### New Features
 
 - **Per-corner TOF distance sensors** - VL53L0X Time-of-Flight sensors for ride height monitoring
   - Supports one sensor per corner (FL, FR, RL, RR) via I2C multiplexer
@@ -470,7 +531,7 @@ pip3 install --break-system-packages adafruit-circuitpython-mcp9600
 - Minimum distance from last 10 seconds shown below with "min:" prefix
 - Shows "--" when sensor out of range or not connected (no spam)
 
-#### ⚙️ Configuration
+#### Configuration
 
 New settings in `utils/config.py`:
 - `TOF_ENABLED` - Master enable for all TOF sensors
@@ -480,7 +541,7 @@ New settings in `utils/config.py`:
 - `TOF_DISPLAY_POSITIONS` - UI positions next to each tyre
 - `TOF_DISTANCE_MIN/OPTIMAL/RANGE/MAX` - Thresholds for colour coding
 
-#### 🔄 Modified Files
+#### Modified Files
 
 - `utils/config.py` - Added TOF configuration section
 - `hardware/unified_corner_handler.py` - Added VL53L0X support with separate backoff
@@ -497,9 +558,9 @@ pip3 install --break-system-packages adafruit-circuitpython-vl53l0x
 
 ## [v0.12] - 2025-11-22
 
-### I2C Bus Reliability Fix 🔧
+### I2C Bus Reliability Fix
 
-#### 🐛 Bug Fixes
+#### Bug Fixes
 
 - **I2C bus contention resolved** - Added threading lock to serialise access between smbus2 and busio libraries
   - Both libraries access the same physical I2C bus (bus 1)
@@ -533,7 +594,7 @@ pip3 install --break-system-packages adafruit-circuitpython-vl53l0x
   - Resets immediately on successful read with recovery message
   - Prevents bus lockups when sensors are disconnected or not yet installed
 
-#### 🔄 Modified Files
+#### Modified Files
 
 - `hardware/unified_corner_handler.py`
   - Added `threading` import
@@ -549,7 +610,7 @@ pip3 install --break-system-packages adafruit-circuitpython-vl53l0x
 - `utils/config.py`
   - Added `THERMAL_STALE_TIMEOUT = 1.0` setting
 
-#### 🔧 Technical Details
+#### Technical Details
 
 **Root Cause:**
 The unified corner handler used two different I2C libraries:
@@ -563,17 +624,17 @@ A `threading.Lock()` now ensures only one I2C transaction occurs at a time, prev
 
 #### 🧪 Testing
 
-- ✅ I2C bus no longer locks up during extended operation
-- ✅ All sensors continue to read correctly
-- ✅ Soak testing in progress
+-I2C bus no longer locks up during extended operation
+-All sensors continue to read correctly
+-Soak testing in progress
 
 ---
 
 ## [v0.11] - 2025-11-21
 
-### Brake Temperature Emissivity Correction 🌡️
+### Brake Temperature Emissivity Correction
 
-#### ✅ New Features
+#### New Features
 - **Automatic emissivity correction** - Software compensation for IR sensor readings
 - **Per-corner emissivity configuration** - Adjust values to match rotor materials
 - **Stefan-Boltzmann correction** - Accurate temperature calculation: `T_actual = T_measured / ε^0.25`
@@ -589,7 +650,7 @@ All IR sensors (MLX90614 and ADC-based) have factory default emissivity of 1.0, 
 3. Sensor reads lower than actual due to less radiation from non-black-body surface
 4. Software correction adjusts reading upward using Stefan-Boltzmann law
 
-#### 🔄 Modified Files
+#### Modified Files
 
 - `utils/config.py` - Added emissivity configuration and correction function
   - New function: `apply_emissivity_correction()` (lines 148-187)
@@ -600,7 +661,7 @@ All IR sensors (MLX90614 and ADC-based) have factory default emissivity of 1.0, 
   - ADC brake sensors: Lines 443-468 with emissivity correction
   - Added detailed docstrings explaining correction process
 
-#### ⚙️ Configuration
+#### Configuration
 
 **Brake Rotor Emissivity** (in `utils/config.py`):
 ```python
@@ -619,7 +680,7 @@ BRAKE_ROTOR_EMISSIVITY = {
 - Steel (polished): 0.15-0.25
 - Ceramic composite: 0.90-0.95
 
-#### 🔧 Technical Details
+#### Technical Details
 
 **Correction Formula:**
 ```
@@ -646,7 +707,7 @@ T_actual (K) = T_measured (K) / ε^0.25
 - Clarified that MLX90640 tyre sensors apply emissivity via Pico firmware (0.95 for rubber)
 - Explained why brake sensors use software correction (MLX90614/ADC default to ε = 1.0)
 
-#### 🛡️ Security Fixes
+#### Security Fixes
 
 - **CAN bus array access** - Restructured conditionals to check length before array access (obd2_handler.py)
 - **Bare except clauses** - Replaced with specific exception types in unified_corner_handler.py
@@ -656,7 +717,7 @@ T_actual (K) = T_measured (K) / ε^0.25
 - **Display dimension validation** - Enhanced security checks for config file parsing
 - **Emissivity bounds checking** - Validates emissivity values between 0.0 and 1.0
 
-#### 🔧 Long Runtime Stability Features
+#### Long Runtime Stability Features
 
 - **Voltage monitoring** - Checks Pi power status at startup and every 60 seconds
   - Detects undervoltage and throttling conditions
@@ -715,22 +776,22 @@ self.speed_history.append(speed)  # O(1) - auto-drops oldest
 
 #### 🧪 Testing
 
-- ✅ Emissivity correction applied to both ADC and MLX90614 brake sensors
-- ✅ Invalid emissivity values (≤0 or >1.0) safely handled
-- ✅ Default emissivity (1.0) returns uncorrected temperature
-- ✅ Configuration properly documented with typical material values
-- ✅ Voltage monitoring detects power issues on CM4-POE-UPS carrier
-- ✅ Garbage collection runs every 60s, freeing 500-700 objects per cycle
-- ✅ Surface cache clearing has no visible impact on display
-- ✅ Deque optimisation maintains identical functionality with better performance
+-Emissivity correction applied to both ADC and MLX90614 brake sensors
+-Invalid emissivity values (≤0 or >1.0) safely handled
+-Default emissivity (1.0) returns uncorrected temperature
+-Configuration properly documented with typical material values
+-Voltage monitoring detects power issues on CM4-POE-UPS carrier
+-Garbage collection runs every 60s, freeing 500-700 objects per cycle
+-Surface cache clearing has no visible impact on display
+-Deque optimisation maintains identical functionality with better performance
 
 ---
 
 ## [v0.10] - 2025-11-20
 
-### Toyota Radar Overlay Integration 📡
+### Toyota Radar Overlay Integration
 
-#### ✅ New Features
+#### New Features
 - **Toyota radar overlay** - Real-time collision warning on rear camera
 - **Radar track detection** - Displays 1-3 nearest vehicles with green/yellow/red chevrons
 - **Solid-filled chevrons** - 3x larger (120×108px), highly visible markers
@@ -750,7 +811,7 @@ opendbc/
 └── toyota_corolla_2017_pt_generated.dbc
 ```
 
-#### 🔄 Modified Files
+#### Modified Files
 
 - `hardware/radar_handler.py` - Fixed radar driver import and configuration
   - Changed import to `from hardware.toyota_radar_driver import ...`
@@ -766,7 +827,7 @@ opendbc/
   - `RADAR_CHANNEL = "can_b1_1"` (radar outputs tracks here)
   - `CAR_CHANNEL = "can_b1_0"` (keep-alive sent here)
 
-#### ⚙️ Configuration
+#### Configuration
 
 **Radar Settings** (in `utils/config.py`):
 ```python
@@ -784,7 +845,7 @@ RADAR_WARN_YELLOW_KPH = 10.0            # Yellow warning threshold
 RADAR_WARN_RED_KPH = 20.0               # Red warning threshold
 ```
 
-#### 📊 Architecture
+#### Architecture
 
 **CAN Channel Assignment**
 - **can_b1_0**: Car keep-alive messages (TX from Pi to radar)
@@ -792,10 +853,10 @@ RADAR_WARN_RED_KPH = 20.0               # Red warning threshold
 - Radar outputs ~960 track messages in 3 seconds (~320 Hz)
 
 **Chevron Color Coding**
-- 🟢 **Green**: Vehicle detected, safe distance (<10 km/h closing)
-- 🟡 **Yellow**: Moderate closing speed (10-20 km/h)
-- 🔴 **Red**: Rapid approach (>20 km/h closing speed)
-- 🔵 **Blue side arrows**: Overtaking vehicle warning
+- **Green**: Vehicle detected, safe distance (<10 km/h closing)
+- **Yellow**: Moderate closing speed (10-20 km/h)
+- **Red**: Rapid approach (>20 km/h closing speed)
+- **Blue side arrows**: Overtaking vehicle warning
 
 **Track Processing**
 - Bounded queue (depth=2) for lock-free render access
@@ -803,7 +864,7 @@ RADAR_WARN_RED_KPH = 20.0               # Red warning threshold
 - 0.5s timeout for stale tracks
 - Displays 3 nearest tracks within 120m range
 
-#### 🐛 Bug Fixes
+#### Bug Fixes
 
 - Fixed radar driver import path (was looking for global module)
 - Disabled CAN interface auto-setup (conflicts with systemd management)
@@ -812,11 +873,11 @@ RADAR_WARN_RED_KPH = 20.0               # Red warning threshold
 
 #### 🧪 Testing
 
-- ✅ Radar successfully receives 1-3 tracks
-- ✅ CAN bus confirmed active (960 track messages in 3 seconds)
-- ✅ Chevrons render on rear camera view (not on front camera)
-- ✅ 3x larger solid-filled chevrons highly visible
-- ✅ No CAN interface conflicts with systemd
+-Radar successfully receives 1-3 tracks
+-CAN bus confirmed active (960 track messages in 3 seconds)
+-Chevrons render on rear camera view (not on front camera)
+-3x larger solid-filled chevrons highly visible
+-No CAN interface conflicts with systemd
 
 #### 📝 Dependencies (Raspberry Pi)
 
@@ -837,9 +898,9 @@ pip3 install --break-system-packages cantools
 
 ## [v0.9] - 2025-11-20
 
-### Status Bars & OBD2 Simulation 📊
+### Status Bars & OBD2 Simulation
 
-#### ✅ New Features
+#### New Features
 - **Application-level status bars** - Top and bottom bars visible on all pages
 - **MAP-based SOC simulation** - Uses intake manifold pressure for desk testing without vehicle
 - **Dynamic color coding** - Real-time visual feedback for charge/discharge state
@@ -847,7 +908,7 @@ pip3 install --break-system-packages cantools
 - **Clean camera transitions** - Stale frames cleared when switching away from camera
 - **Correct front camera orientation** - Front camera shows normal view (not mirrored)
 
-#### 🔄 Modified Files
+#### Modified Files
 
 - `main.py` - Moved status bars from gmeter to application level
   - Status bars now update on ALL pages, not just G-meter
@@ -866,7 +927,7 @@ pip3 install --break-system-packages cantools
   - Conditional horizontal flip (rear camera only, not front)
 - `ui/widgets/horizontal_bar.py` - Status bar widgets (no changes, used by main.py)
 
-#### ⚙️ Configuration
+#### Configuration
 
 **OBD2 Settings** (in `utils/config.py`):
 ```python
@@ -881,17 +942,17 @@ STATUS_BAR_ENABLED = True       # Show status bars at top and bottom
 STATUS_BAR_HEIGHT = 20          # Height of status bars in pixels
 ```
 
-#### 📊 Architecture
+#### Architecture
 
 **Status Bars**
 - **Top Bar**: Lap time delta (simulated for testing)
-  - 🟢 Green = faster than reference lap
-  - 🔴 Red = slower than reference lap
+  - Green = faster than reference lap
+  - Red = slower than reference lap
   - ⚪ Grey = same pace
 - **Bottom Bar**: Battery State of Charge
-  - 🔵 Blue = idle (steady throttle)
-  - 🟢 Green = charging (throttle decreasing, MAP down, SOC up)
-  - 🔴 Red = discharging (throttle increasing, MAP up, SOC down)
+  - Blue = idle (steady throttle)
+  - Green = charging (throttle decreasing, MAP down, SOC up)
+  - Red = discharging (throttle increasing, MAP up, SOC down)
 
 **MAP-to-SOC Mapping**
 ```python
@@ -912,7 +973,7 @@ MAP 100 kPa → 0% SOC   (wide open throttle)
 - **Front camera**: Normal view (not flipped) for road ahead
 - **Frame clearing**: Last frame cleared when switching away from camera
 
-#### 🐛 Bug Fixes
+#### Bug Fixes
 
 - **Status bars only updating on gmeter page** - Fixed by moving update logic outside page conditional
 - **Slow SOC updates** - Changed from rate-of-change to direct mapping (instant response)
@@ -922,12 +983,12 @@ MAP 100 kPa → 0% SOC   (wide open throttle)
 
 #### 🧪 Testing
 
-- ✅ Status bars visible on all pages (telemetry, gmeter, camera)
-- ✅ SOC updates instantly when MAP changes
-- ✅ Colors correct (green=charging, red=discharging, blue=idle)
-- ✅ Camera doesn't show stale frame after switching back
-- ✅ Front camera shows normal view (not mirrored)
-- ✅ Rear camera remains mirrored for backing up
+-Status bars visible on all pages (telemetry, gmeter, camera)
+-SOC updates instantly when MAP changes
+-Colors correct (green=charging, red=discharging, blue=idle)
+-Camera doesn't show stale frame after switching back
+-Front camera shows normal view (not mirrored)
+-Rear camera remains mirrored for backing up
 
 #### 🎯 Use Cases
 
@@ -947,9 +1008,9 @@ MAP 100 kPa → 0% SOC   (wide open throttle)
 
 ## [v0.8] - 2025-11-19
 
-### Multi-Camera Support 🎥
+### Multi-Camera Support
 
-#### ✅ New Features
+#### New Features
 - **Dual USB camera support** - Seamless switching between rear and front cameras
 - **Deterministic camera identification** - Udev rules for consistent device naming across reboots
 - **Smooth camera transitions** - No checkerboard flash during switching, freeze-frame transition
@@ -965,7 +1026,7 @@ config/
     └── 99-camera-names.rules      # Udev rules for persistent camera naming
 ```
 
-#### 🔄 Modified Files
+#### Modified Files
 
 - `gui/camera.py` - Complete rewrite of camera switching logic
   - Added proper camera release before switching
@@ -977,7 +1038,7 @@ config/
 - `install.sh` - Added automatic camera udev rules installation
 - `CHANGELOG.md` - This entry
 
-#### ⚙️ Configuration
+#### Configuration
 
 **Multi-Camera Settings** (in `utils/config.py`):
 ```python
@@ -999,7 +1060,7 @@ SUBSYSTEM=="video4linux", KERNELS=="1-1.1", ATTR{index}=="0", SYMLINK+="video-re
 SUBSYSTEM=="video4linux", KERNELS=="1-1.2", ATTR{index}=="0", SYMLINK+="video-front"
 ```
 
-#### 🔧 Installation
+#### Installation
 
 The `install.sh` script now automatically installs camera udev rules:
 ```bash
@@ -1021,14 +1082,14 @@ ls -l /dev/video-*
 # /dev/video-front -> video3
 ```
 
-#### 🐛 Bug Fixes
+#### Bug Fixes
 
 - **Fixed checkerboard during camera switching** - Implemented freeze-frame transition
 - **Fixed resource conflicts** - Properly release old camera before initializing new one
 - **Fixed test pattern override** - Only generate test pattern if no frame exists
 - **Fixed deterministic identification** - Use udev symlinks directly without resolving to device paths
 
-#### 📊 Architecture
+#### Architecture
 
 **Camera Switching Flow**
 1. Save last frame for smooth transition
@@ -1051,13 +1112,13 @@ Common USB port mappings on Raspberry Pi 4:
 
 #### 🧪 Testing
 
-- ✅ Both cameras initialize correctly
-- ✅ Camera switching works in all directions (telemetry ↔ rear ↔ front)
-- ✅ No checkerboard flash during transitions
-- ✅ Deterministic identification survives reboots
-- ✅ Radar overlay only appears on rear camera
-- ✅ Dual FPS counters display correctly
-- ✅ Resource management prevents conflicts
+-Both cameras initialize correctly
+-Camera switching works in all directions (telemetry ↔ rear ↔ front)
+-No checkerboard flash during transitions
+-Deterministic identification survives reboots
+-Radar overlay only appears on rear camera
+-Dual FPS counters display correctly
+-Resource management prevents conflicts
 
 #### 🎯 Controls
 
@@ -1070,9 +1131,9 @@ Common USB port mappings on Raspberry Pi 4:
 
 ## [v0.7] - 2025-11-13
 
-### Radar Overlay Integration 📡
+### Radar Overlay Integration
 
-#### ✅ New Features
+#### New Features
 - **Optional Toyota radar overlay** - CAN bus radar integration with collision warnings
 - **Radar track visualization** - Green/yellow/red chevron arrows showing relative positions
 - **Overtake warnings** - Blue side arrows for rapidly approaching vehicles
@@ -1089,13 +1150,13 @@ gui/
 └── radar_overlay.py               # Radar overlay renderer (chevrons, overtake alerts)
 ```
 
-#### 🔄 Modified Files
+#### Modified Files
 
 - `main.py` - Added radar handler initialization and cleanup
 - `gui/camera.py` - Integrated radar overlay rendering
 - `utils/config.py` - Added comprehensive radar configuration section
 
-#### ⚙️ Configuration
+#### Configuration
 
 **Radar Settings** (in `utils/config.py`):
 ```python
@@ -1121,7 +1182,7 @@ RADAR_OVERTAKE_MIN_LATERAL = 0.5          # Minimum lateral offset (metres)
 RADAR_OVERTAKE_ARROW_DURATION = 1.0       # Arrow display duration (seconds)
 ```
 
-#### 📊 Architecture
+#### Architecture
 
 **Bounded Queue Integration**
 - Radar handler extends `BoundedQueueHardwareHandler`
@@ -1136,12 +1197,12 @@ RADAR_OVERTAKE_ARROW_DURATION = 1.0       # Arrow display duration (seconds)
 
 #### 🧪 Testing
 
-- ✅ Camera initializes correctly with `radar_handler=None`
-- ✅ Radar handler gracefully disables when hardware unavailable
-- ✅ `get_tracks()` returns empty dict when disabled
-- ✅ Camera doesn't create overlay when radar disabled
-- ✅ Configuration defaults are safe (RADAR_ENABLED = False)
-- ✅ Integration tested on Mac and Pi
+-Camera initializes correctly with `radar_handler=None`
+-Radar handler gracefully disables when hardware unavailable
+-`get_tracks()` returns empty dict when disabled
+-Camera doesn't create overlay when radar disabled
+-Configuration defaults are safe (RADAR_ENABLED = False)
+-Integration tested on Mac and Pi
 
 #### 📝 Dependencies (Optional)
 
@@ -1158,12 +1219,12 @@ Copy `toyota_radar_driver.py` from `scratch/sources/toyota-radar/` or install as
 
 ### Major Performance Refactoring
 
-#### ✅ Fixed
+#### Fixed
 - **NameError in TPMS handler** - Fixed `TirePosition` being used before TPMS library check
 - **Infinite recursion in MLXHandler** - Fixed backwards compatibility wrapper
 - **British English throughout** - Changed all "Tire" → "Tyre", "Optimized" → "Optimised", "Initialize" → "Initialise"
 
-#### 🚀 Performance Optimisations Added
+#### Performance Optimisations Added
 
 **Bounded Queue Architecture**
 - Lock-free data snapshots for render path
@@ -1177,7 +1238,7 @@ Copy `toyota_radar_driver.py` from `scratch/sources/toyota-radar/` or install as
 - Trimmed median filtering
 - EMA smoothing (α ≈ 0.3)
 - Slew-rate limiting (~50 °C/s)
-- **Performance**: < 1 ms/frame/sensor ✓
+- **Performance**: < 1 ms/frame/sensor
 
 **Hardware Handler Refactoring**
 - `MLXHandlerOptimised` - Thermal cameras with zone processing
@@ -1215,16 +1276,15 @@ install.sh                     # Raspberry Pi installation script
 requirements.txt               # Python dependencies
 
 # Documentation
-PERFORMANCE_OPTIMISATIONS.md   # Technical details
 DEPLOYMENT.md                  # Deployment guide
 ```
 
-#### 🔄 Modified Files
+#### Modified Files
 
 - `main.py` - Integrated optimised handlers with performance monitoring
 - All optimised handlers use British English spelling
 
-#### ⚙️ Configuration
+#### Configuration
 
 **Automatic Fallback**
 - System tries optimised handlers first
@@ -1235,14 +1295,14 @@ DEPLOYMENT.md                  # Deployment guide
 - `numba` - JIT compilation for thermal processing (10x speed improvement)
 - Install with: `pip3 install numba`
 
-#### 📊 Performance Targets (from System Plan)
+#### Performance Targets (from System Plan)
 
 | Component | Target | Status |
 |-----------|--------|--------|
-| Render loop | ≤ 12 ms/frame | ✅ |
-| Thermal zones | < 1 ms/sensor | ✅ |
-| Lock-free access | < 0.1 ms | ✅ |
-| FPS | 30-60 FPS | ✅ |
+| Render loop | ≤ 12 ms/frame | Done |
+| Thermal zones | < 1 ms/sensor | Done |
+| Lock-free access | < 0.1 ms | Done |
+| FPS | 30-60 FPS | Done |
 
 #### 🧪 Testing
 
@@ -1325,11 +1385,11 @@ sudo ./install.sh  # If dependencies changed
 
 ---
 
-**Status**: Deployed and tested on Pi 🎉
+**Status**: Deployed and tested on Pi
 
 ### Pi Hardware Status
-- ✅ TPMS: 4/4 sensors auto-paired (FL, FR, RL, RR)
-- ✅ NeoKey 1x4: Working (brightness, camera toggle, UI toggle)
-- ⚠️ MLX90640: 1/4 cameras connected (FL operational)
-- ⚠️ ADS1115: Not detected (brake temps unavailable)
-- ⚠️ Radar: Not configured (RADAR_ENABLED = False by default)
+-TPMS: 4/4 sensors auto-paired (FL, FR, RL, RR)
+-NeoKey 1x4: Working (brightness, camera toggle, UI toggle)
+- MLX90640: 1/4 cameras connected (FL operational)
+- ADS1115: Not detected (brake temps unavailable)
+- Radar: Not configured (RADAR_ENABLED = False by default)

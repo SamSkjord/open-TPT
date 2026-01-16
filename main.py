@@ -39,7 +39,7 @@ from gui.icon_handler import IconHandler
 from gui.gmeter import GMeterDisplay
 from gui.lap_timing_display import LapTimingDisplay
 from gui.fuel_display import FuelDisplay
-from ui.widgets.horizontal_bar import HorizontalBar, DualDirectionBar
+from gui.horizontal_bar import HorizontalBar, DualDirectionBar
 
 # Import optimised TPMS handler
 from hardware.tpms_input_optimized import TPMSHandler

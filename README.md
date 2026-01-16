@@ -6,11 +6,14 @@ A modular GUI system for live racecar telemetry using a Raspberry Pi 4 with HDMI
 ## Overview
 
 openTPT provides real-time monitoring of:
-- 🛞 Tyre pressure & temperature (via TPMS)
-- 🔥 Brake rotor temperatures (via IR sensors + ADC)
-- 🌡️ Tyre surface thermal imaging (via Pico I2C slave modules with MLX90640, or MLX90614 sensors)
-- 🎥 Multi-camera support with seamless switching (dual USB UVC cameras)
-- 📡 Optional Toyota radar overlay on rear camera (CAN bus radar with collision warnings)
+- Tyre pressure and temperature (via TPMS)
+- Brake rotor temperatures (via IR sensors + ADC)
+- Tyre surface thermal imaging (via Pico I2C slave modules with MLX90640, or MLX90614 sensors)
+- Multi-camera support with seamless switching (dual USB UVC cameras)
+- Toyota radar overlay on rear camera (CAN bus radar with collision warnings)
+- Fuel tracking with consumption rate and laps remaining estimation
+- GPS lap timing with delta display
+- NeoDriver LED strip for shift lights, delta, and overtake warnings
 
 The system is designed for racing applications where real-time monitoring of tyre and brake conditions is critical for optimal performance and safety.
 
@@ -44,7 +47,7 @@ openTPT features a high-performance architecture optimised for real-time telemet
   - Compatible Toyota radar unit (e.g., Prius 2017)
   - CAN-to-USB adapters or SPI CAN controllers
   - DBC files for radar decoding
-- Dual Waveshare 2-CH CAN HAT+ stack on the Waveshare CM4-POE-UPS-BASE for multi-bus CAN/OBD work (see `WAVESHARE_DUAL_CAN_HAT_SETUP.md` for wiring, device-tree overlays, and deterministic interface naming instructions applied by `install.sh`)
+- Dual Waveshare 2-CH CAN HAT+ stack on the Waveshare CM4-POE-UPS-BASE for multi-bus CAN/OBD work (see `DEPLOYMENT.md` for hardware setup)
 
 ## Software Requirements
 
@@ -130,19 +133,7 @@ Keyboard controls (for development):
 
 ### Display Configuration
 
-openTPT is designed for 800x480 resolution and scales to other display sizes. To configure your display:
-
-1. Run the configuration utility:
-   ```
-   python3 configure_display.py
-   ```
-
-2. Options:
-   - Show current settings: `python3 configure_display.py --show`
-   - Auto-detect resolution: `python3 configure_display.py --detect`
-   - Set resolution manually: `python3 configure_display.py --width 1280 --height 720`
-
-The display settings are stored in `display_config.json` in the project root directory.
+openTPT is designed for 800x480 resolution and scales to other display sizes. Set `DISPLAY_WIDTH` and `DISPLAY_HEIGHT` in `utils/config.py`.
 
 ### System Configuration
 
@@ -412,10 +403,10 @@ pip3 install --break-system-packages -r requirements.txt
 #### Visual Display
 
 When enabled, the radar overlay shows on the **rear camera only**:
-- 🟢 **Green chevrons**: Vehicle detected, safe distance (<10 km/h closing)
-- 🟡 **Yellow chevrons**: Moderate closing speed (10-20 km/h)
-- 🔴 **Red chevrons**: Rapid approach (>20 km/h closing speed)
-- 🔵 **Blue side arrows**: Overtaking vehicle warning
+- **Green chevrons**: Vehicle detected, safe distance (<10 km/h closing)
+- **Yellow chevrons**: Moderate closing speed (10-20 km/h)
+- **Red chevrons**: Rapid approach (>20 km/h closing speed)
+- **Blue side arrows**: Overtaking vehicle warning
 - **Distance and speed text**: Range in metres and relative velocity
 
 Chevrons are **3x larger (120×108px) and solid-filled** for high visibility.
@@ -457,34 +448,41 @@ openTPT/
 
 ## Features
 
-### Completed ✓
-- ✅ Real-time TPMS monitoring (auto-pairing support)
-- ✅ Brake temperature monitoring with IR sensors
-- ✅ Tyre thermal imaging via Pico I2C slaves (MLX90640) or MLX90614 sensors
-- ✅ Dual USB camera support with seamless switching (60 FPS target)
-- ✅ Deterministic camera identification via udev rules
-- ✅ NeoKey 1x4 physical controls
-- ✅ Performance-optimised architecture with bounded queues
-- ✅ Lock-free rendering (≤12ms per frame target)
-- ✅ Numba JIT thermal processing (< 1ms per sensor)
-- ✅ Dynamic resolution scaling
-- ✅ UI auto-hide with fade animation
-- ✅ Optional Toyota radar overlay with collision warnings
-- ✅ Performance monitoring and validation
-- ✅ Rotary encoder input with menu system
-- ✅ TPMS sensor pairing via on-screen menu
-- ✅ Bluetooth audio pairing for CopePilot
+### Completed
+- Real-time TPMS monitoring (auto-pairing support)
+- Brake temperature monitoring with IR sensors (MCP9601 thermocouples and MLX90614)
+- Tyre thermal imaging via Pico I2C slaves (MLX90640) or MLX90614 sensors
+- Dual USB camera support with seamless switching (60 FPS target)
+- Deterministic camera identification via udev rules
+- NeoKey 1x4 physical controls
+- Rotary encoder input with menu system
+- Performance-optimised architecture with bounded queues
+- Lock-free rendering (≤12ms per frame target)
+- Numba JIT thermal processing (< 1ms per sensor)
+- Dynamic resolution scaling
+- UI auto-hide with fade animation
+- Toyota radar overlay with collision warnings
+- NeoDriver LED strip (shift lights, delta, overtake modes)
+- Performance monitoring and validation
+- TPMS sensor pairing via on-screen menu
+- Bluetooth audio pairing for CopePilot
+- Telemetry recording to CSV (10Hz)
+- GPS handler with 10Hz serial NMEA parsing
+- Lap timing with persistence (best laps saved to SQLite)
+- Fuel tracking with OBD2 integration (level, consumption, laps remaining)
+- Temperature overlays on tyre zones and brake displays
+- Persistent user settings (~/.opentpt_settings.json)
+- Config hot-reload via menu
 
 ### Future Enhancements
-- CAN bus scheduler for OBD-II data
-- GPS lap timing integration
-- Data logging and telemetry export
+- CAN bus scheduler for multi-bus OBD-II data
 - Web-based remote monitoring
 - Additional radar compatibility (other manufacturers)
 - Buildroot image - minimal Linux for sub-5s boot, read-only root, tiny footprint
 
 ### Might Get Round To It One Day
 - SDL2 hardware rendering - use opengles2 renderer instead of software blitting for GPU acceleration
+- Data logging to cloud storage
 
 ### Hardware TODO
 - [x] PA1616S Adafruit GPS - for lap timing and position logging
@@ -497,29 +495,29 @@ openTPT/
 ### Software TODO
 - [x] Bluetooth audio menu - scan, pair, connect, disconnect, forget (requires PulseAudio)
 - [x] Display menu - encoder-based brightness control
-- [ ] Lap timing integration - integrate ../lap-timing-system for GPS lap timing
+- [x] Lap timing integration - GPS lap timing with persistence
 - [ ] CopePilot integration
 - [ ] TPMS menu expansion - swap corners, view sensor data
 - [ ] Tyre temps menu - corner sensor details, full frame view for installation verification, flip inner/outer
 - [x] Camera view options - mirror, rotate settings for front/rear cameras
-- [x] Units menu - °C/°F, PSI/BAR/kPa, km/h/mph switching
+- [x] Units menu - C/F, PSI/BAR/kPa, km/h/mph switching
 - [ ] Alerts/Warnings menu - temperature/pressure thresholds for visual warnings
 - [ ] Recording settings - output directory, auto-start on motion detection
 - [ ] G-meter settings - reset peaks, max G range, history duration
 - [x] Radar settings - enable/disable, sensitivity, overlay options, invert for upside-down mounting
 - [x] System info - IP address, storage space, uptime, sensor status
-- [ ] Pi power status/throttling - show vcgencmd get_throttled status on system info page (undervoltage, current throttling)
+- [ ] Pi power status/throttling - show vcgencmd get_throttled status on system info page
 - [ ] Network/WiFi menu - connect for remote access
-- [ ] Calibration menu - IMU zero offset
+- [x] IMU calibration wizard - zero offset calibration via menu
 - [x] Power menu - screen timeout, safe shutdown
-- [ ] Track selection - for lap timing (requires GPS)
+- [x] Track selection - for lap timing
 - [x] Config persistence - persistent settings via ~/.opentpt_settings.json
-- [ ] Installer improvements - add GPS UART setup (enable_uart=1) and NTP time sync configuration
-- [ ] Configurable OBD2 PIDs - move to config.py with key, mode, pid, bytes, formula, priority, smoothing; support Mode 22/UDS for manufacturer-specific data (brake pressures, boost, oil temp)
+- [x] Config hot-reload - reload settings from menu without restart
+- [ ] Configurable OBD2 PIDs - move to config.py with key, mode, pid, bytes, formula, priority, smoothing
 
-- [ ] Lap corner analysis logging - per lap, per corner: min speeds, yaw acceleration (from lap-timing-system)
+- [ ] Lap corner analysis logging - per lap, per corner: min speeds, yaw acceleration
 - [ ] Pitlane timer - countdown/countup timer for pitlane speed limits and pit stop duration
-- [ ] Fuel tracking page - average fuel per lap, laps remaining, fuel used this session
+- [x] Fuel tracking page - average fuel per lap, laps remaining, fuel used this session
 - [ ] Tyre temp graphs - show tyre temperature graphs on edges of track timer and camera views
 
 ### Bugs
@@ -532,11 +530,8 @@ openTPT/
 | `README.md` | Complete project documentation (this file) |
 | `QUICKSTART.md` | Quick reference for daily use |
 | `DEPLOYMENT.md` | Deployment workflow and troubleshooting |
-| `PERFORMANCE_OPTIMIZATIONS.md` | Technical implementation details |
-| `WAVESHARE_DUAL_CAN_HAT_SETUP.md` | CAN hardware configuration |
 | `CHANGELOG.md` | Version history and features |
-| `open-TPT_System_Plan.md` | Long-term architecture plan |
-| `clade.md` | AI assistant onboarding guide |
+| `CLAUDE.md` | AI assistant context guide |
 
 ## License
 
