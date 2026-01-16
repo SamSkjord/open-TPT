@@ -431,37 +431,118 @@ The script automatically:
 - Configures openTPT to start at `sysinit.target` (before network)
 - Installs boot splash service (displays `assets/splash.png` immediately)
 
-### Boot Splash Services
+### Boot Splash System
 
-Two services work together to provide seamless splash screen display:
+openTPT uses a two-stage splash system for seamless visual feedback from power-on:
 
-**1. fbi-splash.service** (`config/boot/fbi-splash.service`)
+```
+Power On
+    |
+    v
+[fbi-splash.service] -----> Shows splash.png via framebuffer (fbi)
+    |                       Displays within ~2 seconds of boot
+    v
+[openTPT.service] --------> Starts main.py
+    |
+    v
+[main.py init] -----------> Kills fbi process
+    |                       Takes over display with pygame
+    v
+[Process splash] ---------> Shows splash.png + progress bar
+    |                       "Initialising radar... 5%"
+    |                       "Initialising cameras... 15%"
+    |                       etc.
+    v
+[Main display] -----------> Normal operation
+```
 
-Displays `assets/splash.png` using framebuffer image viewer (fbi) as early as possible during boot. This runs before the main application starts.
+#### 1. Early Boot Splash (fbi-splash.service)
 
+**File:** `config/boot/fbi-splash.service`
+
+Displays `assets/splash.png` using the Linux framebuffer image viewer (fbi) as early as possible during boot, before Python or pygame are loaded.
+
+```ini
+[Unit]
+Description=Early Boot Splash Screen (fbi)
+DefaultDependencies=no
+After=sysinit.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash -c 'for i in $(seq 1 50); do [ -e /dev/fb0 ] && break; sleep 0.1; done; exec /usr/bin/fbi -T 1 -d /dev/fb0 --noverbose -a /home/pi/open-TPT/assets/splash.png'
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=sysinit.target
+```
+
+**Key points:**
+- Waits up to 5 seconds for `/dev/fb0` to become available
+- `-T 1` uses virtual terminal 1
+- `-a` enables autozoom to fit display
+- `--noverbose` suppresses status messages
+- Runs at `sysinit.target` for earliest possible display
+
+**Installation:**
 ```bash
-# Install/update the service
 sudo cp /home/pi/open-TPT/config/boot/fbi-splash.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable fbi-splash.service
 ```
 
-Key features:
-- Waits up to 5 seconds for `/dev/fb0` to become available
-- Uses `assets/splash.png` (landscape 800x480)
-- Runs at `sysinit.target` for earliest possible display
+#### 2. Process Splash (main.py)
 
-**2. openTPT.service** (`openTPT.service`)
+Once pygame initialises the display, `main.py` kills the fbi process and shows its own splash screen with a progress bar during hardware initialisation:
 
-The main application service starts after fbi-splash and kills the fbi process once pygame has initialised the display, providing a seamless transition.
+```python
+# Kill fbi splash now that pygame display is ready
+subprocess.run(['pkill', '-9', 'fbi'], capture_output=True)
 
-Service chain: `sysinit.target` -> `fbi-splash.service` -> `openTPT.service`
+# Show splash screen with progress
+self._show_splash("Initialising radar...", 0.05)
+self._show_splash("Initialising cameras...", 0.15)
+# ... etc
+self._show_splash("Ready!", 1.0)
+```
 
-**Customising the splash image:**
+The process splash displays:
+- The same `assets/splash.png` image (scaled to fit)
+- Current initialisation status text
+- Progress bar (0-100%)
 
-Replace `assets/splash.png` with your own image. It should be:
-- PNG format, landscape orientation
-- 800x480 or 1024x600 pixels (will be auto-scaled)
+#### 3. Customising the Splash Image
+
+Both splash stages use the same image file: `assets/splash.png`
+
+**Requirements:**
+- PNG format
+- Landscape orientation
+- Recommended: 800x480 or 1024x600 pixels (auto-scaled to fit display)
+
+**To change the splash:**
+```bash
+# Replace the image
+cp your-splash.png /home/pi/open-TPT/assets/splash.png
+
+# Test immediately (no reboot needed for process splash)
+sudo systemctl restart openTPT.service
+
+# Full test including fbi splash
+sudo reboot
+```
+
+#### 4. Troubleshooting Splash Issues
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| No early splash | fbi-splash.service not enabled | `sudo systemctl enable fbi-splash.service` |
+| Early splash rotated | Wrong image orientation | Ensure splash.png is landscape |
+| "Loading Failed" | fbi can't read image | Check file permissions: `chmod 644 assets/splash.png` |
+| Black screen then splash | fb0 not ready | Increase wait loop in service (currently 50x0.1s = 5s max) |
+| Process splash stuck | main.py crash during init | Check logs: `sudo journalctl -u openTPT.service -f` |
 
 After reboot, verify boot time:
 ```bash
