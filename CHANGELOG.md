@@ -30,6 +30,14 @@
   - "Route: name" when using dedicated GPX route
   - "Stage: name" for point-to-point routes in lap timing
 
+#### Bluetooth Audio Metadata
+
+- **MPRIS D-Bus interface** - Show "Now Playing" info on Bluetooth car head units
+  - Callout text displayed as track title via AVRCP
+  - Album art (splash.png) exposed to connected head units
+  - Updates metadata when callouts play, resets to "CoPilot Ready" when stopped
+  - Works with car stereos, Bluetooth speakers, and head units supporting AVRCP
+
 #### Display Fixes
 
 - **Status bar padding** - CoPilot page now accounts for top/bottom status bars
@@ -47,6 +55,9 @@
 
 #### Modified Files
 
+- `copilot/mpris.py` - New MPRIS D-Bus service for Bluetooth metadata
+- `copilot/audio.py` - MPRIS integration for callout metadata
+- `copilot/splash.png` - Album art for Bluetooth head units
 - `gui/copilot_display.py` - Status bar padding for content area
 - `gui/menu.py` - Route integration menus, Load Route File option
 - `hardware/copilot_handler.py` - Lap timing integration

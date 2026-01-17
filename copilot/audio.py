@@ -1,5 +1,6 @@
 """Audio output for pacenotes using Janne Laahanen samples or TTS fallback."""
 
+import logging
 import os
 import platform
 import random
@@ -13,6 +14,16 @@ from queue import Queue, Empty
 from typing import Dict, List, Optional
 
 from . import config
+
+logger = logging.getLogger('openTPT.copilot.audio')
+
+# Try to import MPRIS for Bluetooth metadata
+try:
+    from .mpris import MPRISProvider
+    MPRIS_AVAILABLE = True
+except ImportError:
+    MPRIS_AVAILABLE = False
+    MPRISProvider = None
 
 
 class JanneSampleLibrary:
@@ -154,6 +165,7 @@ class AudioPlayer:
         voice: str = config.TTS_VOICE,
         speed: int = config.TTS_SPEED,
         enable_effects: bool = True,
+        enable_mpris: bool = True,
     ):
         self.voice = voice
         self.speed = speed
@@ -176,11 +188,25 @@ class AudioPlayer:
         self._has_aplay = shutil.which("aplay") is not None
         self._has_afplay = shutil.which("afplay") is not None
 
+        # MPRIS for Bluetooth metadata (album art on car head units)
+        self._mpris: Optional["MPRISProvider"] = None
+        if enable_mpris and MPRIS_AVAILABLE:
+            art_path = Path(__file__).parent / "splash.png"
+            self._mpris = MPRISProvider(art_path if art_path.exists() else None)
+
     def start(self) -> None:
         """Start the audio playback thread."""
         self._running = True
         self._thread = threading.Thread(target=self._playback_loop, daemon=True)
         self._thread.start()
+
+        # Start MPRIS for Bluetooth metadata
+        if self._mpris:
+            if self._mpris.start():
+                logger.info("MPRIS started for Bluetooth metadata")
+            else:
+                logger.debug("MPRIS not available")
+
         # Warm up sox to avoid delay on first audio (loads libraries)
         if self._has_sox:
             try:
@@ -198,6 +224,11 @@ class AudioPlayer:
         self._running = False
         if self._thread:
             self._thread.join(timeout=1)
+
+        # Stop MPRIS
+        if self._mpris:
+            self._mpris.stop()
+
         # Clean up temp files
         try:
             for f in os.listdir(self._temp_dir):
@@ -246,18 +277,30 @@ class AudioPlayer:
             else:
                 expanded.append(text)
 
+        # Build display text for MPRIS (car head unit)
+        display_text = " into ".join(expanded) if len(expanded) > 1 else expanded[0]
+
+        # Update MPRIS metadata before playing audio
+        if self._mpris:
+            self._mpris.update_now_playing(display_text)
+
         # Try Janne samples first (supports chaining natively)
         if self.samples:
             if self._speak_with_samples(expanded):
+                # Mark as stopped after playback completes
+                if self._mpris:
+                    self._mpris.set_stopped()
                 return
 
         # Fall back to TTS (join with "into" in text)
-        combined = " into ".join(expanded) if len(expanded) > 1 else expanded[0]
-
         if self.enable_effects and self._has_sox:
-            self._speak_with_effects(combined)
+            self._speak_with_effects(display_text)
         else:
-            self._speak_plain(combined)
+            self._speak_plain(display_text)
+
+        # Mark as stopped after playback completes
+        if self._mpris:
+            self._mpris.set_stopped()
 
     def _speak_with_samples(self, chain: List[str]) -> bool:
         """
