@@ -8,6 +8,7 @@ Shows callout text, artist (CoPilot), and album art on the car display.
 import logging
 import os
 import threading
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -371,10 +372,20 @@ class MPRISProvider:
                 else:
                     session_address = f'unix:path=/run/user/{uid}/bus'
 
-            # Verify socket exists
+            # Wait for socket to appear (may not exist at boot before user login)
             socket_path = session_address.replace('unix:path=', '')
+            max_wait = 60  # Wait up to 60 seconds for session bus
+            waited = 0
+            while not os.path.exists(socket_path) and waited < max_wait:
+                if not self._running:
+                    return  # Cancelled during wait
+                time.sleep(2)
+                waited += 2
+                if waited % 10 == 0:
+                    logger.debug("Waiting for session bus socket: %s (%ds)", socket_path, waited)
+
             if not os.path.exists(socket_path):
-                raise RuntimeError(f"Session bus socket not found: {socket_path}")
+                raise RuntimeError(f"Session bus socket not found after {max_wait}s: {socket_path}")
 
             # Check socket permissions
             import stat
