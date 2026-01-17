@@ -1,14 +1,17 @@
 """
 Track loader for lap timing system.
 
-Loads track data from KMZ files (RaceLogic converted tracks).
+Loads track data from KMZ files (RaceLogic converted tracks) and GPX files
+(point-to-point stages).
 """
 
+import math
 import os
 import zipfile
 import xml.etree.ElementTree as ET
+from pathlib import Path
 from typing import List, Tuple, Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from lap_timing.data.models import StartFinishLine
 from lap_timing.utils.geometry import haversine_distance
 from lap_timing import config
@@ -31,6 +34,8 @@ class Track:
     centerline: List[TrackPoint]
     sf_line: StartFinishLine
     length: float  # Total track length in meters
+    is_point_to_point: bool = False  # True for stages, False for circuits
+    source_file: str = ""  # Original file path
 
 
 def parse_kml_coordinates(coord_text: str) -> List[Tuple[float, float]]:
@@ -754,8 +759,160 @@ def load_track_from_kmz(kmz_path: str) -> Track:
         inner_boundary=inner_points,
         centerline=centerline_points,
         sf_line=sf_line,
-        length=track_length
+        length=track_length,
+        is_point_to_point=is_point_to_point,
+        source_file=kmz_path,
     )
+
+
+def load_track_from_gpx(gpx_path: str) -> Track:
+    """
+    Load track from GPX file as a point-to-point stage.
+
+    GPX files are treated as point-to-point stages where:
+    - First trackpoint = start
+    - Last trackpoint = finish
+    - All trackpoints = centerline
+
+    Args:
+        gpx_path: Path to GPX file
+
+    Returns:
+        Track object representing the stage
+    """
+    gpx_path = str(gpx_path)  # Handle Path objects
+
+    # Parse GPX file
+    tree = ET.parse(gpx_path)
+    root = tree.getroot()
+
+    # Handle GPX namespace
+    ns = {'gpx': 'http://www.topografix.com/GPX/1/1'}
+
+    # Extract track name
+    name_elem = root.find('.//gpx:trk/gpx:name', ns)
+    if name_elem is not None and name_elem.text:
+        track_name = name_elem.text
+    else:
+        # Try metadata name
+        name_elem = root.find('.//gpx:metadata/gpx:name', ns)
+        if name_elem is not None and name_elem.text:
+            track_name = name_elem.text
+        else:
+            # Fall back to filename
+            track_name = Path(gpx_path).stem
+
+    # Extract trackpoints
+    points = []
+
+    # Try trackpoints first (trk/trkseg/trkpt)
+    for trkpt in root.findall('.//gpx:trkpt', ns):
+        lat = trkpt.get('lat')
+        lon = trkpt.get('lon')
+        if lat and lon:
+            points.append((float(lat), float(lon)))
+
+    # If no trackpoints, try route points (rte/rtept)
+    if not points:
+        for rtept in root.findall('.//gpx:rtept', ns):
+            lat = rtept.get('lat')
+            lon = rtept.get('lon')
+            if lat and lon:
+                points.append((float(lat), float(lon)))
+
+    # If still no points, try without namespace
+    if not points:
+        for trkpt in root.findall('.//trkpt'):
+            lat = trkpt.get('lat')
+            lon = trkpt.get('lon')
+            if lat and lon:
+                points.append((float(lat), float(lon)))
+
+    if len(points) < 2:
+        raise ValueError(f"GPX file {gpx_path} has fewer than 2 points")
+
+    # Start and finish are first and last points
+    start_point = points[0]
+    finish_point = points[-1]
+
+    # Convert to TrackPoints with cumulative distances
+    centerline_points = calculate_cumulative_distances(points)
+
+    # Interpolate to consistent spacing (5m) for accurate timing
+    interpolated_coords = interpolate_coordinates(points, target_spacing=5.0)
+    centerline_points = calculate_cumulative_distances(interpolated_coords)
+
+    # Track length
+    track_length = centerline_points[-1].distance if centerline_points else 0.0
+
+    # Create S/F line perpendicular to track direction at start
+    start_lat, start_lon = start_point
+
+    # Get direction from first two points
+    if len(points) >= 2:
+        dx = points[1][1] - points[0][1]  # lon diff
+        dy = points[1][0] - points[0][0]  # lat diff
+        length = math.sqrt(dx * dx + dy * dy)
+        if length > 0:
+            # Perpendicular direction, ~10m width
+            width_deg = 0.0001
+            perp_dx = -dy / length * width_deg
+            perp_dy = dx / length * width_deg
+        else:
+            perp_dx, perp_dy = 0.0001, 0
+    else:
+        perp_dx, perp_dy = 0.0001, 0
+
+    point1 = (start_lat - perp_dy, start_lon - perp_dx)
+    point2 = (start_lat + perp_dy, start_lon + perp_dx)
+
+    sf_line = StartFinishLine(
+        point1=point1,
+        point2=point2,
+        center=start_point,
+        heading=math.degrees(math.atan2(perp_dy, perp_dx)),
+        width=haversine_distance(point1[0], point1[1], point2[0], point2[1])
+    )
+
+    # For GPX, use centerline as both boundaries (no track width info)
+    return Track(
+        name=track_name,
+        outer_boundary=centerline_points,
+        inner_boundary=centerline_points,
+        centerline=centerline_points,
+        sf_line=sf_line,
+        length=track_length,
+        is_point_to_point=True,
+        source_file=gpx_path,
+    )
+
+
+def load_track(file_path: str) -> Track:
+    """
+    Load track from file, auto-detecting format from extension.
+
+    Supports:
+    - .kmz - RaceLogic KMZ format (circuits and point-to-point)
+    - .gpx - GPX format (point-to-point stages only)
+
+    Args:
+        file_path: Path to track file (.kmz or .gpx)
+
+    Returns:
+        Track object
+
+    Raises:
+        ValueError: If file format is not supported
+    """
+    file_path = str(file_path)
+    ext = Path(file_path).suffix.lower()
+
+    if ext == '.kmz':
+        return load_track_from_kmz(file_path)
+    elif ext == '.gpx':
+        return load_track_from_gpx(file_path)
+    else:
+        raise ValueError(f"Unsupported track format: {ext}. Use .kmz or .gpx")
 
 
 def get_donington_track() -> Track:

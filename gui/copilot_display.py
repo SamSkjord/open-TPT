@@ -25,6 +25,7 @@ from utils.config import (
     FONT_PATH,
     SCALE_X,
     SCALE_Y,
+    STATUS_BAR_HEIGHT,
 )
 
 
@@ -41,6 +42,12 @@ class CoPilotDisplay:
         self.copilot = copilot_handler
         self.width = DISPLAY_WIDTH
         self.height = DISPLAY_HEIGHT
+
+        # Account for status bars at top and bottom
+        self.status_bar_height = int(STATUS_BAR_HEIGHT * SCALE_Y)
+        self.content_top = self.status_bar_height
+        self.content_bottom = self.height - self.status_bar_height
+        self.content_height = self.content_bottom - self.content_top
 
         # Colours
         self.colour_left = (255, 100, 100)      # Red-ish for left turns
@@ -115,13 +122,14 @@ class CoPilotDisplay:
     def _draw_header(self, screen, status):
         """Draw the header bar with title and status."""
         header_height = int(50 * SCALE_Y)
+        header_y = self.content_top
 
         # Background
-        pygame.draw.rect(screen, (30, 30, 45), (0, 0, self.width, header_height))
+        pygame.draw.rect(screen, (30, 30, 45), (0, header_y, self.width, header_height))
 
         # Title
         title = self.font_large.render("CoPilot", True, WHITE)
-        screen.blit(title, (int(20 * SCALE_X), int(10 * SCALE_Y)))
+        screen.blit(title, (int(20 * SCALE_X), header_y + int(10 * SCALE_Y)))
 
         # Status indicator
         if status == 'active':
@@ -142,12 +150,12 @@ class CoPilotDisplay:
 
         # Status dot
         dot_x = self.width - int(150 * SCALE_X)
-        dot_y = int(25 * SCALE_Y)
+        dot_y = header_y + int(25 * SCALE_Y)
         pygame.draw.circle(screen, status_colour, (dot_x, dot_y), int(8 * SCALE_X))
 
         # Status text
         status_surface = self.font_medium.render(status_text, True, status_colour)
-        screen.blit(status_surface, (dot_x + int(15 * SCALE_X), int(12 * SCALE_Y)))
+        screen.blit(status_surface, (dot_x + int(15 * SCALE_X), header_y + int(12 * SCALE_Y)))
 
     def _draw_main_corner(self, screen, data):
         """Draw the main corner indicator in the centre of the screen."""
@@ -159,9 +167,9 @@ class CoPilotDisplay:
         direction = corner_info.get('direction', '')
         severity = corner_info.get('severity', 0)
 
-        # Centre position for the main indicator
+        # Centre position for the main indicator (within content area)
         centre_x = self.width // 2
-        centre_y = int(self.height * 0.4)
+        centre_y = self.content_top + int(self.content_height * 0.35)
 
         if distance > 0 and direction:
             # Colour based on distance
@@ -266,8 +274,8 @@ class CoPilotDisplay:
             colour = (150, 150, 150)
             bg_alpha = 120
 
-        # Position below main indicator
-        y_pos = int(self.height * 0.7)
+        # Position below main indicator (within content area)
+        y_pos = self.content_top + int(self.content_height * 0.65)
 
         # Render callout text
         callout_surface = self.font_large.render(callout, True, colour)
@@ -286,11 +294,11 @@ class CoPilotDisplay:
 
     def _draw_path_info(self, screen, data):
         """Draw path information panel on the side."""
-        # Panel on the right side
+        # Panel on the right side (within content area)
         panel_x = int(self.width * 0.75)
-        panel_y = int(60 * SCALE_Y)
+        panel_y = self.content_top + int(55 * SCALE_Y)
         panel_width = int(self.width * 0.23)
-        panel_height = int(self.height * 0.55)
+        panel_height = int(self.content_height * 0.55)
 
         # Background
         bg_surface = pygame.Surface((panel_width, panel_height), pygame.SRCALPHA)
@@ -340,7 +348,7 @@ class CoPilotDisplay:
     def _draw_status_message(self, screen, status, data):
         """Draw status message when not active."""
         centre_x = self.width // 2
-        centre_y = int(self.height * 0.45)
+        centre_y = self.content_top + int(self.content_height * 0.4)
 
         if status == 'no_gps':
             title = "Waiting for GPS"
@@ -378,7 +386,7 @@ class CoPilotDisplay:
     def _draw_footer(self, screen, data):
         """Draw footer with GPS coordinates and settings."""
         footer_height = int(45 * SCALE_Y)
-        footer_y = self.height - footer_height
+        footer_y = self.content_bottom - footer_height
 
         # Background
         pygame.draw.rect(screen, (25, 25, 35),

@@ -857,6 +857,7 @@ class OpenTPT:
                     update_interval_s=COPILOT_UPDATE_INTERVAL_S,
                     audio_enabled=COPILOT_AUDIO_ENABLED,
                     audio_volume=COPILOT_AUDIO_VOLUME,
+                    lap_timing_handler=self.lap_timing,
                 )
                 self.copilot.start()
                 self.copilot_display.set_handler(self.copilot)

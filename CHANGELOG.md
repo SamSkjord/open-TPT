@@ -1,5 +1,61 @@
 # Changelog - openTPT
 
+## [v0.18.1] - 2026-01-17
+
+### Unified Route System & CoPilot Improvements
+
+#### Route Integration
+
+- **Unified route/track system** - Lap timing and CoPilot now share route data
+  - CoPilot automatically uses lap timing track centerline for junction guidance
+  - Eliminates need for separate GPX route loading when track is loaded
+  - Both circuit tracks (KMZ) and point-to-point stages (GPX) supported
+- **GPX file support in lap timing** - Load GPX routes as point-to-point stages
+  - First trackpoint = start line, last trackpoint = finish line
+  - Synthetic S/F line created perpendicular to track direction
+  - New `load_track()` auto-detects format from file extension
+- **Load Route File menu** - New option in Lap Timing menu
+  - Scan `~/.opentpt/routes/` for GPX and KMZ files
+  - Shows file type indicator (GPX/KMZ)
+  - Supports up to 15 route files
+
+#### CoPilot Menu Improvements
+
+- **Use Lap Timing Track** - New option in CoPilot Routes menu
+  - Appears when a track is loaded in lap timing
+  - Shows "[Using] Track Name" when active
+  - Automatically switches to Route Follow mode
+- **Track/Route labels** - Display shows source of route data
+  - "Track: name" when using lap timing track
+  - "Route: name" when using dedicated GPX route
+  - "Stage: name" for point-to-point routes in lap timing
+
+#### Display Fixes
+
+- **Status bar padding** - CoPilot page now accounts for top/bottom status bars
+  - Header and footer positioned within content area
+  - Main corner indicator and callouts properly centred
+  - Path info panel positioned correctly
+
+#### Technical Details
+
+- `LapTimingHandler.get_route_waypoints()` - Exposes track centerline for CoPilot
+- `LapTimingHandler.load_track_from_file()` - Unified GPX/KMZ loading
+- `LapTimingHandler.is_point_to_point()` - Check if track is a stage
+- `CoPilotHandler` now accepts `lap_timing_handler` parameter
+- `Track` dataclass extended with `is_point_to_point` and `source_file` fields
+
+#### Modified Files
+
+- `gui/copilot_display.py` - Status bar padding for content area
+- `gui/menu.py` - Route integration menus, Load Route File option
+- `hardware/copilot_handler.py` - Lap timing integration
+- `hardware/lap_timing_handler.py` - Route exposure methods
+- `lap_timing/data/track_loader.py` - GPX parsing, unified loader
+- `main.py` - Pass lap_timing to CoPilot handler
+
+---
+
 ## [v0.18.0] - 2026-01-17
 
 ### CoPilot Rally Callout System

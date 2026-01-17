@@ -12,8 +12,9 @@ openTPT provides real-time monitoring of:
 - Multi-camera support with seamless switching (dual USB UVC cameras)
 - Toyota radar overlay on rear camera (CAN bus radar with collision warnings)
 - Fuel tracking with consumption rate and laps remaining estimation
-- GPS lap timing with delta display
+- GPS lap timing with delta display (circuit tracks and point-to-point stages)
 - NeoDriver LED strip for shift lights, delta, and overtake warnings
+- CoPilot rally callouts for corners, junctions, and hazards (OSM map data)
 
 The system is designed for racing applications where real-time monitoring of tyre and brake conditions is critical for optimal performance and safety.
 
@@ -411,6 +412,54 @@ When enabled, the radar overlay shows on the **rear camera only**:
 
 Chevrons are **3x larger (120×108px) and solid-filled** for high visibility.
 
+### CoPilot Configuration
+
+CoPilot provides rally-style audio callouts for upcoming corners, junctions, bridges, and hazards using OpenStreetMap road data and GPS position.
+
+**Map Data Setup:**
+
+1. Download a pre-processed roads database or create one from OSM PBF data
+2. Place the `.roads.db` file in the maps directory:
+   ```bash
+   mkdir -p ~/.opentpt/copilot/maps
+   # Copy or symlink your roads.db file
+   ln -s /mnt/usb/britain-and-ireland.roads.db ~/.opentpt/copilot/maps/
+   ```
+
+**Route Files:**
+
+Place GPX or KMZ route files in `~/.opentpt/routes/` for loading via the menu.
+
+**Configuration in `utils/config.py`:**
+
+```python
+COPILOT_ENABLED = True              # Enable/disable CoPilot
+COPILOT_MAP_DIR = "~/.opentpt/copilot/maps"  # Path to roads.db files
+COPILOT_LOOKAHEAD_M = 1000          # Corner detection distance (metres)
+COPILOT_AUDIO_ENABLED = True        # Enable audio callouts
+COPILOT_OVERLAY_ENABLED = True      # Show corner indicator on all pages
+```
+
+**Operating Modes:**
+
+- **Just Drive**: Detects corners on whatever road you're currently on
+- **Route Follow**: Follows a loaded track/route for junction guidance
+
+**Corner Severity (ASC Scale):**
+
+| Grade | Description | Typical Speed |
+|-------|-------------|---------------|
+| 1 | Flat out / slight bend | Full throttle |
+| 2 | Easy | Lift slightly |
+| 3 | Medium | Light braking |
+| 4 | Tight | Moderate braking |
+| 5 | Very tight | Heavy braking |
+| 6 | Hairpin | Near stop |
+
+**Route Integration:**
+
+CoPilot integrates with lap timing - when a track is loaded (KMZ circuit or GPX stage), CoPilot automatically uses the track centerline for junction guidance in Route Follow mode.
+
 ## Project Structure
 
 ```
@@ -421,10 +470,18 @@ openTPT/
 ├── assets/
 │   ├── overlay.png                      # Fullscreen static GUI overlay
 │   └── icons/                           # Status, brake, tyre symbols
+├── copilot/                             # Rally callout system
+│   ├── map_loader.py                    # OSM roads.db loading
+│   ├── path_projector.py                # Road path projection
+│   ├── corners.py                       # Corner detection (ASC scale)
+│   ├── pacenotes.py                     # Callout generation
+│   ├── audio.py                         # espeak-ng/sample playback
+│   └── simulator.py                     # GPX route simulation
 ├── gui/
 │   ├── display.py                       # Draw pressure, temps, heatmaps
 │   ├── camera.py                        # Rear-view USB camera with radar overlay
 │   ├── radar_overlay.py                 # Radar track rendering
+│   ├── copilot_display.py               # CoPilot UI page
 │   ├── input_threaded.py                # NeoKey 1x4 (brightness + camera toggle)
 │   ├── encoder_input.py                 # Rotary encoder with menu navigation
 │   ├── menu.py                          # On-screen menu system
@@ -443,7 +500,14 @@ openTPT/
 │   ├── imu_handler.py                   # ICM-20649 IMU for G-meter
 │   ├── neodriver_handler.py             # NeoDriver LED strip
 │   ├── lap_timing_handler.py            # Lap timing logic
+│   ├── copilot_handler.py               # CoPilot integration handler
 │   └── i2c_mux.py                       # TCA9548A Mux control
+├── lap_timing/                          # Lap timing subsystem
+│   ├── data/
+│   │   ├── track_loader.py              # KMZ/GPX track loading
+│   │   └── track_selector.py            # GPS-based track selection
+│   └── utils/
+│       └── geometry.py                  # Geospatial utilities
 ├── utils/
 │   ├── config.py                        # Hardware constants, defaults
 │   ├── settings.py                      # Persistent user settings
@@ -478,7 +542,7 @@ openTPT/
 - NeoDriver LED strip (shift lights, delta, overtake modes)
 - Performance monitoring and validation
 - TPMS sensor pairing via on-screen menu
-- Bluetooth audio pairing for CopePilot
+- Bluetooth audio pairing for CoPilot callouts
 - Telemetry recording to CSV (10Hz)
 - GPS handler with 10Hz serial NMEA parsing
 - Lap timing with persistence (best laps saved to SQLite)
@@ -486,6 +550,8 @@ openTPT/
 - Temperature overlays on tyre zones and brake displays
 - Persistent user settings (~/.opentpt_settings.json)
 - Config hot-reload via menu
+- CoPilot rally callouts (corners, junctions, hazards from OSM data)
+- Unified route system (GPX stages and KMZ circuit tracks)
 
 ### Future Enhancements
 - CAN bus scheduler for multi-bus OBD-II data

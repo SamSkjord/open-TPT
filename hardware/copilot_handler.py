@@ -112,6 +112,7 @@ class CoPilotHandler(BoundedQueueHardwareHandler):
         update_interval_s: float = 0.5,
         audio_enabled: bool = True,
         audio_volume: float = 0.8,
+        lap_timing_handler=None,
     ):
         """
         Initialise CoPilot handler.
@@ -123,6 +124,7 @@ class CoPilotHandler(BoundedQueueHardwareHandler):
             update_interval_s: Update interval in seconds
             audio_enabled: Enable audio callouts
             audio_volume: Audio volume (0.0 - 1.0)
+            lap_timing_handler: Optional LapTimingHandler for route integration
         """
         super().__init__(queue_depth=2)
 
@@ -133,6 +135,7 @@ class CoPilotHandler(BoundedQueueHardwareHandler):
         self.lookahead_m = lookahead_m
         self.update_interval_s = update_interval_s
         self.audio_enabled = audio_enabled
+        self.lap_timing_handler = lap_timing_handler
 
         # Operating mode
         self._mode = MODE_JUST_DRIVE
@@ -180,12 +183,23 @@ class CoPilotHandler(BoundedQueueHardwareHandler):
     @property
     def route_name(self) -> str:
         """Get name of loaded route (if any)."""
-        return self._route_name
+        if self._route_name:
+            return self._route_name
+        # Check lap timing track name
+        if self.lap_timing_handler and self.lap_timing_handler.has_track():
+            return self.lap_timing_handler.get_track_name() or ""
+        return ""
 
     @property
     def has_route(self) -> bool:
-        """Check if a route is loaded."""
-        return self._route_loader is not None and self._route_loader.is_loaded
+        """Check if a route is loaded (from GPX or lap timing track)."""
+        # Check GPX route first
+        if self._route_loader is not None and self._route_loader.is_loaded:
+            return True
+        # Check lap timing track
+        if self.lap_timing_handler and self.lap_timing_handler.has_track():
+            return True
+        return False
 
     def set_mode(self, mode: str) -> bool:
         """
@@ -320,10 +334,17 @@ class CoPilotHandler(BoundedQueueHardwareHandler):
 
         # Get route waypoints if in route_follow mode
         route_waypoints = None
-        if self._mode == MODE_ROUTE_FOLLOW and self._route_loader:
-            route_waypoints = self._route_loader.get_upcoming_waypoints(
-                pos.lat, pos.lon, self.lookahead_m
-            )
+        if self._mode == MODE_ROUTE_FOLLOW:
+            # Try GPX route first
+            if self._route_loader and self._route_loader.is_loaded:
+                route_waypoints = self._route_loader.get_upcoming_waypoints(
+                    pos.lat, pos.lon, self.lookahead_m
+                )
+            # Fall back to lap timing track centerline
+            elif self.lap_timing_handler and self.lap_timing_handler.has_track():
+                route_waypoints = self.lap_timing_handler.get_route_waypoints(
+                    max_distance=self.lookahead_m
+                )
 
         # Project path ahead (with optional route guidance)
         path = self._projector.project_path(

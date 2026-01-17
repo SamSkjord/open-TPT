@@ -1,6 +1,6 @@
 # Claude Context - openTPT Project
 
-**Version:** 0.18.0 | **Updated:** 2026-01-17
+**Version:** 0.18.1 | **Updated:** 2026-01-17
 
 ---
 
@@ -63,7 +63,7 @@
 - OBD2: Speed, RPM, fuel level, Ford Mode 22 HV Battery SOC
 - GPS: PA1616S at 10Hz (serial /dev/ttyS0) for lap timing and CoPilot
 - NeoDriver: I2C LED strip at 0x60 (shift/delta/overtake modes)
-- CoPilot: Rally callouts using OSM map data (NVMe storage for 6.4GB roads.db)
+- CoPilot: Rally callouts using OSM map data (USB/NVMe storage for 6.4GB roads.db)
 
 ---
 
@@ -270,13 +270,15 @@ All settings in `utils/config.py`:
 - Configure per corner in `BRAKE_ROTOR_EMISSIVITY`
 - Cast iron oxidised: 0.95, machined: 0.60-0.70
 
-### CoPilot Rally Callouts (v0.18.0)
+### CoPilot Rally Callouts (v0.18.1)
 - OSM-based corner detection with audio callouts
 - Uses GPS heading for road path projection
-- Map data: `~/.opentpt/copilot/maps/*.roads.db` (symlinked to NVMe)
+- Map data: `~/.opentpt/copilot/maps/*.roads.db` (symlinked to USB/NVMe)
 - Audio: espeak-ng TTS or Janne Laahanen rally samples
-- Modes: Just Drive (follow current road), Route Follow (GPX file)
+- Modes: Just Drive (follow current road), Route Follow (track/GPX)
 - Corner severity: ASC 1-6 scale (1=flat, 6=hairpin)
+- Route integration: Uses lap timing track centerline when available
+- Supports both circuit tracks (KMZ) and point-to-point stages (GPX)
 - Config: `COPILOT_*` in config.py, `copilot.*` in settings
 
 ---

@@ -575,6 +575,12 @@ class MenuSystem:
         )
         lap_timing_menu.add_item(
             MenuItem(
+                "Load Route File",
+                action=lambda: self._show_route_file_menu(),
+            )
+        )
+        lap_timing_menu.add_item(
+            MenuItem(
                 "Current Track",
                 dynamic_label=lambda: self._get_current_track_label(),
                 enabled=False,
@@ -1940,7 +1946,13 @@ class MenuSystem:
         if not self.copilot_handler:
             return "Route: N/A"
         if self.copilot_handler.has_route:
-            return f"Route: {self.copilot_handler.route_name}"
+            route_name = self.copilot_handler.route_name
+            # Check if using lap timing track (no GPX route loaded)
+            if (self.lap_timing_handler and
+                    self.lap_timing_handler.has_track() and
+                    not self.copilot_handler._route_loader):
+                return f"Track: {route_name}"
+            return f"Route: {route_name}"
         return "Route: None"
 
     def _show_route_menu(self) -> str:
@@ -1950,6 +1962,26 @@ class MenuSystem:
 
         # Build route submenu dynamically
         route_menu = Menu("Routes")
+
+        # Add "Use Lap Timing Track" option if a track is loaded
+        if self.lap_timing_handler and self.lap_timing_handler.has_track():
+            track_name = self.lap_timing_handler.get_track_name() or "Track"
+            # Check if already using this track
+            using_track = (
+                self.copilot_handler.has_route and
+                not self.copilot_handler._route_loader
+            )
+            if using_track:
+                route_menu.add_item(
+                    MenuItem(f"[Using] {track_name}", enabled=False)
+                )
+            else:
+                route_menu.add_item(
+                    MenuItem(
+                        f"Use Track: {track_name}",
+                        action=lambda: self._use_lap_timing_track(),
+                    )
+                )
 
         # Scan for GPX files in routes directory
         from pathlib import Path
@@ -1967,14 +1999,17 @@ class MenuSystem:
                     )
                 )
 
-            if not gpx_files:
+            if not gpx_files and not (self.lap_timing_handler and
+                                       self.lap_timing_handler.has_track()):
                 route_menu.add_item(
                     MenuItem("No routes found", enabled=False)
                 )
         else:
-            route_menu.add_item(
-                MenuItem("Routes folder missing", enabled=False)
-            )
+            if not (self.lap_timing_handler and
+                    self.lap_timing_handler.has_track()):
+                route_menu.add_item(
+                    MenuItem("No routes available", enabled=False)
+                )
             # Try to create the directory
             try:
                 routes_dir.mkdir(parents=True, exist_ok=True)
@@ -2004,6 +2039,25 @@ class MenuSystem:
             self._go_back()  # Return to CoPilot menu
             return f"Route loaded: {Path(gpx_path).stem}"
         return "Failed to load route"
+
+    def _use_lap_timing_track(self) -> str:
+        """Use the current lap timing track as route for CoPilot."""
+        if not self.copilot_handler:
+            return "CoPilot not available"
+        if not self.lap_timing_handler or not self.lap_timing_handler.has_track():
+            return "No track loaded"
+
+        # Clear any GPX route so CoPilot uses the lap timing track
+        self.copilot_handler._route_loader = None
+        self.copilot_handler._route_name = ""
+
+        # Switch to route_follow mode
+        from hardware.copilot_handler import MODE_ROUTE_FOLLOW
+        self.copilot_handler.set_mode(MODE_ROUTE_FOLLOW)
+
+        track_name = self.lap_timing_handler.get_track_name() or "track"
+        self._go_back()  # Return to CoPilot menu
+        return f"Using track: {track_name}"
 
     def _clear_route(self) -> str:
         """Clear the loaded route."""
@@ -2376,10 +2430,14 @@ class MenuSystem:
         if snapshot and snapshot.data:
             track_name = snapshot.data.get("track_name")
             if track_name:
+                # Check if point-to-point stage
+                is_p2p = self.lap_timing_handler.is_point_to_point()
+                prefix = "Stage" if is_p2p else "Track"
                 # Truncate if too long
-                if len(track_name) > 20:
-                    track_name = track_name[:17] + "..."
-                return f"Track: {track_name}"
+                max_len = 18 if is_p2p else 20
+                if len(track_name) > max_len:
+                    track_name = track_name[:max_len - 3] + "..."
+                return f"{prefix}: {track_name}"
         return "Track: None"
 
     def _get_best_lap_label(self) -> str:
@@ -2454,6 +2512,76 @@ class MenuSystem:
             self._settings.set("lap_timing.auto_detect", False)
             return f"Selected: {track_name}"
         return f"Failed to load: {track_name}"
+
+    def _show_route_file_menu(self) -> str:
+        """Show submenu with route files (GPX/KMZ) to load."""
+        if not self.lap_timing_handler:
+            return "Lap timing not available"
+
+        # Build route file submenu dynamically
+        route_menu = Menu("Load Route File")
+
+        from pathlib import Path
+        routes_dir = Path.home() / ".opentpt" / "routes"
+
+        files_found = []
+        if routes_dir.exists():
+            # Find GPX and KMZ files
+            gpx_files = list(routes_dir.glob("*.gpx"))
+            kmz_files = list(routes_dir.glob("*.kmz"))
+            files_found = sorted(gpx_files + kmz_files, key=lambda f: f.stem.lower())
+
+            for route_file in files_found[:15]:  # Limit to 15 files
+                file_name = route_file.stem
+                ext = route_file.suffix.lower()
+                # Show file type indicator
+                label = f"{file_name} ({ext[1:].upper()})"
+                route_menu.add_item(
+                    MenuItem(
+                        label,
+                        action=lambda f=str(route_file): self._load_route_file(f),
+                    )
+                )
+
+        if not files_found:
+            route_menu.add_item(
+                MenuItem("No route files found", enabled=False)
+            )
+            route_menu.add_item(
+                MenuItem("Add .gpx/.kmz to", enabled=False)
+            )
+            route_menu.add_item(
+                MenuItem("~/.opentpt/routes/", enabled=False)
+            )
+            # Try to create the directory
+            try:
+                routes_dir.mkdir(parents=True, exist_ok=True)
+            except OSError:
+                pass
+
+        route_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        route_menu.parent = self.lap_timing_menu
+
+        # Switch to route menu
+        self.current_menu.hide()
+        self.current_menu = route_menu
+        route_menu.show()
+        return ""
+
+    def _load_route_file(self, file_path: str) -> str:
+        """Load a route file (GPX or KMZ) into lap timing."""
+        if not self.lap_timing_handler:
+            return "Lap timing not available"
+
+        from pathlib import Path
+        file_name = Path(file_path).stem
+
+        if self.lap_timing_handler.load_track_from_file(file_path):
+            # Disable auto-detect when manually loading
+            self._settings.set("lap_timing.auto_detect", False)
+            self._go_back()  # Return to lap timing menu
+            return f"Loaded: {file_name}"
+        return f"Failed to load: {file_name}"
 
     def show(self):
         """Show the root menu."""

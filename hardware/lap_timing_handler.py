@@ -631,3 +631,69 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
                         logger.warning("Lap timing: Error loading track: %s", e)
                         return False
         return False
+
+    def load_track_from_file(self, file_path: str) -> bool:
+        """
+        Load a track from a file (KMZ or GPX).
+
+        Args:
+            file_path: Path to .kmz or .gpx file
+
+        Returns:
+            True if track was loaded successfully
+        """
+        try:
+            from lap_timing.data.track_loader import load_track
+            track = load_track(file_path)
+            if track:
+                self.set_track(track)
+                return True
+        except Exception as e:
+            logger.warning("Lap timing: Error loading track from %s: %s", file_path, e)
+        return False
+
+    def get_route_waypoints(self, max_distance: float = 0) -> List[tuple]:
+        """
+        Get the current track centerline as route waypoints.
+
+        Used by CoPilot for route following mode when a track is loaded.
+
+        Args:
+            max_distance: Maximum distance ahead to return (0 = all)
+
+        Returns:
+            List of (lat, lon) tuples representing the route
+        """
+        if not self.track or not self.track.centerline:
+            return []
+
+        waypoints = [(p.lat, p.lon) for p in self.track.centerline]
+
+        if max_distance > 0 and self.current_position:
+            # Filter to waypoints within max_distance of current position
+            current_dist = self.current_position.distance_along_track
+            filtered = []
+            for p in self.track.centerline:
+                if p.distance >= current_dist and p.distance <= current_dist + max_distance:
+                    filtered.append((p.lat, p.lon))
+            return filtered
+
+        return waypoints
+
+    def get_route_bounds(self) -> Optional[tuple]:
+        """
+        Get bounds of the current track route.
+
+        Returns:
+            (min_lat, max_lat, min_lon, max_lon) or None if no track
+        """
+        if not self.track or not self.track.centerline:
+            return None
+
+        lats = [p.lat for p in self.track.centerline]
+        lons = [p.lon for p in self.track.centerline]
+        return (min(lats), max(lats), min(lons), max(lons))
+
+    def is_point_to_point(self) -> bool:
+        """Check if current track is a point-to-point stage."""
+        return self.track is not None and self.track.is_point_to_point
