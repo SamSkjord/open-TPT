@@ -4,15 +4,59 @@ Provides a navigable menu overlay for settings and configuration.
 """
 
 import logging
+import os
+import pwd
 import pygame
 import re
 import time
 import subprocess
 import threading
-from typing import List, Optional, Callable, Any
+from typing import List, Optional, Callable, Any, Tuple
 from dataclasses import dataclass, field
 
 logger = logging.getLogger('openTPT.menu')
+
+
+def _get_audio_user() -> Tuple[str, int, str]:
+    """
+    Get the username, UID, and XDG_RUNTIME_DIR for audio/Bluetooth commands.
+
+    Returns:
+        Tuple of (username, uid, runtime_dir)
+    """
+    # Check for existing session buses to find active user
+    run_user = os.path.join('/run', 'user')
+    if os.path.exists(run_user):
+        for uid_name in sorted(os.listdir(run_user)):
+            try:
+                uid = int(uid_name)
+                if uid == 0:
+                    continue  # Skip root
+                bus_path = os.path.join(run_user, uid_name, 'bus')
+                if os.path.exists(bus_path):
+                    # Found active session, get username
+                    try:
+                        pw = pwd.getpwuid(uid)
+                        return pw.pw_name, uid, os.path.join(run_user, uid_name)
+                    except KeyError:
+                        continue
+            except (ValueError, PermissionError):
+                continue
+
+    # Fall back to 'pi' user if available
+    try:
+        pi_user = pwd.getpwnam('pi')
+        return 'pi', pi_user.pw_uid, f'/run/user/{pi_user.pw_uid}'
+    except KeyError:
+        pass
+
+    # Last resort: first non-root user
+    for pw in pwd.getpwall():
+        if pw.pw_uid >= 1000:
+            return pw.pw_name, pw.pw_uid, f'/run/user/{pw.pw_uid}'
+
+    # Absolute fallback
+    return 'pi', 1000, '/run/user/1000'
 
 from utils.config import (
     DISPLAY_WIDTH,
@@ -416,6 +460,11 @@ class MenuSystem:
 
         # Threshold editing mode (stores key being edited, or None)
         self.threshold_editing = None
+
+        # Bluetooth connection state
+        self._bt_connecting = False  # Debounce flag
+        self._bt_connect_lock = threading.Lock()
+        self._bt_sound_thread: Optional[threading.Thread] = None
 
         # Threshold definitions: key -> (settings_key, default, min, max, step, label)
         self.thresholds = {
@@ -1138,6 +1187,7 @@ class MenuSystem:
 
         def do_scan():
             try:
+                username, _, _ = _get_audio_user()
                 # Ensure Bluetooth is powered on
                 subprocess.run(
                     ["sudo", "rfkill", "unblock", "bluetooth"],
@@ -1145,7 +1195,7 @@ class MenuSystem:
                     timeout=5,
                 )
                 subprocess.run(
-                    ["sudo", "-u", "pi", "bluetoothctl", "power", "on"],
+                    ["sudo", "-u", username, "bluetoothctl", "power", "on"],
                     capture_output=True,
                     timeout=5,
                 )
@@ -1154,7 +1204,7 @@ class MenuSystem:
                     [
                         "sudo",
                         "-u",
-                        "pi",
+                        username,
                         "bluetoothctl",
                         "--timeout",
                         "8",
@@ -1331,62 +1381,123 @@ class MenuSystem:
         return ""
 
     def _bt_connect(self, mac: str, name: str) -> str:
-        """Connect to a Bluetooth device."""
-        try:
-            # Check if device is paired first
-            info_result = subprocess.run(
-                ["bluetoothctl", "info", mac],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            is_paired = "Paired: yes" in info_result.stdout
+        """Connect to a Bluetooth device (runs in background)."""
+        # Debounce - prevent rapid reconnect attempts
+        if not self._bt_connect_lock.acquire(blocking=False):
+            return "Connection in progress..."
 
-            # If not paired, try to pair first
-            if not is_paired:
-                pair_result = subprocess.run(
-                    ["bluetoothctl", "pair", mac],
+        if self._bt_connecting:
+            self._bt_connect_lock.release()
+            return "Connection in progress..."
+
+        self._bt_connecting = True
+        self._bt_connect_lock.release()
+
+        def do_connect():
+            try:
+                username, uid, runtime_dir = _get_audio_user()
+
+                # Check if device is paired first
+                info_result = subprocess.run(
+                    ["bluetoothctl", "info", mac],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                is_paired = "Paired: yes" in info_result.stdout
+
+                # If not paired, try to pair first
+                if not is_paired:
+                    pair_result = subprocess.run(
+                        ["bluetoothctl", "pair", mac],
+                        capture_output=True,
+                        text=True,
+                        timeout=15,
+                    )
+                    if pair_result.returncode != 0:
+                        if self.current_menu:
+                            self.current_menu.set_status("Pairing failed - check device")
+                        return
+
+                    # Verify pairing succeeded
+                    verify = subprocess.run(
+                        ["bluetoothctl", "info", mac],
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                    )
+                    if "Paired: yes" not in verify.stdout:
+                        if self.current_menu:
+                            self.current_menu.set_status("Pairing incomplete")
+                        return
+
+                # Trust the device for auto-reconnect
+                trust_result = subprocess.run(
+                    ["bluetoothctl", "trust", mac],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if trust_result.returncode != 0:
+                    logger.debug("Trust failed: %s", trust_result.stderr)
+
+                # Connect as the audio user so PulseAudio profiles work
+                result = subprocess.run(
+                    ["sudo", "-u", username, "bluetoothctl", "connect", mac],
                     capture_output=True,
                     text=True,
                     timeout=15,
                 )
-                if "Failed" in pair_result.stdout + pair_result.stderr:
-                    return "Pairing failed - is device in range?"
 
-            # Trust the device for auto-reconnect
-            subprocess.run(
-                ["bluetoothctl", "trust", mac],
-                capture_output=True,
-                timeout=5,
-            )
+                # Check connection status by querying device info
+                status = subprocess.run(
+                    ["bluetoothctl", "info", mac],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
 
-            # Run as pi user so PulseAudio audio profiles work
-            result = subprocess.run(
-                ["sudo", "-u", "pi", "bluetoothctl", "connect", mac],
-                capture_output=True,
-                text=True,
-                timeout=15,
-            )
-            output = result.stdout + result.stderr
-            if "Connection successful" in output or "Connected: yes" in output:
-                # Play test sound to confirm audio working
-                self._play_bt_test_sound()
-                return f"Connected to {name}"
-            elif "profile-unavailable" in output:
-                return "Audio profile unavailable"
-            elif "page-timeout" in output:
-                return "Device not responding"
-            elif "Failed" in output or "Error" in output:
-                return "Failed to connect"
-            return f"Connecting to {name}..."
-        except subprocess.TimeoutExpired:
-            return "Connection timed out"
-        except Exception as e:
-            logger.debug("Bluetooth connect failed: %s", e)
-            return f"Error: {e}"
+                if "Connected: yes" in status.stdout:
+                    self._play_bt_test_sound()
+                    if self.current_menu:
+                        self.current_menu.set_status(f"Connected to {name}")
+                elif "profile-unavailable" in result.stderr:
+                    if self.current_menu:
+                        self.current_menu.set_status("Audio profile unavailable")
+                elif result.returncode != 0:
+                    # Parse specific error from stderr
+                    if "page-timeout" in result.stderr:
+                        msg = "Device not responding"
+                    elif "not available" in result.stderr:
+                        msg = "Device not found"
+                    else:
+                        msg = "Connection failed"
+                    if self.current_menu:
+                        self.current_menu.set_status(msg)
+                else:
+                    if self.current_menu:
+                        self.current_menu.set_status("Connection failed")
+
+            except subprocess.TimeoutExpired:
+                if self.current_menu:
+                    self.current_menu.set_status("Connection timed out")
+            except Exception as e:
+                logger.debug("Bluetooth connect failed: %s", e)
+                if self.current_menu:
+                    self.current_menu.set_status(f"Error: {e}")
+            finally:
+                self._bt_connecting = False
+
+        # Run connection in background thread
+        connect_thread = threading.Thread(target=do_connect, daemon=True)
+        connect_thread.start()
+        return f"Connecting to {name}..."
 
     def _play_bt_test_sound(self):
         """Play a test sound to confirm Bluetooth audio is working."""
+        # Cancel any previous sound thread (don't pile up)
+        if self._bt_sound_thread and self._bt_sound_thread.is_alive():
+            return  # Previous sound still playing, skip
 
         def do_play():
             try:
@@ -1397,11 +1508,12 @@ class MenuSystem:
                     "/usr/share/sounds/alsa/Front_Center.wav",
                 ]
                 for sound in sound_files:
-                    result = subprocess.run(
-                        ["paplay", sound], capture_output=True, timeout=5
-                    )
-                    if result.returncode == 0:
-                        return
+                    if os.path.exists(sound):
+                        result = subprocess.run(
+                            ["paplay", sound], capture_output=True, timeout=5
+                        )
+                        if result.returncode == 0:
+                            return
                 # Fallback: generate a simple beep using speaker-test
                 subprocess.run(
                     ["speaker-test", "-t", "sine", "-f", "1000", "-l", "1"],
@@ -1411,12 +1523,14 @@ class MenuSystem:
             except Exception as e:
                 logger.debug("Audio test failed: %s", e)
 
-        # Run in background to not block menu
-        threading.Thread(target=do_play, daemon=True).start()
+        # Run in background to not block menu, track thread
+        self._bt_sound_thread = threading.Thread(target=do_play, daemon=True)
+        self._bt_sound_thread.start()
 
     def _run_pactl(self, args: list) -> subprocess.CompletedProcess:
-        """Run pactl command as pi user with correct environment."""
-        env_cmd = ["sudo", "-u", "pi", "env", "XDG_RUNTIME_DIR=/run/user/1000"]
+        """Run pactl command as the audio user with correct environment."""
+        username, uid, runtime_dir = _get_audio_user()
+        env_cmd = ["sudo", "-u", username, "env", f"XDG_RUNTIME_DIR={runtime_dir}"]
         return subprocess.run(
             env_cmd + ["pactl"] + args, capture_output=True, text=True, timeout=5
         )
@@ -1474,10 +1588,10 @@ class MenuSystem:
     def _bt_pair(self, mac: str, name: str) -> str:
         """Pair with a Bluetooth device."""
         try:
-            # Run as pi user so PulseAudio audio profiles work
+            username, _, _ = _get_audio_user()
             # Trust the device first (allows auto-reconnect)
             subprocess.run(
-                ["sudo", "-u", "pi", "bluetoothctl", "trust", mac],
+                ["sudo", "-u", username, "bluetoothctl", "trust", mac],
                 capture_output=True,
                 text=True,
                 timeout=5,
@@ -1485,7 +1599,7 @@ class MenuSystem:
 
             # Pair with the device (default agent works better than NoInputNoOutput)
             result = subprocess.run(
-                ["sudo", "-u", "pi", "bluetoothctl", "pair", mac],
+                ["sudo", "-u", username, "bluetoothctl", "pair", mac],
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -1495,7 +1609,7 @@ class MenuSystem:
             # Handle stuck state - remove and retry once
             if "AlreadyExists" in output:
                 subprocess.run(
-                    ["sudo", "-u", "pi", "bluetoothctl", "remove", mac],
+                    ["sudo", "-u", username, "bluetoothctl", "remove", mac],
                     capture_output=True,
                     timeout=5,
                 )
@@ -1528,8 +1642,9 @@ class MenuSystem:
 
         mac, name = connected
         try:
+            username, _, _ = _get_audio_user()
             result = subprocess.run(
-                ["sudo", "-u", "pi", "bluetoothctl", "disconnect", mac],
+                ["sudo", "-u", username, "bluetoothctl", "disconnect", mac],
                 capture_output=True,
                 text=True,
                 timeout=10,
@@ -1568,8 +1683,9 @@ class MenuSystem:
     def _bt_forget(self, mac: str, name: str) -> str:
         """Forget/unpair a Bluetooth device."""
         try:
+            username, _, _ = _get_audio_user()
             result = subprocess.run(
-                ["sudo", "-u", "pi", "bluetoothctl", "remove", mac],
+                ["sudo", "-u", username, "bluetoothctl", "remove", mac],
                 capture_output=True,
                 text=True,
                 timeout=10,

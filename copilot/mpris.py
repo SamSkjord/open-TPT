@@ -7,6 +7,7 @@ Shows callout text, artist (CoPilot), and album art on the car display.
 
 import logging
 import os
+import pwd
 import threading
 import time
 from pathlib import Path
@@ -14,13 +15,53 @@ from typing import Optional
 
 logger = logging.getLogger('openTPT.copilot.mpris')
 
+
+def _get_session_bus_user() -> tuple[int, str]:
+    """
+    Get the UID and bus path for the session bus user.
+
+    Returns the first non-root user with an active session bus,
+    or falls back to user 'pi' if available.
+    """
+    # Check for existing session buses
+    run_user = Path('/run/user')
+    if run_user.exists():
+        for uid_dir in sorted(run_user.iterdir()):
+            try:
+                uid = int(uid_dir.name)
+                if uid == 0:
+                    continue  # Skip root
+                bus_path = uid_dir / 'bus'
+                if bus_path.exists():
+                    return uid, str(bus_path)
+            except (ValueError, PermissionError):
+                continue
+
+    # Fall back to 'pi' user if no active session found
+    try:
+        pi_user = pwd.getpwnam('pi')
+        return pi_user.pw_uid, f'/run/user/{pi_user.pw_uid}/bus'
+    except KeyError:
+        pass
+
+    # Last resort: first non-root user
+    for pw in pwd.getpwall():
+        if pw.pw_uid >= 1000:
+            return pw.pw_uid, f'/run/user/{pw.pw_uid}/bus'
+
+    raise RuntimeError("No suitable user found for session bus")
+
+
 # Set session bus address for root processes BEFORE importing dbus
 # This allows systemd services to connect to the user's session bus
 if os.getuid() == 0 and 'DBUS_SESSION_BUS_ADDRESS' not in os.environ:
-    user_bus = '/run/user/1000/bus'
-    if os.path.exists(user_bus):
-        os.environ['DBUS_SESSION_BUS_ADDRESS'] = f'unix:path={user_bus}'
-        logger.debug("Set DBUS_SESSION_BUS_ADDRESS for root process")
+    try:
+        _uid, _bus_path = _get_session_bus_user()
+        if os.path.exists(_bus_path):
+            os.environ['DBUS_SESSION_BUS_ADDRESS'] = f'unix:path={_bus_path}'
+            logger.debug("Set DBUS_SESSION_BUS_ADDRESS for root process: %s", _bus_path)
+    except Exception as e:
+        logger.debug("Could not determine session bus user: %s", e)
 
 # Try to import D-Bus bindings
 try:
@@ -56,11 +97,14 @@ if DBUS_AVAILABLE:
             Args:
                 bus: D-Bus bus connection
                 art_path: Path to album art image (PNG/JPEG)
+
+            Raises:
+                RuntimeError: If bus name acquisition fails
             """
             self._bus = bus
+            self._lock = threading.RLock()  # Protect metadata access
 
             # Request the well-known name on the bus
-            # Works with both SessionBus and BusConnection
             name = "org.mpris.MediaPlayer2.openTPT"
             try:
                 # Try BusName first (works with SessionBus)
@@ -75,7 +119,7 @@ if DBUS_AVAILABLE:
                 elif result == dbus.bus.REQUEST_NAME_REPLY_ALREADY_OWNER:
                     logger.debug("Already own bus name: %s", name)
                 else:
-                    logger.warning("Failed to acquire bus name %s (result=%d)", name, result)
+                    raise RuntimeError(f"Failed to acquire bus name {name} (result={result})")
                 self._bus_name = None
 
             dbus.service.Object.__init__(self, bus, "/org/mpris/MediaPlayer2")
@@ -86,7 +130,7 @@ if DBUS_AVAILABLE:
             else:
                 self._art_url = ""
 
-            # Current metadata
+            # Current metadata (protected by self._lock)
             self._title = ""
             self._playback_status = "Stopped"
             self._track_id = "/org/mpris/MediaPlayer2/TrackList/NoTrack"
@@ -99,15 +143,17 @@ if DBUS_AVAILABLE:
                 title: Callout text to display
                 playing: Whether audio is currently playing
             """
-            self._title = title
-            self._playback_status = "Playing" if playing else "Stopped"
-            self._track_id = f"/org/mpris/MediaPlayer2/Track/{hash(title) & 0xFFFFFFFF}"
+            with self._lock:
+                self._title = title
+                self._playback_status = "Playing" if playing else "Stopped"
+                self._track_id = f"/org/mpris/MediaPlayer2/Track/{hash(title) & 0xFFFFFFFF}"
 
-            # Emit PropertiesChanged signal
-            changed_props = {
-                "Metadata": self._get_metadata(),
-                "PlaybackStatus": self._playback_status,
-            }
+                # Emit PropertiesChanged signal
+                changed_props = {
+                    "Metadata": self._get_metadata(),
+                    "PlaybackStatus": self._playback_status,
+                }
+
             self.PropertiesChanged(
                 MPRIS_PLAYER_INTERFACE,
                 changed_props,
@@ -116,7 +162,9 @@ if DBUS_AVAILABLE:
 
         def set_stopped(self) -> None:
             """Set playback status to stopped."""
-            self._playback_status = "Stopped"
+            with self._lock:
+                self._playback_status = "Stopped"
+
             self.PropertiesChanged(
                 MPRIS_PLAYER_INTERFACE,
                 {"PlaybackStatus": "Stopped"},
@@ -124,7 +172,7 @@ if DBUS_AVAILABLE:
             )
 
         def _get_metadata(self) -> dbus.Dictionary:
-            """Build metadata dictionary."""
+            """Build metadata dictionary. Must be called with lock held."""
             metadata = dbus.Dictionary({
                 "mpris:trackid": dbus.ObjectPath(self._track_id),
                 "xesam:title": self._title or "CoPilot Ready",
@@ -224,23 +272,24 @@ if DBUS_AVAILABLE:
                 }, signature="sv")
 
             elif interface == MPRIS_PLAYER_INTERFACE:
-                return dbus.Dictionary({
-                    "PlaybackStatus": self._playback_status,
-                    "LoopStatus": "None",
-                    "Rate": 1.0,
-                    "Shuffle": False,
-                    "Metadata": self._get_metadata(),
-                    "Volume": 1.0,
-                    "Position": dbus.Int64(0),
-                    "MinimumRate": 1.0,
-                    "MaximumRate": 1.0,
-                    "CanGoNext": False,
-                    "CanGoPrevious": False,
-                    "CanPlay": False,
-                    "CanPause": False,
-                    "CanSeek": False,
-                    "CanControl": False,
-                }, signature="sv")
+                with self._lock:
+                    return dbus.Dictionary({
+                        "PlaybackStatus": self._playback_status,
+                        "LoopStatus": "None",
+                        "Rate": 1.0,
+                        "Shuffle": False,
+                        "Metadata": self._get_metadata(),
+                        "Volume": 1.0,
+                        "Position": dbus.Int64(0),
+                        "MinimumRate": 1.0,
+                        "MaximumRate": 1.0,
+                        "CanGoNext": False,
+                        "CanGoPrevious": False,
+                        "CanPlay": False,
+                        "CanPause": False,
+                        "CanSeek": False,
+                        "CanControl": False,
+                    }, signature="sv")
 
             return dbus.Dictionary({}, signature="sv")
 
@@ -280,15 +329,20 @@ class MPRISProvider:
         self._mainloop: Optional["GLib.MainLoop"] = None
         self._thread: Optional[threading.Thread] = None
         self._running = False
+        self._init_event = threading.Event()  # Signals when initialisation completes
+        self._init_error: Optional[str] = None  # Stores initialisation error message
 
     @property
     def available(self) -> bool:
         """Check if MPRIS is available."""
         return DBUS_AVAILABLE
 
-    def start(self) -> bool:
+    def start(self, timeout: float = 5.0) -> bool:
         """
         Start the MPRIS service.
+
+        Args:
+            timeout: Maximum seconds to wait for initialisation
 
         Returns:
             True if started successfully
@@ -302,12 +356,21 @@ class MPRISProvider:
 
         try:
             self._running = True
+            self._init_event.clear()
+            self._init_error = None
             self._thread = threading.Thread(target=self._run_mainloop, daemon=True)
             self._thread.start()
 
-            # Wait briefly for service to initialise
-            import time
-            time.sleep(0.1)
+            # Wait for initialisation to complete
+            if not self._init_event.wait(timeout=timeout):
+                logger.warning("MPRIS service initialisation timed out")
+                self._running = False
+                return False
+
+            if self._init_error:
+                logger.warning("MPRIS service failed: %s", self._init_error)
+                self._running = False
+                return False
 
             if self._service:
                 logger.info("MPRIS service started: org.mpris.MediaPlayer2.openTPT")
@@ -334,6 +397,7 @@ class MPRISProvider:
 
         self._service = None
         self._mainloop = None
+        self._init_event.clear()
         logger.info("MPRIS service stopped")
 
     def update_now_playing(self, title: str) -> None:
@@ -345,16 +409,21 @@ class MPRISProvider:
         Args:
             title: Callout text to display on head unit
         """
-        if self._service and self._running:
-            # Schedule update on the GLib mainloop thread
-            if self._mainloop:
-                GLib.idle_add(self._service.update_metadata, title, True)
+        # Store local references to avoid TOCTOU race
+        service = self._service
+        mainloop = self._mainloop
+
+        if service and self._running and mainloop:
+            GLib.idle_add(service.update_metadata, title, True)
 
     def set_stopped(self) -> None:
         """Set playback status to stopped."""
-        if self._service and self._running:
-            if self._mainloop:
-                GLib.idle_add(self._service.set_stopped)
+        # Store local references to avoid TOCTOU race
+        service = self._service
+        mainloop = self._mainloop
+
+        if service and self._running and mainloop:
+            GLib.idle_add(service.set_stopped)
 
     def _run_mainloop(self) -> None:
         """Run the GLib mainloop (called in background thread)."""
@@ -365,12 +434,12 @@ class MPRISProvider:
             # Determine session bus address
             session_address = os.environ.get('DBUS_SESSION_BUS_ADDRESS')
             if not session_address:
-                # For root/systemd services, use pi user's session bus
-                uid = os.getuid()
-                if uid == 0:
-                    session_address = 'unix:path=/run/user/1000/bus'
-                else:
-                    session_address = f'unix:path=/run/user/{uid}/bus'
+                # For root/systemd services, find the user's session bus
+                try:
+                    uid, bus_path = _get_session_bus_user()
+                    session_address = f'unix:path={bus_path}'
+                except Exception as e:
+                    raise RuntimeError(f"Could not determine session bus: {e}")
 
             # Wait for socket to appear (may not exist at boot before user login)
             socket_path = session_address.replace('unix:path=', '')
@@ -378,6 +447,7 @@ class MPRISProvider:
             waited = 0
             while not os.path.exists(socket_path) and waited < max_wait:
                 if not self._running:
+                    self._init_event.set()
                     return  # Cancelled during wait
                 time.sleep(2)
                 waited += 2
@@ -388,7 +458,6 @@ class MPRISProvider:
                 raise RuntimeError(f"Session bus socket not found after {max_wait}s: {socket_path}")
 
             # Check socket permissions
-            import stat
             socket_stat = os.stat(socket_path)
             logger.debug(
                 "Session bus socket: %s (mode=%o, uid=%d)",
@@ -407,7 +476,10 @@ class MPRISProvider:
             if bus.name_has_owner(name):
                 logger.info("MPRIS name acquired: %s", name)
             else:
-                logger.warning("MPRIS name not visible on bus: %s", name)
+                raise RuntimeError(f"MPRIS name not visible on bus: {name}")
+
+            # Signal successful initialisation
+            self._init_event.set()
 
             # Run mainloop
             self._mainloop = GLib.MainLoop()
@@ -418,4 +490,8 @@ class MPRISProvider:
 
         except Exception as e:
             logger.error("MPRIS mainloop error: %s", e, exc_info=True)
+            self._init_error = str(e)
             self._service = None
+            self._mainloop = None
+            self._running = False
+            self._init_event.set()  # Signal completion (with error)

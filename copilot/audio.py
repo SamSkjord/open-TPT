@@ -280,16 +280,19 @@ class AudioPlayer:
         # Build display text for MPRIS (car head unit)
         display_text = " into ".join(expanded) if len(expanded) > 1 else expanded[0]
 
+        # Store local reference to avoid TOCTOU race
+        mpris = self._mpris
+
         # Update MPRIS metadata before playing audio
-        if self._mpris:
-            self._mpris.update_now_playing(display_text)
+        if mpris:
+            mpris.update_now_playing(display_text)
 
         # Try Janne samples first (supports chaining natively)
         if self.samples:
             if self._speak_with_samples(expanded):
                 # Mark as stopped after playback completes
-                if self._mpris:
-                    self._mpris.set_stopped()
+                if mpris:
+                    mpris.set_stopped()
                 return
 
         # Fall back to TTS (join with "into" in text)
@@ -299,8 +302,8 @@ class AudioPlayer:
             self._speak_plain(display_text)
 
         # Mark as stopped after playback completes
-        if self._mpris:
-            self._mpris.set_stopped()
+        if mpris:
+            mpris.set_stopped()
 
     def _speak_with_samples(self, chain: List[str]) -> bool:
         """
