@@ -1333,6 +1333,33 @@ class MenuSystem:
     def _bt_connect(self, mac: str, name: str) -> str:
         """Connect to a Bluetooth device."""
         try:
+            # Check if device is paired first
+            info_result = subprocess.run(
+                ["bluetoothctl", "info", mac],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            is_paired = "Paired: yes" in info_result.stdout
+
+            # If not paired, try to pair first
+            if not is_paired:
+                pair_result = subprocess.run(
+                    ["bluetoothctl", "pair", mac],
+                    capture_output=True,
+                    text=True,
+                    timeout=15,
+                )
+                if "Failed" in pair_result.stdout + pair_result.stderr:
+                    return "Pairing failed - is device in range?"
+
+            # Trust the device for auto-reconnect
+            subprocess.run(
+                ["bluetoothctl", "trust", mac],
+                capture_output=True,
+                timeout=5,
+            )
+
             # Run as pi user so PulseAudio audio profiles work
             result = subprocess.run(
                 ["sudo", "-u", "pi", "bluetoothctl", "connect", mac],
@@ -1346,7 +1373,9 @@ class MenuSystem:
                 self._play_bt_test_sound()
                 return f"Connected to {name}"
             elif "profile-unavailable" in output:
-                return "Start PulseAudio first"
+                return "Audio profile unavailable"
+            elif "page-timeout" in output:
+                return "Device not responding"
             elif "Failed" in output or "Error" in output:
                 return "Failed to connect"
             return f"Connecting to {name}..."
