@@ -1,5 +1,52 @@
 # Changelog - openTPT
 
+## [v0.18.3] - 2026-01-17
+
+### Main Application Refactoring
+
+#### Code Organisation
+
+- **Modular main application** - Split monolithic `main.py` (2063 lines) into focused modules
+  - Each subsystem is now a separate mixin class for maintainability
+  - main.py reduced to 569 lines (72% reduction)
+  - Clear separation of concerns by functionality
+
+#### New Structure
+
+```
+core/
+├── __init__.py           # Exports all mixins
+├── initialization.py     # Hardware subsystem init (~445 lines)
+├── event_handlers.py     # Input/event processing (~261 lines)
+├── rendering.py          # Display pipeline (~377 lines)
+├── telemetry.py          # Telemetry recording (~148 lines)
+└── performance.py        # Power/memory monitoring (~394 lines)
+```
+
+#### Architecture
+
+- **Mixin pattern** - OpenTPT class inherits from all core mixins
+  - `PerformanceMixin` - Power status, memory stats, periodic maintenance
+  - `TelemetryMixin` - Telemetry frame recording
+  - `EventHandlerMixin` - Pygame events, input handling, UI state
+  - `InitializationMixin` - Hardware subsystem setup with splash progress
+  - `RenderingMixin` - Display rendering pipeline
+- **Same public interface** - No changes to main.py entry point
+- **No functional changes** - All behaviour preserved
+
+#### Modified Files
+
+- `main.py` - Reduced from 2063 to 569 lines, now uses mixins
+- `core/__init__.py` - New package exports
+- `core/performance.py` - Power/memory monitoring functions and mixin
+- `core/telemetry.py` - Telemetry recording mixin
+- `core/event_handlers.py` - Event handling mixin
+- `core/initialization.py` - Hardware initialization mixin
+- `core/rendering.py` - Display rendering mixin
+- `CLAUDE.md` - Updated directory structure and version
+
+---
+
 ## [v0.18.2] - 2026-01-17
 
 ### Menu System Refactoring

@@ -1,6 +1,6 @@
 # Claude Context - openTPT Project
 
-**Version:** 0.18.1 | **Updated:** 2026-01-17
+**Version:** 0.18.3 | **Updated:** 2026-01-17
 
 ---
 
@@ -71,7 +71,14 @@
 
 ```
 openTPT/
-├── main.py                          # Entry point
+├── main.py                          # Entry point + OpenTPT class shell
+├── core/                            # Core application modules (mixins)
+│   ├── __init__.py                  # Exports all mixins
+│   ├── initialization.py            # Hardware subsystem init
+│   ├── event_handlers.py            # Input/event processing
+│   ├── rendering.py                 # Display pipeline
+│   ├── telemetry.py                 # Telemetry recording
+│   └── performance.py               # Power/memory monitoring
 ├── copilot/                         # Rally callout system
 │   ├── main.py                      # CoPilot core class
 │   ├── map_loader.py                # OSM roads.db loading
