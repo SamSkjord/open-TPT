@@ -460,6 +460,18 @@ COPILOT_OVERLAY_ENABLED = True      # Show corner indicator on all pages
 
 CoPilot integrates with lap timing - when a track is loaded (KMZ circuit or GPX stage), CoPilot automatically uses the track centerline for junction guidance in Route Follow mode.
 
+**Bluetooth Audio Metadata:**
+
+When connected to a Bluetooth car head unit or speaker, CoPilot provides "Now Playing" information via AVRCP:
+- Track title shows the current callout text (e.g., "left 4 tightens into right 3")
+- Album art displays the CoPilot logo (splash.png)
+- Artist shows "CoPilot", album shows "openTPT"
+
+Requires `python3-dbus` and `python3-gi` packages:
+```bash
+sudo apt install python3-dbus python3-gi
+```
+
 ## Project Structure
 
 ```
