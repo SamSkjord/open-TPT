@@ -1,5 +1,66 @@
 # Changelog - openTPT
 
+## [v0.18.0] - 2026-01-17
+
+### CoPilot Rally Callout System
+
+#### New Features
+
+- **CoPilot integration** - Rally-style audio callouts for upcoming corners
+  - Uses OSM map data to detect corners, junctions, bridges, and hazards
+  - Audio callouts via espeak-ng TTS or Janne Laahanen rally samples
+  - Corner severity on ASC 1-6 scale (1=flat out, 6=hairpin)
+  - Lookahead distance configurable (500m-1500m)
+- **GPS heading extraction** - Added course-over-ground parsing from RMC sentences
+  - Required for CoPilot road path projection
+  - 10Hz updates from PA1616S GPS module
+- **CoPilot display page** - Dedicated UI page showing:
+  - Large corner indicator with direction arrow and severity
+  - Distance to next corner with colour coding (green/yellow/red)
+  - Current mode, route name, and status information
+- **CoPilot modes** - Two operating modes:
+  - Just Drive: Follow whatever road you're on, detecting corners ahead
+  - Route Follow: Follow a loaded GPX route file
+- **Corner overlay** - Shows next corner on all display pages
+  - Direction arrow (left/right)
+  - Severity number
+  - Distance countdown
+- **CoPilot menu** - Full settings submenu:
+  - Enable/disable, Audio on/off, Lookahead distance
+  - Mode selection, Route loading from GPX files
+
+#### Technical Details
+
+- Map data stored on NVMe (`/mnt/nvme/copilot/maps/`) due to 6.4GB size
+- Symlinked from `~/.opentpt/copilot/maps/`
+- Pre-processed roads.db with R-tree spatial indexing for fast queries
+- Threaded worker with bounded queue following openTPT patterns
+- GPS adapter bridges openTPT GPSHandler to CoPilot interface
+
+#### Configuration
+
+- `COPILOT_ENABLED` - Enable/disable system
+- `COPILOT_MAP_DIR` - Path to roads.db files
+- `COPILOT_LOOKAHEAD_M` - Corner detection distance (default 1000m)
+- `COPILOT_AUDIO_ENABLED` - Enable audio callouts
+- `COPILOT_OVERLAY_ENABLED` - Show corner indicator overlay
+
+#### Modified Files
+
+- `main.py` - CoPilot handler and display integration
+- `gui/menu.py` - CoPilot settings submenu
+- `gui/display.py` - Corner indicator overlay method
+- `hardware/gps_handler.py` - Heading extraction from RMC
+- `utils/config.py` - COPILOT_* configuration options
+
+#### New Files
+
+- `copilot/` - Rally callout module (map_loader, path_projector, corners, pacenotes, audio)
+- `hardware/copilot_handler.py` - CoPilot integration handler with GPS adapter
+- `gui/copilot_display.py` - CoPilot UI page
+
+---
+
 ## [v0.17.9] - 2026-01-16
 
 ### Fuel Tracking, Temperature Overlays & Code Quality

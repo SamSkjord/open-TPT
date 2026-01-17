@@ -61,6 +61,7 @@ UI_PAGES = [
     {"id": "gmeter", "name": "G-Meter", "default_enabled": True},
     {"id": "lap_timing", "name": "Lap Timing", "default_enabled": True},
     {"id": "fuel", "name": "Fuel", "default_enabled": True},
+    {"id": "copilot", "name": "CoPilot", "default_enabled": True},
 ]
 
 # ==============================================================================
@@ -673,6 +674,39 @@ FUEL_SMOOTHING_SAMPLES = 5
 
 # Number of laps to average for consumption estimate
 FUEL_LAP_HISTORY_COUNT = 5
+
+# ==============================================================================
+# COPILOT CONFIGURATION (Rally Callouts)
+# ==============================================================================
+
+# Enable/disable CoPilot system
+COPILOT_ENABLED = True  # Set to False to disable CoPilot
+
+# Map data directory (SQLite .roads.db files)
+# Download regional PBF files from Geofabrik and convert to .roads.db
+COPILOT_MAP_DIR = os.path.expanduser("~/.opentpt/copilot/maps")
+
+# Cache directory for CoPilot data
+COPILOT_CACHE_DIR = os.path.expanduser("~/.opentpt/copilot/cache")
+
+# Lookahead distance for corner detection (metres)
+# Higher values give earlier warnings but may be less accurate
+COPILOT_LOOKAHEAD_M = 1000
+
+# Update interval in seconds
+# Lower values give more responsive callouts but use more CPU
+COPILOT_UPDATE_INTERVAL_S = 0.5
+
+# Audio settings
+COPILOT_AUDIO_ENABLED = True  # Enable audio callouts
+COPILOT_AUDIO_VOLUME = 0.8    # Audio volume (0.0-1.0)
+
+# Corner indicator overlay settings
+COPILOT_OVERLAY_ENABLED = True  # Show corner indicator on screen
+COPILOT_OVERLAY_POSITION = "bottom-left"  # top-left, top-right, bottom-left, bottom-right
+
+# Status bar settings
+COPILOT_STATUS_ENABLED = True  # Show last callout in status bar
 
 # ==============================================================================
 # HELPER FUNCTIONS

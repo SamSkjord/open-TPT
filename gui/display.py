@@ -1067,3 +1067,137 @@ class Display:
 
         # Draw the FPS counter
         self.surface.blit(fps_surface, pos)
+
+    def draw_corner_indicator(
+        self,
+        distance: float,
+        direction: str,
+        severity: int,
+        position: str = "bottom-left",
+    ):
+        """
+        Draw corner indicator overlay for CoPilot callouts.
+
+        Args:
+            distance: Distance to corner in metres
+            direction: Corner direction ("left" or "right")
+            severity: Corner severity (1-6, 6 = hairpin)
+            position: Screen position for the indicator
+        """
+        if distance <= 0 or not direction:
+            return
+
+        # Colour based on distance
+        if distance > 200:
+            colour = GREEN
+            bg_colour = (0, 40, 0)
+        elif distance > 100:
+            colour = YELLOW
+            bg_colour = (40, 40, 0)
+        else:
+            colour = RED
+            bg_colour = (40, 0, 0)
+
+        # Severity text
+        if severity >= 6:
+            severity_text = "HP"  # Hairpin
+        else:
+            severity_text = str(severity)
+
+        # Direction arrow
+        if direction == "left":
+            arrow = "<"
+        elif direction == "right":
+            arrow = ">"
+        else:
+            arrow = "-"
+
+        # Build indicator text
+        indicator_text = f"{arrow} {severity_text}"
+        distance_text = f"{int(distance)}m"
+
+        # Render text
+        indicator_surface = self.font_medarge.render(indicator_text, True, colour)
+        distance_surface = self.font_small.render(distance_text, True, colour)
+
+        # Calculate indicator size
+        padding = int(10 * SCALE_X)
+        box_width = max(indicator_surface.get_width(), distance_surface.get_width()) + padding * 2
+        box_height = indicator_surface.get_height() + distance_surface.get_height() + padding * 2
+
+        # Calculate position
+        margin = int(20 * SCALE_X)
+        if position == "bottom-left":
+            box_x = margin
+            box_y = DISPLAY_HEIGHT - box_height - margin - int(30 * SCALE_Y)  # Above status bar
+        elif position == "bottom-right":
+            box_x = DISPLAY_WIDTH - box_width - margin
+            box_y = DISPLAY_HEIGHT - box_height - margin - int(30 * SCALE_Y)
+        elif position == "top-left":
+            box_x = margin
+            box_y = margin + int(30 * SCALE_Y)  # Below status bar
+        elif position == "top-right":
+            box_x = DISPLAY_WIDTH - box_width - margin
+            box_y = margin + int(30 * SCALE_Y)
+        else:
+            box_x = margin
+            box_y = DISPLAY_HEIGHT - box_height - margin - int(30 * SCALE_Y)
+
+        # Draw background box
+        bg_surface = pygame.Surface((box_width, box_height), pygame.SRCALPHA)
+        bg_surface.fill((*bg_colour, 200))  # Semi-transparent background
+        self.surface.blit(bg_surface, (box_x, box_y))
+
+        # Draw border
+        pygame.draw.rect(self.surface, colour, (box_x, box_y, box_width, box_height), 2)
+
+        # Draw indicator text (centred)
+        ind_x = box_x + (box_width - indicator_surface.get_width()) // 2
+        ind_y = box_y + padding
+        self.surface.blit(indicator_surface, (ind_x, ind_y))
+
+        # Draw distance text (centred below)
+        dist_x = box_x + (box_width - distance_surface.get_width()) // 2
+        dist_y = ind_y + indicator_surface.get_height() + int(5 * SCALE_Y)
+        self.surface.blit(distance_surface, (dist_x, dist_y))
+
+    def draw_copilot_status(self, callout_text: str, position: str = "bottom-centre"):
+        """
+        Draw the last CoPilot callout text in the status area.
+
+        Args:
+            callout_text: Last callout text (e.g., "left 4 tightens into right 3")
+            position: Screen position for the status
+        """
+        if not callout_text:
+            return
+
+        # Render callout text
+        text_surface = self.font_small.render(callout_text, True, WHITE)
+
+        # Calculate position
+        margin = int(10 * SCALE_X)
+        if position == "bottom-centre":
+            text_x = (DISPLAY_WIDTH - text_surface.get_width()) // 2
+            text_y = DISPLAY_HEIGHT - text_surface.get_height() - margin - int(30 * SCALE_Y)
+        elif position == "top-centre":
+            text_x = (DISPLAY_WIDTH - text_surface.get_width()) // 2
+            text_y = margin + int(30 * SCALE_Y)
+        else:
+            text_x = (DISPLAY_WIDTH - text_surface.get_width()) // 2
+            text_y = DISPLAY_HEIGHT - text_surface.get_height() - margin - int(30 * SCALE_Y)
+
+        # Draw background for readability
+        padding = int(5 * SCALE_X)
+        bg_rect = pygame.Rect(
+            text_x - padding,
+            text_y - padding // 2,
+            text_surface.get_width() + padding * 2,
+            text_surface.get_height() + padding,
+        )
+        bg_surface = pygame.Surface((bg_rect.width, bg_rect.height), pygame.SRCALPHA)
+        bg_surface.fill((0, 0, 0, 160))  # Semi-transparent black
+        self.surface.blit(bg_surface, bg_rect.topleft)
+
+        # Draw text
+        self.surface.blit(text_surface, (text_x, text_y))

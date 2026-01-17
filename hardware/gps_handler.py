@@ -54,6 +54,7 @@ class GPSHandler(BoundedQueueHardwareHandler):
         self.speed_kmh = 0.0
         self.latitude = 0.0
         self.longitude = 0.0
+        self.heading = 0.0  # Course over ground in degrees (0-360)
         self.has_fix = False
         self.satellites = 0
         self.gps_time = None
@@ -308,6 +309,12 @@ class GPSHandler(BoundedQueueHardwareHandler):
                 speed_knots = float(speed_str)
                 self.speed_kmh = speed_knots * 1.852
 
+            # Course over ground (heading): degrees
+            if len(parts) > 8:
+                course_str = parts[8]
+                if course_str:
+                    self.heading = float(course_str)
+
             self.last_update = time.monotonic()
 
             # Sync system time once on first valid fix
@@ -375,6 +382,7 @@ class GPSHandler(BoundedQueueHardwareHandler):
             'speed_kmh': self.speed_kmh,
             'latitude': self.latitude,
             'longitude': self.longitude,
+            'heading': self.heading,
             'has_fix': self.has_fix,
             'satellites': self.satellites,
             'gps_time': self.gps_time,
@@ -400,6 +408,10 @@ class GPSHandler(BoundedQueueHardwareHandler):
     def get_update_rate(self) -> float:
         """Get current GPS update rate in Hz."""
         return self.update_rate
+
+    def get_heading(self) -> float:
+        """Get current course over ground in degrees (0-360)."""
+        return self.heading if self.has_fix else 0.0
 
     def stop(self):
         """Stop the GPS handler and close serial connection."""

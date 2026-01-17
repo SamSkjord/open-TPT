@@ -39,6 +39,7 @@ from gui.icon_handler import IconHandler
 from gui.gmeter import GMeterDisplay
 from gui.lap_timing_display import LapTimingDisplay
 from gui.fuel_display import FuelDisplay
+from gui.copilot_display import CoPilotDisplay
 from gui.horizontal_bar import HorizontalBar, DualDirectionBar
 
 # Import optimised TPMS handler
@@ -202,6 +203,24 @@ except ImportError as e:
     FuelTracker = None
     FUEL_TRACKING_ENABLED = False
     logger.warning("Fuel tracking not available: %s", e)
+
+# Import CoPilot handler (optional, for rally callouts)
+try:
+    from hardware.copilot_handler import CoPilotHandler
+    from utils.config import (
+        COPILOT_ENABLED,
+        COPILOT_MAP_DIR,
+        COPILOT_LOOKAHEAD_M,
+        COPILOT_UPDATE_INTERVAL_S,
+        COPILOT_AUDIO_ENABLED,
+        COPILOT_AUDIO_VOLUME,
+    )
+    COPILOT_AVAILABLE = True
+except ImportError as e:
+    COPILOT_AVAILABLE = False
+    CoPilotHandler = None
+    COPILOT_ENABLED = False
+    logger.debug("CoPilot not available: %s", e)
 
 # Import performance monitoring
 try:
@@ -548,6 +567,7 @@ class OpenTPT:
         self.gmeter = GMeterDisplay()
         self.lap_timing_display = LapTimingDisplay()
         self.fuel_display = FuelDisplay()
+        self.copilot_display = CoPilotDisplay()
         self.fuel_tracker = None
 
         # Status bars (top and bottom) - used across all pages
@@ -824,6 +844,30 @@ class OpenTPT:
             if LAP_TIMING_ENABLED and not self.gps:
                 logger.warning("Lap timing disabled: GPS required but not available")
 
+        # Initialise CoPilot handler (optional, requires GPS for rally callouts)
+        self._show_splash("Initialising CoPilot...", 0.82)
+        self.copilot = None
+        if COPILOT_ENABLED and COPILOT_AVAILABLE and CoPilotHandler and self.gps:
+            try:
+                from pathlib import Path
+                self.copilot = CoPilotHandler(
+                    gps_handler=self.gps,
+                    map_path=Path(COPILOT_MAP_DIR),
+                    lookahead_m=COPILOT_LOOKAHEAD_M,
+                    update_interval_s=COPILOT_UPDATE_INTERVAL_S,
+                    audio_enabled=COPILOT_AUDIO_ENABLED,
+                    audio_volume=COPILOT_AUDIO_VOLUME,
+                )
+                self.copilot.start()
+                self.copilot_display.set_handler(self.copilot)
+                logger.info("CoPilot initialised")
+            except (IOError, OSError, RuntimeError, ValueError, ImportError) as e:
+                logger.warning("Could not initialise CoPilot: %s", e)
+                self.copilot = None
+        else:
+            if COPILOT_ENABLED and not self.gps:
+                logger.debug("CoPilot disabled: GPS required but not available")
+
         # Initialise Ford Hybrid handler (optional, for battery SOC)
         if FORD_HYBRID_ENABLED and FORD_HYBRID_AVAILABLE and FordHybridHandler:
             try:
@@ -850,6 +894,7 @@ class OpenTPT:
             radar_handler=self.radar,
             camera_handler=self.camera,
             lap_timing_handler=self.lap_timing,
+            copilot_handler=self.copilot,
         )
         logger.debug("menu init done t=%.1fs", time.time()-_boot_start)
 
@@ -1632,6 +1677,11 @@ class OpenTPT:
             t0 = time.time()
             self.fuel_display.draw(self.screen)
             render_times['fuel'] = (time.time() - t0) * 1000
+        elif self.current_category == "ui" and self.current_ui_page == "copilot":
+            # Render CoPilot page
+            t0 = time.time()
+            self.copilot_display.draw(self.screen)
+            render_times['copilot'] = (time.time() - t0) * 1000
         else:
             # Render the telemetry page (default UI view)
             self._update_ui_visibility()
@@ -1823,6 +1873,22 @@ class OpenTPT:
             self._draw_fuel_warning()
         render_times['fuel_warning'] = (time.time() - t0) * 1000
 
+        # Draw CoPilot corner indicator on all pages
+        t0 = time.time()
+        if self.copilot:
+            snapshot = self.copilot.get_snapshot()
+            if snapshot and snapshot.data and snapshot.data.get('status') == 'active':
+                corner_info = self.copilot.get_next_corner_info()
+                if corner_info.get('distance', 0) > 0:
+                    from utils.config import COPILOT_OVERLAY_POSITION
+                    self.display.draw_corner_indicator(
+                        distance=corner_info.get('distance', 0),
+                        direction=corner_info.get('direction', ''),
+                        severity=corner_info.get('severity', 0),
+                        position=COPILOT_OVERLAY_POSITION,
+                    )
+        render_times['copilot_overlay'] = (time.time() - t0) * 1000
+
         # Apply brightness adjustment using BLEND_MULT (faster than alpha)
         t0 = time.time()
         brightness = self.input_handler.get_brightness()
@@ -1948,6 +2014,11 @@ class OpenTPT:
         if self.gps:
             logger.debug("Stopping GPS...")
             self.gps.stop()
+
+        # Stop CoPilot if enabled
+        if self.copilot:
+            logger.debug("Stopping CoPilot...")
+            self.copilot.stop()
 
         # Stop Ford Hybrid if enabled
         if self.ford_hybrid:

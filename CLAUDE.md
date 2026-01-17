@@ -1,6 +1,6 @@
 # Claude Context - openTPT Project
 
-**Version:** 0.17.9 | **Updated:** 2026-01-16
+**Version:** 0.18.0 | **Updated:** 2026-01-17
 
 ---
 
@@ -61,8 +61,9 @@
 - Brake Temps: FL (MCP9601 dual 0x65/0x66), FR (ADC) - rear disabled
 - Toyota Radar: can_b1_0 (keep-alive), can_b1_1 (tracks)
 - OBD2: Speed, RPM, fuel level, Ford Mode 22 HV Battery SOC
-- GPS: PA1616S at 10Hz (serial /dev/ttyS0) for lap timing
+- GPS: PA1616S at 10Hz (serial /dev/ttyS0) for lap timing and CoPilot
 - NeoDriver: I2C LED strip at 0x60 (shift/delta/overtake modes)
+- CoPilot: Rally callouts using OSM map data (NVMe storage for 6.4GB roads.db)
 
 ---
 
@@ -71,10 +72,19 @@
 ```
 openTPT/
 ├── main.py                          # Entry point
+├── copilot/                         # Rally callout system
+│   ├── main.py                      # CoPilot core class
+│   ├── map_loader.py                # OSM roads.db loading
+│   ├── path_projector.py            # Road path projection
+│   ├── corners.py                   # Corner detection (ASC scale)
+│   ├── pacenotes.py                 # Callout generation
+│   ├── audio.py                     # espeak-ng/sample playback
+│   └── simulator.py                 # GPX route following
 ├── gui/
 │   ├── display.py                   # Rendering + temperature overlays
 │   ├── camera.py                    # Multi-camera + radar overlay
 │   ├── menu.py                      # On-screen menu system
+│   ├── copilot_display.py           # CoPilot UI page
 │   └── radar_overlay.py             # Radar visualisation
 ├── hardware/
 │   ├── unified_corner_handler.py    # All tyre sensors
@@ -83,7 +93,8 @@ openTPT/
 │   ├── obd2_handler.py              # OBD2/CAN
 │   ├── gps_handler.py               # GPS serial NMEA parsing
 │   ├── neodriver_handler.py         # NeoDriver LED strip
-│   └── lap_timing_handler.py        # Lap timing logic
+│   ├── lap_timing_handler.py        # Lap timing logic
+│   └── copilot_handler.py           # CoPilot integration handler
 ├── utils/
 │   ├── config.py                    # ALL configuration
 │   ├── settings.py                  # Persistent user settings
@@ -258,6 +269,15 @@ All settings in `utils/config.py`:
 - Software correction: `T_actual = T_measured / e^0.25`
 - Configure per corner in `BRAKE_ROTOR_EMISSIVITY`
 - Cast iron oxidised: 0.95, machined: 0.60-0.70
+
+### CoPilot Rally Callouts (v0.18.0)
+- OSM-based corner detection with audio callouts
+- Uses GPS heading for road path projection
+- Map data: `~/.opentpt/copilot/maps/*.roads.db` (symlinked to NVMe)
+- Audio: espeak-ng TTS or Janne Laahanen rally samples
+- Modes: Just Drive (follow current road), Route Follow (GPX file)
+- Corner severity: ASC 1-6 scale (1=flat, 6=hairpin)
+- Config: `COPILOT_*` in config.py, `copilot.*` in settings
 
 ---
 
