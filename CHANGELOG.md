@@ -1,5 +1,53 @@
 # Changelog - openTPT
 
+## [v0.18.2] - 2026-01-17
+
+### Menu System Refactoring
+
+#### Code Organisation
+
+- **Modular menu system** - Split monolithic `gui/menu.py` (2848 lines) into focused modules
+  - Each subsystem is now a separate mixin class for maintainability
+  - Largest file now 1115 lines (was 2848)
+  - Clear separation of concerns by functionality
+
+#### New Structure
+
+```
+gui/menu/
+├── __init__.py       # Exports Menu, MenuItem, MenuSystem
+├── base.py           # Core menu classes (Menu, MenuItem, MenuSystem)
+├── bluetooth.py      # Bluetooth Audio + TPMS pairing
+├── camera.py         # Camera settings
+├── copilot.py        # CoPilot rally callout settings
+├── lap_timing.py     # Lap timing + track selection
+├── lights.py         # NeoDriver LED strip
+├── settings.py       # Display, Units, Thresholds, Pages
+└── system.py         # GPS, IMU, Radar, System Status
+```
+
+#### Architecture
+
+- **Mixin pattern** - MenuSystem inherits from all subsystem mixins
+- **Backwards compatible** - `from gui.menu import MenuSystem` unchanged
+- **No functional changes** - All menu behaviour preserved
+
+#### Modified Files
+
+- `gui/menu.py` - Removed (replaced by gui/menu/ package)
+- `gui/menu/__init__.py` - New package exports
+- `gui/menu/base.py` - Core Menu, MenuItem, MenuSystem classes
+- `gui/menu/bluetooth.py` - Bluetooth Audio and TPMS pairing mixin
+- `gui/menu/camera.py` - Camera settings mixin
+- `gui/menu/copilot.py` - CoPilot settings mixin
+- `gui/menu/lap_timing.py` - Lap timing mixin
+- `gui/menu/lights.py` - NeoDriver LED strip mixin
+- `gui/menu/settings.py` - Display/Units/Thresholds/Pages mixin
+- `gui/menu/system.py` - GPS/IMU/Radar/System Status mixin
+- `CLAUDE.md` - Updated directory structure
+
+---
+
 ## [v0.18.1] - 2026-01-17
 
 ### Unified Route System & CoPilot Improvements

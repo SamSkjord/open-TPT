@@ -83,7 +83,16 @@ openTPT/
 ├── gui/
 │   ├── display.py                   # Rendering + temperature overlays
 │   ├── camera.py                    # Multi-camera + radar overlay
-│   ├── menu.py                      # On-screen menu system
+│   ├── menu/                        # On-screen menu system (modular)
+│   │   ├── __init__.py              # Exports Menu, MenuItem, MenuSystem
+│   │   ├── base.py                  # Core menu classes
+│   │   ├── bluetooth.py             # Bluetooth Audio + TPMS pairing
+│   │   ├── camera.py                # Camera settings
+│   │   ├── copilot.py               # CoPilot settings
+│   │   ├── lap_timing.py            # Lap timing + track selection
+│   │   ├── lights.py                # NeoDriver LED strip
+│   │   ├── settings.py              # Display, Units, Thresholds, Pages
+│   │   └── system.py                # GPS, IMU, Radar, System Status
 │   ├── copilot_display.py           # CoPilot UI page
 │   └── radar_overlay.py             # Radar visualisation
 ├── hardware/
