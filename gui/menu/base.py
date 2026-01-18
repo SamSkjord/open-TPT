@@ -334,7 +334,7 @@ class Menu:
                 self.status_message, True, MENU_HEADER_COLOUR
             )
             status_x = menu_x + (menu_width - status_surface.get_width()) // 2
-            status_y = menu_y + menu_height - 20
+            status_y = menu_y + menu_height - 30
             surface.blit(status_surface, (status_x, status_y))
 
 
