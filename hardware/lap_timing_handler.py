@@ -116,14 +116,22 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
 
         try:
             # Initialise track selector for auto-detection
-            tracks_db_path = os.path.join(LAP_TIMING_DATA_DIR, "tracks", "tracks.db")
-            racelogic_db_path = os.path.join(LAP_TIMING_DATA_DIR, "tracks", "racelogic.db")
+            tracks_dir = os.path.join(LAP_TIMING_DATA_DIR, "tracks")
+            tracks_db_path = os.path.join(tracks_dir, "tracks.db")
+            racelogic_db_path = os.path.join(tracks_dir, "racelogic.db")
+            custom_tracks_dir = os.path.join(tracks_dir, "maps")
+            racelogic_tracks_dir = os.path.join(tracks_dir, "racelogic")
 
             if os.path.exists(tracks_db_path) or os.path.exists(racelogic_db_path):
-                self.track_selector = TrackSelector()
+                self.track_selector = TrackSelector(
+                    tracks_db_path=tracks_db_path,
+                    racelogic_db_path=racelogic_db_path,
+                    custom_tracks_dir=custom_tracks_dir,
+                    racelogic_tracks_dir=racelogic_tracks_dir,
+                )
                 logger.info("Lap timing: Track selector initialised")
             else:
-                logger.warning("Lap timing: Track databases not found at %s", LAP_TIMING_DATA_DIR)
+                logger.warning("Lap timing: Track databases not found at %s", tracks_dir)
 
         except Exception as e:
             logger.warning("Lap timing: Initialisation error: %s", e)
