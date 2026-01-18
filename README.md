@@ -587,7 +587,7 @@ openTPT/
 - [x] Bluetooth audio menu - scan, pair, connect, disconnect, forget (requires PulseAudio)
 - [x] Display menu - encoder-based brightness control
 - [x] Lap timing integration - GPS lap timing with persistence
-- [ ] CopePilot integration
+- [x] CoPilot integration
 - [ ] TPMS menu expansion - swap corners, view sensor data
 - [ ] Tyre temps menu - corner sensor details, full frame view for installation verification, flip inner/outer
 - [x] Camera view options - mirror, rotate settings for front/rear cameras
