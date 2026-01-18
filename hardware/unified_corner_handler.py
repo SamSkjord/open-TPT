@@ -8,8 +8,12 @@ import logging
 import time
 import threading
 import numpy as np
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Callable, TypeVar
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+
+# Type variable for generic timeout wrapper
+T = TypeVar('T')
 
 logger = logging.getLogger('openTPT.hardware.corners')
 
@@ -274,6 +278,10 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             "RL": 0,
             "RR": 0,
         }
+
+        # I2C operation timeout (prevents bus hangs from blocking worker thread)
+        self._i2c_timeout = 0.5  # 500ms timeout for I2C operations
+        self._i2c_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="i2c_timeout")
 
         # Initialise hardware
         self._initialise_hardware()
@@ -600,6 +608,30 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
 
         return False
 
+    def _i2c_with_timeout(self, func: Callable[[], T], default: T = None) -> T:
+        """
+        Execute an I2C operation with timeout protection.
+
+        Prevents bus hangs from blocking the worker thread indefinitely.
+        Uses ThreadPoolExecutor to run the operation with a timeout.
+
+        Args:
+            func: Callable to execute (should be a lambda wrapping the I2C call)
+            default: Value to return on timeout
+
+        Returns:
+            Result of func() or default on timeout
+        """
+        try:
+            future = self._i2c_executor.submit(func)
+            return future.result(timeout=self._i2c_timeout)
+        except FuturesTimeoutError:
+            logger.warning("I2C operation timed out after %.1fs", self._i2c_timeout)
+            return default
+        except Exception as e:
+            # Re-raise non-timeout exceptions to be handled by caller
+            raise e
+
     def _worker_loop(self):
         """
         Worker thread - reads all sensors per corner in sequence.
@@ -667,7 +699,15 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         try:
             with self._i2c_lock:
                 # Select mux channel via smbus2 (write to TCA9548A control register)
-                self.i2c_smbus.write_byte(I2C_MUX_ADDRESS, 1 << channel)
+                # Use timeout wrapper to prevent I2C bus hangs from blocking
+                # write_byte returns None on success, so use sentinel for timeout detection
+                mux_ok = self._i2c_with_timeout(
+                    lambda: (self.i2c_smbus.write_byte(I2C_MUX_ADDRESS, 1 << channel), True)[1],
+                    default=False
+                )
+                if not mux_ok:
+                    self._track_read_failure(position)
+                    return None
                 time.sleep(0.005)  # Brief delay
 
                 # Read temperature registers (left, centre, right)
@@ -711,8 +751,17 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
     def _read_pico_int16(self, reg: int) -> Optional[int]:
         """Read signed int16 from Pico (little-endian, tenths of °C)."""
         try:
-            low = self.i2c_smbus.read_byte_data(self.PICO_I2C_ADDR, reg)
-            high = self.i2c_smbus.read_byte_data(self.PICO_I2C_ADDR, reg + 1)
+            # Use timeout wrapper to prevent I2C bus hangs from blocking
+            low = self._i2c_with_timeout(
+                lambda: self.i2c_smbus.read_byte_data(self.PICO_I2C_ADDR, reg)
+            )
+            if low is None:
+                return None
+            high = self._i2c_with_timeout(
+                lambda: self.i2c_smbus.read_byte_data(self.PICO_I2C_ADDR, reg + 1)
+            )
+            if high is None:
+                return None
             value = (high << 8) | low
             if value & 0x8000:
                 value -= 0x10000
@@ -1173,6 +1222,10 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
 
     def stop(self):
         """Stop the handler and clean up GPIO and I2C resources."""
+        # Shutdown I2C timeout executor first
+        if hasattr(self, '_i2c_executor') and self._i2c_executor:
+            self._i2c_executor.shutdown(wait=False)
+
         super().stop()
 
         # Clean up GPIO for mux reset pin

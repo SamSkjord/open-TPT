@@ -1,5 +1,28 @@
 # Changelog - openTPT
 
+## [v0.18.5] - 2026-01-18
+
+### Remaining High Priority Fixes
+
+#### Thread Lifecycle and I2C Safety
+
+- **Add lap_timing.stop() to cleanup** - Ensures lap timing worker thread stops gracefully
+- **Add I2C timeout wrapper** - Prevents bus hangs from blocking worker thread indefinitely
+  - Added `_i2c_with_timeout()` method using ThreadPoolExecutor
+  - Wrapped smbus2 mux select and Pico sensor reads with 500ms timeout
+  - Added I2C executor shutdown in stop() method
+
+#### Thermal Data Memory
+
+- **Verified no memory leak** - Queues already use `maxlen=2`, render caches limited to 4 positions
+
+#### Modified Files
+
+- `main.py` - Added lap_timing.stop() to cleanup sequence
+- `hardware/unified_corner_handler.py` - Added I2C timeout wrapper and executor
+
+---
+
 ## [v0.18.4] - 2026-01-18
 
 ### Critical and High Priority Bug Fixes

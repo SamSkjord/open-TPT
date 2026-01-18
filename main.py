@@ -531,6 +531,11 @@ class OpenTPT(
             logger.debug("Stopping GPS...")
             self.gps.stop()
 
+        # Stop Lap Timing if enabled
+        if self.lap_timing:
+            logger.debug("Stopping Lap Timing...")
+            self.lap_timing.stop()
+
         # Stop CoPilot if enabled
         if self.copilot:
             logger.debug("Stopping CoPilot...")
