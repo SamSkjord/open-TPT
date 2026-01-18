@@ -1,0 +1,37 @@
+# Codecov configuration for openTPT
+# https://docs.codecov.com/docs/codecov-yaml
+
+coverage:
+  precision: 2
+  round: down
+  range: "60...100"
+
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 5%
+        informational: true
+    patch:
+      default:
+        target: auto
+        threshold: 5%
+        informational: true
+
+# Only report coverage for these paths
+fixes:
+  - "utils/::utils/"
+  - "copilot/::copilot/"
+
+# Ignore hardware-dependent files that can't be tested without mocks
+ignore:
+  - "hardware/**/*"
+  - "gui/**/*"
+  - "core/**/*"
+  - "main.py"
+  - "**/__pycache__/**"
+
+comment:
+  layout: "reach,diff,flags,files"
+  behavior: default
+  require_changes: true

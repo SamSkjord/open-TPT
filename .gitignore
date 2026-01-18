@@ -5,3 +5,9 @@
 /utils/__pycache__
 *.pyc
 /assets/tracks/racelogic
+
+# Test coverage
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/

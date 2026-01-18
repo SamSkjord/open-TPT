@@ -1,5 +1,39 @@
 # Changelog - openTPT
 
+## [v0.18.6] - 2026-01-18
+
+### Unit Test Framework
+
+Added comprehensive pytest-based unit testing with GitHub Actions CI/CD integration.
+
+#### Test Coverage (243 tests)
+
+- **Conversions** (54 tests) - Temperature, pressure, display scaling, emissivity correction
+- **Geometry** (31 tests) - Haversine distance, bearing, curvature, GPS calculations
+- **Settings** (27 tests) - Dot-notation access, persistence, edge cases
+- **Hardware Base** (30 tests) - Exponential backoff, bounded queues, snapshots
+- **Fuel Tracker** (44 tests) - Consumption calculations, lap tracking, state management
+- **GPS Parsing** (21 tests) - NMEA sentence parsing (RMC, GGA), checksum validation
+- **OBD2 Parsing** (36 tests) - PID response parsing (speed, RPM, temps, fuel, MAP, MAF)
+
+#### CI/CD Integration
+
+- GitHub Actions workflow runs tests on push/PR to main
+- Coverage reporting via Codecov
+- Minimum 70% coverage threshold enforced
+- Test and coverage badges added to README
+
+#### New Files
+
+- `tests/` - Test directory structure with conftest.py, fixtures
+- `tests/unit/` - All unit test modules
+- `tests/pytest.ini` - Pytest configuration
+- `requirements-dev.txt` - Development dependencies (pytest, pytest-cov, pytest-mock)
+- `.github/workflows/tests.yml` - GitHub Actions workflow
+- `codecov.yml` - Codecov configuration
+
+---
+
 ## [v0.18.5] - 2026-01-18
 
 ### Remaining High Priority Fixes
