@@ -1,6 +1,6 @@
-# openTPT - Open Tyre Pressure and Temperature Telemetry
+# openTPT - Open Track Performance Telemetry
 
-A modular GUI system for live motorsport telemetry using a Raspberry Pi 4/5 with HDMI display support.
+A modular GUI system for live motorsport telemetry using a Raspberry Pi 4/5 with HDMI display support. Features radar overlay on camera feeds for collision and overtake warnings.
 
 [![Tests](https://github.com/SamSkjord/open-TPT/actions/workflows/tests.yml/badge.svg)](https://github.com/SamSkjord/open-TPT/actions/workflows/tests.yml)
 [![codecov](https://codecov.io/gh/SamSkjord/open-TPT/branch/main/graph/badge.svg)](https://codecov.io/gh/SamSkjord/open-TPT)
