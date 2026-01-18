@@ -334,6 +334,8 @@ class OpenTPT(
                 # Maintain frame rate
                 t0 = time.time()
                 self.clock.tick(FPS_TARGET)
+                # Explicit yield to reduce CPU usage (pygame tick can busy-wait on Linux)
+                time.sleep(0.001)
                 loop_times['clock_tick'] = (time.time() - t0) * 1000
 
                 # Calculate FPS

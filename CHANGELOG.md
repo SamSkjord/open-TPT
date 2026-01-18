@@ -20,17 +20,26 @@ Added boost pressure display on the status bar when no track/route is active, wi
 
 - **High Priority Boost Polling** - MAP/Boost PID moved from low priority (~1Hz) to high priority (~7Hz) for responsive gauge updates
 
+#### Performance Improvements
+
+- **Reduced Frame Rate Target** - Lowered from 60 to 30 FPS (matches camera hardware limit), significantly reducing CPU usage
+- **Explicit CPU Yield** - Added 1ms sleep after frame tick to prevent busy-waiting on Linux
+- **Non-blocking CoPilot Enable** - CoPilot map loading now runs in background thread to prevent UI lockup
+
 #### Bug Fixes
 
 - **Encoder Long Press Consistency** - Long pressing the encoder when menu is open now always closes the menu entirely, rather than sometimes going back one level
 - **Boost Range Menu Back Button** - Fixed missing parent assignment that prevented Back button from working
+- **Menu Status Message Position** - Moved status messages up 10px to sit within the menu box
 
 #### Modified Files
 
-- `main.py` - Boost pressure display logic with unit conversion
+- `main.py` - Boost pressure display, reduced FPS target, explicit CPU yield
 - `hardware/obd2_handler.py` - MAP/Boost moved to high priority polling
-- `gui/menu/base.py` - Added boost range threshold settings
+- `gui/menu/base.py` - Boost range settings, status message positioning
+- `gui/menu/copilot.py` - Background thread for CoPilot start
 - `core/event_handlers.py` - Changed menu long press from back() to hide()
+- `utils/config.py` - FPS_TARGET reduced to 30
 
 ---
 

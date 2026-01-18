@@ -3,6 +3,7 @@ CoPilot rally callouts menu mixin for openTPT.
 """
 
 import logging
+import threading
 from pathlib import Path
 
 logger = logging.getLogger('openTPT.menu.copilot')
@@ -26,7 +27,12 @@ class CoPilotMenuMixin:
         new_state = not enabled
         self._settings.set("copilot.enabled", new_state)
         if new_state:
-            self.copilot_handler.start()
+            # Start in background thread to avoid blocking UI during map loading
+            thread = threading.Thread(
+                target=self.copilot_handler.start,
+                daemon=True
+            )
+            thread.start()
         else:
             self.copilot_handler.stop()
         return f"CoPilot {'enabled' if new_state else 'disabled'}"

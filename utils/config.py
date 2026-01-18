@@ -29,7 +29,7 @@ REFERENCE_WIDTH = 800
 REFERENCE_HEIGHT = 480
 
 # Frame rate and brightness
-FPS_TARGET = 60  # Increased to allow higher camera FPS
+FPS_TARGET = 30  # Target frame rate (matches camera hardware limit)
 DEFAULT_BRIGHTNESS = 0.8  # 0.0 to 1.0
 BRIGHTNESS_PRESETS = [0.3, 0.5, 0.7, 0.9, 1.0]  # Cycle through these brightness levels
 ROTATION = 90  # Degrees: 0, 90, 180, 270
