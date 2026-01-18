@@ -1,6 +1,6 @@
 # openTPT - Open Tyre Pressure and Temperature Telemetry
 
-A modular GUI system for live motorsport telemetry using a Raspberry Pi 4 with HDMI display support.
+A modular GUI system for live motorsport telemetry using a Raspberry Pi 4/5 with HDMI display support.
 
 [![Tests](https://github.com/SamSkjord/open-TPT/actions/workflows/tests.yml/badge.svg)](https://github.com/SamSkjord/open-TPT/actions/workflows/tests.yml)
 [![codecov](https://codecov.io/gh/SamSkjord/open-TPT/branch/main/graph/badge.svg)](https://codecov.io/gh/SamSkjord/open-TPT)
@@ -33,7 +33,7 @@ openTPT features a high-performance architecture optimised for real-time telemet
 ## Hardware Requirements
 
 ### Core Components
-- Raspberry Pi 4 (2GB+ RAM recommended)
+- Raspberry Pi 4 or 5 (2GB+ RAM recommended)
 - Waveshare 1024x600 HDMI display (or other HDMI displays - UI designed for 800x480, scales to fit)
 - TPMS receivers and sensors
 - ADS1115/ADS1015 ADC for IR brake temperature sensors
@@ -55,7 +55,7 @@ openTPT features a high-performance architecture optimised for real-time telemet
 
 ## Software Requirements
 
-- Python 3.7+
+- Python 3.11+
 - Required Python packages:
   - pygame (GUI and rendering)
   - numpy (data processing)
@@ -120,17 +120,17 @@ sudo python3 ./main.py --windowed
 
 ### Controls
 
-When using physical NeoKey 1x4:
-- Button 0: Cycle brightness (30% → 50% → 70% → 90% → 100%)
-- Button 1: Page settings (context-sensitive: hide overlay, reset peaks, etc.)
-- Button 2: Switch within category (camera: rear↔front | UI: telemetry↔G-meter)
-- Button 3: Switch view mode (camera pages ↔ UI pages)
+When using physical NeoKey 1x4 (board mounted upside down, so physical positions inverted):
+- Button 0: Switch view mode (camera pages ↔ UI pages)
+- Button 1: Switch within category (camera: rear↔front | UI: cycles through enabled pages)
+- Button 2: Page settings (context-sensitive: hide overlay, reset peaks, toggle map view, etc.)
+- Button 3: Toggle telemetry recording (hold 1 second to activate)
 
 Keyboard controls (for development):
-- Up arrow: Cycle brightness
+- Up arrow: Switch view mode (camera ↔ UI)
 - Down arrow or 'T' key: Page settings
 - Spacebar: Switch within category
-- Right arrow: Switch view mode (camera ↔ UI)
+- Right arrow: Toggle telemetry recording
 - ESC: Exit application
 
 ## Configuration
@@ -345,9 +345,12 @@ Common USB port mappings on Raspberry Pi 4:
 
 **Note:** USB 3.0 ports use different kernel paths (e.g., `2-1`, `2-2`). Adjust the udev rules accordingly if using USB 3.0 ports.
 
-#### Camera Switching Behavior
+#### Camera Switching Behaviour
 
-- Press Button 2 (or Spacebar) to cycle through views: Telemetry → Rear Camera → Front Camera → Telemetry
+- Press Button 0 to switch between camera pages and UI pages
+- Press Button 1 (or Spacebar) to switch within the current category:
+  - In camera mode: Toggle between rear and front cameras
+  - In UI mode: Cycle through enabled pages (telemetry, G-meter, lap timing, fuel, CoPilot)
 - When radar is enabled, the overlay only appears on the rear camera view
 - Camera switching is seamless with smooth frame transitions (no checkerboard flash)
 - Dual FPS counters show both camera feed FPS and overall system FPS
@@ -479,13 +482,21 @@ sudo apt install python3-dbus python3-gi
 
 ```
 openTPT/
-├── main.py                              # App entrypoint
+├── main.py                              # Entry point + OpenTPT class shell
 ├── requirements.txt
 ├── install.sh                           # Installation script for Raspberry Pi
 ├── assets/
 │   ├── overlay.png                      # Fullscreen static GUI overlay
 │   └── icons/                           # Status, brake, tyre symbols
+├── core/                                # Core application modules (mixins)
+│   ├── __init__.py                      # Exports all mixins
+│   ├── initialization.py                # Hardware subsystem init
+│   ├── event_handlers.py                # Input/event processing
+│   ├── rendering.py                     # Display pipeline
+│   ├── telemetry.py                     # Telemetry recording
+│   └── performance.py                   # Power/memory monitoring
 ├── copilot/                             # Rally callout system
+│   ├── main.py                          # CoPilot core class
 │   ├── map_loader.py                    # OSM roads.db loading
 │   ├── path_projector.py                # Road path projection
 │   ├── corners.py                       # Corner detection (ASC scale)
@@ -493,13 +504,22 @@ openTPT/
 │   ├── audio.py                         # espeak-ng/sample playback
 │   └── simulator.py                     # GPX route simulation
 ├── gui/
-│   ├── display.py                       # Draw pressure, temps, heatmaps
-│   ├── camera.py                        # Rear-view USB camera with radar overlay
-│   ├── radar_overlay.py                 # Radar track rendering
+│   ├── display.py                       # Rendering + temperature overlays
+│   ├── camera.py                        # Multi-camera + radar overlay
+│   ├── menu/                            # On-screen menu system (modular)
+│   │   ├── __init__.py                  # Exports Menu, MenuItem, MenuSystem
+│   │   ├── base.py                      # Core menu classes
+│   │   ├── bluetooth.py                 # Bluetooth Audio + TPMS pairing
+│   │   ├── camera.py                    # Camera settings
+│   │   ├── copilot.py                   # CoPilot settings
+│   │   ├── lap_timing.py                # Lap timing + track selection
+│   │   ├── lights.py                    # NeoDriver LED strip
+│   │   ├── settings.py                  # Display, Units, Thresholds, Pages
+│   │   └── system.py                    # GPS, IMU, Radar, System Status
+│   ├── radar_overlay.py                 # Radar visualisation
 │   ├── copilot_display.py               # CoPilot UI page
-│   ├── input_threaded.py                # NeoKey 1x4 (brightness + camera toggle)
+│   ├── input_threaded.py                # NeoKey 1x4 input handler
 │   ├── encoder_input.py                 # Rotary encoder with menu navigation
-│   ├── menu.py                          # On-screen menu system
 │   ├── gmeter.py                        # G-meter display with IMU
 │   ├── fuel_display.py                  # Fuel tracking display
 │   ├── lap_timing_display.py            # Lap timing display
@@ -531,11 +551,7 @@ openTPT/
 │   ├── lap_timing_store.py              # SQLite lap time persistence
 │   ├── telemetry_recorder.py            # CSV telemetry recording
 │   └── performance.py                   # Performance monitoring
-└── scratch/
-    └── sources/                         # Source code for external libraries
-        ├── TPMS/
-        ├── toyota-radar/
-        └── uvc-radar-overlay/
+└── opendbc/                             # CAN message definitions (DBC files)
 ```
 
 ## Features
