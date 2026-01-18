@@ -175,7 +175,10 @@ class BluetoothMenuMixin:
                 # Update status when done
                 if self.current_menu:
                     self.current_menu.set_status("Scan complete")
-            except Exception as e:
+            except subprocess.TimeoutExpired:
+                if self.current_menu:
+                    self.current_menu.set_status("Scan timed out")
+            except (OSError, subprocess.SubprocessError) as e:
                 logger.debug("Bluetooth scan failed: %s", e)
                 if self.current_menu:
                     self.current_menu.set_status(f"Scan error: {e}")
@@ -514,7 +517,9 @@ class BluetoothMenuMixin:
             new_vol = max(0, min(100, current + delta))
             self._run_pactl(["set-sink-volume", "@DEFAULT_SINK@", f"{new_vol}%"])
             return f"Volume: {new_vol}%"
-        except Exception as e:
+        except subprocess.TimeoutExpired:
+            return "Volume adjust timed out"
+        except (OSError, subprocess.SubprocessError) as e:
             logger.debug("Volume adjust failed: %s", e)
             return f"Error: {e}"
 
@@ -612,7 +617,9 @@ class BluetoothMenuMixin:
             if "Successful" in result.stdout or "Disconnected" in result.stdout:
                 return f"Disconnected from {name}"
             return "Disconnect requested"
-        except Exception as e:
+        except subprocess.TimeoutExpired:
+            return "Disconnect timed out"
+        except (OSError, subprocess.SubprocessError) as e:
             logger.debug("Bluetooth disconnect failed: %s", e)
             return f"Error: {e}"
 
@@ -656,7 +663,9 @@ class BluetoothMenuMixin:
             if "removed" in result.stdout.lower() or result.returncode == 0:
                 return f"Forgot {name}"
             return f"Failed to forget {name}"
-        except Exception as e:
+        except subprocess.TimeoutExpired:
+            return "Forget timed out"
+        except (OSError, subprocess.SubprocessError) as e:
             logger.debug("Bluetooth forget device failed: %s", e)
             return f"Error: {e}"
 
@@ -677,7 +686,10 @@ class BluetoothMenuMixin:
                 time.sleep(2)
                 if self.current_menu:
                     self.current_menu.set_status("BT services refreshed")
-            except Exception as e:
+            except subprocess.TimeoutExpired:
+                if self.current_menu:
+                    self.current_menu.set_status("Refresh timed out")
+            except (OSError, subprocess.SubprocessError) as e:
                 logger.debug("Bluetooth refresh services failed: %s", e)
                 if self.current_menu:
                     self.current_menu.set_status(f"Refresh failed: {e}")

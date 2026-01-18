@@ -646,7 +646,7 @@ Design supports 60 FPS target:
 - [x] Fix British English violations (tire → tyre)
 - [x] Fix best lap falsy check (was `if best_lap` now `if best_lap is not None`)
 - [x] Fix camera menu memory leak (cached submenus)
-- [ ] Standardise error handling across menu mixins
+- [x] Standardise error handling across menu mixins (subprocess.TimeoutExpired, OSError)
 - [ ] Add visual indicator for stale data
 
 ### Phase 4: Low Priority (Ongoing)
