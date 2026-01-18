@@ -87,6 +87,9 @@ class RadarHandlerOptimised(BoundedQueueHardwareHandler):
         self.control_dbc = control_dbc
         self.track_timeout = track_timeout
 
+        # Overlay visibility (separate from enabled - can be toggled at runtime)
+        self.overlay_visible = True
+
         # Initialise radar if enabled
         if self.enabled:
             self._initialise_radar()
@@ -160,6 +163,11 @@ class RadarHandlerOptimised(BoundedQueueHardwareHandler):
                 logger.info("Radar driver stopped")
             except Exception as e:
                 logger.debug("Error stopping radar: %s", e)
+
+    def toggle_overlay(self):
+        """Toggle radar overlay visibility."""
+        self.overlay_visible = not self.overlay_visible
+        logger.info("Radar overlay %s", "visible" if self.overlay_visible else "hidden")
 
     def _worker_loop(self):
         """

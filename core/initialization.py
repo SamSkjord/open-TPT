@@ -113,8 +113,10 @@ class InitializationMixin:
     def _init_subsystems(self):
         """Initialise the hardware subsystems."""
         global _boot_start
+        # Use the boot start time set by main.py (falls back to now if not set)
         if _boot_start is None:
             _boot_start = time.time()
+            logger.warning("Boot start time not set, using current time")
 
         # Import optional handlers
         try:

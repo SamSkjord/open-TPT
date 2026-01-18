@@ -25,6 +25,7 @@ from utils.config import (
     SCALE_X,
     SCALE_Y,
     kpa_to_psi,
+    COPILOT_OVERLAY_POSITION,
 )
 
 logger = logging.getLogger('openTPT.render')
@@ -126,7 +127,7 @@ class RenderingMixin:
 
         # Draw status bars on all pages (before brightness so they get dimmed too)
         t0 = time.time()
-        if self.status_bar_enabled:
+        if self.status_bar_enabled and self.top_bar and self.bottom_bar:
             self.top_bar.draw(self.screen)
             self.bottom_bar.draw(self.screen)
         render_times['status_bars'] = (time.time() - t0) * 1000
@@ -143,7 +144,6 @@ class RenderingMixin:
             if snapshot and snapshot.data and snapshot.data.get('status') == 'active':
                 corner_info = self.copilot.get_next_corner_info()
                 if corner_info.get('distance', 0) > 0:
-                    from utils.config import COPILOT_OVERLAY_POSITION
                     self.display.draw_corner_indicator(
                         distance=corner_info.get('distance', 0),
                         direction=corner_info.get('direction', ''),

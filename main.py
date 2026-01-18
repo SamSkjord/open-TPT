@@ -212,11 +212,20 @@ class OpenTPT(
         self.display = Display(self.screen)
 
         # Note: Camera and radar will be initialised in _init_subsystems
-        # to ensure proper ordering
+        # to ensure proper ordering. All optional handlers initialised to None
+        # here to prevent AttributeError if init fails partway through.
         self.camera = None
         self.radar = None
         self.input_handler = None
+        self.encoder = None
+        self.neodriver = None
         self.imu = None
+        self.obd2 = None
+        self.gps = None
+        self.lap_timing = None
+        self.copilot = None
+        self.ford_hybrid = None
+        self.menu = None
         self.gmeter = GMeterDisplay()
         self.lap_timing_display = LapTimingDisplay()
         self.fuel_display = FuelDisplay()

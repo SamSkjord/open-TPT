@@ -201,6 +201,11 @@ class CoPilotHandler(BoundedQueueHardwareHandler):
             return True
         return False
 
+    @property
+    def has_gpx_route(self) -> bool:
+        """Check if a GPX route (not lap timing track) is loaded."""
+        return self._route_loader is not None and self._route_loader.is_loaded
+
     def set_mode(self, mode: str) -> bool:
         """
         Set operating mode.

@@ -321,9 +321,9 @@ class BluetoothMenuMixin:
         if not devices:
             return "No paired devices"
 
-        # Build connect submenu dynamically
+        # Build connect submenu dynamically (limit to 20 devices)
         connect_menu = Menu("Connect Device")
-        for mac, name in devices:
+        for mac, name in devices[:20]:
             # Use default argument to capture mac in closure
             connect_menu.add_item(
                 MenuItem(
@@ -343,15 +343,11 @@ class BluetoothMenuMixin:
     def _bt_connect(self, mac: str, name: str) -> str:
         """Connect to a Bluetooth device (runs in background)."""
         # Debounce - prevent rapid reconnect attempts
-        if not self._bt_connect_lock.acquire(blocking=False):
-            return "Connection in progress..."
-
-        if self._bt_connecting:
-            self._bt_connect_lock.release()
-            return "Connection in progress..."
-
-        self._bt_connecting = True
-        self._bt_connect_lock.release()
+        # Hold lock while checking and setting flag to avoid race condition
+        with self._bt_connect_lock:
+            if self._bt_connecting:
+                return "Connection in progress..."
+            self._bt_connecting = True
 
         def do_connect():
             try:
@@ -446,7 +442,8 @@ class BluetoothMenuMixin:
                 if self.current_menu:
                     self.current_menu.set_status(f"Error: {e}")
             finally:
-                self._bt_connecting = False
+                with self._bt_connect_lock:
+                    self._bt_connecting = False
 
         # Run connection in background thread
         connect_thread = threading.Thread(target=do_connect, daemon=True)
@@ -530,9 +527,9 @@ class BluetoothMenuMixin:
         if not devices:
             return "No new devices found. Scan first."
 
-        # Build pair submenu dynamically
+        # Build pair submenu dynamically (limit to 20 devices)
         pair_menu = Menu("Pair Device")
-        for mac, name in devices:
+        for mac, name in devices[:20]:
             pair_menu.add_item(
                 MenuItem(
                     name[:25] if len(name) > 25 else name,
@@ -628,9 +625,9 @@ class BluetoothMenuMixin:
         if not devices:
             return "No paired devices"
 
-        # Build forget submenu dynamically
+        # Build forget submenu dynamically (limit to 20 devices)
         forget_menu = Menu("Forget Device")
-        for mac, name in devices:
+        for mac, name in devices[:20]:
             forget_menu.add_item(
                 MenuItem(
                     name[:25] if len(name) > 25 else name,

@@ -1,5 +1,48 @@
 # Changelog - openTPT
 
+## [v0.18.4] - 2026-01-18
+
+### Critical and High Priority Bug Fixes
+
+#### Thread Safety and Race Conditions
+
+- **Fixed Bluetooth connection race condition** - `_bt_connecting` flag now protected by lock during check-and-set
+- **Fixed boot timing race condition** - Added warning log if boot start time not set by main.py
+
+#### Initialisation Safety
+
+- **All optional handlers initialised to None** - Prevents AttributeError if init fails partway through
+  - Added: `encoder`, `neodriver`, `obd2`, `gps`, `lap_timing`, `copilot`, `ford_hybrid`, `menu`
+- **Status bar null check** - Now checks both `top_bar` and `bottom_bar` exist before rendering
+- **CoPilot handler encapsulation** - Added `has_gpx_route` property; menu no longer accesses private attributes
+
+#### Performance Improvements
+
+- **Moved import outside render loop** - `COPILOT_OVERLAY_POSITION` now imported at module level in rendering.py
+- **Bluetooth device list limits** - Connect, pair, and forget menus now limited to 20 devices max
+
+#### New Features
+
+- **Radar overlay toggle** - Button 1 on camera page now toggles radar overlay visibility
+  - Added `toggle_overlay()` method to radar handler
+  - Added `overlay_visible` property for runtime toggle
+- **MenuItem error handling** - `get_label()` now catches exceptions from dynamic labels
+
+#### Modified Files
+
+- `main.py` - Optional handlers initialised to None
+- `core/rendering.py` - Import moved to module level, status bar null check
+- `core/event_handlers.py` - Radar overlay toggle implementation
+- `core/initialization.py` - Boot timing warning
+- `gui/menu/base.py` - MenuItem exception handling
+- `gui/menu/bluetooth.py` - Race condition fix, device limits
+- `gui/menu/copilot.py` - Use public properties instead of private attributes
+- `gui/camera.py` - Check overlay_visible before rendering radar
+- `hardware/radar_handler.py` - Added toggle_overlay(), overlay_visible
+- `hardware/copilot_handler.py` - Added has_gpx_route property
+
+---
+
 ## [v0.18.3] - 2026-01-17
 
 ### Main Application Refactoring

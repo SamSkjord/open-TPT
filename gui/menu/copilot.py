@@ -129,7 +129,7 @@ class CoPilotMenuMixin:
             # Check if using lap timing track (no GPX route loaded)
             if (self.lap_timing_handler and
                     self.lap_timing_handler.has_track() and
-                    not self.copilot_handler._route_loader):
+                    not self.copilot_handler.has_gpx_route):
                 return f"Track: {route_name}"
             return f"Route: {route_name}"
         return "Route: None"
@@ -151,7 +151,7 @@ class CoPilotMenuMixin:
             # Check if already using this track
             using_track = (
                 self.copilot_handler.has_route and
-                not self.copilot_handler._route_loader
+                not self.copilot_handler.has_gpx_route
             )
             if using_track:
                 route_menu.add_item(
@@ -228,11 +228,10 @@ class CoPilotMenuMixin:
         if not self.lap_timing_handler or not self.lap_timing_handler.has_track():
             return "No track loaded"
 
-        # Clear any GPX route so CoPilot uses the lap timing track
-        self.copilot_handler._route_loader = None
-        self.copilot_handler._route_name = ""
+        # Clear any existing GPX route first (this switches to just_drive mode)
+        self.copilot_handler.clear_route()
 
-        # Switch to route_follow mode
+        # Now switch to route_follow mode to use the lap timing track
         from hardware.copilot_handler import MODE_ROUTE_FOLLOW
         self.copilot_handler.set_mode(MODE_ROUTE_FOLLOW)
 

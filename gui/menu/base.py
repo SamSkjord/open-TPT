@@ -65,7 +65,12 @@ class MenuItem:
     def get_label(self) -> str:
         """Get the display label (may be dynamic)."""
         if self.dynamic_label:
-            return self.dynamic_label()
+            try:
+                return self.dynamic_label()
+            except Exception as e:
+                # Return error indicator if dynamic label fails
+                # (e.g., handler unavailable at runtime)
+                return f"[Error: {e}]"
         return self.label
 
     def is_selectable(self) -> bool:

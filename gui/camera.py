@@ -643,8 +643,9 @@ class Camera:
                 del self.display_array
                 self.display_array = None
 
-            # Render radar overlay if enabled (rear camera only)
-            if self.radar_overlay and self.radar_handler and self.current_camera == 'rear':
+            # Render radar overlay if enabled and visible (rear camera only)
+            if (self.radar_overlay and self.radar_handler and
+                    self.current_camera == 'rear' and self.radar_handler.overlay_visible):
                 tracks = self.radar_handler.get_tracks()
                 if tracks:
                     self.radar_overlay.render(self.surface, tracks)
