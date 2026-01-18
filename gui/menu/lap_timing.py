@@ -176,6 +176,9 @@ class LapTimingMenuMixin:
             for route_file in files_found[:15]:  # Limit to 15 files
                 file_name = route_file.stem
                 ext = route_file.suffix.lower()
+                # Truncate long file names (max 18 chars + extension indicator)
+                if len(file_name) > 18:
+                    file_name = file_name[:15] + "..."
                 # Show file type indicator
                 label = f"{file_name} ({ext[1:].upper()})"
                 route_menu.add_item(

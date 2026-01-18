@@ -148,6 +148,9 @@ class CoPilotMenuMixin:
         # Add "Use Lap Timing Track" option if a track is loaded
         if self.lap_timing_handler and self.lap_timing_handler.has_track():
             track_name = self.lap_timing_handler.get_track_name() or "Track"
+            # Truncate long track names
+            if len(track_name) > 14:
+                track_name = track_name[:11] + "..."
             # Check if already using this track
             using_track = (
                 self.copilot_handler.has_route and
@@ -172,6 +175,9 @@ class CoPilotMenuMixin:
             gpx_files = sorted(routes_dir.glob("*.gpx"))
             for gpx_file in gpx_files[:10]:  # Limit to 10 routes
                 route_name = gpx_file.stem
+                # Truncate long route names
+                if len(route_name) > 20:
+                    route_name = route_name[:17] + "..."
                 # Use default parameter to capture gpx_file in closure
                 route_menu.add_item(
                     MenuItem(

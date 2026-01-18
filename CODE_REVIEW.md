@@ -651,8 +651,8 @@ Design supports 60 FPS target:
 
 ### Phase 4: Low Priority (Ongoing)
 
-- [ ] Truncate long route file names
-- [ ] Improve logging with error-level messages
+- [x] Truncate long route file names
+- [x] Improve logging with error-level messages (reviewed: current levels appropriate)
 - [ ] Add type hints to remaining files
 - [ ] Add comprehensive metrics collection
 - [ ] Document threading guarantees
