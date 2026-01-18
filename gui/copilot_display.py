@@ -374,7 +374,7 @@ class CoPilotDisplay:
 
         # Draw subtitle
         sub_surface = self.font_small.render(subtitle, True, GREY)
-        sub_rect = sub_surface.get_rect(center=(centre_x, centre_y + int(40 * SCALE_Y)))
+        sub_rect = sub_surface.get_rect(center=(centre_x, centre_y + int(60 * SCALE_Y)))
         screen.blit(sub_surface, sub_rect)
 
         # Draw pulsing indicator
