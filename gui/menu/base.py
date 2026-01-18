@@ -37,6 +37,7 @@ from gui.menu.camera import CameraMenuMixin
 from gui.menu.copilot import CoPilotMenuMixin
 from gui.menu.lap_timing import LapTimingMenuMixin
 from gui.menu.lights import LightsMenuMixin
+from gui.menu.map_theme import MapThemeMenuMixin
 from gui.menu.settings import SettingsMenuMixin
 from gui.menu.system import SystemMenuMixin
 
@@ -343,6 +344,7 @@ class MenuSystem(
     CoPilotMenuMixin,
     LapTimingMenuMixin,
     LightsMenuMixin,
+    MapThemeMenuMixin,
     SettingsMenuMixin,
     SystemMenuMixin,
 ):
@@ -618,6 +620,13 @@ class MenuSystem(
             MenuItem(
                 "Clear Track",
                 action=lambda: self._clear_current_track(),
+            )
+        )
+        lap_timing_menu.add_item(
+            MenuItem(
+                "Map Theme",
+                dynamic_label=lambda: self._get_map_theme_label(),
+                action=lambda: self._show_map_theme_menu(),
             )
         )
         lap_timing_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))

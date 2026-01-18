@@ -653,6 +653,9 @@ LAP_TIMING_DATA_DIR = os.path.expanduser("~/.opentpt/lap_timing")
 # Sector configuration
 LAP_TIMING_SECTOR_COUNT = 3  # Number of sectors per lap
 
+# Map theme (theme files in assets/themes/)
+MAP_THEME_DEFAULT = "default"
+
 # ==============================================================================
 # FUEL TRACKING CONFIGURATION
 # ==============================================================================

@@ -1,0 +1,11 @@
+{
+  "name": "Noir",
+  "description": "Pure black background with white/grey roads - modern gallery aesthetic",
+  "bg": "#000000",
+  "road_primary": "#FFFFFF",
+  "road_secondary": "#808080",
+  "road_default": "#808080",
+  "car_marker": "#00FF00",
+  "sf_line": "#FF0000",
+  "text": "#FFFFFF"
+}

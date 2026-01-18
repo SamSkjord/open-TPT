@@ -487,7 +487,8 @@ openTPT/
 ├── install.sh                           # Installation script for Raspberry Pi
 ├── assets/
 │   ├── overlay.png                      # Fullscreen static GUI overlay
-│   └── icons/                           # Status, brake, tyre symbols
+│   ├── icons/                           # Status, brake, tyre symbols
+│   └── themes/                          # Map view colour themes (JSON)
 ├── core/                                # Core application modules (mixins)
 │   ├── __init__.py                      # Exports all mixins
 │   ├── initialization.py                # Hardware subsystem init
@@ -514,6 +515,7 @@ openTPT/
 │   │   ├── copilot.py                   # CoPilot settings
 │   │   ├── lap_timing.py                # Lap timing + track selection
 │   │   ├── lights.py                    # NeoDriver LED strip
+│   │   ├── map_theme.py                 # Map view theme selection
 │   │   ├── settings.py                  # Display, Units, Thresholds, Pages
 │   │   └── system.py                    # GPS, IMU, Radar, System Status
 │   ├── radar_overlay.py                 # Radar visualisation
@@ -550,6 +552,7 @@ openTPT/
 │   ├── fuel_tracker.py                  # Fuel consumption tracking
 │   ├── lap_timing_store.py              # SQLite lap time persistence
 │   ├── telemetry_recorder.py            # CSV telemetry recording
+│   ├── theme_loader.py                  # Map view theme loading
 │   └── performance.py                   # Performance monitoring
 └── opendbc/                             # CAN message definitions (DBC files)
 ```
@@ -642,6 +645,10 @@ openTPT/
 | `DEPLOYMENT.md` | Deployment workflow and troubleshooting |
 | `CHANGELOG.md` | Version history and features |
 | `CLAUDE.md` | AI assistant context guide |
+
+## Acknowledgements
+
+- Map view themes adapted from [maptoposter](https://github.com/originalankur/maptoposter) by Ankur Gupta
 
 ## License
 

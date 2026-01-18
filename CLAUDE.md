@@ -1,6 +1,6 @@
 # Claude Context - openTPT Project
 
-**Version:** 0.18.5 | **Updated:** 2026-01-18
+**Version:** 0.18.7 | **Updated:** 2026-01-18
 
 ---
 
@@ -98,6 +98,7 @@ openTPT/
 │   │   ├── copilot.py               # CoPilot settings
 │   │   ├── lap_timing.py            # Lap timing + track selection
 │   │   ├── lights.py                # NeoDriver LED strip
+│   │   ├── map_theme.py             # Map view theme selection
 │   │   ├── settings.py              # Display, Units, Thresholds, Pages
 │   │   └── system.py                # GPS, IMU, Radar, System Status
 │   ├── copilot_display.py           # CoPilot UI page
@@ -111,13 +112,16 @@ openTPT/
 │   ├── neodriver_handler.py         # NeoDriver LED strip
 │   ├── lap_timing_handler.py        # Lap timing logic
 │   └── copilot_handler.py           # CoPilot integration handler
+├── assets/
+│   └── themes/                      # Map view colour themes (JSON)
 ├── utils/
 │   ├── config.py                    # ALL configuration
 │   ├── settings.py                  # Persistent user settings
 │   ├── hardware_base.py             # Bounded queue base class
 │   ├── fuel_tracker.py              # Fuel consumption tracking
 │   ├── lap_timing_store.py          # SQLite lap time persistence
-│   └── telemetry_recorder.py        # CSV telemetry recording
+│   ├── telemetry_recorder.py        # CSV telemetry recording
+│   └── theme_loader.py              # Map view theme loading
 └── opendbc/*.dbc                    # CAN message definitions
 ```
 

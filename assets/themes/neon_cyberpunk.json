@@ -1,0 +1,11 @@
+{
+  "name": "Neon Cyberpunk",
+  "description": "Dark background with electric pink/cyan - bold night city vibes",
+  "bg": "#0D0D1A",
+  "road_primary": "#00FFFF",
+  "road_secondary": "#0098A0",
+  "road_default": "#0098A0",
+  "car_marker": "#00FF00",
+  "sf_line": "#FF00FF",
+  "text": "#00FFFF"
+}

@@ -1,0 +1,11 @@
+{
+  "name": "Blueprint",
+  "description": "Classic architectural blueprint - technical drawing aesthetic",
+  "bg": "#1A3A5C",
+  "road_primary": "#E8F4FF",
+  "road_secondary": "#7BAED4",
+  "road_default": "#7BAED4",
+  "car_marker": "#FFFF00",
+  "sf_line": "#FF6666",
+  "text": "#E8F4FF"
+}

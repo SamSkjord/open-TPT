@@ -1,5 +1,53 @@
 # Changelog - openTPT
 
+## [v0.18.7] - 2026-01-18
+
+### Map Themes for Lap Timing Display
+
+Added JSON-based theme support for the lap timing map view, allowing customisation of track colours and backgrounds. Dark themes adapted from [maptoposter](https://github.com/originalankur/maptoposter).
+
+#### New Features
+
+- **Map Theme System** - Five built-in dark themes selectable via menu:
+  - Default - Dark motorsport style with white track
+  - Noir - Pure black with white/grey roads
+  - Midnight Blue - Deep navy with gold/copper accents
+  - Blueprint - Architectural blueprint aesthetic
+  - Neon Cyberpunk - Electric pink and cyan night city vibes
+
+- **Theme Persistence** - Selected theme saved to settings and restored on restart
+- **Immediate Theme Switching** - Theme changes apply instantly without restart
+
+#### Menu Integration
+
+- Menu > Lap Timing > Map Theme - Opens theme selection submenu
+- Current theme shown in menu label
+- Selected theme marked with asterisk in submenu
+
+#### Theme Colours
+
+Each theme controls:
+- Background colour
+- Track edge (primary road)
+- Track surface (secondary road)
+- Car marker
+- Start/finish line
+- Text colour
+
+#### New Files
+
+- `assets/themes/*.json` - Theme definition files (5 dark themes)
+- `utils/theme_loader.py` - Theme loading and caching singleton
+- `gui/menu/map_theme.py` - Map theme menu mixin
+
+#### Modified Files
+
+- `utils/config.py` - Added MAP_THEME_DEFAULT constant
+- `gui/menu/base.py` - Added MapThemeMenuMixin and menu item
+- `gui/lap_timing_display.py` - Theme loading and application
+
+---
+
 ## [v0.18.6] - 2026-01-18
 
 ### Unit Test Framework

@@ -1,0 +1,11 @@
+{
+  "name": "Default",
+  "description": "Dark motorsport style with white track",
+  "bg": "#000000",
+  "road_primary": "#FFFFFF",
+  "road_secondary": "#3C3C3C",
+  "road_default": "#3C3C3C",
+  "car_marker": "#00FF00",
+  "sf_line": "#FF0000",
+  "text": "#FFFFFF"
+}

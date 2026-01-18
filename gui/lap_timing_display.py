@@ -25,8 +25,10 @@ from utils.config import (
     FONT_PATH,
     SCALE_X,
     SCALE_Y,
+    MAP_THEME_DEFAULT,
 )
 from utils.settings import get_settings
+from utils.theme_loader import get_theme_loader
 
 
 class LapTimingDisplay:
@@ -60,11 +62,13 @@ class LapTimingDisplay:
         self.colour_sector_current = YELLOW   # Yellow - current sector
         self.colour_no_data = (80, 80, 80)    # Dark grey - no data
 
-        # Map view colours
+        # Map view colours (loaded from theme)
         self.colour_track_edge = (255, 255, 255)   # White edge
         self.colour_track_surface = (60, 60, 60)  # Dark grey surface
         self.colour_car = (0, 255, 0)             # Green car marker
         self.colour_sf_line = (255, 0, 0)         # Red S/F line
+        self._theme_background = BLACK             # Theme background colour
+        self._current_theme_id = None              # Track current theme for change detection
 
         # Fonts
         try:
@@ -84,6 +88,9 @@ class LapTimingDisplay:
         # Settings
         self._settings = get_settings()
 
+        # Load initial theme
+        self._load_theme()
+
         # Cached track rendering data
         self._track_cache = None
         self._track_surface = None
@@ -100,6 +107,33 @@ class LapTimingDisplay:
         else:
             self.view_mode = self.VIEW_TIMER
             logger.debug("Lap timing: Switched to timer view")
+
+    def _load_theme(self):
+        """Load the current map theme and update colours."""
+        theme_id = self._settings.get("map.theme", MAP_THEME_DEFAULT)
+
+        # Skip if theme hasn't changed
+        if theme_id == self._current_theme_id:
+            return
+
+        loader = get_theme_loader()
+        theme = loader.get_theme(theme_id)
+
+        if theme:
+            self._current_theme_id = theme_id
+            self._theme_background = theme.bg
+            self.colour_track_edge = theme.road_primary
+            self.colour_track_surface = theme.road_secondary
+            self.colour_car = theme.car_marker
+            self.colour_sf_line = theme.sf_line
+            # Text colour from theme (for map view headers)
+            self._theme_text = theme.text
+            logger.debug("Loaded map theme: %s", theme.name)
+        else:
+            logger.warning("Theme not found: %s, using default colours", theme_id)
+
+        # Clear the theme change flag
+        self._settings.set("map.theme_changed", False, save=False)
 
     def _format_time(self, seconds, show_sign=False):
         """
@@ -319,6 +353,13 @@ class LapTimingDisplay:
 
     def _draw_map_view(self, screen, data):
         """Draw the map view showing track layout and car position."""
+        # Check for theme changes
+        if self._settings.get("map.theme_changed", False):
+            self._load_theme()
+
+        # Fill with theme background
+        screen.fill(self._theme_background)
+
         track_name = data.get('track_name', None)
         track = data.get('track', None)
         current_lat = data.get('current_lat')
