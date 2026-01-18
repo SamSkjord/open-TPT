@@ -56,7 +56,7 @@ class Template:
         # Fill with a transparent dark gray
         self.Template_image.fill((40, 40, 40, 200))
 
-        # Draw placeholder boxes for each tire
+        # Draw placeholder boxes for each tyre
         positions = [
             # FL
             (50, 50, 200, 200),

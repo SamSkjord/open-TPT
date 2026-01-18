@@ -16,6 +16,9 @@ logger = logging.getLogger('openTPT.menu.camera')
 class CameraMenuMixin:
     """Mixin providing camera settings menu functionality."""
 
+    # Cache for camera submenus to prevent memory leak from repeated creation
+    _camera_submenus: dict = {}
+
     def _show_camera_menu(self, camera_name: str) -> str:
         """Show camera settings submenu and switch to that camera."""
         # Import here to avoid circular imports
@@ -29,43 +32,47 @@ class CameraMenuMixin:
             if self.camera_handler.current_camera != camera_name:
                 self.camera_handler.switch_camera()
 
-        # Build dynamic camera submenu
-        title = f"{camera_name.capitalize()} Camera"
-        cam_menu = Menu(title)
+        # Use cached submenu or create new one
+        if camera_name not in self._camera_submenus:
+            title = f"{camera_name.capitalize()} Camera"
+            cam_menu = Menu(title)
 
-        # Status info (read-only)
-        cam_menu.add_item(
-            MenuItem(
-                "FPS",
-                dynamic_label=lambda n=camera_name: self._get_camera_fps_label(n),
-                enabled=False,
+            # Status info (read-only)
+            cam_menu.add_item(
+                MenuItem(
+                    "FPS",
+                    dynamic_label=lambda n=camera_name: self._get_camera_fps_label(n),
+                    enabled=False,
+                )
             )
-        )
-        cam_menu.add_item(
-            MenuItem(
-                "Status",
-                dynamic_label=lambda n=camera_name: self._get_camera_status_label(n),
-                enabled=False,
+            cam_menu.add_item(
+                MenuItem(
+                    "Status",
+                    dynamic_label=lambda n=camera_name: self._get_camera_status_label(n),
+                    enabled=False,
+                )
             )
-        )
 
-        # Settings
-        cam_menu.add_item(
-            MenuItem(
-                "Mirror",
-                dynamic_label=lambda n=camera_name: self._get_camera_mirror_label(n),
-                action=lambda n=camera_name: self._toggle_camera_mirror(n),
+            # Settings
+            cam_menu.add_item(
+                MenuItem(
+                    "Mirror",
+                    dynamic_label=lambda n=camera_name: self._get_camera_mirror_label(n),
+                    action=lambda n=camera_name: self._toggle_camera_mirror(n),
+                )
             )
-        )
-        cam_menu.add_item(
-            MenuItem(
-                "Rotate",
-                dynamic_label=lambda n=camera_name: self._get_camera_rotate_label(n),
-                action=lambda n=camera_name: self._cycle_camera_rotate(n),
+            cam_menu.add_item(
+                MenuItem(
+                    "Rotate",
+                    dynamic_label=lambda n=camera_name: self._get_camera_rotate_label(n),
+                    action=lambda n=camera_name: self._cycle_camera_rotate(n),
+                )
             )
-        )
-        cam_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
-        cam_menu.parent = self.camera_menu
+            cam_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+            cam_menu.parent = self.camera_menu
+            self._camera_submenus[camera_name] = cam_menu
+        else:
+            cam_menu = self._camera_submenus[camera_name]
 
         # Switch to camera menu
         self.current_menu.hide()

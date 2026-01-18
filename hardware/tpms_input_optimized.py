@@ -128,8 +128,8 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
         Callback for tyre state updates (called by TPMS library).
 
         Args:
-            position: TirePosition enum
-            state: TireState object
+            position: TyrePosition enum
+            state: TyreState object
         """
         if not TPMS_AVAILABLE or position not in self.position_map:
             return

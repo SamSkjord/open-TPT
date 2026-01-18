@@ -81,7 +81,7 @@ class SettingsMenuMixin:
 
     def _toggle_pressure_unit(self) -> str:
         """Cycle through pressure units: PSI -> BAR -> kPa -> PSI."""
-        units = ["PSI", "BAR", "KPA"]
+        units = ["PSI", "BAR", "kPa"]
         current_idx = (
             units.index(self.pressure_unit) if self.pressure_unit in units else 0
         )

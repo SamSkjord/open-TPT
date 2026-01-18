@@ -80,7 +80,7 @@ class MLX90614Handler:
             "RR": None,
         }
 
-        # Mapping of tire positions to I2C multiplexer channels (from config)
+        # Mapping of tyre positions to I2C multiplexer channels (from config)
         self.position_to_channel = MLX90614_MUX_CHANNELS
 
         # Initialise I2C and mux
@@ -244,13 +244,13 @@ class MLX90614Handler:
 
     def get_thermal_data(self, position=None):
         """
-        Get thermal data for a specific tire or all tires.
+        Get thermal data for a specific tyre or all tyres.
 
         Note: MLX90614 returns synthetic uniform thermal images
         (all pixels = same temperature) for API compatibility.
 
         Args:
-            position: Tire position ("FL", "FR", "RL", "RR") or None for all
+            position: Tyre position ("FL", "FR", "RL", "RR") or None for all
 
         Returns:
             numpy array: Synthetic thermal data array or dictionary of arrays
@@ -277,10 +277,10 @@ class MLX90614Handler:
 
     def get_point_temperature(self, position):
         """
-        Get single-point temperature reading for a specific tire.
+        Get single-point temperature reading for a specific tyre.
 
         Args:
-            position: Tire position ("FL", "FR", "RL", "RR")
+            position: Tyre position ("FL", "FR", "RL", "RR")
 
         Returns:
             float: Temperature in °C or None if no data
@@ -290,12 +290,12 @@ class MLX90614Handler:
 
     def get_temperature_range(self, position):
         """
-        Get the min and max temperature for a specific tire.
+        Get the min and max temperature for a specific tyre.
 
         Note: For MLX90614, min and max are the same (single point).
 
         Args:
-            position: Tire position ("FL", "FR", "RL", "RR")
+            position: Tyre position ("FL", "FR", "RL", "RR")
 
         Returns:
             tuple: (min_temp, max_temp) or (None, None) if no data

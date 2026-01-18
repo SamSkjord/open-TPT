@@ -84,7 +84,7 @@ class LapTimingMenuMixin:
         snapshot = self.lap_timing_handler.get_snapshot()
         if snapshot and snapshot.data:
             best_lap = snapshot.data.get("best_lap_time")
-            if best_lap and best_lap > 0:
+            if best_lap is not None and best_lap > 0:
                 mins = int(best_lap // 60)
                 secs = best_lap % 60
                 return f"Best: {mins}:{secs:06.3f}"

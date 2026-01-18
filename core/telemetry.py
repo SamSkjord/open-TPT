@@ -115,7 +115,7 @@ class TelemetryMixin:
         # GPS data
         if self.gps:
             gps_snapshot = self.gps.get_snapshot()
-            if gps_snapshot and gps_snapshot.data.get("has_fix"):
+            if gps_snapshot and gps_snapshot.data and gps_snapshot.data.get("has_fix"):
                 frame.gps_latitude = gps_snapshot.data.get("latitude")
                 frame.gps_longitude = gps_snapshot.data.get("longitude")
                 frame.gps_speed_kmh = gps_snapshot.data.get("speed_kmh")
