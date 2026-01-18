@@ -6,7 +6,7 @@
 
 Added comprehensive pytest-based unit testing with GitHub Actions CI/CD integration.
 
-#### Test Coverage (243 tests)
+#### Test Coverage (367 tests, 39% codebase coverage)
 
 - **Conversions** (54 tests) - Temperature, pressure, display scaling, emissivity correction
 - **Geometry** (31 tests) - Haversine distance, bearing, curvature, GPS calculations
@@ -15,12 +15,27 @@ Added comprehensive pytest-based unit testing with GitHub Actions CI/CD integrat
 - **Fuel Tracker** (44 tests) - Consumption calculations, lap tracking, state management
 - **GPS Parsing** (21 tests) - NMEA sentence parsing (RMC, GGA), checksum validation
 - **OBD2 Parsing** (36 tests) - PID response parsing (speed, RPM, temps, fuel, MAP, MAF)
+- **Corner Detection** (53 tests) - ASC algorithm, severity classification, chicane merging
+- **Lap Timing Store** (25 tests) - SQLite persistence, best laps, reference laps, statistics
+- **Pacenotes** (46 tests) - Rally callout generation, distance brackets, note merging
+
+#### Module Coverage
+
+| Module | Coverage |
+|--------|----------|
+| utils/config.py | 100% |
+| copilot/geometry.py | 97% |
+| utils/fuel_tracker.py | 93% |
+| utils/hardware_base.py | 90% |
+| utils/lap_timing_store.py | 88% |
+| copilot/corners.py | 84% |
+| utils/settings.py | 74% |
+| copilot/pacenotes.py | 66% |
 
 #### CI/CD Integration
 
 - GitHub Actions workflow runs tests on push/PR to main
 - Coverage reporting via Codecov
-- Minimum 70% coverage threshold enforced
 - Test and coverage badges added to README
 
 #### New Files
