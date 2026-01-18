@@ -93,7 +93,7 @@ MIN_LAP_DISTANCE_RATIO = 0.9    # Minimum distance ratio for valid lap
 
 PLAYBACK_SPEED_DEFAULT = 3.0    # Default playback speed multiplier
 
-# Display colors (matplotlib format)
+# Display colours (matplotlib format)
 COLOR_FASTER = '#00ff00'        # Bright green
 COLOR_SLOWER = '#ff3333'        # Bright red
 COLOR_ACTIVE = '#00ffff'        # Cyan
