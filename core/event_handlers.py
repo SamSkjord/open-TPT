@@ -250,7 +250,7 @@ class EventHandlerMixin:
                 if encoder_event.short_press:
                     self.menu.select()
                 if encoder_event.long_press:
-                    self.menu.back()
+                    self.menu.hide()
             else:
                 # Menu closed - rotation controls brightness, long press opens menu
                 if encoder_event.rotation_delta != 0:

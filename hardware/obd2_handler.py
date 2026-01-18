@@ -59,12 +59,12 @@ class OBD2Handler(BoundedQueueHardwareHandler):
         - Speed (PID 0x0D) - critical for lap timing
         - RPM (PID 0x0C) - critical for shift lights
         - Throttle (PID 0x11) - responsive feel
+        - MAP/Boost (PID 0x0B) - responsive boost gauge
 
     Low Priority (rotated, one per cycle):
         - Coolant temp (PID 0x05)
         - Oil temp (PID 0x5C)
         - Intake temp (PID 0x0F)
-        - MAP (PID 0x0B)
         - MAF (PID 0x10)
         - Fuel level (PID 0x2F)
         - Fuel rate (PID 0x5E)
@@ -136,8 +136,8 @@ class OBD2Handler(BoundedQueueHardwareHandler):
         self.soc_read_attempts = 0
         self.soc_max_failures = 5
 
-        # Low-priority PID rotation
-        self.low_priority_pids = [PID_COOLANT_TEMP, PID_OIL_TEMP, PID_INTAKE_TEMP, PID_INTAKE_MAP, PID_MAF, PID_FUEL_LEVEL, PID_FUEL_RATE]
+        # Low-priority PID rotation (temps and fuel - don't need fast updates)
+        self.low_priority_pids = [PID_COOLANT_TEMP, PID_OIL_TEMP, PID_INTAKE_TEMP, PID_MAF, PID_FUEL_LEVEL, PID_FUEL_RATE]
         self.low_priority_index = 0
 
         if self.enabled:
@@ -355,7 +355,13 @@ class OBD2Handler(BoundedQueueHardwareHandler):
                             sum(self.throttle_history) / len(self.throttle_history), 1
                         )
 
-                    # Low priority: Rotate through temps/pressures
+                    # High priority: MAP/Boost (for responsive boost gauge)
+                    result = self._poll_pid(PID_INTAKE_MAP, timeout_s=0.08)
+                    if result:
+                        self.current_data['map_kpa'] = result[0]
+                        self.current_data['boost_kpa'] = result[0] - 101
+
+                    # Low priority: Rotate through temps/fuel
                     pid = self.low_priority_pids[self.low_priority_index % len(self.low_priority_pids)]
                     self.low_priority_index += 1
 
@@ -368,9 +374,6 @@ class OBD2Handler(BoundedQueueHardwareHandler):
                                 self.current_data['oil_temp_c'] = result[0] - 40
                             elif pid == PID_INTAKE_TEMP:
                                 self.current_data['intake_temp_c'] = result[0] - 40
-                            elif pid == PID_INTAKE_MAP:
-                                self.current_data['map_kpa'] = result[0]
-                                self.current_data['boost_kpa'] = result[0] - 101
                             elif pid == PID_MAF and len(result) >= 2:
                                 self.current_data['maf_gs'] = ((result[0] * 256) + result[1]) / 100
                             elif pid == PID_FUEL_LEVEL:

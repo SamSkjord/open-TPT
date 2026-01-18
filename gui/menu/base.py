@@ -443,6 +443,9 @@ class MenuSystem(
             "brake_hot": ("thresholds.brake.hot", BRAKE_TEMP_HOT, 100, 500, 10, "Hot"),
             "pressure_front": ("thresholds.pressure.front", PRESSURE_FRONT_OPTIMAL, 15, 50, 0.5, "Front"),
             "pressure_rear": ("thresholds.pressure.rear", PRESSURE_REAR_OPTIMAL, 15, 50, 0.5, "Rear"),
+            # Boost gauge range (stored in PSI, converted for display)
+            "boost_min": ("thresholds.boost.min", -15, -30, 0, 1, "Min (vacuum)"),
+            "boost_max": ("thresholds.boost.max", 25, 5, 50, 1, "Max (boost)"),
         }
 
         # Check Bluetooth audio dependencies
@@ -919,7 +922,26 @@ class MenuSystem(
         )
         pressure_thresh_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
 
+        # Boost gauge range (PSI values, converted for other units in display)
+        boost_thresh_menu = Menu("Boost Range")
+        boost_thresh_menu.add_item(
+            MenuItem(
+                "Min (vacuum)",
+                dynamic_label=lambda: self._get_threshold_label("boost_min"),
+                action=lambda: self._toggle_threshold_editing("boost_min"),
+            )
+        )
+        boost_thresh_menu.add_item(
+            MenuItem(
+                "Max (boost)",
+                dynamic_label=lambda: self._get_threshold_label("boost_max"),
+                action=lambda: self._toggle_threshold_editing("boost_max"),
+            )
+        )
+        boost_thresh_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+
         # Add submenus to thresholds menu
+        thresholds_menu.add_item(MenuItem("Boost Range", submenu=boost_thresh_menu))
         thresholds_menu.add_item(MenuItem("Tyre Temps", submenu=tyre_thresh_menu))
         thresholds_menu.add_item(MenuItem("Brake Temps", submenu=brake_thresh_menu))
         thresholds_menu.add_item(MenuItem("Pressures", submenu=pressure_thresh_menu))
@@ -991,6 +1013,7 @@ class MenuSystem(
         tyre_thresh_menu.parent = thresholds_menu
         brake_thresh_menu.parent = thresholds_menu
         pressure_thresh_menu.parent = thresholds_menu
+        boost_thresh_menu.parent = thresholds_menu
         units_menu.parent = system_menu
 
     def _go_back(self):

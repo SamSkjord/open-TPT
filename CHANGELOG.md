@@ -1,5 +1,39 @@
 # Changelog - openTPT
 
+## [v0.18.8] - 2026-01-18
+
+### Boost Pressure Display and UI Improvements
+
+Added boost pressure display on the status bar when no track/route is active, with configurable range and improved encoder behaviour.
+
+#### New Features
+
+- **Boost Pressure on Delta Bar** - When no track or route is active, the top status bar shows turbo boost/vacuum pressure instead of greyed-out delta time
+  - Cyan bar for positive boost, grey for vacuum
+  - Respects user's pressure unit setting (PSI, BAR, kPa)
+  - Automatic switching between boost and delta modes based on track state
+
+- **Configurable Boost Range** - Menu > System > Thresholds > Boost Range
+  - Min (vacuum): -30 to 0 PSI (default -15)
+  - Max (boost): 5 to 50 PSI (default 25)
+  - Values stored in PSI, converted to user's preferred unit for display
+
+- **High Priority Boost Polling** - MAP/Boost PID moved from low priority (~1Hz) to high priority (~7Hz) for responsive gauge updates
+
+#### Bug Fixes
+
+- **Encoder Long Press Consistency** - Long pressing the encoder when menu is open now always closes the menu entirely, rather than sometimes going back one level
+- **Boost Range Menu Back Button** - Fixed missing parent assignment that prevented Back button from working
+
+#### Modified Files
+
+- `main.py` - Boost pressure display logic with unit conversion
+- `hardware/obd2_handler.py` - MAP/Boost moved to high priority polling
+- `gui/menu/base.py` - Added boost range threshold settings
+- `core/event_handlers.py` - Changed menu long press from back() to hide()
+
+---
+
 ## [v0.18.7] - 2026-01-18
 
 ### Map Themes for Lap Timing Display

@@ -55,6 +55,8 @@ from utils.config import (
     SCALE_Y,
     FONT_SIZE_SMALL,
     FONT_PATH,
+    PRESSURE_UNIT,
+    kpa_to_psi,
 )
 
 # Import performance monitoring
@@ -236,6 +238,7 @@ class OpenTPT(
         self.status_bar_enabled = STATUS_BAR_ENABLED
         self.top_bar = None
         self.bottom_bar = None
+        self._top_bar_mode = "delta"  # "delta" or "boost" - tracks current configuration
 
         if self.status_bar_enabled:
             bar_height = int(STATUS_BAR_HEIGHT * SCALE_Y)
@@ -470,25 +473,88 @@ class OpenTPT(
                 # No OBD2 handler
                 self.bottom_bar.set_greyed_out(True)
 
-            # Update lap delta from lap timing handler
+            # Update top bar - show lap delta if track active, else boost pressure
+            track_active = False
             if self.lap_timing:
                 lap_data = self.lap_timing.get_data()
                 if lap_data and lap_data.get('track_detected'):
-                    # Real lap timing data available
+                    track_active = True
+                    # Switch to delta mode if not already
+                    if self._top_bar_mode != "delta":
+                        self.top_bar.set_label("Lap Δ")
+                        self.top_bar.set_unit("s")
+                        self.top_bar.set_range(-10, 10)
+                        self.top_bar.set_colours(
+                            positive=(255, 0, 0),    # Red = slower
+                            negative=(0, 255, 0),    # Green = faster
+                            neutral=(128, 128, 128)
+                        )
+                        self._top_bar_mode = "delta"
+                    # Show delta value
                     delta = lap_data.get('delta_seconds', 0.0)
                     self.top_bar.set_value(delta)
                     self.top_bar.set_greyed_out(False)
+
+            if not track_active:
+                # No track - show boost pressure if available
+                boost_kpa = None
+                if self.obd2:
+                    obd_data = self.obd2.get_data()
+                    if obd_data:
+                        boost_kpa = obd_data.get('boost_kpa')
+
+                if boost_kpa is not None:
+                    # Convert to user's preferred pressure unit
+                    settings = get_settings()
+                    pressure_unit = settings.get("units.pressure", PRESSURE_UNIT)
+
+                    # Get user-configured boost range (stored in PSI)
+                    range_min_psi = settings.get("thresholds.boost.min", -15)
+                    range_max_psi = settings.get("thresholds.boost.max", 25)
+
+                    if pressure_unit == "PSI":
+                        boost_display = kpa_to_psi(boost_kpa)
+                        unit_str = "PSI"
+                        range_min, range_max = range_min_psi, range_max_psi
+                    elif pressure_unit == "BAR":
+                        boost_display = boost_kpa / 100.0
+                        unit_str = "BAR"
+                        # Convert PSI range to BAR (1 PSI = 0.0689476 BAR)
+                        range_min = range_min_psi * 0.0689476
+                        range_max = range_max_psi * 0.0689476
+                    else:  # kPa
+                        boost_display = boost_kpa
+                        unit_str = "kPa"
+                        # Convert PSI range to kPa (1 PSI = 6.89476 kPa)
+                        range_min = range_min_psi * 6.89476
+                        range_max = range_max_psi * 6.89476
+
+                    # Switch to boost mode if not already, or update if unit/range changed
+                    needs_update = (
+                        self._top_bar_mode != "boost" or
+                        self.top_bar.unit != unit_str or
+                        self.top_bar.min_value != range_min or
+                        self.top_bar.max_value != range_max
+                    )
+                    if needs_update:
+                        self.top_bar.set_label("Boost")
+                        self.top_bar.set_unit(unit_str)
+                        self.top_bar.set_range(range_min, range_max)
+                        self.top_bar.set_colours(
+                            positive=(0, 200, 255),   # Cyan = boost
+                            negative=(100, 100, 100), # Grey = vacuum
+                            neutral=(128, 128, 128)
+                        )
+                        self._top_bar_mode = "boost"
+                    self.top_bar.set_value(boost_display)
+                    self.top_bar.set_greyed_out(False)
                 else:
-                    # No track detected yet
+                    # No boost data available
                     self.top_bar.set_value(0.0)
                     self.top_bar.set_greyed_out(True)
-            else:
-                # No lap timing handler
-                self.top_bar.set_value(0.0)
-                self.top_bar.set_greyed_out(True)
 
-            # Update NeoDriver with lap delta (after top_bar value is set)
-            if self.neodriver:
+            # Update NeoDriver with lap delta (only when showing delta, not boost)
+            if self.neodriver and self._top_bar_mode == "delta":
                 self.neodriver.set_delta(self.top_bar.value)
 
         # Sync NeoDriver brightness with display brightness

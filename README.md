@@ -614,7 +614,7 @@ openTPT/
 - [ ] Tyre temps menu - corner sensor details, full frame view for installation verification, flip inner/outer
 - [x] Camera view options - mirror, rotate settings for front/rear cameras
 - [x] Units menu - C/F, PSI/BAR/kPa, km/h/mph switching
-- [ ] Alerts/Warnings menu - temperature/pressure thresholds for visual warnings
+- [x] Alerts/Warnings menu - temperature/pressure thresholds for visual warnings
 - [ ] Recording settings - output directory, auto-start on motion detection
 - [ ] G-meter settings - reset peaks, max G range, history duration
 - [x] Radar settings - enable/disable, sensitivity, overlay options, invert for upside-down mounting
@@ -627,6 +627,7 @@ openTPT/
 - [x] Config persistence - persistent settings via ~/.opentpt_settings.json
 - [x] Config hot-reload - reload settings from menu without restart
 - [ ] Configurable OBD2 PIDs - move to config.py with key, mode, pid, bytes, formula, priority, smoothing
+- [ ] Status bar configuration - choose which PIDs/data to display on status bars
 
 - [ ] Lap corner analysis logging - per lap, per corner: min speeds, yaw acceleration
 - [ ] Pitlane timer - countdown/countup timer for pitlane speed limits and pit stop duration
@@ -635,6 +636,7 @@ openTPT/
 
 ### Bugs
 - [ ] Camera settings menu always opens on rear camera even when front camera is selected
+- [ ] Menu status bar text is horizontally aligned with the bottom of the menu square, appears to have a line through it - adjust spacing
 
 ## Documentation
 
