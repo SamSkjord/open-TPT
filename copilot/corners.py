@@ -25,22 +25,45 @@ class Direction(Enum):
 
 @dataclass
 class Corner:
-    """A detected corner with rally-style classification."""
+    """
+    A detected corner with rally-style classification.
 
-    entry_distance: float  # Distance from current position to entry
-    apex_distance: float   # Distance to apex (tightest point)
-    exit_distance: float   # Distance to exit
+    Attributes:
+        entry_distance: Distance in metres from path start to corner entry point.
+        apex_distance: Distance in metres to apex (tightest curvature point).
+        exit_distance: Distance in metres to corner exit point.
+        apex_lat: Latitude of apex point in decimal degrees.
+        apex_lon: Longitude of apex point in decimal degrees.
+        direction: Entry direction (LEFT or RIGHT). For chicanes, this is the
+            first turn direction.
+        severity: Rally-style severity rating from 1 (hairpin, tightest) to
+            7 (kink, gentlest). See RADIUS_SEVERITY for thresholds.
+        total_angle: Total degrees turned through the corner (integrated
+            curvature converted to degrees).
+        min_radius: Minimum (tightest) radius in metres. Lower = sharper corner.
+        tightens: True if corner gets tighter towards exit (decreasing radius).
+        opens: True if corner opens up towards exit (increasing radius).
+        long_corner: True if corner length exceeds 50 metres.
+        is_chicane: True if this represents a merged chicane (two consecutive
+            opposite-direction corners).
+        exit_direction: For chicanes only - the second turn direction. None for
+            regular corners.
+    """
+
+    entry_distance: float
+    apex_distance: float
+    exit_distance: float
     apex_lat: float
     apex_lon: float
-    direction: Direction   # Entry direction (or first turn direction for chicane)
-    severity: int          # 1 (hairpin) to 6 (flat/slight)
-    total_angle: float     # Total degrees turned
-    min_radius: float      # Tightest radius in meters
+    direction: Direction
+    severity: int
+    total_angle: float
+    min_radius: float
     tightens: bool = False
     opens: bool = False
     long_corner: bool = False
-    is_chicane: bool = False  # True if this is a merged chicane
-    exit_direction: Optional[Direction] = None  # For chicanes: the second turn direction
+    is_chicane: bool = False
+    exit_direction: Optional[Direction] = None
 
 
 # Rally pacenote severity scale based on minimum radius:
@@ -64,12 +87,29 @@ RADIUS_SEVERITY = [
 
 @dataclass
 class Segment:
-    """A segment of path between two cuts."""
+    """
+    A segment of path between two cut points.
+
+    Created during the ASC segmentation process, segments are later
+    classified as corners or straights based on their geometric properties.
+
+    Attributes:
+        start_idx: Index into the points array where segment begins.
+        end_idx: Index into the points array where segment ends.
+        start_distance: Distance in metres from path start to segment entry.
+        end_distance: Distance in metres from path start to segment exit.
+        segment_type: Classification - "corner" or "straight".
+        avg_curvature: Average curvature (1/radius) across the segment.
+            Positive = left turn, negative = right turn.
+        max_curvature: Maximum absolute curvature in the segment. Used to
+            determine minimum radius (1 / max_curvature).
+        direction: Turn direction - "left", "right", or None for straights.
+    """
     start_idx: int
     end_idx: int
     start_distance: float
     end_distance: float
-    segment_type: str      # "corner" or "straight"
+    segment_type: str
     avg_curvature: float
     max_curvature: float
     direction: Optional[str]
@@ -80,7 +120,56 @@ class CornerDetector:
     Detect corners using ASC (Automated Segmentation based on Curvature).
 
     Based on VEHITS 2024 paper - segments path using a 5-phase algorithm
-    that places "cuts" at key geometric features.
+    that places "cuts" at key geometric features, then classifies segments
+    as corners or straights.
+
+    Algorithm Phases
+    ----------------
+    Phase 1 - Peak Detection:
+        Identify local maxima in |curvature| above threshold. These are
+        potential corner apexes where the road bends most sharply.
+
+    Phase 2 - Redundancy Reduction:
+        Merge cuts that are too close together (< min_cut_distance).
+        Keeps the middle cut from each cluster to preserve segment centres.
+
+    Phase 3 - Straight Section Filling:
+        Add equidistant cuts in long sections without existing cuts.
+        Prevents excessively long segments that may contain missed corners.
+
+    Phase 4 - Curvature Sign Changes:
+        Add cuts where curvature changes from positive to negative (or vice
+        versa). These mark transitions between left and right turns.
+
+    Phase 5 - Final Filtering:
+        Second pass of redundancy reduction to clean up any close cuts
+        introduced by Phase 4.
+
+    Corner Classification
+    ---------------------
+    After segmentation, each segment is analysed:
+    - Total angle turned (integrated curvature)
+    - Minimum radius (1 / max_curvature)
+    - Direction (left/right based on average curvature sign)
+
+    Segments are classified as corners if they meet angle AND radius thresholds,
+    or if the radius is very tight regardless of angle (for sparse OSM data).
+
+    Severity Scale (ASC 1-6)
+    ------------------------
+    Based on minimum radius, matching rally pacenote conventions:
+    - 1 = Hairpin (< 15m radius)
+    - 2 = Very tight (15-30m)
+    - 3 = Tight (30-50m)
+    - 4 = Medium (50-80m)
+    - 5 = Fast (80-120m)
+    - 6 = Flat/slight (120-200m)
+    - 7 = Kink (> 200m, barely noticeable)
+
+    Chicane Detection
+    -----------------
+    Consecutive opposite-direction corners within max_chicane_gap are merged
+    into single chicane callouts (e.g., "left-right" or "right-left").
     """
 
     def __init__(
@@ -618,9 +707,24 @@ class CornerDetector:
         self, curvatures: List[float]
     ) -> Tuple[bool, bool]:
         """
-        Check if corner tightens or opens.
+        Analyse curvature profile to detect tightening or opening corners.
 
-        Returns: (tightens, opens)
+        Compares average curvature before and after the apex (maximum curvature
+        point) to determine if the corner gets progressively tighter or opens up.
+
+        Algorithm:
+            1. Find apex index (maximum |curvature|)
+            2. Calculate average |curvature| for entry (before apex)
+            3. Calculate average |curvature| for exit (after apex)
+            4. Compare exit/entry ratio:
+               - ratio > 1.5: corner tightens (exit is sharper)
+               - ratio < 0.67: corner opens (exit is gentler)
+
+        Args:
+            curvatures: List of curvature values along the segment.
+
+        Returns:
+            Tuple of (tightens, opens) booleans. At most one will be True.
         """
         if len(curvatures) < 3:
             return False, False

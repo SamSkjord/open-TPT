@@ -115,7 +115,42 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
     Reads all sensors on a mux channel together to eliminate I2C bus contention.
     Supports:
     - Tyres: Pico (MLX90640), MLX90614
-    - Brakes: ADC, MLX90614, OBD
+    - Brakes: ADC, MLX90614, MCP9601 thermocouple
+    - Distance: VL53L0X TOF sensors
+
+    Architecture
+    ------------
+    This handler uses THREE separate bounded deques instead of the parent class's
+    single data_queue. This design allows consumers to access tyre, brake, and TOF
+    data independently via get_thermal_data(), get_brake_data(), and get_tof_data()
+    without coupling their update rates or blocking each other.
+
+    The worker thread reads all sensors in sequence (FL -> FR -> RL -> RR) and
+    publishes to all three queues atomically at the end of each cycle.
+
+    Thread Safety
+    -------------
+    - _i2c_lock: Serialises access to the I2C bus between smbus2 and busio
+      libraries, which both access the same physical bus
+    - Deque access uses try/except for IndexError as a defensive measure,
+      though the if-check should prevent this in normal operation
+    - All published data is immutable (dicts with primitive values)
+
+    Recovery Mechanisms
+    -------------------
+    - Exponential backoff: Failed sensors back off 1s -> 2s -> 4s -> ... -> 64s max
+    - Mux reset: After N consecutive failures, GPIO pulse resets TCA9548A
+    - TOF reinit: Failed TOF sensors are automatically reinitialised
+
+    Data Flow
+    ---------
+    Worker Thread                    Main Thread (render)
+         |                                 |
+    [read sensors]                         |
+         |                                 |
+    tyre_queue.append() -----> get_thermal_data() -> lock-free read
+    brake_queue.append() ----> get_brake_data()   -> lock-free read
+    tof_queue.append() ------> get_tof_data()     -> lock-free read
 
     Maintains 10Hz read rate with lock-free data access.
     """
@@ -129,7 +164,22 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         Initialise the unified corner handler.
 
         Args:
-            smoothing_alpha: EMA smoothing factor for brake temps (0-1)
+            smoothing_alpha: EMA (Exponential Moving Average) smoothing factor
+                for brake and TOF sensor readings. Range 0-1 where:
+                - 0.0 = no smoothing (use raw values)
+                - 0.3 = moderate smoothing (default, balances response vs noise)
+                - 1.0 = maximum smoothing (very slow response)
+
+        Initialisation Order:
+            1. I2C buses (smbus2 for Pico, busio for Adafruit sensors)
+            2. TCA9548A I2C multiplexer
+            3. ADC (ADS1115) if any brake uses ADC type
+            4. Per-corner sensors via mux channels (tyre, brake, TOF)
+            5. GPIO for mux reset pin
+
+        Note:
+            Hardware initialisation happens synchronously in __init__.
+            Call start() to begin the background polling thread.
         """
         super().__init__(queue_depth=2)
 
@@ -181,10 +231,11 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             "RR": None,
         }
 
-        # Separate queues for each data type (tyres, brakes, TOF).
-        # Note: We use our own deques instead of the parent's single data_queue
-        # because we have three independent data streams that consumers access
-        # separately via get_thermal_data(), get_brake_data(), get_tof_data().
+        # Separate bounded queues for each data type (tyres, brakes, TOF).
+        # maxlen=2 provides double-buffering: worker writes to one slot while
+        # render thread reads from the other. Oldest data is automatically
+        # discarded if consumer falls behind.
+        # See class docstring for rationale on three-queue architecture.
         self.tyre_queue = deque(maxlen=2)
         self.brake_queue = deque(maxlen=2)
         self.tof_queue = deque(maxlen=2)
@@ -698,9 +749,14 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
 
         try:
             with self._i2c_lock:
-                # Select mux channel via smbus2 (write to TCA9548A control register)
-                # Use timeout wrapper to prevent I2C bus hangs from blocking
-                # write_byte returns None on success, so use sentinel for timeout detection
+                # Select mux channel via smbus2 (write to TCA9548A control register).
+                # The TCA9548A uses a bitmask: channel 0 = 0x01, channel 1 = 0x02, etc.
+                #
+                # Timeout wrapper pattern explanation:
+                # - write_byte() returns None on success, making timeout detection ambiguous
+                # - We use a tuple trick: (write_byte(...), True)[1] always returns True
+                #   on success, while _i2c_with_timeout returns False on timeout
+                # - This lets us distinguish "success" from "timeout" cleanly
                 mux_ok = self._i2c_with_timeout(
                     lambda: (self.i2c_smbus.write_byte(I2C_MUX_ADDRESS, 1 << channel), True)[1],
                     default=False

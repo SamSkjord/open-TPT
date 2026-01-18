@@ -24,7 +24,66 @@ class GPSInterface(Protocol):
 
 
 class CoPilot:
-    """Main application coordinating all components."""
+    """
+    Main CoPilot application coordinating GPS, maps, and audio callouts.
+
+    This class orchestrates all CoPilot components to provide rally-style
+    pacenote callouts while driving. It reads GPS position, projects the
+    road ahead from OSM map data, detects corners, and generates audio
+    callouts for upcoming hazards.
+
+    Architecture
+    ------------
+    The CoPilot runs a main loop that executes update cycles at a fixed
+    interval (default 0.2s = 5Hz). Each cycle:
+
+    1. Read GPS position
+    2. Check/apply pending background map loads
+    3. Fetch new road data if moved far from last load centre
+    4. Project path ahead using road network topology
+    5. Detect corners in projected path
+    6. Generate pacenotes for detected features
+    7. Filter and speak new callouts via audio system
+    8. Update visualisation (if enabled)
+
+    Asynchronous Map Loading
+    ------------------------
+    Road data loading can be slow (100-500ms for dense areas). To avoid
+    blocking the update loop:
+
+    - First load is synchronous (must have data to start)
+    - Subsequent loads happen in a background daemon thread
+    - _pending_network stores loaded data for main thread pickup
+    - _apply_pending_network() atomically swaps in new data
+
+    State Machine
+    -------------
+    The map loading state machine has three states:
+
+    1. NO_DATA: _network is None, needs initial sync load
+    2. LOADING: _loading_thread is alive, async load in progress
+    3. READY: _network is set, normal operation
+
+    Transitions:
+    - NO_DATA -> READY: via _fetch_roads_sync()
+    - READY -> LOADING: via _fetch_roads_async() when moved far enough
+    - LOADING -> READY: via _apply_pending_network() on next update
+
+    Thread Safety
+    -------------
+    - Main loop runs in calling thread (typically main thread)
+    - Background loads use daemon thread (dies with main)
+    - _pending_network/pos set atomically from background thread
+    - Audio playback runs in separate thread via AudioPlayer
+
+    GPS Sources
+    -----------
+    Supports multiple GPS interfaces via GPSInterface protocol:
+    - GPSReader: Real serial GPS (PA1616S at 10Hz)
+    - GPSSimulator: Simulated GPS at fixed heading
+    - VBOSimulator: Replay from VBO log file
+    - GPXSimulator: Follow GPX route file
+    """
 
     def __init__(
         self,
@@ -88,7 +147,29 @@ class CoPilot:
             self.gps.disconnect()
 
     def _update_cycle(self) -> None:
-        """Single update cycle: read GPS, project path, detect corners, call pacenotes."""
+        """
+        Execute a single update cycle of the CoPilot main loop.
+
+        This method performs the complete pipeline from GPS reading to audio
+        callout. It is called repeatedly by run() at the configured update
+        interval (typically 5Hz).
+
+        Pipeline Steps:
+            1. Read GPS position - skip cycle if no fix available
+            2. Apply pending network - swap in background-loaded map data
+            3. Refetch roads if needed - async load when far from last centre
+            4. Project path - use road topology to predict path ahead
+            5. Detect corners - ASC algorithm on projected geometry
+            6. Generate pacenotes - convert corners/features to callouts
+            7. Filter and speak - deduplicate and send to audio system
+            8. Update visualisation - refresh map display if enabled
+            9. Clear old callouts - prevent memory growth
+
+        Note:
+            This method is designed to complete quickly (< 50ms typical).
+            Expensive operations like map loading are delegated to background
+            threads. If GPS has no fix, the cycle returns immediately.
+        """
         pos = self.gps.read_position()
         if not pos:
             return

@@ -64,7 +64,56 @@ def set_boot_start(start_time):
 
 
 class InitializationMixin:
-    """Mixin providing hardware initialization methods."""
+    """
+    Mixin providing hardware initialisation methods for OpenTPT.
+
+    This mixin handles the complete hardware initialisation sequence during
+    application startup. It displays progress on a splash screen while
+    initialising each subsystem in the correct order.
+
+    Initialisation Order
+    --------------------
+    The subsystems are initialised in dependency order:
+
+    1. Radar Handler (0.05) - CAN bus for Toyota radar
+    2. Camera (0.15) - USB cameras with optional radar overlay
+    3. Input Handler (0.25) - NeoKey 1x4 button input
+    4. Encoder (0.35) - Rotary encoder with NeoPixel
+    5. NeoDriver (0.45) - LED strip controller
+    6. Sensors (0.55) - TPMS and corner sensors (tyre/brake/TOF)
+    7. IMU (0.65) - Accelerometer for G-meter
+    8. OBD2 (0.75) - Vehicle CAN bus data
+    9. GPS (0.78) - Serial NMEA for position/speed
+    10. Fuel Tracker (0.79) - Requires OBD2
+    11. Lap Timing (0.80) - Requires GPS
+    12. CoPilot (0.82) - Requires GPS, optional lap timing
+    13. Ford Hybrid (0.83) - Ford-specific HV battery
+    14. Menu System (0.85) - UI menu with all handlers
+    15. Thread Start (0.95) - Start polling threads
+
+    Dependency Graph
+    ----------------
+    Some subsystems depend on others being initialised first:
+
+    - Camera depends on Radar (for overlay)
+    - Fuel Tracker depends on OBD2 (for fuel level PID)
+    - Lap Timing depends on GPS (for position/crossing)
+    - CoPilot depends on GPS and optionally Lap Timing
+
+    Graceful Degradation
+    --------------------
+    All handlers are optional. If a handler fails to initialise:
+    - Warning is logged
+    - Handler attribute is set to None
+    - Dependant features are disabled
+    - Application continues with reduced functionality
+
+    Thread Safety
+    -------------
+    All initialisation happens in the main thread before the render loop
+    starts. Handler start() methods spawn background threads but return
+    immediately.
+    """
 
     def _show_splash(self, status_text, progress=None):
         """Show splash screen with optional progress bar."""
@@ -111,7 +160,32 @@ class InitializationMixin:
         pygame.display.flip()
 
     def _init_subsystems(self):
-        """Initialise the hardware subsystems."""
+        """
+        Initialise all hardware subsystems with splash screen progress.
+
+        This method is the main entry point for hardware initialisation.
+        It imports handler modules dynamically (to handle missing dependencies),
+        creates handler instances, and starts background polling threads.
+
+        Progress Display:
+            Each subsystem updates the splash screen with its name and
+            a progress value (0.0 to 1.0). This provides visual feedback
+            during the ~5 second boot sequence.
+
+        Dynamic Imports:
+            Handler modules are imported inside this method rather than at
+            module level. This allows the application to start even if some
+            hardware libraries are not installed (graceful degradation).
+
+        Timing Logs:
+            Debug-level logs record the time taken for each subsystem,
+            relative to boot start. Use these to identify slow initialisers.
+
+        Raises:
+            No exceptions - all errors are caught and logged as warnings.
+            The application will start with reduced functionality rather
+            than failing completely.
+        """
         global _boot_start
         # Use the boot start time set by main.py (falls back to now if not set)
         if _boot_start is None:

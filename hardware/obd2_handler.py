@@ -46,9 +46,49 @@ class OBD2Handler(BoundedQueueHardwareHandler):
     """
     OBD2 handler for vehicle telemetry via CAN bus.
 
-    Polls standard PIDs and provides data snapshots.
-    High-priority PIDs (speed, RPM, throttle) polled every cycle.
-    Low-priority PIDs (temps) rotated to keep cycle time reasonable.
+    Polls standard OBD2 PIDs via SocketCAN interface and provides data
+    snapshots for display and logging. Supports both standard Mode 01
+    PIDs and Ford-specific Mode 22 (UDS) DIDs.
+
+    Polling Strategy
+    ----------------
+    To maintain responsive updates while polling multiple PIDs, the handler
+    uses a priority-based rotation scheme:
+
+    High Priority (every cycle, ~7Hz):
+        - Speed (PID 0x0D) - critical for lap timing
+        - RPM (PID 0x0C) - critical for shift lights
+        - Throttle (PID 0x11) - responsive feel
+
+    Low Priority (rotated, one per cycle):
+        - Coolant temp (PID 0x05)
+        - Oil temp (PID 0x5C)
+        - Intake temp (PID 0x0F)
+        - MAP (PID 0x0B)
+        - MAF (PID 0x10)
+        - Fuel level (PID 0x2F)
+        - Fuel rate (PID 0x5E)
+
+    Ford Hybrid (if supported):
+        - HV Battery SOC (DID 0x4801 via Mode 22)
+
+    PID Failure Tracking
+    --------------------
+    Not all PIDs are supported by all vehicles. When a PID fails to
+    respond 5 times consecutively, it is disabled to avoid wasting
+    bus time on unsupported PIDs.
+
+    Data Smoothing
+    --------------
+    Speed, RPM, and throttle use short history deques for smoothing:
+        - Speed: 5-sample average (reduces GPS jitter)
+        - RPM: 3-sample average (reduces flicker)
+        - Throttle: 2-sample average (minimal lag)
+
+    Reconnection
+    ------------
+    After 10 consecutive errors, the handler attempts to reinitialise
+    the CAN bus interface with a 5-second cooldown between attempts.
     """
 
     def __init__(self):
@@ -107,7 +147,20 @@ class OBD2Handler(BoundedQueueHardwareHandler):
             logger.info("OBD2 disabled in config")
 
     def _initialise(self):
-        """Initialise the CAN bus connection."""
+        """
+        Initialise the SocketCAN bus connection.
+
+        Creates a CAN bus interface using python-can's SocketCAN backend.
+        The CAN interface must be brought up beforehand with correct bitrate:
+
+            sudo ip link set can0 up type can bitrate 500000
+
+        For OBD2, standard bitrate is 500000 bps (500 kbps).
+
+        Note:
+            This method may be called multiple times for reconnection.
+            Old bus instances are cleaned up by the caller before retry.
+        """
         if not CAN_AVAILABLE:
             logger.debug("OBD2: python-can not available (mock mode)")
             self.hardware_available = False
@@ -131,10 +184,29 @@ class OBD2Handler(BoundedQueueHardwareHandler):
 
     def _poll_pid(self, pid: int, timeout_s: float = 0.1) -> Optional[list]:
         """
-        Poll a Mode 01 PID and return raw data bytes.
+        Poll a standard OBD2 Mode 01 PID and return raw data bytes.
+
+        Sends a diagnostic request to the broadcast OBD2 address (0x7DF) and
+        waits for a response from any ECU (0x7E8-0x7EF range).
+
+        OBD2 Request Format:
+            [length, mode, pid, 0, 0, 0, 0, 0]
+            Example: [0x02, 0x01, 0x0D, 0, 0, 0, 0, 0] for speed
+
+        OBD2 Response Format:
+            [length, mode+0x40, pid, data_a, data_b, ...]
+            Example: [0x03, 0x41, 0x0D, 0x32, ...] for speed = 50 km/h
+
+        Args:
+            pid: OBD2 Parameter ID (0x00-0xFF).
+            timeout_s: Maximum time to wait for response in seconds.
 
         Returns:
-            List of data bytes, or None if no response/failed
+            List of data bytes (after mode and PID), or None if:
+            - No CAN bus available
+            - PID previously failed too many times
+            - No response within timeout
+            - Invalid response format
         """
         if not self.bus:
             return None

@@ -32,16 +32,41 @@ class GPSHandler(BoundedQueueHardwareHandler):
     """
     GPS handler reading NMEA directly from serial at 10Hz.
 
-    Parses GPRMC sentences for:
-    - Speed (knots converted to km/h)
-    - Position (lat/lon)
-    - Fix status
-    - UTC time
+    This handler interfaces with the PA1616S GPS module (MTK3339 chipset)
+    via serial UART. It provides position, speed, heading, and time data
+    for lap timing and CoPilot functionality.
 
-    Parses GPGGA sentences for:
-    - Number of satellites in use
+    NMEA Sentences Parsed
+    ---------------------
+    GPRMC/GNRMC (Recommended Minimum):
+        - Position (latitude, longitude)
+        - Speed over ground (knots -> km/h)
+        - Course over ground (heading)
+        - Fix status (A=valid, V=invalid)
+        - UTC time and date
 
-    Time sync is handled by chrony via PPS on /dev/pps0.
+    GPGGA/GNGGA (Fix Data):
+        - Number of satellites in use (for fix quality indication)
+
+    Time Synchronisation
+    --------------------
+    Initial time sync is performed via date command when first valid fix
+    is received. High-precision time sync is handled separately by chrony
+    using the PPS signal on /dev/pps0 (GPIO 4).
+
+    Thread Model
+    ------------
+    The handler runs a background worker thread that:
+    1. Reads NMEA data from serial port
+    2. Parses complete sentences
+    3. Publishes snapshots to bounded queue
+    4. Tracks update rate (should be ~10Hz with fix)
+
+    Error Recovery
+    --------------
+    After max_consecutive_errors (10), the handler attempts to reinitialise
+    the serial connection. This handles temporary USB disconnects or
+    serial port issues.
     """
 
     def __init__(self):
@@ -101,7 +126,31 @@ class GPSHandler(BoundedQueueHardwareHandler):
             self.hardware_available = False
 
     def _configure_mtk3339(self):
-        """Configure MTK3339 GPS module for higher baud rate and 10Hz updates."""
+        """
+        Configure MTK3339 GPS module for higher baud rate and 10Hz updates.
+
+        The MTK3339 (PA1616S) boots at 9600 baud by default. This method
+        reconfigures it for higher baud rates and faster update rates.
+
+        Configuration Procedure:
+            1. Try connecting at target baud rate first (already configured?)
+            2. If valid NMEA received, just ensure RMC+GGA sentences enabled
+            3. Otherwise, connect at 9600 baud (factory default)
+            4. Send PMTK commands to configure:
+               - Update rate: 10Hz (100ms between fixes)
+               - NMEA sentences: RMC + GGA only (position + satellite count)
+               - Baud rate: target rate (38400, 57600, or 115200)
+            5. Close and reconnect at new baud rate
+
+        PMTK Commands Used:
+            - PMTK220,100: Set 10Hz update rate
+            - PMTK314,...: Enable only RMC and GGA sentences
+            - PMTK251,XXXXX: Set baud rate
+
+        Note:
+            Configuration is persistent in the GPS module's flash memory.
+            After first configuration, the module will boot at the new rate.
+        """
         logger.info("GPS: Configuring MTK3339 for %s baud / 10Hz...", GPS_BAUD_RATE)
 
         # First, try connecting at the target baud rate (in case already configured)
