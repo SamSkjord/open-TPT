@@ -653,9 +653,9 @@ Design supports 60 FPS target:
 
 - [x] Truncate long route file names
 - [x] Improve logging with error-level messages (reviewed: current levels appropriate)
+- [x] Document threading guarantees (added to CLAUDE.md)
 - [ ] Add type hints to remaining files
 - [ ] Add comprehensive metrics collection
-- [ ] Document threading guarantees
 
 ---
 

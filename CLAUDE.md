@@ -223,6 +223,68 @@ sudo journalctl -u openTPT.service -f | grep -E "failures|error|backoff"
 
 ---
 
+## Threading Architecture
+
+### Thread Structure
+
+| Thread | Purpose | Blocking Allowed |
+|--------|---------|------------------|
+| **Main Thread** | Pygame event loop, rendering at 60 FPS | NO - must complete in ≤12ms |
+| **Hardware Threads** | I2C/CAN/Serial I/O, one per handler | YES - isolated from render |
+| **Background Threads** | Bluetooth ops, menu actions, audio | YES - daemon threads |
+
+### Data Flow Guarantees
+
+```
+Hardware Thread          Queue (depth=2)         Main Thread
+     |                        |                       |
+  [I/O read]                  |                       |
+     |                        |                       |
+  _publish_snapshot() ------> [snapshot] -----> get_snapshot()
+     |                     (non-blocking)        (lock-free)
+     |                        |                       |
+                           [oldest dropped         [render]
+                            if queue full]
+```
+
+**Key Guarantees:**
+1. **Lock-free consumer path** - `get_snapshot()` never blocks
+2. **Bounded memory** - Queue maxsize=2 prevents unbounded growth
+3. **No data races** - Immutable `HardwareSnapshot` (frozen dataclass)
+4. **Graceful degradation** - Dropped frames logged, render continues
+
+### Thread Safety Patterns
+
+| Pattern | Used For | Example |
+|---------|----------|---------|
+| **Bounded Queue** | Hardware data transfer | `BoundedQueueHardwareHandler` |
+| **Immutable Snapshots** | Lock-free render access | `HardwareSnapshot(frozen=True)` |
+| **Daemon Threads** | Background operations | `threading.Thread(daemon=True)` |
+| **Threading Lock** | Shared mutable state | `_bt_connect_lock` in bluetooth.py |
+| **Exponential Backoff** | Hardware retry logic | `ExponentialBackoff` class |
+
+### What Can Run Where
+
+| Operation | Main Thread | Hardware Thread | Background Thread |
+|-----------|-------------|-----------------|-------------------|
+| Pygame rendering | YES | NO | NO |
+| I2C/SPI reads | NO | YES | NO |
+| Subprocess calls | NO | NO | YES |
+| Queue publish | NO | YES | NO |
+| Queue consume | YES | NO | NO |
+| Settings read | YES | YES | YES |
+| Settings write | YES | NO | YES |
+
+### Critical Rules
+
+1. **Never block main thread** - All I/O must happen in worker threads
+2. **Never access pygame from threads** - Only main thread touches display
+3. **Use queues for data transfer** - No shared mutable state between threads
+4. **Daemon threads for optional work** - Allows clean shutdown
+5. **Timeout all I/O** - Prevents thread hangs (see `_i2c_with_timeout`)
+
+---
+
 ## Key Design Patterns
 
 ### Bounded Queue Handler
