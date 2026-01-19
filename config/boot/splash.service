@@ -1,15 +1,14 @@
 [Unit]
 Description=openTPT Boot Splash
 DefaultDependencies=no
-After=systemd-tmpfiles-setup.service
+After=sysinit.target
 Before=openTPT.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/bin/fbi -T 1 -d /dev/fb0 --noverbose --autozoom /home/pi/open-TPT/assets/splash.png
-ExecStop=/usr/bin/true
-StandardInput=tty
+# Wait up to 5 seconds for framebuffer to become available
+ExecStart=/bin/bash -c 'for i in $(seq 1 50); do [ -e /dev/fb0 ] && break; sleep 0.1; done; exec /usr/bin/fbi -T 1 -d /dev/fb0 --noverbose -a /home/pi/open-TPT/assets/splash.png'
 StandardOutput=null
 StandardError=null
 

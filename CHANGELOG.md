@@ -22,6 +22,11 @@ Minor fixes identified during code review to improve robustness and clarity.
   - Added metadata caching for bounds (instant lookup on subsequent boots)
   - Backwards compatible with existing databases (auto-migrates schema)
 
+- **Splash Service Fix** - Consolidated redundant splash services and added framebuffer wait
+  - Removed `fbi-splash.service`, now using single `splash.service`
+  - Added wait loop for `/dev/fb0` (up to 5 seconds) to handle early boot timing
+  - Updated `openTPT.service` dependency
+
 - **Defensive Dict Access** - Fixed potential KeyError in `unified_corner_handler.py` if snapshot format changes unexpectedly
   - `get_thermal_data()`, `get_zone_data()`, `get_temps()`, `get_tof_distances()` now use safe `.get()` pattern
   - Prevents render thread crashes from malformed snapshots
@@ -38,7 +43,9 @@ Minor fixes identified during code review to improve robustness and clarity.
 - `hardware/unified_corner_handler.py` - Safe dict access, corrected atomicity comment
 - `hardware/obd2_handler.py` - Simplified SOC arithmetic
 - `config/boot/optimize-boot.sh` - Keep wpa_supplicant enabled for WiFi
+- `config/boot/splash.service` - Added framebuffer wait loop, consolidated from fbi-splash.service
 - `copilot/sqlite_cache.py` - Fast bounds lookup via R-tree and metadata caching
+- `openTPT.service` - Updated splash service dependency
 
 ---
 

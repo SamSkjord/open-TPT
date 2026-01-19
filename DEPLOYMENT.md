@@ -439,7 +439,7 @@ openTPT uses a two-stage splash system for seamless visual feedback from power-o
 Power On
     |
     v
-[fbi-splash.service] -----> Shows splash.png via framebuffer (fbi)
+[splash.service] -----> Shows splash.png via framebuffer (fbi)
     |                       Displays within ~2 seconds of boot
     v
 [openTPT.service] --------> Starts main.py
@@ -456,9 +456,9 @@ Power On
 [Main display] -----------> Normal operation
 ```
 
-#### 1. Early Boot Splash (fbi-splash.service)
+#### 1. Early Boot Splash (splash.service)
 
-**File:** `config/boot/fbi-splash.service`
+**File:** `config/boot/splash.service`
 
 Displays `assets/splash.png` using the Linux framebuffer image viewer (fbi) as early as possible during boot, before Python or pygame are loaded.
 
@@ -488,9 +488,9 @@ WantedBy=sysinit.target
 
 **Installation:**
 ```bash
-sudo cp /home/pi/open-TPT/config/boot/fbi-splash.service /etc/systemd/system/
+sudo cp /home/pi/open-TPT/config/boot/splash.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable fbi-splash.service
+sudo systemctl enable splash.service
 ```
 
 #### 2. Process Splash (main.py)
@@ -538,7 +538,7 @@ sudo reboot
 
 | Issue | Cause | Solution |
 |-------|-------|----------|
-| No early splash | fbi-splash.service not enabled | `sudo systemctl enable fbi-splash.service` |
+| No early splash | splash.service not enabled | `sudo systemctl enable splash.service` |
 | Early splash rotated | Wrong image orientation | Ensure splash.png is landscape |
 | "Loading Failed" | fbi can't read image | Check file permissions: `chmod 644 assets/splash.png` |
 | Black screen then splash | fb0 not ready | Increase wait loop in service (currently 50x0.1s = 5s max) |

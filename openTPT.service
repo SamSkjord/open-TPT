@@ -1,7 +1,7 @@
 [Unit]
 Description=openTPT Main Display Service
 DefaultDependencies=no
-After=sysinit.target fbi-splash.service
+After=sysinit.target splash.service
 Wants=can-setup.service
 
 [Service]
