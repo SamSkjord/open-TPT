@@ -289,7 +289,7 @@ class OBD2Handler(BoundedQueueHardwareHandler):
 
                 # Positive response (0x62)
                 if msg.data[1] == 0x62 and msg.data[2] == 0x48 and msg.data[3] == 0x01:
-                    soc = ((msg.data[4] * 256) + msg.data[5]) * (1 / 5) / 100
+                    soc = ((msg.data[4] * 256) + msg.data[5]) / 500
                     self.soc_read_attempts = 0
                     return max(0, min(100, soc))
 

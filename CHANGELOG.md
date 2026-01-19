@@ -1,5 +1,30 @@
 # Changelog - openTPT
 
+## [v0.18.9] - 2026-01-19
+
+### Code Quality Improvements
+
+Minor fixes identified during code review to improve robustness and clarity.
+
+#### Bug Fixes
+
+- **Defensive Dict Access** - Fixed potential KeyError in `unified_corner_handler.py` if snapshot format changes unexpectedly
+  - `get_thermal_data()`, `get_zone_data()`, `get_temps()`, `get_tof_distances()` now use safe `.get()` pattern
+  - Prevents render thread crashes from malformed snapshots
+
+- **Clearer Integer Arithmetic** - Simplified SOC calculation in `obd2_handler.py` from `* (1 / 5) / 100` to `/ 500`
+
+#### Documentation
+
+- **Corrected Threading Comment** - Updated `unified_corner_handler.py` docstring to clarify queue publishes are "together" not "atomic"
+
+#### Modified Files
+
+- `hardware/unified_corner_handler.py` - Safe dict access, corrected atomicity comment
+- `hardware/obd2_handler.py` - Simplified SOC arithmetic
+
+---
+
 ## [v0.18.8] - 2026-01-18
 
 ### Boost Pressure Display and UI Improvements

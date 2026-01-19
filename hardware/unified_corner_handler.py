@@ -126,7 +126,8 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
     without coupling their update rates or blocking each other.
 
     The worker thread reads all sensors in sequence (FL -> FR -> RL -> RR) and
-    publishes to all three queues atomically at the end of each cycle.
+    publishes to all three queues together at the end of each cycle (not truly
+    atomic, but published in quick succession with negligible timing difference).
 
     Thread Safety
     -------------
@@ -1187,7 +1188,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         except IndexError:
             return None
 
-        data = snapshot["data"].get(position)
+        data = snapshot.get("data", {}).get(position)
 
         if data and "thermal_array" in data:
             return data["thermal_array"]
@@ -1202,7 +1203,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             snapshot = self.tyre_queue[-1]
         except IndexError:
             return None
-        return snapshot["data"].get(position)
+        return snapshot.get("data", {}).get(position)
 
     # Public API - Brake data access (backward compatible)
     def get_temps(self) -> Dict:
@@ -1213,7 +1214,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             snapshot = self.brake_queue[-1]
         except IndexError:
             return {pos: {"temp": None} for pos in ["FL", "FR", "RL", "RR"]}
-        return snapshot["data"]
+        return snapshot.get("data", {pos: {"temp": None} for pos in ["FL", "FR", "RL", "RR"]})
 
     def get_brake_temp(self, position: str) -> Optional[float]:
         """Get temperature for a specific brake."""
@@ -1231,7 +1232,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             snapshot = self.tof_queue[-1]
         except IndexError:
             return {pos: {"distance": None} for pos in ["FL", "FR", "RL", "RR"]}
-        return snapshot["data"]
+        return snapshot.get("data", {pos: {"distance": None} for pos in ["FL", "FR", "RL", "RR"]})
 
     def get_tof_distance(self, position: str) -> Optional[float]:
         """Get distance for a specific corner in millimetres."""
