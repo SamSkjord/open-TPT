@@ -471,7 +471,7 @@ CoPilot integrates with lap timing - when a track is loaded (KMZ circuit or GPX 
 When connected to a Bluetooth car head unit or speaker, CoPilot provides "Now Playing" information via AVRCP:
 - Track title shows the current callout text (e.g., "left 4 tightens into right 3")
 - Album art displays the CoPilot logo (splash.png)
-- Artist shows "CoPilot", album shows "openTPT"
+- Artist shows "Skjord Motorsport", album shows "CoPilot"
 
 Requires `python3-dbus` and `python3-gi` packages:
 ```bash

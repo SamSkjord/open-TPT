@@ -2,7 +2,7 @@
 MPRIS D-Bus interface for CoPilot audio metadata.
 
 Provides "Now Playing" information to Bluetooth car head units via AVRCP.
-Shows callout text, artist (CoPilot), and album art on the car display.
+Shows callout text, artist (Skjord Motorsport), and album art on the car display.
 """
 
 import logging
@@ -176,8 +176,8 @@ if DBUS_AVAILABLE:
             metadata = dbus.Dictionary({
                 "mpris:trackid": dbus.ObjectPath(self._track_id),
                 "xesam:title": self._title or "CoPilot Ready",
-                "xesam:artist": dbus.Array(["CoPilot"], signature="s"),
-                "xesam:album": "openTPT",
+                "xesam:artist": dbus.Array(["Skjord Motorsport"], signature="s"),
+                "xesam:album": "CoPilot",
             }, signature="sv")
 
             if self._art_url:
