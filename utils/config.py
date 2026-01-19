@@ -135,7 +135,7 @@ MCP9601_ADDRESSES = {
 
 CAMERA_WIDTH = 800
 CAMERA_HEIGHT = 600
-CAMERA_FPS = 30
+CAMERA_FPS = 60  # Request max; each camera delivers what it can
 
 # Multi-camera configuration
 # Set which cameras are available in your system
