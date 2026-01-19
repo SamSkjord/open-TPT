@@ -137,11 +137,11 @@ Keyboard controls (for development):
 
 ### Display Configuration
 
-openTPT is designed for 800x480 resolution and scales to other display sizes. Set `DISPLAY_WIDTH` and `DISPLAY_HEIGHT` in `utils/config.py`.
+openTPT is designed for 800x480 resolution and scales to other display sizes. Set `DISPLAY_WIDTH` and `DISPLAY_HEIGHT` in `config.py`.
 
 ### System Configuration
 
-Hardware and system constants are in `utils/config.py`:
+Hardware and system constants are in `config.py`:
 - I2C addresses and bus settings
 - CAN channels and bitrates
 - Display dimensions and font paths
@@ -165,7 +165,7 @@ openTPT supports per-tyre sensor type configuration, allowing you to mix Pico I2
 
 **Emissivity Note:** Pico modules with MLX90640 sensors have emissivity pre-configured in the Pico firmware (default 0.95 for rubber tyres, configurable via I2C register). This is applied during temperature calculation on the Pico itself, not in openTPT.
 
-Edit `utils/config.py` and configure the `TYRE_SENSOR_TYPES` dictionary:
+Edit `config.py` and configure the `TYRE_SENSOR_TYPES` dictionary:
 
 ```python
 TYRE_SENSOR_TYPES = {
@@ -189,7 +189,7 @@ TYRE_SENSOR_TYPES = {
 
 **I2C multiplexer channel assignments:**
 
-Configure channels for each sensor type in `utils/config.py`:
+Configure channels for each sensor type in `config.py`:
 
 ```python
 # Pico I2C slave modules (MLX90640 thermal cameras)
@@ -217,7 +217,7 @@ openTPT supports per-corner brake sensor type configuration with automatic emiss
 
 #### Sensor Types
 
-Edit `utils/config.py` to configure the `BRAKE_SENSOR_TYPES` dictionary:
+Edit `config.py` to configure the `BRAKE_SENSOR_TYPES` dictionary:
 
 ```python
 BRAKE_SENSOR_TYPES = {
@@ -249,7 +249,7 @@ Both approaches achieve the same result - accurate temperature readings - using 
 3. Sensor reads lower than actual due to less radiation from non-black-body surface
 4. Software correction adjusts reading upward: `T_actual = T_measured / ε^0.25`
 
-Configure per-corner emissivity values in `utils/config.py`:
+Configure per-corner emissivity values in `config.py`:
 
 ```python
 BRAKE_ROTOR_EMISSIVITY = {
@@ -279,7 +279,7 @@ openTPT supports dual USB cameras for rear and front views with seamless switchi
    - **Rear camera** → USB port 1.1 (creates `/dev/video-rear`)
    - **Front camera** → USB port 1.2 (creates `/dev/video-front`)
 
-2. Enable cameras in `utils/config.py`:
+2. Enable cameras in `config.py`:
    ```python
    # Multi-camera configuration
    CAMERA_REAR_ENABLED = True   # Rear camera (with radar overlay if radar enabled)
@@ -371,7 +371,7 @@ The Toyota radar overlay is now **enabled by default** and displays collision wa
 
 #### Software Configuration
 
-The radar is configured in `utils/config.py`:
+The radar is configured in `config.py`:
 
 ```python
 # Enable/disable radar overlay
@@ -436,7 +436,7 @@ CoPilot provides rally-style audio callouts for upcoming corners, junctions, bri
 
 Place GPX or KMZ route files in `~/.opentpt/routes/` for loading via the menu.
 
-**Configuration in `utils/config.py`:**
+**Configuration in `config.py`:**
 
 ```python
 COPILOT_ENABLED = True              # Enable/disable CoPilot

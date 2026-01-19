@@ -11,7 +11,7 @@ from typing import List, Optional, Callable, Any
 
 import pygame
 
-from utils.config import (
+from config import (
     DISPLAY_WIDTH,
     DISPLAY_HEIGHT,
     FONT_SIZE_MEDIUM,
@@ -415,12 +415,12 @@ class MenuSystem(
         self._settings = get_settings()
 
         # Speed source (persistent, config.py as default)
-        from utils.config import SPEED_SOURCE
+        from config import SPEED_SOURCE
 
         self.speed_source = self._settings.get("speed_source", SPEED_SOURCE)
 
         # Unit settings (persistent, config.py as defaults)
-        from utils.config import TEMP_UNIT, PRESSURE_UNIT, SPEED_UNIT
+        from config import TEMP_UNIT, PRESSURE_UNIT, SPEED_UNIT
 
         self.temp_unit = self._settings.get("units.temp", TEMP_UNIT)
         self.pressure_unit = self._settings.get("units.pressure", PRESSURE_UNIT)

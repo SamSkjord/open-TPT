@@ -18,7 +18,7 @@ T = TypeVar('T')
 logger = logging.getLogger('openTPT.hardware.corners')
 
 from utils.hardware_base import BoundedQueueHardwareHandler
-from utils.config import (
+from config import (
     BRAKE_TEMP_MIN,
     BRAKE_TEMP_HOT,
     TYRE_SENSOR_TYPES,

@@ -69,7 +69,7 @@ ssh pi@192.168.199.246 "sudo systemctl status openTPT.service"
 
 | File | Purpose |
 |------|---------|
-| `utils/config.py` | All system constants, positions, thresholds |
+| `config.py` | All system constants, positions, thresholds |
 | `utils/settings.py` | Persistent user settings (~/.opentpt_settings.json) |
 | `/etc/udev/rules.d/99-camera-names.rules` | Camera device naming (auto-installed) |
 | `/etc/udev/rules.d/80-can-persistent-names.rules` | CAN bus naming (auto-installed) |
@@ -107,7 +107,7 @@ ssh pi@192.168.199.246 "ls -l /dev/video-*"
 ### OBD2 Speed Reading
 The system automatically brings up all CAN interfaces on boot via the `can-setup.service`. OBD-II is connected to `can_b2_1` (Board 2, CAN_1 connector).
 
-Enable/disable OBD2 speed in `utils/config.py`:
+Enable/disable OBD2 speed in `config.py`:
 ```python
 OBD_ENABLED = True  # Set to False to disable
 OBD_CHANNEL = "can_b2_1"  # OBD-II interface

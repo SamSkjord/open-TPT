@@ -8,7 +8,7 @@ import os
 import pygame
 
 logger = logging.getLogger('openTPT.template')
-from utils.config import TEMPLATE_PATH, DISPLAY_WIDTH, DISPLAY_HEIGHT
+from config import TEMPLATE_PATH, DISPLAY_WIDTH, DISPLAY_HEIGHT
 
 
 class Template:

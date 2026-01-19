@@ -25,7 +25,7 @@ except ImportError:
 
 # Import config
 try:
-    from utils.config import (
+    from config import (
         MLX90614_MUX_CHANNELS,
         MLX_WIDTH,
         MLX_HEIGHT,

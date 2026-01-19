@@ -18,7 +18,7 @@ from typing import Optional, Dict, Any
 
 logger = logging.getLogger('openTPT.fuel')
 
-from utils.config import (
+from config import (
     FUEL_TANK_CAPACITY_LITRES_DEFAULT,
     FUEL_LOW_THRESHOLD_PERCENT,
     FUEL_CRITICAL_THRESHOLD_PERCENT,

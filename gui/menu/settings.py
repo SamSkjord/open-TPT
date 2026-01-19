@@ -5,7 +5,7 @@ Display, Units, Thresholds, and Pages settings.
 
 import logging
 
-from utils.config import UI_PAGES
+from config import UI_PAGES
 
 logger = logging.getLogger('openTPT.menu.settings')
 

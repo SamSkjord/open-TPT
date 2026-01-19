@@ -12,7 +12,7 @@ from collections import deque
 
 logger = logging.getLogger('openTPT.ford_hybrid')
 from utils.hardware_base import BoundedQueueHardwareHandler
-from utils.config import FORD_HYBRID_ENABLED, FORD_HYBRID_CHANNEL, FORD_HYBRID_BITRATE
+from config import FORD_HYBRID_ENABLED, FORD_HYBRID_CHANNEL, FORD_HYBRID_BITRATE
 
 
 class FordHybridHandler(BoundedQueueHardwareHandler):

@@ -192,7 +192,7 @@ except queue.Full:
 
 ```python
 # Line 146 - INSIDE RENDER PATH (called every frame)
-from utils.config import COPILOT_OVERLAY_POSITION
+from config import COPILOT_OVERLAY_POSITION
 ```
 
 **Impact:** Violates ≤12ms render budget; GIL contention risk.

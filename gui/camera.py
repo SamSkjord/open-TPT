@@ -15,7 +15,7 @@ logger = logging.getLogger('openTPT.camera')
 # Debug flag - set to True for verbose camera logging (impacts performance)
 DEBUG_CAMERA = False
 
-from utils.config import (
+from config import (
     DISPLAY_WIDTH,
     DISPLAY_HEIGHT,
     CAMERA_WIDTH,

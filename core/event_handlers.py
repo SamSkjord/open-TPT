@@ -9,7 +9,7 @@ import time
 
 import pygame
 
-from utils.config import (
+from config import (
     BUTTON_PAGE_SETTINGS,
     BUTTON_CATEGORY_SWITCH,
     BUTTON_VIEW_MODE,

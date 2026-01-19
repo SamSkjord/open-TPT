@@ -278,7 +278,7 @@ class PerformanceMixin:
 
     def _log_memory_stats(self):
         """Log detailed memory statistics if monitoring is enabled."""
-        from utils.config import MEMORY_MONITORING_ENABLED
+        from config import MEMORY_MONITORING_ENABLED
 
         if not MEMORY_MONITORING_ENABLED:
             return

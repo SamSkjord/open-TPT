@@ -5,7 +5,7 @@ Handles TCA9548A I2C multiplexer for accessing multiple MLX90640 thermal cameras
 
 import logging
 import time
-from utils.config import I2C_MUX_ADDRESS, I2C_BUS
+from config import I2C_MUX_ADDRESS, I2C_BUS
 
 logger = logging.getLogger('openTPT.i2c_mux')
 

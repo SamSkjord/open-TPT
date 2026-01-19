@@ -72,6 +72,8 @@
 ```
 openTPT/
 ├── main.py                          # Entry point + OpenTPT class shell
+├── config.py                        # ALL configuration constants
+├── services/                        # Pi service configs (systemd, udev, etc.)
 ├── core/                            # Core application modules (mixins)
 │   ├── __init__.py                  # Exports all mixins
 │   ├── initialization.py            # Hardware subsystem init
@@ -115,7 +117,6 @@ openTPT/
 ├── assets/
 │   └── themes/                      # Map view colour themes (JSON)
 ├── utils/
-│   ├── config.py                    # ALL configuration
 │   ├── settings.py                  # Persistent user settings
 │   ├── hardware_base.py             # Bounded queue base class
 │   ├── fuel_tracker.py              # Fuel consumption tracking
@@ -310,7 +311,7 @@ class MyHandler(BoundedQueueHardwareHandler):
 ```
 
 ### Configuration
-All settings in `utils/config.py`:
+All settings in `config.py` (root level):
 - Display/scaling, I2C addresses, sensor types
 - Camera devices, radar/OBD2 channels
 - Temperature thresholds, emissivity values

@@ -5,7 +5,7 @@ Handles rendering of temperature and pressure scale bars.
 
 import pygame
 import numpy as np
-from utils.config import (
+from config import (
     DISPLAY_WIDTH,
     DISPLAY_HEIGHT,
     SCALE_X,

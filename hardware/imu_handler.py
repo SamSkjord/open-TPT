@@ -13,7 +13,7 @@ from collections import deque
 from utils.hardware_base import BoundedQueueHardwareHandler
 
 logger = logging.getLogger('openTPT.imu')
-from utils.config import (
+from config import (
     IMU_TYPE,
     IMU_ENABLED,
     IMU_I2C_ADDRESS,

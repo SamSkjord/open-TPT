@@ -98,7 +98,7 @@ class SystemMenuMixin:
 
     def _get_gps_port_label(self) -> str:
         """Get GPS serial port label."""
-        from utils.config import GPS_SERIAL_PORT, GPS_BAUD_RATE, GPS_ENABLED
+        from config import GPS_SERIAL_PORT, GPS_BAUD_RATE, GPS_ENABLED
 
         if not GPS_ENABLED:
             return "Port: Disabled"

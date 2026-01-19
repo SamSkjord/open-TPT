@@ -10,7 +10,7 @@ import serial
 from typing import Optional
 
 from utils.hardware_base import BoundedQueueHardwareHandler
-from utils.config import GPS_ENABLED, GPS_SERIAL_PORT, GPS_BAUD_RATE
+from config import GPS_ENABLED, GPS_SERIAL_PORT, GPS_BAUD_RATE
 
 logger = logging.getLogger('openTPT.gps')
 

@@ -12,7 +12,7 @@ from typing import Optional, Callable
 
 logger = logging.getLogger('openTPT.encoder')
 
-from utils.config import DEFAULT_BRIGHTNESS
+from config import DEFAULT_BRIGHTNESS
 from utils.settings import get_settings
 
 # Import board only if available

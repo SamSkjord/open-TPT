@@ -11,7 +11,7 @@ import time
 
 import pygame
 
-from utils.config import (
+from config import (
     DISPLAY_WIDTH,
     DISPLAY_HEIGHT,
     PRESSURE_UNIT,

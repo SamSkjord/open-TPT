@@ -43,7 +43,7 @@ from utils.telemetry_recorder import TelemetryRecorder
 from utils.settings import get_settings
 
 # Import configuration
-from utils.config import (
+from config import (
     DISPLAY_WIDTH,
     DISPLAY_HEIGHT,
     FPS_TARGET,

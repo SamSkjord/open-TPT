@@ -13,14 +13,14 @@ class LapTimingMenuMixin:
 
     def _get_lap_timing_enabled_label(self) -> str:
         """Get lap timing enabled status label."""
-        from utils.config import LAP_TIMING_ENABLED
+        from config import LAP_TIMING_ENABLED
 
         enabled = self._settings.get("lap_timing.enabled", LAP_TIMING_ENABLED)
         return f"Enabled: {'Yes' if enabled else 'No'}"
 
     def _toggle_lap_timing_enabled(self) -> str:
         """Toggle lap timing enabled state."""
-        from utils.config import LAP_TIMING_ENABLED
+        from config import LAP_TIMING_ENABLED
 
         current = self._settings.get("lap_timing.enabled", LAP_TIMING_ENABLED)
         new_value = not current
@@ -34,14 +34,14 @@ class LapTimingMenuMixin:
 
     def _get_lap_timing_auto_detect_label(self) -> str:
         """Get auto-detect status label."""
-        from utils.config import TRACK_AUTO_DETECT
+        from config import TRACK_AUTO_DETECT
 
         enabled = self._settings.get("lap_timing.auto_detect", TRACK_AUTO_DETECT)
         return f"Auto-Detect: {'Yes' if enabled else 'No'}"
 
     def _toggle_lap_timing_auto_detect(self) -> str:
         """Toggle track auto-detection."""
-        from utils.config import TRACK_AUTO_DETECT
+        from config import TRACK_AUTO_DETECT
 
         current = self._settings.get("lap_timing.auto_detect", TRACK_AUTO_DETECT)
         new_value = not current

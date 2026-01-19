@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import pygame
 
-from utils.config import BUTTON_VIEW_MODE
+from config import BUTTON_VIEW_MODE
 
 logger = logging.getLogger('openTPT.menu.camera')
 

@@ -5,7 +5,7 @@ Provides menu functionality for selecting map view themes.
 
 import logging
 
-from utils.config import MAP_THEME_DEFAULT
+from config import MAP_THEME_DEFAULT
 from utils.settings import get_settings
 from utils.theme_loader import get_theme_loader
 

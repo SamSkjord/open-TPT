@@ -4,7 +4,7 @@ Tests pure functions from utils/config.py with no mocking required.
 """
 
 import pytest
-from utils.config import (
+from config import (
     celsius_to_fahrenheit,
     fahrenheit_to_celsius,
     psi_to_bar,

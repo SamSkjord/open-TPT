@@ -11,7 +11,7 @@ from typing import Optional, Dict, Any
 from utils.hardware_base import BoundedQueueHardwareHandler
 
 logger = logging.getLogger('openTPT.obd2')
-from utils.config import OBD_CHANNEL, OBD_ENABLED, OBD_BITRATE
+from config import OBD_CHANNEL, OBD_ENABLED, OBD_BITRATE
 
 # Try to import CAN library
 try:

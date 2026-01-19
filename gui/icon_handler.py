@@ -7,7 +7,7 @@ import os
 import pygame
 
 logger = logging.getLogger('openTPT.icons')
-from utils.config import (
+from config import (
     TYRE_ICON_PATH,
     BRAKE_ICON_PATH,
     TYRE_ICON_POSITION,

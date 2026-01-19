@@ -13,7 +13,7 @@ from typing import Optional, List, Dict, Any
 from utils.hardware_base import BoundedQueueHardwareHandler
 
 logger = logging.getLogger('openTPT.lap_timing')
-from utils.config import (
+from config import (
     LAP_TIMING_ENABLED,
     TRACK_AUTO_DETECT,
     TRACK_SEARCH_RADIUS_KM,

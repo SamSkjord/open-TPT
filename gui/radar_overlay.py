@@ -9,7 +9,7 @@ import pygame
 import math
 from typing import Dict, List, Tuple, Optional
 import time
-from utils.config import FONT_PATH
+from config import FONT_PATH
 
 # Overlay styling constants (3x larger, solid fill)
 ARROW_HEIGHT = 120  # 3x larger (was 40)

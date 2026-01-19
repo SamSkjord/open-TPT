@@ -8,7 +8,7 @@ import pygame
 import numpy as np
 
 logger = logging.getLogger('openTPT.display')
-from utils.config import (
+from config import (
     TPMS_POSITIONS,
     FONT_SIZE_LARGE,
     FONT_SIZE_MEDIUM,

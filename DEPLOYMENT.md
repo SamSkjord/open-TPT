@@ -417,7 +417,7 @@ ssh pi@192.168.199.246
 cd /home/pi/open-TPT
 
 # Run the boot optimisation script
-sudo ./config/boot/optimize-boot.sh
+sudo ./services/boot/optimize-boot.sh
 
 # Reboot to apply
 sudo reboot
@@ -458,7 +458,7 @@ Power On
 
 #### 1. Early Boot Splash (splash.service)
 
-**File:** `config/boot/splash.service`
+**File:** `services/boot/splash.service`
 
 Displays `assets/splash.png` using the Linux framebuffer image viewer (fbi) as early as possible during boot, before Python or pygame are loaded.
 
@@ -488,7 +488,7 @@ WantedBy=sysinit.target
 
 **Installation:**
 ```bash
-sudo cp /home/pi/open-TPT/config/boot/splash.service /etc/systemd/system/
+sudo cp /home/pi/open-TPT/services/boot/splash.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable splash.service
 ```

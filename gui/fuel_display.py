@@ -8,7 +8,7 @@ import pygame
 
 logger = logging.getLogger('openTPT.fuel_display')
 
-from utils.config import (
+from config import (
     DISPLAY_WIDTH,
     DISPLAY_HEIGHT,
     BLACK,

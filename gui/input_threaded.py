@@ -17,7 +17,7 @@ try:
 except ImportError:
     BOARD_AVAILABLE = False
 
-from utils.config import (
+from config import (
     BUTTON_RECORDING,
     BUTTON_PAGE_SETTINGS,
     BUTTON_CATEGORY_SWITCH,

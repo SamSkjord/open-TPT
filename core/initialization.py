@@ -10,7 +10,7 @@ import time
 
 import pygame
 
-from utils.config import (
+from config import (
     DISPLAY_WIDTH,
     DISPLAY_HEIGHT,
     FONT_PATH,
@@ -202,7 +202,7 @@ class InitializationMixin:
 
         try:
             from hardware.imu_handler import IMUHandler
-            from utils.config import IMU_ENABLED
+            from config import IMU_ENABLED
             IMU_AVAILABLE = True
         except ImportError:
             IMU_AVAILABLE = False
@@ -211,7 +211,7 @@ class InitializationMixin:
 
         try:
             from hardware.obd2_handler import OBD2Handler
-            from utils.config import OBD_ENABLED
+            from config import OBD_ENABLED
             OBD2_AVAILABLE = True
         except ImportError:
             OBD2_AVAILABLE = False
@@ -220,7 +220,7 @@ class InitializationMixin:
 
         try:
             from hardware.gps_handler import GPSHandler
-            from utils.config import GPS_ENABLED
+            from config import GPS_ENABLED
             GPS_AVAILABLE = True
         except ImportError:
             GPS_AVAILABLE = False
@@ -229,7 +229,7 @@ class InitializationMixin:
 
         try:
             from hardware.ford_hybrid_handler import FordHybridHandler
-            from utils.config import FORD_HYBRID_ENABLED
+            from config import FORD_HYBRID_ENABLED
             FORD_HYBRID_AVAILABLE = True
         except ImportError:
             FORD_HYBRID_AVAILABLE = False
@@ -238,7 +238,7 @@ class InitializationMixin:
 
         try:
             from hardware.lap_timing_handler import LapTimingHandler
-            from utils.config import LAP_TIMING_ENABLED
+            from config import LAP_TIMING_ENABLED
             LAP_TIMING_AVAILABLE = True
         except ImportError as e:
             LAP_TIMING_AVAILABLE = False
@@ -248,7 +248,7 @@ class InitializationMixin:
 
         try:
             from utils.fuel_tracker import FuelTracker
-            from utils.config import FUEL_TRACKING_ENABLED
+            from config import FUEL_TRACKING_ENABLED
             FUEL_TRACKING_AVAILABLE = True
         except ImportError as e:
             FUEL_TRACKING_AVAILABLE = False
@@ -258,7 +258,7 @@ class InitializationMixin:
 
         try:
             from hardware.copilot_handler import CoPilotHandler
-            from utils.config import (
+            from config import (
                 COPILOT_ENABLED,
                 COPILOT_MAP_DIR,
                 COPILOT_LOOKAHEAD_M,
