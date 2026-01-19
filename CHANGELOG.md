@@ -1,5 +1,40 @@
 # Changelog - openTPT
 
+## [v0.18.11] - 2026-01-19
+
+### Camera Performance Optimisation
+
+Fixed camera capture running at 15-16fps instead of the hardware-capable 26fps.
+
+#### Changes
+
+- **V4L2 Backend** - Explicitly specify `cv2.CAP_V4L2` backend for VideoCapture
+  - OpenCV's default backend selection was slower than direct V4L2
+  - Applied to main camera open and test camera detection
+
+- **Removed BUFFERSIZE=1** - Was causing frame starvation
+  - With slow processing (~20ms), BUFFERSIZE=1 forced waiting for each new frame
+  - Default buffering allows reading already-captured frames immediately
+  - Reduced grab() time from 45ms to 33ms
+
+- **Skip No-Op Resize** - Avoid cv2.resize() when scale=1.0
+  - At 800x600 camera on 1024x600 display, no scaling needed (letterboxed)
+  - OpenCV still copied the array even with same dimensions, wasting 2.5ms
+
+- **FOURCC Order** - Set MJPG format before resolution in init path
+  - Some cameras need codec set first for proper resolution negotiation
+
+#### Results
+
+- Rear camera: **26fps** (was 15-16fps) - now at hardware limit
+- Front camera: **16fps** (hardware limit of that specific camera model)
+
+#### Modified Files
+
+- `gui/camera.py` - V4L2 backend, removed BUFFERSIZE, conditional resize
+
+---
+
 ## [v0.18.10] - 2026-01-19
 
 ### Menu Restructure

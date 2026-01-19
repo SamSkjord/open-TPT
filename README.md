@@ -563,7 +563,7 @@ openTPT/
 - Real-time TPMS monitoring (auto-pairing support)
 - Brake temperature monitoring with IR sensors (MCP9601 thermocouples and MLX90614)
 - Tyre thermal imaging via Pico I2C slaves (MLX90640) or MLX90614 sensors
-- Dual USB camera support with seamless switching (60 FPS target)
+- Dual USB camera support with seamless switching (up to 26fps depending on camera hardware)
 - Deterministic camera identification via udev rules
 - NeoKey 1x4 physical controls
 - Rotary encoder input with menu system

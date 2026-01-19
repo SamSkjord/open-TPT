@@ -246,7 +246,7 @@ class Camera:
         self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, self.camera_width)
         self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, self.camera_height)
         self.camera.set(cv2.CAP_PROP_FPS, self.camera_fps)
-        self.camera.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        # Note: Removed BUFFERSIZE=1 - it causes frame starvation with slow processing
         self.camera.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0)
 
         # Set thread priority
@@ -275,6 +275,8 @@ class Camera:
         target_h = int(self.camera_height * scale)
         x_offset = (DISPLAY_WIDTH - target_w) // 2
         y_offset = (DISPLAY_HEIGHT - target_h) // 2
+        # Skip resize if dimensions match (scale == 1.0)
+        needs_resize = (target_w != self.camera_width or target_h != self.camera_height)
 
         # Variables for FPS tracking within the thread
         thread_frame_count = 0
@@ -339,10 +341,13 @@ class Camera:
                     t4 = time.time()
                     profile_times['cvt'] += (t4 - t3b) * 1000
 
-                    # Resize using fastest interpolation
-                    resized_frame = cv2.resize(
-                        rgb_frame, (target_w, target_h), interpolation=cv2.INTER_NEAREST
-                    )
+                    # Resize only if needed (skip when scale == 1.0)
+                    if needs_resize:
+                        resized_frame = cv2.resize(
+                            rgb_frame, (target_w, target_h), interpolation=cv2.INTER_NEAREST
+                        )
+                    else:
+                        resized_frame = rgb_frame
                     t5 = time.time()
                     profile_times['resize'] += (t5 - t4) * 1000
 
@@ -437,7 +442,7 @@ class Camera:
             else:
                 # Auto-detect: try named devices first, then indices
                 named_device = f"/dev/video-{self.current_camera}"
-                test_camera = cv2.VideoCapture(named_device)
+                test_camera = cv2.VideoCapture(named_device, cv2.CAP_V4L2)
                 if test_camera.isOpened():
                     test_camera.release()
                     camera_to_open = named_device
@@ -445,7 +450,7 @@ class Camera:
                 else:
                     # Fall back to auto-detect by index
                     for idx in range(6):  # Try indices 0-5
-                        test_camera = cv2.VideoCapture(idx)
+                        test_camera = cv2.VideoCapture(idx, cv2.CAP_V4L2)
                         if test_camera.isOpened():
                             test_camera.release()
                             camera_to_open = idx
@@ -462,18 +467,18 @@ class Camera:
             if DEBUG_CAMERA:
                 logger.debug("Opening camera at %s", camera_to_open)
 
-            # Open camera without explicit backend specification, let OpenCV choose best one
-            self.camera = cv2.VideoCapture(camera_to_open)
+            # Open camera with V4L2 backend for better performance
+            self.camera = cv2.VideoCapture(camera_to_open, cv2.CAP_V4L2)
 
             if not self.camera.isOpened():
                 self.error_message = f"Failed to open camera at index {camera_index}"
                 return False
 
-            # Configure camera resolution and FPS
+            # Configure camera - FOURCC must be set before resolution
+            self.camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
             self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
             self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
             self.camera.set(cv2.CAP_PROP_FPS, CAMERA_FPS)
-            self.camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
 
             self.error_message = None
             logger.info("Camera initialised successfully at index %s", camera_index)
