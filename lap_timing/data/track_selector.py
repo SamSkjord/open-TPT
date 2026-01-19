@@ -11,7 +11,13 @@ import sqlite3
 from dataclasses import dataclass
 from typing import List, Optional
 
-from lap_timing import config
+from config import (
+    TRACK_SEARCH_RADIUS_KM,
+    LAP_TIMING_TRACKS_DB,
+    LAP_TIMING_RACELOGIC_DB,
+    LAP_TIMING_CUSTOM_TRACKS_DIR,
+    LAP_TIMING_RACELOGIC_TRACKS_DIR,
+)
 from lap_timing.data.track_loader import Track, load_track_from_kmz
 from lap_timing.utils.geometry import haversine_distance
 
@@ -153,10 +159,10 @@ class TrackSelector:
             custom_tracks_dir: Directory containing custom KMZ files
             racelogic_tracks_dir: Directory containing RaceLogic KMZ files (by country)
         """
-        self.tracks_db_path = tracks_db_path or config.TRACKS_DB_PATH
-        self.racelogic_db_path = racelogic_db_path or config.RACELOGIC_DB_PATH
-        self.custom_tracks_dir = custom_tracks_dir or config.CUSTOM_TRACKS_DIR
-        self.racelogic_tracks_dir = racelogic_tracks_dir or config.RACELOGIC_TRACKS_DIR
+        self.tracks_db_path = tracks_db_path or LAP_TIMING_TRACKS_DB
+        self.racelogic_db_path = racelogic_db_path or LAP_TIMING_RACELOGIC_DB
+        self.custom_tracks_dir = custom_tracks_dir or LAP_TIMING_CUSTOM_TRACKS_DIR
+        self.racelogic_tracks_dir = racelogic_tracks_dir or LAP_TIMING_RACELOGIC_TRACKS_DIR
 
         # Verify databases exist
         self._check_databases()
@@ -291,7 +297,7 @@ class TrackSelector:
             List of TrackInfo, sorted by distance (nearest first)
         """
         if max_distance_km is None:
-            max_distance_km = config.TRACK_SEARCH_RADIUS_KM
+            max_distance_km = TRACK_SEARCH_RADIUS_KM
 
         nearby = []
 
@@ -337,7 +343,7 @@ class TrackSelector:
         if len(nearby) == 0:
             logger.info(
                 "No tracks found within %dkm of position (%.6f, %.6f)",
-                max_distance_km or config.TRACK_SEARCH_RADIUS_KM, lat, lon
+                max_distance_km or TRACK_SEARCH_RADIUS_KM, lat, lon
             )
             return None
 
@@ -358,7 +364,7 @@ class TrackSelector:
         # Multiple tracks found - ask user to select
         logger.info(
             "Found %d tracks within %dkm",
-            len(nearby), max_distance_km or config.TRACK_SEARCH_RADIUS_KM
+            len(nearby), max_distance_km or TRACK_SEARCH_RADIUS_KM
         )
 
         for i, track_info in enumerate(nearby, 1):

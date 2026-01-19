@@ -38,6 +38,19 @@ Added support for Adafruit 128x32 OLED Bonnet (SSD1306) as secondary display for
 
 - Pitlane timer mode for minidisplay
 
+### Config Cleanup
+
+Removed standalone CLI code and consolidated configuration files.
+
+#### Changes
+
+- **copilot/main.py**: Removed 130 lines of argparse CLI code (never used standalone)
+- **copilot/config.py**: Removed unused standalone settings (GPS_PORT, MAP_FILE, PROJECT_ROOT)
+- **lap_timing/config.py**: Deleted, track paths moved to main config
+- **config.py**: Added `LAP_TIMING_TRACKS_DB`, `LAP_TIMING_RACELOGIC_DB`, `LAP_TIMING_CUSTOM_TRACKS_DIR`, `LAP_TIMING_RACELOGIC_TRACKS_DIR`
+
+Note: CoPilot and lap_timing retain separate corner detection configs (`copilot/config.py`) as they have different tuning for road vs track use.
+
 ---
 
 ## [v0.18.12] - 2026-01-19

@@ -664,6 +664,13 @@ DELTA_BAR_RANGE = 10.0  # Maximum delta to display (seconds, +/-)
 # Lap timing data directory
 LAP_TIMING_DATA_DIR = os.path.expanduser("~/.opentpt/lap_timing")
 
+# Track database paths (relative to LAP_TIMING_DATA_DIR)
+LAP_TIMING_TRACKS_DIR = os.path.join(LAP_TIMING_DATA_DIR, "tracks")
+LAP_TIMING_TRACKS_DB = os.path.join(LAP_TIMING_TRACKS_DIR, "tracks.db")
+LAP_TIMING_RACELOGIC_DB = os.path.join(LAP_TIMING_TRACKS_DIR, "racelogic.db")
+LAP_TIMING_CUSTOM_TRACKS_DIR = os.path.join(LAP_TIMING_TRACKS_DIR, "maps")
+LAP_TIMING_RACELOGIC_TRACKS_DIR = os.path.join(LAP_TIMING_TRACKS_DIR, "racelogic")
+
 # Sector configuration
 LAP_TIMING_SECTOR_COUNT = 3  # Number of sectors per lap
 

@@ -14,7 +14,7 @@ from typing import List, Tuple, Optional
 from dataclasses import dataclass, field
 from lap_timing.data.models import StartFinishLine
 from lap_timing.utils.geometry import haversine_distance
-from lap_timing import config
+from config import LAP_TIMING_RACELOGIC_TRACKS_DIR
 
 
 @dataclass
@@ -923,7 +923,7 @@ def get_donington_track() -> Track:
         Track object for Donington National
     """
     kmz_path = os.path.join(
-        config.RACELOGIC_TRACKS_DIR,
+        LAP_TIMING_RACELOGIC_TRACKS_DIR,
         'United Kingdom',
         'Donington National.kmz'
     )
