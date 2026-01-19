@@ -1,5 +1,38 @@
 # Changelog - openTPT
 
+## [v0.18.10] - 2026-01-19
+
+### Menu Restructure
+
+Simplified the main menu from 10 top-level items to 4 focused items, moving "set and forget" options into System.
+
+#### Changes
+
+- **Simplified Menu Structure** - Reduced top-level items from 10 to 4:
+  - **Track & Timing** - Select Track, Load Route, Current Track, Best Lap, Map Theme, Clear Best Laps, Clear Track
+  - **CoPilot** - Enabled, Mode, Route, Lookahead, Audio, Status
+  - **Thresholds** - Promoted to top level (Tyre Temps, Brake Temps, Pressures, Boost Range)
+  - **System** - Consolidated all "set and forget" options
+
+- **System Menu Reorganisation** - Grouped related settings into submenus:
+  - Bluetooth Audio (moved to top per user request)
+  - Display (Brightness + Pages submenu)
+  - Cameras
+  - Light Strip
+  - Units
+  - Status (GPS, Sensors, Radar, Network, Storage, Uptime)
+  - Hardware (TPMS Pairing, IMU Calibration, Speed Source)
+  - Reboot/Shutdown at bottom
+
+- **Renamed Root Menu** - Changed title from "Settings" to "Menu"
+
+#### Modified Files
+
+- `gui/menu/base.py` - Rewrote `_build_menus()` with new 4-item structure
+- `gui/menu/lap_timing.py` - Updated parent references to use `track_timing_menu`
+
+---
+
 ## [v0.18.9] - 2026-01-19
 
 ### Code Quality Improvements

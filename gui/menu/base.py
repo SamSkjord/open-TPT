@@ -454,50 +454,64 @@ class MenuSystem(
         self._build_menus()
 
     def _build_menus(self):
-        """Build the menu structure (items alphabetical, Back always last)."""
-        # Bluetooth submenu (alphabetical)
-        bt_menu = Menu("Bluetooth Audio")
-        bt_menu.add_item(
-            MenuItem("Connect", action=lambda: self._show_bt_connect_menu())
-        )
-        bt_menu.add_item(MenuItem("Disconnect", action=lambda: self._bt_disconnect()))
-        bt_menu.add_item(
-            MenuItem("Forget Device", action=lambda: self._show_bt_forget_menu())
-        )
-        bt_menu.add_item(
-            MenuItem("Pair New Device", action=lambda: self._show_bt_pair_menu())
-        )
-        bt_menu.add_item(
-            MenuItem("Refresh BT Services", action=lambda: self._bt_refresh_services())
-        )
-        bt_menu.add_item(
-            MenuItem("Scan for Devices", action=lambda: self._scan_bluetooth())
-        )
-        bt_menu.add_item(
-            MenuItem("Status", dynamic_label=lambda: self._get_bt_status_label())
-        )
-        bt_menu.add_item(
+        """Build the menu structure with 4 top-level items."""
+        # =====================================================================
+        # TRACK & TIMING MENU
+        # =====================================================================
+        track_timing_menu = Menu("Track & Timing")
+        track_timing_menu.add_item(
             MenuItem(
-                "Volume",
-                dynamic_label=lambda: self._get_volume_label(),
-                action=lambda: self._toggle_volume_editing(),
+                "Select Track",
+                action=lambda: self._show_track_selection_menu(),
             )
         )
-        bt_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
-        self.bt_menu = bt_menu
-
-        # Camera submenu (alphabetical)
-        camera_menu = Menu("Camera")
-        camera_menu.add_item(
-            MenuItem("Front Camera", action=lambda: self._show_camera_menu("front"))
+        track_timing_menu.add_item(
+            MenuItem(
+                "Load Route File",
+                action=lambda: self._show_route_file_menu(),
+            )
         )
-        camera_menu.add_item(
-            MenuItem("Rear Camera", action=lambda: self._show_camera_menu("rear"))
+        track_timing_menu.add_item(
+            MenuItem(
+                "Current Track",
+                dynamic_label=lambda: self._get_current_track_label(),
+                enabled=False,
+            )
         )
-        camera_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
-        self.camera_menu = camera_menu
+        track_timing_menu.add_item(
+            MenuItem(
+                "Best Lap",
+                dynamic_label=lambda: self._get_best_lap_label(),
+                enabled=False,
+            )
+        )
+        track_timing_menu.add_item(
+            MenuItem(
+                "Map Theme",
+                dynamic_label=lambda: self._get_map_theme_label(),
+                action=lambda: self._show_map_theme_menu(),
+            )
+        )
+        track_timing_menu.add_item(
+            MenuItem(
+                "Clear Best Laps",
+                action=lambda: self._clear_best_laps(),
+            )
+        )
+        track_timing_menu.add_item(
+            MenuItem(
+                "Clear Track",
+                action=lambda: self._clear_current_track(),
+            )
+        )
+        track_timing_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        self.track_timing_menu = track_timing_menu
+        # Keep alias for backwards compatibility with lap_timing.py
+        self.lap_timing_menu = track_timing_menu
 
-        # CoPilot submenu (rally callouts)
+        # =====================================================================
+        # COPILOT MENU
+        # =====================================================================
         copilot_menu = Menu("CoPilot")
         copilot_menu.add_item(
             MenuItem(
@@ -522,16 +536,16 @@ class MenuSystem(
         )
         copilot_menu.add_item(
             MenuItem(
-                "Audio",
-                dynamic_label=lambda: self._get_copilot_audio_label(),
-                action=lambda: self._toggle_copilot_audio(),
+                "Lookahead",
+                dynamic_label=lambda: self._get_copilot_lookahead_label(),
+                action=lambda: self._cycle_copilot_lookahead(),
             )
         )
         copilot_menu.add_item(
             MenuItem(
-                "Lookahead",
-                dynamic_label=lambda: self._get_copilot_lookahead_label(),
-                action=lambda: self._cycle_copilot_lookahead(),
+                "Audio",
+                dynamic_label=lambda: self._get_copilot_audio_label(),
+                action=lambda: self._toggle_copilot_audio(),
             )
         )
         copilot_menu.add_item(
@@ -544,321 +558,9 @@ class MenuSystem(
         copilot_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
         self.copilot_menu = copilot_menu
 
-        # Display submenu
-        display_menu = Menu("Display")
-        display_menu.add_item(
-            MenuItem(
-                "Brightness",
-                dynamic_label=lambda: self._get_brightness_label(),
-                action=lambda: self._toggle_brightness_editing(),
-            )
-        )
-        display_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
-
-        # Pages submenu - toggle which UI pages are in the rotation
-        pages_menu = Menu("Pages")
-        # Dynamically add menu items for each available page
-        for page_config in UI_PAGES:
-            page_id = page_config["id"]
-            page_name = page_config["name"]
-            # Use default parameters to capture current values in closure
-            pages_menu.add_item(
-                MenuItem(
-                    page_name,
-                    dynamic_label=lambda pid=page_id, pname=page_name: self._get_page_enabled_label(pid, pname),
-                    action=lambda pid=page_id: self._toggle_page_enabled(pid),
-                )
-            )
-        pages_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
-
-        # Lap Timing submenu
-        lap_timing_menu = Menu("Lap Timing")
-        lap_timing_menu.add_item(
-            MenuItem(
-                "Enabled",
-                dynamic_label=lambda: self._get_lap_timing_enabled_label(),
-                action=lambda: self._toggle_lap_timing_enabled(),
-            )
-        )
-        lap_timing_menu.add_item(
-            MenuItem(
-                "Auto-Detect",
-                dynamic_label=lambda: self._get_lap_timing_auto_detect_label(),
-                action=lambda: self._toggle_lap_timing_auto_detect(),
-            )
-        )
-        lap_timing_menu.add_item(
-            MenuItem(
-                "Select Track",
-                action=lambda: self._show_track_selection_menu(),
-            )
-        )
-        lap_timing_menu.add_item(
-            MenuItem(
-                "Load Route File",
-                action=lambda: self._show_route_file_menu(),
-            )
-        )
-        lap_timing_menu.add_item(
-            MenuItem(
-                "Current Track",
-                dynamic_label=lambda: self._get_current_track_label(),
-                enabled=False,
-            )
-        )
-        lap_timing_menu.add_item(
-            MenuItem(
-                "Best Lap",
-                dynamic_label=lambda: self._get_best_lap_label(),
-                enabled=False,
-            )
-        )
-        lap_timing_menu.add_item(
-            MenuItem(
-                "Clear Best Laps",
-                action=lambda: self._clear_best_laps(),
-            )
-        )
-        lap_timing_menu.add_item(
-            MenuItem(
-                "Clear Track",
-                action=lambda: self._clear_current_track(),
-            )
-        )
-        lap_timing_menu.add_item(
-            MenuItem(
-                "Map Theme",
-                dynamic_label=lambda: self._get_map_theme_label(),
-                action=lambda: self._show_map_theme_menu(),
-            )
-        )
-        lap_timing_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
-        self.lap_timing_menu = lap_timing_menu
-
-        # Light Strip submenu (NeoDriver)
-        lights_menu = Menu("Light Strip")
-
-        # Direction submenu (alphabetical)
-        direction_menu = Menu("Light Direction")
-        direction_menu.add_item(
-            MenuItem(
-                "Centre Out", action=lambda: self._set_lights_direction("centre_out")
-            )
-        )
-        direction_menu.add_item(
-            MenuItem("Edges In", action=lambda: self._set_lights_direction("edges_in"))
-        )
-        direction_menu.add_item(
-            MenuItem(
-                "Left to Right", action=lambda: self._set_lights_direction("left_right")
-            )
-        )
-        direction_menu.add_item(
-            MenuItem(
-                "Right to Left", action=lambda: self._set_lights_direction("right_left")
-            )
-        )
-        direction_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
-        direction_menu.parent = lights_menu
-
-        # Mode submenu (alphabetical)
-        mode_menu = Menu("Light Mode")
-        mode_menu.add_item(
-            MenuItem("Lap Delta", action=lambda: self._set_lights_mode("delta"))
-        )
-        mode_menu.add_item(MenuItem("Off", action=lambda: self._set_lights_mode("off")))
-        mode_menu.add_item(
-            MenuItem("Overtake", action=lambda: self._set_lights_mode("overtake"))
-        )
-        mode_menu.add_item(
-            MenuItem("Shift Lights", action=lambda: self._set_lights_mode("shift"))
-        )
-        mode_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
-        mode_menu.parent = lights_menu
-
-        # Light Strip items (alphabetical)
-        lights_menu.add_item(
-            MenuItem(
-                "Direction",
-                dynamic_label=lambda: self._get_lights_direction_label(),
-                submenu=direction_menu,
-            )
-        )
-        lights_menu.add_item(
-            MenuItem(
-                "Mode",
-                dynamic_label=lambda: self._get_lights_mode_label(),
-                submenu=mode_menu,
-            )
-        )
-        lights_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
-
-        # Radar submenu (alphabetical)
-        radar_menu = Menu("Radar")
-        radar_menu.add_item(
-            MenuItem(
-                "Enabled",
-                dynamic_label=lambda: self._get_radar_enabled_label(),
-                action=lambda: self._toggle_radar_enabled(),
-            )
-        )
-        radar_menu.add_item(
-            MenuItem(
-                "CAN Channel",
-                dynamic_label=lambda: self._get_radar_channel_label(),
-                enabled=False,
-            )
-        )
-        radar_menu.add_item(
-            MenuItem(
-                "Status",
-                dynamic_label=lambda: self._get_radar_status_label(),
-                enabled=False,
-            )
-        )
-        radar_menu.add_item(
-            MenuItem(
-                "Tracks",
-                dynamic_label=lambda: self._get_radar_tracks_label(),
-                enabled=False,
-            )
-        )
-        radar_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
-
-        # System submenus
-
-        # GPS Status submenu (alphabetical)
-        gps_menu = Menu("GPS Status")
-        gps_menu.add_item(
-            MenuItem(
-                "Antenna",
-                dynamic_label=lambda: self._get_gps_antenna_label(),
-                enabled=False,
-            )
-        )
-        gps_menu.add_item(
-            MenuItem(
-                "Fix", dynamic_label=lambda: self._get_gps_fix_label(), enabled=False
-            )
-        )
-        gps_menu.add_item(
-            MenuItem(
-                "Port", dynamic_label=lambda: self._get_gps_port_label(), enabled=False
-            )
-        )
-        gps_menu.add_item(
-            MenuItem(
-                "Position",
-                dynamic_label=lambda: self._get_gps_position_label(),
-                enabled=False,
-            )
-        )
-        gps_menu.add_item(
-            MenuItem(
-                "Satellites",
-                dynamic_label=lambda: self._get_gps_satellites_label(),
-                enabled=False,
-            )
-        )
-        gps_menu.add_item(
-            MenuItem(
-                "Speed",
-                dynamic_label=lambda: self._get_gps_speed_label(),
-                enabled=False,
-            )
-        )
-        gps_menu.add_item(
-            MenuItem(
-                "Update Rate",
-                dynamic_label=lambda: self._get_gps_update_rate_label(),
-                enabled=False,
-            )
-        )
-        gps_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
-
-        # IMU calibration submenu (numbered steps - keep order)
-        imu_menu = Menu("IMU Calibration")
-        imu_menu.add_item(
-            MenuItem(
-                "1. Zero (level)",
-                dynamic_label=lambda: self._get_imu_zero_label(),
-                action=lambda: self._imu_calibrate_zero(),
-            )
-        )
-        imu_menu.add_item(
-            MenuItem(
-                "2. Accelerate",
-                dynamic_label=lambda: self._get_imu_accel_label(),
-                action=lambda: self._imu_calibrate_accel(),
-            )
-        )
-        imu_menu.add_item(
-            MenuItem(
-                "3. Turn Left",
-                dynamic_label=lambda: self._get_imu_turn_label(),
-                action=lambda: self._imu_calibrate_turn(),
-            )
-        )
-        imu_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
-
-        # System Status submenu (alphabetical)
-        status_menu = Menu("System Status")
-        status_menu.add_item(
-            MenuItem(
-                "IP Address",
-                dynamic_label=lambda: self._get_system_ip_label(),
-                enabled=False,
-            )
-        )
-        status_menu.add_item(
-            MenuItem(
-                "Sensors",
-                dynamic_label=lambda: self._get_sensor_status_label(),
-                enabled=False,
-            )
-        )
-        status_menu.add_item(
-            MenuItem(
-                "Storage",
-                dynamic_label=lambda: self._get_system_storage_label(),
-                enabled=False,
-            )
-        )
-        status_menu.add_item(
-            MenuItem(
-                "Uptime",
-                dynamic_label=lambda: self._get_system_uptime_label(),
-                enabled=False,
-            )
-        )
-        status_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
-
-        # Units submenu (alphabetical)
-        units_menu = Menu("Units")
-        units_menu.add_item(
-            MenuItem(
-                "Pressure",
-                dynamic_label=lambda: self._get_pressure_unit_label(),
-                action=lambda: self._toggle_pressure_unit(),
-            )
-        )
-        units_menu.add_item(
-            MenuItem(
-                "Speed",
-                dynamic_label=lambda: self._get_speed_unit_label(),
-                action=lambda: self._toggle_speed_unit(),
-            )
-        )
-        units_menu.add_item(
-            MenuItem(
-                "Temperature",
-                dynamic_label=lambda: self._get_temp_unit_label(),
-                action=lambda: self._toggle_temp_unit(),
-            )
-        )
-        units_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
-
-        # Thresholds submenu
+        # =====================================================================
+        # THRESHOLDS MENU (promoted to top level)
+        # =====================================================================
         thresholds_menu = Menu("Thresholds")
 
         # Tyre temperature thresholds
@@ -922,7 +624,7 @@ class MenuSystem(
         )
         pressure_thresh_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
 
-        # Boost gauge range (PSI values, converted for other units in display)
+        # Boost gauge range
         boost_thresh_menu = Menu("Boost Range")
         boost_thresh_menu.add_item(
             MenuItem(
@@ -941,32 +643,287 @@ class MenuSystem(
         boost_thresh_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
 
         # Add submenus to thresholds menu
-        thresholds_menu.add_item(MenuItem("Boost Range", submenu=boost_thresh_menu))
         thresholds_menu.add_item(MenuItem("Tyre Temps", submenu=tyre_thresh_menu))
         thresholds_menu.add_item(MenuItem("Brake Temps", submenu=brake_thresh_menu))
         thresholds_menu.add_item(MenuItem("Pressures", submenu=pressure_thresh_menu))
+        thresholds_menu.add_item(MenuItem("Boost Range", submenu=boost_thresh_menu))
         thresholds_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        self.thresholds_menu = thresholds_menu
 
-        # System menu (alphabetical)
+        # =====================================================================
+        # SYSTEM MENU (consolidated)
+        # =====================================================================
         system_menu = Menu("System")
-        system_menu.add_item(MenuItem("Status", submenu=status_menu))
-        system_menu.add_item(MenuItem("GPS Status", submenu=gps_menu))
-        system_menu.add_item(MenuItem("Thresholds", submenu=thresholds_menu))
-        system_menu.add_item(MenuItem("Units", submenu=units_menu))
-        system_menu.add_item(
+
+        # --- Bluetooth Audio (at top per user request) ---
+        bt_menu = Menu("Bluetooth Audio")
+        bt_menu.add_item(
+            MenuItem("Connect", action=lambda: self._show_bt_connect_menu())
+        )
+        bt_menu.add_item(MenuItem("Disconnect", action=lambda: self._bt_disconnect()))
+        bt_menu.add_item(
+            MenuItem("Forget Device", action=lambda: self._show_bt_forget_menu())
+        )
+        bt_menu.add_item(
+            MenuItem("Pair New Device", action=lambda: self._show_bt_pair_menu())
+        )
+        bt_menu.add_item(
+            MenuItem("Refresh BT Services", action=lambda: self._bt_refresh_services())
+        )
+        bt_menu.add_item(
+            MenuItem("Scan for Devices", action=lambda: self._scan_bluetooth())
+        )
+        bt_menu.add_item(
+            MenuItem("Status", dynamic_label=lambda: self._get_bt_status_label())
+        )
+        bt_menu.add_item(
             MenuItem(
-                "Speed Source",
-                dynamic_label=lambda: f"Speed Source: {self._get_speed_source().upper()}",
-                action=lambda: self._toggle_speed_source(),
+                "Volume",
+                dynamic_label=lambda: self._get_volume_label(),
+                action=lambda: self._toggle_volume_editing(),
             )
         )
-        system_menu.add_item(MenuItem("IMU Calibration", submenu=imu_menu))
-        system_menu.add_item(MenuItem("Reboot", action=lambda: self._reboot()))
-        system_menu.add_item(MenuItem("Shutdown", action=lambda: self._shutdown()))
-        system_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        bt_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        self.bt_menu = bt_menu
 
-        # TPMS submenu (positional order - FL, FR, RL, RR)
-        tpms_menu = Menu("TPMS Settings")
+        # --- Display submenu ---
+        display_menu = Menu("Display")
+        display_menu.add_item(
+            MenuItem(
+                "Brightness",
+                dynamic_label=lambda: self._get_brightness_label(),
+                action=lambda: self._toggle_brightness_editing(),
+            )
+        )
+        # Pages submenu nested under Display
+        pages_menu = Menu("Pages")
+        for page_config in UI_PAGES:
+            page_id = page_config["id"]
+            page_name = page_config["name"]
+            pages_menu.add_item(
+                MenuItem(
+                    page_name,
+                    dynamic_label=lambda pid=page_id, pname=page_name: self._get_page_enabled_label(pid, pname),
+                    action=lambda pid=page_id: self._toggle_page_enabled(pid),
+                )
+            )
+        pages_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        display_menu.add_item(MenuItem("Pages", submenu=pages_menu))
+        display_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        self.display_menu = display_menu
+
+        # --- Cameras submenu ---
+        camera_menu = Menu("Cameras")
+        camera_menu.add_item(
+            MenuItem("Front Camera", action=lambda: self._show_camera_menu("front"))
+        )
+        camera_menu.add_item(
+            MenuItem("Rear Camera", action=lambda: self._show_camera_menu("rear"))
+        )
+        camera_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        self.camera_menu = camera_menu
+
+        # --- Light Strip submenu ---
+        lights_menu = Menu("Light Strip")
+
+        direction_menu = Menu("Light Direction")
+        direction_menu.add_item(
+            MenuItem(
+                "Centre Out", action=lambda: self._set_lights_direction("centre_out")
+            )
+        )
+        direction_menu.add_item(
+            MenuItem("Edges In", action=lambda: self._set_lights_direction("edges_in"))
+        )
+        direction_menu.add_item(
+            MenuItem(
+                "Left to Right", action=lambda: self._set_lights_direction("left_right")
+            )
+        )
+        direction_menu.add_item(
+            MenuItem(
+                "Right to Left", action=lambda: self._set_lights_direction("right_left")
+            )
+        )
+        direction_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+
+        mode_menu = Menu("Light Mode")
+        mode_menu.add_item(
+            MenuItem("Lap Delta", action=lambda: self._set_lights_mode("delta"))
+        )
+        mode_menu.add_item(MenuItem("Off", action=lambda: self._set_lights_mode("off")))
+        mode_menu.add_item(
+            MenuItem("Overtake", action=lambda: self._set_lights_mode("overtake"))
+        )
+        mode_menu.add_item(
+            MenuItem("Shift Lights", action=lambda: self._set_lights_mode("shift"))
+        )
+        mode_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+
+        lights_menu.add_item(
+            MenuItem(
+                "Direction",
+                dynamic_label=lambda: self._get_lights_direction_label(),
+                submenu=direction_menu,
+            )
+        )
+        lights_menu.add_item(
+            MenuItem(
+                "Mode",
+                dynamic_label=lambda: self._get_lights_mode_label(),
+                submenu=mode_menu,
+            )
+        )
+        lights_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        self.lights_menu = lights_menu
+
+        # --- Units submenu ---
+        units_menu = Menu("Units")
+        units_menu.add_item(
+            MenuItem(
+                "Pressure",
+                dynamic_label=lambda: self._get_pressure_unit_label(),
+                action=lambda: self._toggle_pressure_unit(),
+            )
+        )
+        units_menu.add_item(
+            MenuItem(
+                "Speed",
+                dynamic_label=lambda: self._get_speed_unit_label(),
+                action=lambda: self._toggle_speed_unit(),
+            )
+        )
+        units_menu.add_item(
+            MenuItem(
+                "Temperature",
+                dynamic_label=lambda: self._get_temp_unit_label(),
+                action=lambda: self._toggle_temp_unit(),
+            )
+        )
+        units_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        self.units_menu = units_menu
+
+        # --- Status submenu (consolidated GPS, Sensors, Radar, Network) ---
+        status_menu = Menu("Status")
+        # GPS submenu
+        gps_menu = Menu("GPS")
+        gps_menu.add_item(
+            MenuItem(
+                "Fix", dynamic_label=lambda: self._get_gps_fix_label(), enabled=False
+            )
+        )
+        gps_menu.add_item(
+            MenuItem(
+                "Satellites",
+                dynamic_label=lambda: self._get_gps_satellites_label(),
+                enabled=False,
+            )
+        )
+        gps_menu.add_item(
+            MenuItem(
+                "Speed",
+                dynamic_label=lambda: self._get_gps_speed_label(),
+                enabled=False,
+            )
+        )
+        gps_menu.add_item(
+            MenuItem(
+                "Position",
+                dynamic_label=lambda: self._get_gps_position_label(),
+                enabled=False,
+            )
+        )
+        gps_menu.add_item(
+            MenuItem(
+                "Antenna",
+                dynamic_label=lambda: self._get_gps_antenna_label(),
+                enabled=False,
+            )
+        )
+        gps_menu.add_item(
+            MenuItem(
+                "Port", dynamic_label=lambda: self._get_gps_port_label(), enabled=False
+            )
+        )
+        gps_menu.add_item(
+            MenuItem(
+                "Update Rate",
+                dynamic_label=lambda: self._get_gps_update_rate_label(),
+                enabled=False,
+            )
+        )
+        gps_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+
+        # Radar submenu
+        radar_menu = Menu("Radar")
+        radar_menu.add_item(
+            MenuItem(
+                "Enabled",
+                dynamic_label=lambda: self._get_radar_enabled_label(),
+                action=lambda: self._toggle_radar_enabled(),
+            )
+        )
+        radar_menu.add_item(
+            MenuItem(
+                "Status",
+                dynamic_label=lambda: self._get_radar_status_label(),
+                enabled=False,
+            )
+        )
+        radar_menu.add_item(
+            MenuItem(
+                "Tracks",
+                dynamic_label=lambda: self._get_radar_tracks_label(),
+                enabled=False,
+            )
+        )
+        radar_menu.add_item(
+            MenuItem(
+                "CAN Channel",
+                dynamic_label=lambda: self._get_radar_channel_label(),
+                enabled=False,
+            )
+        )
+        radar_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+
+        status_menu.add_item(MenuItem("GPS", submenu=gps_menu))
+        status_menu.add_item(
+            MenuItem(
+                "Sensors",
+                dynamic_label=lambda: self._get_sensor_status_label(),
+                enabled=False,
+            )
+        )
+        status_menu.add_item(MenuItem("Radar", submenu=radar_menu))
+        status_menu.add_item(
+            MenuItem(
+                "Network (IP)",
+                dynamic_label=lambda: self._get_system_ip_label(),
+                enabled=False,
+            )
+        )
+        status_menu.add_item(
+            MenuItem(
+                "Storage",
+                dynamic_label=lambda: self._get_system_storage_label(),
+                enabled=False,
+            )
+        )
+        status_menu.add_item(
+            MenuItem(
+                "Uptime",
+                dynamic_label=lambda: self._get_system_uptime_label(),
+                enabled=False,
+            )
+        )
+        status_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        self.status_menu = status_menu
+
+        # --- Hardware submenu (TPMS, IMU, Speed Source) ---
+        hardware_menu = Menu("Hardware")
+
+        # TPMS Pairing submenu
+        tpms_menu = Menu("TPMS Pairing")
         tpms_menu.add_item(
             MenuItem("Pair FL", action=lambda: self._start_tpms_pairing("FL"))
         )
@@ -980,41 +937,99 @@ class MenuSystem(
             MenuItem("Pair RR", action=lambda: self._start_tpms_pairing("RR"))
         )
         tpms_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        self.tpms_menu = tpms_menu
 
-        # Root menu (alphabetical)
-        self.root_menu = Menu("Settings")
-        self.root_menu.add_item(MenuItem("Bluetooth", submenu=bt_menu))
-        self.root_menu.add_item(MenuItem("Camera", submenu=camera_menu))
+        # IMU calibration submenu
+        imu_menu = Menu("IMU Calibration")
+        imu_menu.add_item(
+            MenuItem(
+                "1. Zero (level)",
+                dynamic_label=lambda: self._get_imu_zero_label(),
+                action=lambda: self._imu_calibrate_zero(),
+            )
+        )
+        imu_menu.add_item(
+            MenuItem(
+                "2. Accelerate",
+                dynamic_label=lambda: self._get_imu_accel_label(),
+                action=lambda: self._imu_calibrate_accel(),
+            )
+        )
+        imu_menu.add_item(
+            MenuItem(
+                "3. Turn Left",
+                dynamic_label=lambda: self._get_imu_turn_label(),
+                action=lambda: self._imu_calibrate_turn(),
+            )
+        )
+        imu_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        self.imu_menu = imu_menu
+
+        hardware_menu.add_item(MenuItem("TPMS Pairing", submenu=tpms_menu))
+        hardware_menu.add_item(MenuItem("IMU Calibration", submenu=imu_menu))
+        hardware_menu.add_item(
+            MenuItem(
+                "Speed Source",
+                dynamic_label=lambda: f"Speed Source: {self._get_speed_source().upper()}",
+                action=lambda: self._toggle_speed_source(),
+            )
+        )
+        hardware_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        self.hardware_menu = hardware_menu
+
+        # Build System menu items
+        system_menu.add_item(MenuItem("Bluetooth Audio", submenu=bt_menu))
+        system_menu.add_item(MenuItem("Display", submenu=display_menu))
+        system_menu.add_item(MenuItem("Cameras", submenu=camera_menu))
+        system_menu.add_item(MenuItem("Light Strip", submenu=lights_menu))
+        system_menu.add_item(MenuItem("Units", submenu=units_menu))
+        system_menu.add_item(MenuItem("Status", submenu=status_menu))
+        system_menu.add_item(MenuItem("Hardware", submenu=hardware_menu))
+        system_menu.add_item(MenuItem("Reboot", action=lambda: self._reboot()))
+        system_menu.add_item(MenuItem("Shutdown", action=lambda: self._shutdown()))
+        system_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        self.system_menu = system_menu
+
+        # =====================================================================
+        # ROOT MENU (4 items)
+        # =====================================================================
+        self.root_menu = Menu("Menu")
+        self.root_menu.add_item(MenuItem("Track & Timing", submenu=track_timing_menu))
         self.root_menu.add_item(MenuItem("CoPilot", submenu=copilot_menu))
-        self.root_menu.add_item(MenuItem("Display", submenu=display_menu))
-        self.root_menu.add_item(MenuItem("Lap Timing", submenu=lap_timing_menu))
-        self.root_menu.add_item(MenuItem("Light Strip", submenu=lights_menu))
-        self.root_menu.add_item(MenuItem("Pages", submenu=pages_menu))
-        self.root_menu.add_item(MenuItem("Radar", submenu=radar_menu))
+        self.root_menu.add_item(MenuItem("Thresholds", submenu=thresholds_menu))
         self.root_menu.add_item(MenuItem("System", submenu=system_menu))
-        self.root_menu.add_item(MenuItem("TPMS", submenu=tpms_menu))
         self.root_menu.add_item(MenuItem("Back", action=lambda: self._close_menu()))
 
-        # Set parent references
-        bt_menu.parent = self.root_menu
-        camera_menu.parent = self.root_menu
+        # =====================================================================
+        # SET PARENT REFERENCES
+        # =====================================================================
+        # Top-level menus
+        track_timing_menu.parent = self.root_menu
         copilot_menu.parent = self.root_menu
-        display_menu.parent = self.root_menu
-        lap_timing_menu.parent = self.root_menu
-        lights_menu.parent = self.root_menu
-        pages_menu.parent = self.root_menu
-        radar_menu.parent = self.root_menu
+        thresholds_menu.parent = self.root_menu
         system_menu.parent = self.root_menu
-        tpms_menu.parent = self.root_menu
-        gps_menu.parent = system_menu
-        imu_menu.parent = system_menu
-        status_menu.parent = system_menu
-        thresholds_menu.parent = system_menu
+
+        # Thresholds submenus
         tyre_thresh_menu.parent = thresholds_menu
         brake_thresh_menu.parent = thresholds_menu
         pressure_thresh_menu.parent = thresholds_menu
         boost_thresh_menu.parent = thresholds_menu
+
+        # System submenus
+        bt_menu.parent = system_menu
+        display_menu.parent = system_menu
+        pages_menu.parent = display_menu
+        camera_menu.parent = system_menu
+        lights_menu.parent = system_menu
+        direction_menu.parent = lights_menu
+        mode_menu.parent = lights_menu
         units_menu.parent = system_menu
+        status_menu.parent = system_menu
+        gps_menu.parent = status_menu
+        radar_menu.parent = status_menu
+        hardware_menu.parent = system_menu
+        tpms_menu.parent = hardware_menu
+        imu_menu.parent = hardware_menu
 
     def _go_back(self):
         """Go back to parent menu."""

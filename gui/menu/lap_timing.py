@@ -135,7 +135,7 @@ class LapTimingMenuMixin:
                 )
             )
         track_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
-        track_menu.parent = self.lap_timing_menu
+        track_menu.parent = self.track_timing_menu
 
         # Switch to track menu
         self.current_menu.hide()
@@ -205,7 +205,7 @@ class LapTimingMenuMixin:
                 pass
 
         route_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
-        route_menu.parent = self.lap_timing_menu
+        route_menu.parent = self.track_timing_menu
 
         # Switch to route menu
         self.current_menu.hide()
