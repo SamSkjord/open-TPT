@@ -17,6 +17,11 @@ Minor fixes identified during code review to improve robustness and clarity.
   - WiFi now remains enabled after boot optimisation
   - Existing installations: run `sudo systemctl unmask wpa_supplicant && sudo systemctl enable --now wpa_supplicant`
 
+- **CoPilot Init Speed** - Reduced CoPilot map initialisation from ~15s to ~1s
+  - Changed `get_bounds()` to query R-tree index instead of full nodes table scan
+  - Added metadata caching for bounds (instant lookup on subsequent boots)
+  - Backwards compatible with existing databases (auto-migrates schema)
+
 - **Defensive Dict Access** - Fixed potential KeyError in `unified_corner_handler.py` if snapshot format changes unexpectedly
   - `get_thermal_data()`, `get_zone_data()`, `get_temps()`, `get_tof_distances()` now use safe `.get()` pattern
   - Prevents render thread crashes from malformed snapshots
@@ -33,6 +38,7 @@ Minor fixes identified during code review to improve robustness and clarity.
 - `hardware/unified_corner_handler.py` - Safe dict access, corrected atomicity comment
 - `hardware/obd2_handler.py` - Simplified SOC arithmetic
 - `config/boot/optimize-boot.sh` - Keep wpa_supplicant enabled for WiFi
+- `copilot/sqlite_cache.py` - Fast bounds lookup via R-tree and metadata caching
 
 ---
 

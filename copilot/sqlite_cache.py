@@ -151,20 +151,20 @@ class SQLiteMapCache:
 
         # Check schema version
         try:
-            version = conn.execute(
-                "SELECT version FROM metadata WHERE key='schema_version'"
+            row = conn.execute(
+                "SELECT value FROM metadata WHERE key='schema_version'"
             ).fetchone()
-            if version and version[0] == SCHEMA_VERSION:
+            if row and int(row[0]) == SCHEMA_VERSION:
                 return  # Schema is current
-        except sqlite3.OperationalError:
-            pass  # Table doesn't exist yet
+        except (sqlite3.OperationalError, ValueError, TypeError):
+            pass  # Table doesn't exist yet or invalid value
 
         # Create tables
         conn.executescript("""
-            -- Metadata
+            -- Metadata (key-value store for schema version, bounds, etc.)
             CREATE TABLE IF NOT EXISTS metadata (
                 key TEXT PRIMARY KEY,
-                version INTEGER
+                value TEXT
             );
 
             -- Nodes with coordinates
@@ -256,20 +256,64 @@ class SQLiteMapCache:
 
         # Set schema version
         conn.execute(
-            "INSERT OR REPLACE INTO metadata (key, version) VALUES ('schema_version', ?)",
-            (SCHEMA_VERSION,)
+            "INSERT OR REPLACE INTO metadata (key, value) VALUES ('schema_version', ?)",
+            (str(SCHEMA_VERSION),)
         )
         conn.commit()
 
     def get_bounds(self) -> Optional[Tuple[float, float, float, float]]:
-        """Get bounding box of all data (min_lat, min_lon, max_lat, max_lon)."""
+        """Get bounding box of all data (min_lat, min_lon, max_lat, max_lon).
+
+        First checks metadata cache for instant lookup, falls back to R-tree query.
+        """
         conn = self._get_conn()
+
+        # Try cached bounds first (instant)
+        try:
+            row = conn.execute(
+                "SELECT value FROM metadata WHERE key='bounds'"
+            ).fetchone()
+            if row and row[0]:
+                parts = row[0].split(',')
+                if len(parts) == 4:
+                    return tuple(float(p) for p in parts)
+        except (sqlite3.OperationalError, ValueError):
+            pass
+
+        # Fall back to R-tree query and cache the result
         row = conn.execute("""
-            SELECT MIN(lat), MIN(lon), MAX(lat), MAX(lon) FROM nodes
+            SELECT MIN(min_lat), MIN(min_lon), MAX(max_lat), MAX(max_lon)
+            FROM node_rtree
         """).fetchone()
         if row and row[0] is not None:
-            return (row[0], row[1], row[2], row[3])
+            bounds = (row[0], row[1], row[2], row[3])
+            # Cache for future lookups
+            self._cache_bounds(bounds)
+            return bounds
         return None
+
+    def _cache_bounds(self, bounds: Tuple[float, float, float, float]) -> None:
+        """Cache bounds in metadata table for fast future lookups."""
+        conn = self._get_conn()
+        bounds_str = ','.join(str(b) for b in bounds)
+        try:
+            # Try new schema first (value TEXT)
+            conn.execute(
+                "INSERT OR REPLACE INTO metadata (key, value) VALUES ('bounds', ?)",
+                (bounds_str,)
+            )
+            conn.commit()
+        except sqlite3.OperationalError:
+            # Old schema (version INTEGER) - try adding value column
+            try:
+                conn.execute("ALTER TABLE metadata ADD COLUMN value TEXT")
+                conn.execute(
+                    "INSERT OR REPLACE INTO metadata (key, value) VALUES ('bounds', ?)",
+                    (bounds_str,)
+                )
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass  # Can't cache - will use R-tree query next time
 
     def import_from_pbf(self, pbf_path: Path, progress_callback=None) -> None:
         """Import road network from OSM PBF file using streaming.
