@@ -13,6 +13,10 @@ Minor fixes identified during code review to improve robustness and clarity.
   - Previously, asymmetric ranges (e.g. -15 to +25 PSI) placed zero at the wrong position
   - Fixes boost gauge showing 0 at ~11 PSI instead of atmospheric pressure
 
+- **WiFi Dropout Fix** - Removed `wpa_supplicant` from disabled services in boot optimisation script
+  - WiFi now remains enabled after boot optimisation
+  - Existing installations: run `sudo systemctl unmask wpa_supplicant && sudo systemctl enable --now wpa_supplicant`
+
 - **Defensive Dict Access** - Fixed potential KeyError in `unified_corner_handler.py` if snapshot format changes unexpectedly
   - `get_thermal_data()`, `get_zone_data()`, `get_temps()`, `get_tof_distances()` now use safe `.get()` pattern
   - Prevents render thread crashes from malformed snapshots
@@ -28,6 +32,7 @@ Minor fixes identified during code review to improve robustness and clarity.
 - `gui/horizontal_bar.py` - Fixed zero-point scaling in DualDirectionBar
 - `hardware/unified_corner_handler.py` - Safe dict access, corrected atomicity comment
 - `hardware/obd2_handler.py` - Simplified SOC arithmetic
+- `config/boot/optimize-boot.sh` - Keep wpa_supplicant enabled for WiFi
 
 ---
 

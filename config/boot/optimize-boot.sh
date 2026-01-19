@@ -113,12 +113,12 @@ echo "[4/8] Disabling unnecessary services..."
 SERVICES_TO_DISABLE=(
     "avahi-daemon"
     "triggerhappy"
-    "wpa_supplicant"
     "ModemManager"
     "apt-daily.timer"
     "apt-daily-upgrade.timer"
     "man-db.timer"
     # Note: systemd-timesyncd kept enabled for NTP time sync
+    # Note: wpa_supplicant kept enabled for WiFi connectivity
 )
 
 # Mask additional slow services
@@ -135,8 +135,9 @@ done
 systemctl mask plymouth 2>/dev/null || true
 echo "  Masked: plymouth"
 
-# Keep bluetooth enabled for CopePilot audio
-echo "  Kept enabled: bluetooth (for CopePilot audio)"
+# Keep bluetooth enabled for CoPilot audio
+echo "  Kept enabled: bluetooth (for CoPilot audio)"
+echo "  Kept enabled: wpa_supplicant (for WiFi connectivity)"
 
 # Systemd journal optimisation - use RAM only
 echo ""
@@ -227,9 +228,6 @@ echo "  - can-setup.service: removed network dependency (saves ~3s)"
 echo "  - openTPT.service: starts at sysinit.target (before network)"
 echo "  - splash.service: displays splash-rotated.png at boot"
 echo "  - Python bytecode: precompiled for faster imports"
-echo ""
-echo "WiFi is disabled at boot. To enable manually:"
-echo "  sudo systemctl start wpa_supplicant"
 echo ""
 echo "Reboot to apply changes:"
 echo "  sudo reboot"
