@@ -1,5 +1,45 @@
 # Changelog - openTPT
 
+## [v0.18.13] - 2026-01-19
+
+### OLED Bonnet Handler
+
+Added support for Adafruit 128x32 OLED Bonnet (SSD1306) as secondary display for fuel and lap delta information.
+
+#### Features
+
+- **Two display modes**: Fuel (level bar, laps remaining, litres) and Delta (delta bar, last/best lap times)
+- **Auto-cycle**: Cycles between modes every 10 seconds (configurable)
+- **Splash screen**: Shows "Skjord Motorsport" on startup/shutdown (5 seconds)
+- **Menu integration**: System > OLED Display submenu for mode/auto-cycle control
+- **Late binding**: Connects to lap_timing and fuel_tracker after initialisation
+- **Mock mode**: Runs without hardware for `--windowed` testing
+
+#### Configuration (config.py)
+
+- `OLED_BONNET_ENABLED` - Enable/disable (currently False - hardware damaged)
+- `OLED_BONNET_I2C_ADDRESS` - Default 0x3C
+- `OLED_BONNET_DEFAULT_MODE` - "fuel" or "delta"
+- `OLED_BONNET_AUTO_CYCLE` - Toggle auto-cycling
+- `OLED_BONNET_CYCLE_INTERVAL` - Seconds between mode changes
+
+#### New Files
+
+- `hardware/oled_bonnet_handler.py` - OLED handler with threading model
+- `gui/menu/oled.py` - Menu mixin for OLED settings
+
+#### Modified Files
+
+- `config.py` - Added OLED configuration section
+- `core/initialization.py` - OLED handler initialisation and integration
+- `gui/menu/base.py` - Added OLEDMenuMixin and OLED Display submenu
+
+#### TODO
+
+- Pitlane timer mode for minidisplay
+
+---
+
 ## [v0.18.12] - 2026-01-19
 
 ### Project Structure Reorganisation

@@ -63,6 +63,7 @@
 - OBD2: Speed, RPM, fuel level, Ford Mode 22 HV Battery SOC
 - GPS: PA1616S at 10Hz (serial /dev/ttyS0) for lap timing and CoPilot
 - NeoDriver: I2C LED strip at 0x60 (shift/delta/overtake modes)
+- OLED Bonnet: Disabled (hardware damaged) - 128x32 SSD1306 at 0x3C for fuel/delta display
 - CoPilot: Rally callouts using OSM map data (USB/NVMe storage for 6.4GB roads.db)
 
 ---
@@ -101,6 +102,7 @@ openTPT/
 │   │   ├── lap_timing.py            # Lap timing + track selection
 │   │   ├── lights.py                # NeoDriver LED strip
 │   │   ├── map_theme.py             # Map view theme selection
+│   │   ├── oled.py                  # OLED Bonnet display settings
 │   │   ├── settings.py              # Display, Units, Thresholds, Pages
 │   │   └── system.py                # GPS, IMU, Radar, System Status
 │   ├── copilot_display.py           # CoPilot UI page
@@ -112,6 +114,7 @@ openTPT/
 │   ├── obd2_handler.py              # OBD2/CAN
 │   ├── gps_handler.py               # GPS serial NMEA parsing
 │   ├── neodriver_handler.py         # NeoDriver LED strip
+│   ├── oled_bonnet_handler.py       # OLED Bonnet secondary display
 │   ├── lap_timing_handler.py        # Lap timing logic
 │   └── copilot_handler.py           # CoPilot integration handler
 ├── assets/
@@ -137,6 +140,7 @@ openTPT/
 | `0x29` | VL53L0X | TOF distance (per corner) |
 | `0x30` | NeoKey | 1x4 button input with NeoPixels |
 | `0x36` | Seesaw | Rotary encoder with NeoPixel |
+| `0x3C` | SSD1306 | OLED Bonnet 128x32 (disabled) |
 | `0x48` | ADS1115 | ADC for brake IR sensors |
 | `0x5A` | MLX90614 | Single-point IR (per corner) |
 | `0x60` | NeoDriver | I2C to NeoPixel LED strip |

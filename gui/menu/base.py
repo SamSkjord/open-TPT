@@ -38,6 +38,7 @@ from gui.menu.copilot import CoPilotMenuMixin
 from gui.menu.lap_timing import LapTimingMenuMixin
 from gui.menu.lights import LightsMenuMixin
 from gui.menu.map_theme import MapThemeMenuMixin
+from gui.menu.oled import OLEDMenuMixin
 from gui.menu.settings import SettingsMenuMixin
 from gui.menu.system import SystemMenuMixin
 
@@ -345,6 +346,7 @@ class MenuSystem(
     LapTimingMenuMixin,
     LightsMenuMixin,
     MapThemeMenuMixin,
+    OLEDMenuMixin,
     SettingsMenuMixin,
     SystemMenuMixin,
 ):
@@ -361,6 +363,7 @@ class MenuSystem(
         encoder_handler=None,
         input_handler=None,
         neodriver_handler=None,
+        oled_handler=None,
         imu_handler=None,
         gps_handler=None,
         radar_handler=None,
@@ -376,6 +379,7 @@ class MenuSystem(
             encoder_handler: Encoder handler for brightness control
             input_handler: Input handler for display brightness sync
             neodriver_handler: NeoDriver handler for LED strip control
+            oled_handler: OLED Bonnet handler for secondary display
             imu_handler: IMU handler for G-meter calibration
             gps_handler: GPS handler for speed and position
             radar_handler: Radar handler for Toyota radar
@@ -387,6 +391,7 @@ class MenuSystem(
         self.encoder_handler = encoder_handler
         self.input_handler = input_handler
         self.neodriver_handler = neodriver_handler
+        self.oled_handler = oled_handler
         self.imu_handler = imu_handler
         self.gps_handler = gps_handler
         self.radar_handler = radar_handler
@@ -777,6 +782,32 @@ class MenuSystem(
         lights_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
         self.lights_menu = lights_menu
 
+        # --- OLED Display submenu ---
+        oled_menu = Menu("OLED Display")
+        oled_menu.add_item(
+            MenuItem(
+                "Mode",
+                dynamic_label=lambda: self._get_oled_mode_label(),
+                action=lambda: self._cycle_oled_mode(),
+            )
+        )
+        oled_menu.add_item(
+            MenuItem(
+                "Auto-Cycle",
+                dynamic_label=lambda: self._get_oled_auto_cycle_label(),
+                action=lambda: self._toggle_oled_auto_cycle(),
+            )
+        )
+        oled_menu.add_item(
+            MenuItem(
+                "Status",
+                dynamic_label=lambda: self._get_oled_status_label(),
+                enabled=False,
+            )
+        )
+        oled_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        self.oled_menu = oled_menu
+
         # --- Units submenu ---
         units_menu = Menu("Units")
         units_menu.add_item(
@@ -982,6 +1013,7 @@ class MenuSystem(
         system_menu.add_item(MenuItem("Display", submenu=display_menu))
         system_menu.add_item(MenuItem("Cameras", submenu=camera_menu))
         system_menu.add_item(MenuItem("Light Strip", submenu=lights_menu))
+        system_menu.add_item(MenuItem("OLED Display", submenu=oled_menu))
         system_menu.add_item(MenuItem("Units", submenu=units_menu))
         system_menu.add_item(MenuItem("Status", submenu=status_menu))
         system_menu.add_item(MenuItem("Hardware", submenu=hardware_menu))
@@ -1023,6 +1055,7 @@ class MenuSystem(
         lights_menu.parent = system_menu
         direction_menu.parent = lights_menu
         mode_menu.parent = lights_menu
+        oled_menu.parent = system_menu
         units_menu.parent = system_menu
         status_menu.parent = system_menu
         gps_menu.parent = status_menu

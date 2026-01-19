@@ -39,6 +39,16 @@ from config import (
     NEODRIVER_MAX_RPM,
     NEODRIVER_SHIFT_RPM,
     NEODRIVER_START_RPM,
+    # OLED Bonnet configuration
+    OLED_BONNET_ENABLED,
+    OLED_BONNET_I2C_ADDRESS,
+    OLED_BONNET_WIDTH,
+    OLED_BONNET_HEIGHT,
+    OLED_BONNET_DEFAULT_MODE,
+    OLED_BONNET_AUTO_CYCLE,
+    OLED_BONNET_CYCLE_INTERVAL,
+    OLED_BONNET_BRIGHTNESS,
+    OLED_BONNET_UPDATE_RATE,
 )
 from utils.settings import get_settings
 
@@ -48,6 +58,7 @@ from gui.input_threaded import InputHandlerThreaded as InputHandler
 from gui.encoder_input import EncoderInputHandler
 from gui.menu import MenuSystem
 from hardware.neodriver_handler import NeoDriverHandler, NeoDriverMode, NeoDriverDirection
+from hardware.oled_bonnet_handler import OLEDBonnetHandler, OLEDBonnetMode
 from hardware.tpms_input_optimized import TPMSHandler
 from hardware.unified_corner_handler import UnifiedCornerHandler
 
@@ -374,6 +385,37 @@ class InitializationMixin:
                 self.neodriver = None
         logger.debug("neodriver init done t=%.1fs", time.time()-_boot_start)
 
+        # Initialise OLED Bonnet display (optional)
+        self._show_splash("Initialising OLED...", 0.50)
+        logger.debug("oled init start t=%.1fs", time.time()-_boot_start)
+        self.oled_bonnet = None
+        if OLED_BONNET_ENABLED:
+            try:
+                # Convert mode string to enum
+                oled_mode_map = {
+                    "fuel": OLEDBonnetMode.FUEL,
+                    "delta": OLEDBonnetMode.DELTA,
+                }
+                oled_default_mode = oled_mode_map.get(
+                    OLED_BONNET_DEFAULT_MODE, OLEDBonnetMode.FUEL
+                )
+
+                self.oled_bonnet = OLEDBonnetHandler(
+                    i2c_address=OLED_BONNET_I2C_ADDRESS,
+                    width=OLED_BONNET_WIDTH,
+                    height=OLED_BONNET_HEIGHT,
+                    default_mode=oled_default_mode,
+                    auto_cycle=OLED_BONNET_AUTO_CYCLE,
+                    cycle_interval=OLED_BONNET_CYCLE_INTERVAL,
+                    brightness=OLED_BONNET_BRIGHTNESS,
+                    update_rate=OLED_BONNET_UPDATE_RATE,
+                )
+                logger.info("OLED Bonnet initialised")
+            except (IOError, OSError, RuntimeError, ValueError) as e:
+                logger.warning("Could not initialise OLED Bonnet: %s", e)
+                self.oled_bonnet = None
+        logger.debug("oled init done t=%.1fs", time.time()-_boot_start)
+
         # Create hardware handlers
         self._show_splash("Initialising sensors...", 0.55)
         self.tpms = TPMSHandler()
@@ -454,6 +496,13 @@ class InitializationMixin:
             if LAP_TIMING_ENABLED and not self.gps:
                 logger.warning("Lap timing disabled: GPS required but not available")
 
+        # Connect OLED Bonnet to data sources (late binding)
+        if self.oled_bonnet:
+            self.oled_bonnet.set_handlers(
+                lap_timing_handler=self.lap_timing,
+                fuel_tracker=self.fuel_tracker,
+            )
+
         # Initialise CoPilot handler (optional, requires GPS for rally callouts)
         self._show_splash("Initialising CoPilot...", 0.82)
         self.copilot = None
@@ -500,6 +549,7 @@ class InitializationMixin:
             encoder_handler=self.encoder,
             input_handler=self.input_handler,
             neodriver_handler=self.neodriver,
+            oled_handler=self.oled_bonnet,
             imu_handler=self.imu,
             gps_handler=self.gps,
             radar_handler=self.radar,
@@ -515,6 +565,8 @@ class InitializationMixin:
         self.input_handler.start()  # Start NeoKey polling thread
         if self.encoder:
             self.encoder.start()  # Start encoder polling thread
+        if self.oled_bonnet:
+            self.oled_bonnet.start()  # Start OLED update thread
         self.tpms.start()
         self.corner_sensors.start()
         self._show_splash("Ready!", 1.0)

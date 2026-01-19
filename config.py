@@ -634,6 +634,20 @@ NEODRIVER_START_RPM = (
 )
 
 # ==============================================================================
+# OLED BONNET CONFIGURATION (Adafruit 128x32 SSD1306)
+# ==============================================================================
+
+OLED_BONNET_ENABLED = False  # Disabled - hardware damaged
+OLED_BONNET_I2C_ADDRESS = 0x3C  # Default SSD1306 address
+OLED_BONNET_WIDTH = 128  # Display width in pixels
+OLED_BONNET_HEIGHT = 32  # Display height in pixels
+OLED_BONNET_DEFAULT_MODE = "fuel"  # fuel, delta
+OLED_BONNET_AUTO_CYCLE = True  # Auto-cycle between modes
+OLED_BONNET_CYCLE_INTERVAL = 10.0  # Seconds between mode changes
+OLED_BONNET_BRIGHTNESS = 0.8  # Display contrast (0.0-1.0)
+OLED_BONNET_UPDATE_RATE = 5  # Display refresh rate in Hz
+
+# ==============================================================================
 # LAP TIMING CONFIGURATION
 # ==============================================================================
 
