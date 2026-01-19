@@ -18,6 +18,12 @@ from config import (
     TRACK_AUTO_DETECT,
     TRACK_SEARCH_RADIUS_KM,
     LAP_TIMING_DATA_DIR,
+    LAP_TIMING_CORNER_DETECTOR,
+    LAP_TIMING_CORNER_MIN_RADIUS_M,
+    LAP_TIMING_CORNER_MIN_ANGLE_DEG,
+    LAP_TIMING_CORNER_MIN_CUT_DISTANCE_M,
+    LAP_TIMING_CORNER_STRAIGHT_FILL_M,
+    LAP_TIMING_CORNER_MERGE_CHICANES,
 )
 from utils.settings import get_settings
 from utils.lap_timing_store import get_lap_timing_store, LapRecord
@@ -27,9 +33,14 @@ try:
     from lap_timing.core.lap_detector import LapDetector, LapCrossing
     from lap_timing.core.position_tracker import PositionTracker
     from lap_timing.core.delta_calculator import DeltaCalculator
-    from lap_timing.data.models import GPSPoint, Lap, Delta, TrackPosition
+    from lap_timing.data.models import GPSPoint, Lap, Delta, TrackPosition, Corner, CornerSpeedRecord
     from lap_timing.data.track_loader import Track
     from lap_timing.data.track_selector import TrackSelector
+    from lap_timing.analysis.corner_analyzer import CornerAnalyzer
+    from lap_timing.analysis.hybrid_corner_detector import HybridCornerDetector
+    from lap_timing.analysis.asc_corner_detector import ASCCornerDetector
+    from lap_timing.analysis.corner_detector import CornerDetector
+    from lap_timing.analysis.curvefinder_detector import CurveFinderDetector
     LAP_TIMING_AVAILABLE = True
 except ImportError as e:
     logger.warning("Lap timing modules not available: %s", e)
@@ -97,6 +108,13 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
         # Fuel tracking state
         self._lap_start_fuel_percent: Optional[float] = None
 
+        # Corner detection and analysis state
+        self.corners: List[Any] = []  # Detected corners on track
+        self.corner_analyzer: Optional[Any] = None  # CornerAnalyzer instance
+        self.current_lap_positions: List[TrackPosition] = []  # Positions during current lap
+        self.last_lap_corner_speeds: List[Any] = []  # Corner speeds from last lap
+        self.best_corner_speeds: Dict[int, Any] = {}  # Best speed per corner
+
         # Track auto-detection - read from settings, fallback to config
         self.track_detected = False
         self.auto_detect_enabled = self._settings.get("lap_timing.auto_detect", TRACK_AUTO_DETECT)
@@ -154,16 +172,21 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
             for i in range(self.sector_count - 1)
         ]
 
+        # Detect corners on track
+        self._detect_corners(track)
+
         # Reset lap state
         self.current_lap_number = 0
         self.current_lap_start_time = None
         self.current_lap_points = []
+        self.current_lap_positions = []
         self.current_sector = 0
         self.sector_times = [None] * self.sector_count
         self.sector_start_time = None
 
         self.track_detected = True
-        logger.info("Lap timing: Track set to '%s' (%.0fm)", track.name, track.length)
+        logger.info("Lap timing: Track set to '%s' (%.0fm, %d corners)",
+                    track.name, track.length, len(self.corners))
 
         # Load stored best lap for this track
         self._load_best_lap_from_store()
@@ -180,6 +203,7 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
         self.current_lap_number = 0
         self.current_lap_start_time = None
         self.current_lap_points = []
+        self.current_lap_positions = []
         self.laps = []
         self.best_lap = None
         self.last_lap = None
@@ -191,7 +215,65 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
         self.current_delta = None
         self.current_position = None
 
+        # Reset corner state
+        self.corners = []
+        self.corner_analyzer = None
+        self.last_lap_corner_speeds = []
+        self.best_corner_speeds = {}
+
         logger.info("Lap timing: Track cleared")
+
+    def _detect_corners(self, track: Track):
+        """
+        Detect corners on the track and initialise corner analyzer.
+
+        Args:
+            track: Track with centerline for corner detection
+        """
+        try:
+            # Select detector based on config
+            detector_type = LAP_TIMING_CORNER_DETECTOR.lower()
+
+            if detector_type == "hybrid":
+                detector = HybridCornerDetector(
+                    min_corner_radius=LAP_TIMING_CORNER_MIN_RADIUS_M,
+                    min_corner_angle=LAP_TIMING_CORNER_MIN_ANGLE_DEG,
+                    min_cut_distance=LAP_TIMING_CORNER_MIN_CUT_DISTANCE_M,
+                    straight_fill_distance=LAP_TIMING_CORNER_STRAIGHT_FILL_M,
+                    merge_chicanes=LAP_TIMING_CORNER_MERGE_CHICANES,
+                )
+            elif detector_type == "asc":
+                detector = ASCCornerDetector(
+                    min_corner_radius=LAP_TIMING_CORNER_MIN_RADIUS_M,
+                    min_corner_angle=LAP_TIMING_CORNER_MIN_ANGLE_DEG,
+                    min_cut_distance=LAP_TIMING_CORNER_MIN_CUT_DISTANCE_M,
+                    straight_fill_distance=LAP_TIMING_CORNER_STRAIGHT_FILL_M,
+                    merge_same_direction=LAP_TIMING_CORNER_MERGE_CHICANES,
+                )
+            elif detector_type == "curvefinder":
+                detector = CurveFinderDetector()
+            else:  # threshold
+                detector = CornerDetector(
+                    min_radius=LAP_TIMING_CORNER_MIN_RADIUS_M,
+                    min_angle=LAP_TIMING_CORNER_MIN_ANGLE_DEG,
+                )
+
+            # Detect corners
+            self.corners = detector.detect_corners(track)
+
+            # Initialise corner analyzer if corners found
+            if self.corners:
+                self.corner_analyzer = CornerAnalyzer(self.corners)
+                logger.info("Lap timing: Detected %d corners using %s detector",
+                           len(self.corners), detector_type)
+            else:
+                self.corner_analyzer = None
+                logger.info("Lap timing: No corners detected on track")
+
+        except Exception as e:
+            logger.warning("Lap timing: Corner detection failed: %s", e)
+            self.corners = []
+            self.corner_analyzer = None
 
     def _worker_loop(self):
         """Background thread for lap timing calculations."""
@@ -296,9 +378,11 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
                 self.current_position
             )
 
-        # Add point to current lap
+        # Add point and position to current lap (needed for corner analysis)
         if self.current_lap_start_time is not None:
             self.current_lap_points.append(gps_point)
+            if self.current_position:
+                self.current_lap_positions.append(self.current_position)
 
         # Publish current state
         self._publish_state()
@@ -316,6 +400,7 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
                 end_time=crossing_time,
                 duration=lap_duration,
                 gps_points=self.current_lap_points.copy(),
+                positions=self.current_lap_positions.copy(),  # For corner analysis
                 is_valid=True,
             )
 
@@ -342,6 +427,25 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
             self.laps.append(lap)
             self.last_lap = lap
 
+            # Analyze corner speeds if corner analyzer is available
+            if self.corner_analyzer and lap.positions:
+                try:
+                    corner_speeds = self.corner_analyzer.analyze_lap(lap)
+                    self.last_lap_corner_speeds = corner_speeds
+
+                    # Update best corner speeds
+                    for record in corner_speeds:
+                        corner_id = record.corner_id
+                        if corner_id not in self.best_corner_speeds:
+                            self.best_corner_speeds[corner_id] = record
+                        elif record.min_speed > self.best_corner_speeds[corner_id].min_speed:
+                            self.best_corner_speeds[corner_id] = record
+
+                    logger.debug("Lap timing: Analyzed %d corner speeds", len(corner_speeds))
+                except Exception as e:
+                    logger.warning("Lap timing: Corner analysis failed: %s", e)
+                    self.last_lap_corner_speeds = []
+
             # Check if this is the best lap
             if self.best_lap is None or lap.duration < self.best_lap.duration:
                 self.best_lap = lap
@@ -363,6 +467,7 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
         self.current_lap_number += 1
         self.current_lap_start_time = crossing_time
         self.current_lap_points = []
+        self.current_lap_positions = []
         self.current_sector = 0
         self.sector_times = [None] * self.sector_count
         self.sector_start_time = crossing_time
@@ -453,6 +558,12 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
             'sectors': sector_data,
             'sector_times': self.sector_times,
             'best_sector_times': self.best_sector_times,
+
+            # Corner data
+            'corners': self.corners,
+            'corner_count': len(self.corners),
+            'last_lap_corner_speeds': self.last_lap_corner_speeds,
+            'best_corner_speeds': self.best_corner_speeds,
 
             # Stats
             'total_laps': len(self.laps),

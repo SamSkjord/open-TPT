@@ -646,6 +646,15 @@ LAP_TIMING_RACELOGIC_TRACKS_DIR = os.path.join(LAP_TIMING_TRACKS_DIR, "racelogic
 # Sector configuration
 LAP_TIMING_SECTOR_COUNT = 3  # Number of sectors per lap
 
+# Corner detection configuration (for track corner analysis)
+# These are tuned for track use - tighter thresholds than CoPilot road settings
+LAP_TIMING_CORNER_DETECTOR = "hybrid"  # hybrid, asc, curvefinder, or threshold
+LAP_TIMING_CORNER_MIN_RADIUS_M = 100.0  # Max radius to classify as corner (metres)
+LAP_TIMING_CORNER_MIN_ANGLE_DEG = 15.0  # Min angle to classify as corner (degrees)
+LAP_TIMING_CORNER_MIN_CUT_DISTANCE_M = 15.0  # Min distance between cuts (metres)
+LAP_TIMING_CORNER_STRAIGHT_FILL_M = 100.0  # Add cuts every N metres in straights
+LAP_TIMING_CORNER_MERGE_CHICANES = True  # Merge consecutive opposite-direction corners
+
 # Map theme (theme files in assets/themes/)
 MAP_THEME_DEFAULT = "default"
 
