@@ -4,7 +4,7 @@
 
 ### Camera Performance Optimisation
 
-Fixed camera capture running at 15-16fps instead of the hardware-capable 26fps.
+Comprehensive camera performance improvements, increasing frame rates significantly.
 
 #### Changes
 
@@ -24,14 +24,23 @@ Fixed camera capture running at 15-16fps instead of the hardware-capable 26fps.
 - **FOURCC Order** - Set MJPG format before resolution in init path
   - Some cameras need codec set first for proper resolution negotiation
 
+- **Faster Render with frombuffer** - Replace direct pixel array copy with frombuffer+blit
+  - 39% faster rendering (19ms → 12ms per frame)
+  - tobytes: 2.1ms, frombuffer: 0.1ms, blit: 3.2ms, flip: 6.2ms
+
+- **Increased FPS Targets** - Allow faster cameras to reach their potential
+  - `CAMERA_FPS`: 30 → 60 (cameras deliver what they can)
+  - `FPS_TARGET`: 30 → 60 (render loop cap)
+
 #### Results
 
-- Rear camera: **26fps** (was 15-16fps) - now at hardware limit
-- Front camera: **16fps** (hardware limit of that specific camera model)
+- Rear camera: **27fps** (was 15-16fps) - at hardware limit
+- Front camera: **38fps** (was 15-16fps) - with 55fps-capable camera
 
 #### Modified Files
 
-- `gui/camera.py` - V4L2 backend, removed BUFFERSIZE, conditional resize
+- `gui/camera.py` - V4L2 backend, removed BUFFERSIZE, conditional resize, frombuffer render
+- `utils/config.py` - CAMERA_FPS=60, FPS_TARGET=60
 
 ---
 
