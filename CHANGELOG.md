@@ -66,6 +66,12 @@ Fixed broken corner detection integration from the standalone lap-timing-system 
 - Best corner speeds tracked across session
 - Delta vs best available for each corner
 
+#### Bug Fixes (Code Review)
+
+- **Array sync fix**: GPS points and positions now only added when both valid, preventing index mismatch in corner analysis
+- **ASCCornerDetector**: Removed incorrect `merge_same_direction` parameter mapping (was using chicane config for wrong purpose)
+- **CurveFinderDetector**: Now respects `LAP_TIMING_CORNER_MIN_RADIUS_M` and `LAP_TIMING_CORNER_MIN_ANGLE_DEG` config values
+
 ### Config Cleanup
 
 Removed standalone CLI code and consolidated configuration files into main config.py.

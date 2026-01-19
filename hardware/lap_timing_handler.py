@@ -243,15 +243,20 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
                     merge_chicanes=LAP_TIMING_CORNER_MERGE_CHICANES,
                 )
             elif detector_type == "asc":
+                # Note: ASCCornerDetector's merge_same_direction controls merging
+                # consecutive corners of the same direction, not chicanes.
+                # Let it use the default (True) as chicane merging is HybridCornerDetector only.
                 detector = ASCCornerDetector(
                     min_corner_radius=LAP_TIMING_CORNER_MIN_RADIUS_M,
                     min_corner_angle=LAP_TIMING_CORNER_MIN_ANGLE_DEG,
                     min_cut_distance=LAP_TIMING_CORNER_MIN_CUT_DISTANCE_M,
                     straight_fill_distance=LAP_TIMING_CORNER_STRAIGHT_FILL_M,
-                    merge_same_direction=LAP_TIMING_CORNER_MERGE_CHICANES,
                 )
             elif detector_type == "curvefinder":
-                detector = CurveFinderDetector()
+                detector = CurveFinderDetector(
+                    min_corner_radius=LAP_TIMING_CORNER_MIN_RADIUS_M,
+                    min_corner_angle=LAP_TIMING_CORNER_MIN_ANGLE_DEG,
+                )
             else:  # threshold
                 detector = CornerDetector(
                     min_radius=LAP_TIMING_CORNER_MIN_RADIUS_M,
@@ -379,10 +384,10 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
             )
 
         # Add point and position to current lap (needed for corner analysis)
-        if self.current_lap_start_time is not None:
+        # Only add when both GPS point and position are valid to keep arrays in sync
+        if self.current_lap_start_time is not None and self.current_position:
             self.current_lap_points.append(gps_point)
-            if self.current_position:
-                self.current_lap_positions.append(self.current_position)
+            self.current_lap_positions.append(self.current_position)
 
         # Publish current state
         self._publish_state()
