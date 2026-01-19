@@ -38,6 +38,34 @@ Added support for Adafruit 128x32 OLED Bonnet (SSD1306) as secondary display for
 
 - Pitlane timer mode for minidisplay
 
+### Corner Detection Integration
+
+Fixed broken corner detection integration from the standalone lap-timing-system import.
+
+#### What Was Missing
+
+- Corner detection not called when tracks loaded
+- CornerAnalyzer not initialised
+- Lap positions not tracked during GPS processing
+- Lap.positions field not populated on lap completion
+- Corner analysis not called on lap completion
+
+#### Fixes Applied
+
+- Added `LAP_TIMING_CORNER_*` config settings for detector selection and tuning
+- `_detect_corners()` method creates detector based on config (hybrid, asc, curvefinder, threshold)
+- `set_track()` now detects corners after loading track
+- `_process_gps_point()` tracks positions during lap (required for corner analysis)
+- `_handle_lap_crossing()` populates `lap.positions`, calls `corner_analyzer.analyze_lap()`
+- `_publish_state()` includes corner data in snapshot
+
+#### Corner Analysis Output
+
+- Corner speeds: min, entry, exit, average (m/s)
+- G-forces: lateral and longitudinal
+- Best corner speeds tracked across session
+- Delta vs best available for each corner
+
 ### Config Cleanup
 
 Removed standalone CLI code and consolidated configuration files into main config.py.
