@@ -62,6 +62,7 @@ class OLEDMenuMixin:
                 return f"Unknown mode: {mode_str}"
 
             self.oled_handler.set_mode(mode_map[mode_str])
+            self._settings.set("oled.mode", mode_str)
             return f"OLED mode: {mode_str.title()}"
 
         except Exception as e:
@@ -83,6 +84,7 @@ class OLEDMenuMixin:
             next_mode = modes[next_idx]
 
             self.oled_handler.set_mode(next_mode)
+            self._settings.set("oled.mode", next_mode.value)
             return f"OLED mode: {next_mode.value.title()}"
 
         except Exception as e:
@@ -96,8 +98,10 @@ class OLEDMenuMixin:
 
         try:
             current = self.oled_handler.get_auto_cycle()
-            self.oled_handler.set_auto_cycle(not current)
-            return f"Auto-cycle: {'On' if not current else 'Off'}"
+            new_state = not current
+            self.oled_handler.set_auto_cycle(new_state)
+            self._settings.set("oled.auto_cycle", new_state)
+            return f"Auto-cycle: {'On' if new_state else 'Off'}"
 
         except Exception as e:
             logger.warning("Failed to toggle OLED auto-cycle: %s", e)

@@ -58,6 +58,7 @@ class LightsMenuMixin:
         mode = mode_map.get(mode_str)
         if mode:
             self.neodriver_handler.set_mode(mode)
+            self._settings.set("neodriver.mode", mode_str)
             return f"Mode set to {mode_str}"
         return "Invalid mode"
 
@@ -74,5 +75,6 @@ class LightsMenuMixin:
         direction = direction_map.get(direction_str)
         if direction:
             self.neodriver_handler.set_direction(direction)
+            self._settings.set("neodriver.direction", direction_str)
             return f"Direction set to {direction_str.replace('_', ' ')}"
         return "Invalid direction"

@@ -18,7 +18,7 @@ Organised into logical sections:
 import logging
 import os
 
-logger = logging.getLogger('openTPT.config')
+logger = logging.getLogger("openTPT.config")
 
 # ==============================================================================
 # DISPLAY & UI SETTINGS
@@ -637,7 +637,7 @@ NEODRIVER_START_RPM = (
 # OLED BONNET CONFIGURATION (Adafruit 128x32 SSD1306)
 # ==============================================================================
 
-OLED_BONNET_ENABLED = False  # Disabled - hardware damaged
+OLED_BONNET_ENABLED = True
 OLED_BONNET_I2C_ADDRESS = 0x3C  # Default SSD1306 address
 OLED_BONNET_WIDTH = 128  # Display width in pixels
 OLED_BONNET_HEIGHT = 32  # Display height in pixels
@@ -689,7 +689,7 @@ FUEL_TRACKING_ENABLED = True  # Set to False to disable fuel tracking
 FUEL_TANK_CAPACITY_LITRES_DEFAULT = 50.0
 
 # Fuel warning thresholds (percentage of tank capacity)
-FUEL_LOW_THRESHOLD_PERCENT = 20.0      # Yellow warning threshold
+FUEL_LOW_THRESHOLD_PERCENT = 20.0  # Yellow warning threshold
 FUEL_CRITICAL_THRESHOLD_PERCENT = 10.0  # Red warning threshold
 
 # Smoothing for fuel level readings (number of samples to average)
@@ -719,29 +719,35 @@ COPILOT_LOOKAHEAD_M = 1000
 
 # Road data fetching
 COPILOT_ROAD_FETCH_RADIUS_M = 2000  # Radius to cache roads around current position
-COPILOT_REFETCH_DISTANCE_M = 500    # Refetch roads when moved this far from last fetch
+COPILOT_REFETCH_DISTANCE_M = 500  # Refetch roads when moved this far from last fetch
 
 # Update interval in seconds
 # Lower values give more responsive callouts but use more CPU
 COPILOT_UPDATE_INTERVAL_S = 0.5
 
 # Corner detection (tuned for road driving - larger radii than track)
-COPILOT_CORNER_MIN_RADIUS_M = 300.0   # Minimum radius to consider a corner (metres)
-COPILOT_CORNER_MIN_ANGLE_DEG = 10.0   # Minimum total angle to consider a corner (degrees)
+COPILOT_CORNER_MIN_RADIUS_M = 300.0  # Minimum radius to consider a corner (metres)
+COPILOT_CORNER_MIN_ANGLE_DEG = (
+    10.0  # Minimum total angle to consider a corner (degrees)
+)
 
 # Junction detection
 COPILOT_JUNCTION_WARN_DISTANCE_M = 200  # Warn about T-junctions this far ahead
-COPILOT_HEADING_TOLERANCE_DEG = 30.0    # Roads within this angle of heading are "straight on"
+COPILOT_HEADING_TOLERANCE_DEG = (
+    30.0  # Roads within this angle of heading are "straight on"
+)
 
 # Audio settings
 COPILOT_AUDIO_ENABLED = True  # Enable audio callouts
-COPILOT_AUDIO_VOLUME = 0.8    # Audio volume (0.0-1.0)
+COPILOT_AUDIO_VOLUME = 0.8  # Audio volume (0.0-1.0)
 COPILOT_TTS_VOICE = "Daniel"  # British male voice (macOS), falls back to en-gb on Linux
-COPILOT_TTS_SPEED = 210       # Words per minute (faster for rally style)
+COPILOT_TTS_SPEED = 210  # Words per minute (faster for rally style)
 
 # Corner indicator overlay settings
 COPILOT_OVERLAY_ENABLED = True  # Show corner indicator on screen
-COPILOT_OVERLAY_POSITION = "bottom-left"  # top-left, top-right, bottom-left, bottom-right
+COPILOT_OVERLAY_POSITION = (
+    "bottom-left"  # top-left, top-right, bottom-left, bottom-right
+)
 
 # Status bar settings
 COPILOT_STATUS_ENABLED = True  # Show last callout in status bar

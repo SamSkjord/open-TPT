@@ -284,12 +284,14 @@ class InitializationMixin:
             COPILOT_ENABLED = False
             logger.debug("CoPilot not available: %s", e)
 
+        # Load persistent user settings (used by multiple handlers below)
+        settings = get_settings()
+
         # Initialise radar handler (optional)
         self._show_splash("Initialising radar...", 0.05)
         if RADAR_ENABLED and RADAR_AVAILABLE and RadarHandler:
             try:
                 # Load radar enabled state from persistent settings (default True)
-                settings = get_settings()
                 radar_enabled = settings.get("radar.enabled", True)
                 self.radar = RadarHandler(
                     radar_channel=RADAR_CHANNEL,
@@ -361,8 +363,11 @@ class InitializationMixin:
                     "centre_out": NeoDriverDirection.CENTRE_OUT,
                     "edges_in": NeoDriverDirection.EDGES_IN,
                 }
-                default_mode = mode_map.get(NEODRIVER_DEFAULT_MODE, NeoDriverMode.OFF)
-                default_direction = direction_map.get(NEODRIVER_DEFAULT_DIRECTION, NeoDriverDirection.CENTRE_OUT)
+                # Load user settings, falling back to config defaults
+                neodriver_mode_str = settings.get("neodriver.mode", NEODRIVER_DEFAULT_MODE)
+                neodriver_direction_str = settings.get("neodriver.direction", NEODRIVER_DEFAULT_DIRECTION)
+                default_mode = mode_map.get(neodriver_mode_str, NeoDriverMode.OFF)
+                default_direction = direction_map.get(neodriver_direction_str, NeoDriverDirection.CENTRE_OUT)
 
                 self.neodriver = NeoDriverHandler(
                     i2c_address=NEODRIVER_I2C_ADDRESS,
@@ -376,7 +381,7 @@ class InitializationMixin:
                 )
                 if self.neodriver.is_available():
                     self.neodriver.start()
-                    logger.info("NeoDriver initialised with %d pixels, mode: %s", NEODRIVER_NUM_PIXELS, NEODRIVER_DEFAULT_MODE)
+                    logger.info("NeoDriver initialised with %d pixels, mode: %s", NEODRIVER_NUM_PIXELS, neodriver_mode_str)
                 else:
                     logger.warning("NeoDriver not detected")
                     self.neodriver = None
@@ -396,21 +401,22 @@ class InitializationMixin:
                     "fuel": OLEDBonnetMode.FUEL,
                     "delta": OLEDBonnetMode.DELTA,
                 }
-                oled_default_mode = oled_mode_map.get(
-                    OLED_BONNET_DEFAULT_MODE, OLEDBonnetMode.FUEL
-                )
+                # Load user settings, falling back to config defaults
+                oled_mode_str = settings.get("oled.mode", OLED_BONNET_DEFAULT_MODE)
+                oled_auto_cycle = settings.get("oled.auto_cycle", OLED_BONNET_AUTO_CYCLE)
+                oled_default_mode = oled_mode_map.get(oled_mode_str, OLEDBonnetMode.FUEL)
 
                 self.oled_bonnet = OLEDBonnetHandler(
                     i2c_address=OLED_BONNET_I2C_ADDRESS,
                     width=OLED_BONNET_WIDTH,
                     height=OLED_BONNET_HEIGHT,
                     default_mode=oled_default_mode,
-                    auto_cycle=OLED_BONNET_AUTO_CYCLE,
+                    auto_cycle=oled_auto_cycle,
                     cycle_interval=OLED_BONNET_CYCLE_INTERVAL,
                     brightness=OLED_BONNET_BRIGHTNESS,
                     update_rate=OLED_BONNET_UPDATE_RATE,
                 )
-                logger.info("OLED Bonnet initialised")
+                logger.info("OLED Bonnet initialised (mode=%s, auto_cycle=%s)", oled_mode_str, oled_auto_cycle)
             except (IOError, OSError, RuntimeError, ValueError) as e:
                 logger.warning("Could not initialise OLED Bonnet: %s", e)
                 self.oled_bonnet = None
