@@ -12,7 +12,7 @@ from .geometry import (
     cumulative_distances,
 )
 from .map_loader import RoadNetwork, Junction, Way
-from . import config
+from config import COPILOT_HEADING_TOLERANCE_DEG, COPILOT_LOOKAHEAD_M
 
 
 @dataclass
@@ -137,7 +137,7 @@ class PathProjector:
     def __init__(
         self,
         network: RoadNetwork,
-        heading_tolerance: float = config.HEADING_TOLERANCE_DEG,
+        heading_tolerance: float = COPILOT_HEADING_TOLERANCE_DEG,
     ):
         self.network = network
         self.heading_tolerance = heading_tolerance
@@ -219,7 +219,7 @@ class PathProjector:
         lat: float,
         lon: float,
         heading: float,
-        max_distance: float = config.LOOKAHEAD_DISTANCE_M,
+        max_distance: float = COPILOT_LOOKAHEAD_M,
         route_waypoints: Optional[List[Tuple[float, float]]] = None,
     ) -> Optional[ProjectedPath]:
         """

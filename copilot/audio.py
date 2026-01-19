@@ -13,7 +13,7 @@ from pathlib import Path
 from queue import Queue, Empty
 from typing import Dict, List, Optional
 
-from . import config
+from config import COPILOT_TTS_VOICE, COPILOT_TTS_SPEED
 
 logger = logging.getLogger('openTPT.copilot.audio')
 
@@ -162,8 +162,8 @@ class AudioPlayer:
     def __init__(
         self,
         sample_dir: Optional[Path] = None,
-        voice: str = config.TTS_VOICE,
-        speed: int = config.TTS_SPEED,
+        voice: str = COPILOT_TTS_VOICE,
+        speed: int = COPILOT_TTS_SPEED,
         enable_effects: bool = True,
         enable_mpris: bool = True,
     ):

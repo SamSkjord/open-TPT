@@ -9,7 +9,7 @@ from .path_projector import (
     JunctionInfo, BridgeInfo, TunnelInfo, RailwayCrossingInfo,
     FordInfo, SpeedBumpInfo, SurfaceChangeInfo, BarrierInfo, NarrowInfo
 )
-from . import config
+from config import COPILOT_LOOKAHEAD_M, COPILOT_JUNCTION_WARN_DISTANCE_M
 
 
 class NoteType(Enum):
@@ -74,8 +74,8 @@ class PacenoteGenerator:
 
     def __init__(
         self,
-        distance_threshold_m: float = config.LOOKAHEAD_DISTANCE_M,
-        junction_warn_distance: float = config.JUNCTION_WARN_DISTANCE_M,
+        distance_threshold_m: float = COPILOT_LOOKAHEAD_M,
+        junction_warn_distance: float = COPILOT_JUNCTION_WARN_DISTANCE_M,
         callout_distance_m: float = 100,  # Only call corners within this distance
     ):
         self.distance_threshold = distance_threshold_m

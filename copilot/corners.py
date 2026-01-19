@@ -15,7 +15,7 @@ from enum import Enum
 from typing import List, Optional, Tuple
 
 from .geometry import haversine_distance, calculate_curvature, cumulative_distances
-from . import config
+from config import COPILOT_CORNER_MIN_ANGLE_DEG, COPILOT_CORNER_MIN_RADIUS_M
 
 
 class Direction(Enum):
@@ -177,8 +177,8 @@ class CornerDetector:
         curvature_peak_threshold: float = 0.005,  # 1/200m radius
         min_cut_distance: float = 15.0,           # Minimum meters between cuts
         straight_fill_distance: float = 100.0,    # Add cuts every N meters in straights
-        min_corner_angle: float = config.CORNER_MIN_ANGLE_DEG,
-        min_corner_radius: float = config.CORNER_MIN_RADIUS_M,
+        min_corner_angle: float = COPILOT_CORNER_MIN_ANGLE_DEG,
+        min_corner_radius: float = COPILOT_CORNER_MIN_RADIUS_M,
         merge_same_direction: bool = True,
         # Chicane detection parameters
         merge_chicanes: bool = True,

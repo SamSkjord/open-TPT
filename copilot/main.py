@@ -11,7 +11,12 @@ from .corners import CornerDetector
 from .pacenotes import PacenoteGenerator
 from .audio import AudioPlayer
 from .geometry import haversine_distance
-from . import config
+from config import (
+    COPILOT_LOOKAHEAD_M,
+    COPILOT_UPDATE_INTERVAL_S,
+    COPILOT_REFETCH_DISTANCE_M,
+    COPILOT_ROAD_FETCH_RADIUS_M,
+)
 
 
 class GPSInterface(Protocol):
@@ -87,8 +92,8 @@ class CoPilot:
         self,
         gps: GPSInterface,
         map_loader: MapLoader,
-        lookahead_m: float = config.LOOKAHEAD_DISTANCE_M,
-        update_interval: float = config.UPDATE_INTERVAL_S,
+        lookahead_m: float = COPILOT_LOOKAHEAD_M,
+        update_interval: float = COPILOT_UPDATE_INTERVAL_S,
         audio_enabled: bool = True,
         visualize: bool = False,
         simulation_mode: bool = False,
@@ -258,11 +263,11 @@ class CoPilot:
         if self.simulation_mode:
             return distance > 2500  # Refetch when 2.5km from last load centre
 
-        return distance > config.REFETCH_DISTANCE_M
+        return distance > COPILOT_REFETCH_DISTANCE_M
 
     def _fetch_roads_sync(self, pos: Position) -> None:
         """Fetch road data synchronously (blocks until complete)."""
-        radius = 5000 if self.simulation_mode else config.ROAD_FETCH_RADIUS_M
+        radius = 5000 if self.simulation_mode else COPILOT_ROAD_FETCH_RADIUS_M
 
         try:
             print(f"Loading roads near {pos.lat:.4f}, {pos.lon:.4f}...")
@@ -292,7 +297,7 @@ class CoPilot:
 
     def _fetch_roads_async(self, pos: Position) -> None:
         """Start background thread to fetch road data."""
-        radius = 5000 if self.simulation_mode else config.ROAD_FETCH_RADIUS_M
+        radius = 5000 if self.simulation_mode else COPILOT_ROAD_FETCH_RADIUS_M
 
         def load_in_background():
             try:

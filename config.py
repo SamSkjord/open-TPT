@@ -717,13 +717,27 @@ COPILOT_CACHE_DIR = os.path.expanduser("~/.opentpt/copilot/cache")
 # Higher values give earlier warnings but may be less accurate
 COPILOT_LOOKAHEAD_M = 1000
 
+# Road data fetching
+COPILOT_ROAD_FETCH_RADIUS_M = 2000  # Radius to cache roads around current position
+COPILOT_REFETCH_DISTANCE_M = 500    # Refetch roads when moved this far from last fetch
+
 # Update interval in seconds
 # Lower values give more responsive callouts but use more CPU
 COPILOT_UPDATE_INTERVAL_S = 0.5
 
+# Corner detection (tuned for road driving - larger radii than track)
+COPILOT_CORNER_MIN_RADIUS_M = 300.0   # Minimum radius to consider a corner (metres)
+COPILOT_CORNER_MIN_ANGLE_DEG = 10.0   # Minimum total angle to consider a corner (degrees)
+
+# Junction detection
+COPILOT_JUNCTION_WARN_DISTANCE_M = 200  # Warn about T-junctions this far ahead
+COPILOT_HEADING_TOLERANCE_DEG = 30.0    # Roads within this angle of heading are "straight on"
+
 # Audio settings
 COPILOT_AUDIO_ENABLED = True  # Enable audio callouts
 COPILOT_AUDIO_VOLUME = 0.8    # Audio volume (0.0-1.0)
+COPILOT_TTS_VOICE = "Daniel"  # British male voice (macOS), falls back to en-gb on Linux
+COPILOT_TTS_SPEED = 210       # Words per minute (faster for rally style)
 
 # Corner indicator overlay settings
 COPILOT_OVERLAY_ENABLED = True  # Show corner indicator on screen
