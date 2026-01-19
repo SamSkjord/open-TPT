@@ -1,5 +1,39 @@
 # Changelog - openTPT
 
+## [v0.18.12] - 2026-01-19
+
+### Project Structure Reorganisation
+
+Cleaner separation between Python configuration and Pi service files.
+
+#### Changes
+
+- **Moved `config.py` to root level** - Was `utils/config.py`, now `config.py`
+  - Clearer project structure with configuration at top level
+  - Updated all 34 Python imports from `from utils.config` to `from config`
+  - Fixed `_PROJECT_ROOT` calculation (single dirname, not double)
+
+- **Renamed `/config/` to `/services/`** - Contains Pi deployment files
+  - `services/boot/` - Boot optimisation, splash service
+  - `services/camera/` - Camera udev rules
+  - `services/can/` - CAN bus udev rules
+  - `services/gps/` - GPS config service
+  - `services/systemd/` - CAN setup service
+
+- **Updated CoPilot AVRCP metadata**
+  - Artist: "CoPilot" → "Skjord Motorsport"
+  - Album: "openTPT" → "CoPilot"
+
+#### Modified Files
+
+- `config.py` - Moved from utils/, fixed _PROJECT_ROOT
+- `services/` - Renamed from config/
+- `copilot/mpris.py` - Updated AVRCP artist/album
+- 34 Python files - Updated imports
+- Documentation - README, QUICKSTART, DEPLOYMENT, CLAUDE.md
+
+---
+
 ## [v0.18.11] - 2026-01-19
 
 ### Camera Performance Optimisation
