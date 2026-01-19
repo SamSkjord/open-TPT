@@ -84,7 +84,7 @@ BRAKE_ICON_PATH = "assets/icons/icons8-brake-discs-60.png"
 
 # Font configuration
 # Using Noto Sans for consistent cross-platform typography
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 FONT_PATH = os.path.join(_PROJECT_ROOT, "fonts", "NotoSans-Regular.ttf")
 FONT_PATH_BOLD = os.path.join(_PROJECT_ROOT, "fonts", "NotoSans-Bold.ttf")
 
