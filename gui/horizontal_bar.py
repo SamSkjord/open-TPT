@@ -221,20 +221,29 @@ class DualDirectionBar(HorizontalBar):
         bg_rect = pygame.Rect(self.x, self.y, self.width, self.height)
         pygame.draw.rect(surface, (40, 40, 40), bg_rect)
 
-        # Centre position
+        # Centre position (always represents zero)
         centre_x = self.x + self.width // 2
+        half_width = self.width // 2
 
-        # Calculate bar fill
-        value_range = self.max_value - self.min_value
-        if self.value is None or value_range <= 0:
-            fill_offset = 0
+        # Calculate bar fill - scale positive and negative independently
+        # so zero is always at visual centre
+        if self.value is None:
+            fill_ratio = 0
+        elif self.value >= 0:
+            # Scale positive values: 0 to max_value maps to 0 to 1
+            if self.max_value > 0:
+                fill_ratio = min(1.0, self.value / self.max_value)
+            else:
+                fill_ratio = 0
         else:
-            fill_percent = (self.value - self.min_value) / value_range
-            # Map to -0.5 to +0.5 range (0 = centre)
-            fill_offset = fill_percent - 0.5
+            # Scale negative values: min_value to 0 maps to 1 to 0
+            if self.min_value < 0:
+                fill_ratio = min(1.0, abs(self.value) / abs(self.min_value))
+            else:
+                fill_ratio = 0
 
         # Calculate bar half-width (grows symmetrically from centre)
-        bar_half_width = int((self.width // 2) * abs(fill_offset) * 2)
+        bar_half_width = int(half_width * fill_ratio)
 
         if bar_half_width > 0:
             # Choose colour based on sign
