@@ -1,22 +1,24 @@
 """
 Unit tests for temperature, pressure, and display scaling conversions.
-Tests pure functions from utils/config.py with no mocking required.
+Tests pure functions from utils/ modules with no mocking required.
 """
 
 import pytest
 from config import (
+    scale_position,
+    scale_size,
+    SCALE_X,
+    SCALE_Y,
+)
+from utils.conversions import (
     celsius_to_fahrenheit,
     fahrenheit_to_celsius,
     psi_to_bar,
     psi_to_kpa,
     bar_to_psi,
     kpa_to_psi,
-    scale_position,
-    scale_size,
-    apply_emissivity_correction,
-    SCALE_X,
-    SCALE_Y,
 )
+from utils.thermal import apply_emissivity_correction
 
 
 class TestTemperatureConversions:

@@ -18,6 +18,7 @@ T = TypeVar('T')
 logger = logging.getLogger('openTPT.hardware.corners')
 
 from utils.hardware_base import BoundedQueueHardwareHandler
+from utils.thermal import apply_emissivity_correction
 from config import (
     BRAKE_TEMP_MIN,
     BRAKE_TEMP_HOT,
@@ -32,7 +33,6 @@ from config import (
     I2C_MUX_RESET_PIN,
     I2C_MUX_RESET_FAILURES,
     BRAKE_ROTOR_EMISSIVITY,
-    apply_emissivity_correction,
     TOF_ENABLED,
     TOF_SENSOR_ENABLED,
     TOF_MUX_CHANNELS,

@@ -56,8 +56,8 @@ from config import (
     FONT_SIZE_SMALL,
     FONT_PATH,
     PRESSURE_UNIT,
-    kpa_to_psi,
 )
+from utils.conversions import kpa_to_psi
 
 # Import performance monitoring
 try:

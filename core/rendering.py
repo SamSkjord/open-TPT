@@ -24,9 +24,9 @@ from config import (
     YELLOW,
     SCALE_X,
     SCALE_Y,
-    kpa_to_psi,
     COPILOT_OVERLAY_POSITION,
 )
+from utils.conversions import kpa_to_psi
 
 logger = logging.getLogger('openTPT.render')
 
