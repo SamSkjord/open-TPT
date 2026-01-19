@@ -483,6 +483,7 @@ sudo apt install python3-dbus python3-gi
 ```
 openTPT/
 ├── main.py                              # Entry point + OpenTPT class shell
+├── config.py                            # Hardware constants, defaults
 ├── requirements.txt
 ├── install.sh                           # Installation script for Raspberry Pi
 ├── assets/
@@ -545,8 +546,13 @@ openTPT/
 │   │   └── track_selector.py            # GPS-based track selection
 │   └── utils/
 │       └── geometry.py                  # Geospatial utilities
+├── services/                            # Pi service configs
+│   ├── boot/                            # Boot optimisation, splash service
+│   ├── camera/                          # Camera udev rules
+│   ├── can/                             # CAN bus udev rules
+│   ├── gps/                             # GPS config service
+│   └── systemd/                         # CAN setup service
 ├── utils/
-│   ├── config.py                        # Hardware constants, defaults
 │   ├── settings.py                      # Persistent user settings
 │   ├── hardware_base.py                 # Bounded queue base class
 │   ├── fuel_tracker.py                  # Fuel consumption tracking
