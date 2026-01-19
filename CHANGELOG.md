@@ -20,6 +20,11 @@ Added boost pressure display on the status bar when no track/route is active, wi
 
 - **High Priority Boost Polling** - MAP/Boost PID moved from low priority (~1Hz) to high priority (~7Hz) for responsive gauge updates
 
+- **Reverse Camera Auto-Switch** - Automatically switches to rear camera when reverse gear detected (PID 0xA4), restores previous view when exiting reverse
+  - Requires vehicle support for transmission gear PID (auto-disabled if unsupported)
+
+- **USB Telemetry Storage** - Telemetry recordings now saved to USB drive (`/mnt/usb/telemetry`) if available, with automatic fallback to SD card
+
 #### Performance Improvements
 
 - **Reduced Frame Rate Target** - Lowered from 60 to 30 FPS (matches camera hardware limit), significantly reducing CPU usage
@@ -34,12 +39,14 @@ Added boost pressure display on the status bar when no track/route is active, wi
 
 #### Modified Files
 
-- `main.py` - Boost pressure display, reduced FPS target, explicit CPU yield
-- `hardware/obd2_handler.py` - MAP/Boost moved to high priority polling
+- `main.py` - Boost pressure display, reduced FPS target, reverse camera auto-switch
+- `hardware/obd2_handler.py` - MAP/Boost high priority, gear PID 0xA4 for reverse detection
+- `gui/camera.py` - Added switch_to() method for specific camera selection
 - `gui/menu/base.py` - Boost range settings, status message positioning
 - `gui/menu/copilot.py` - Background thread for CoPilot start
 - `core/event_handlers.py` - Changed menu long press from back() to hide()
 - `utils/config.py` - FPS_TARGET reduced to 30
+- `utils/telemetry_recorder.py` - USB storage with SD card fallback
 
 ---
 

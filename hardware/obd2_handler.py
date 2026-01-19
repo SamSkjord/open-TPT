@@ -37,6 +37,7 @@ PID_THROTTLE = 0x11       # Throttle position: A * 100 / 255 (%)
 PID_FUEL_LEVEL = 0x2F     # Fuel tank level input: A * 100 / 255 (%)
 PID_OIL_TEMP = 0x5C       # Engine oil temp: A - 40 (C) - not always supported
 PID_FUEL_RATE = 0x5E      # Engine fuel rate: ((A*256)+B) / 20 (L/h) - not always supported
+PID_GEAR = 0xA4           # Transmission actual gear: A (0=N, 1-10=fwd, 126=R, 127=P)
 
 # Ford Mode 22 (UDS) DIDs
 FORD_DID_SOC = 0x4801  # HV Battery State of Charge
@@ -68,6 +69,7 @@ class OBD2Handler(BoundedQueueHardwareHandler):
         - MAF (PID 0x10)
         - Fuel level (PID 0x2F)
         - Fuel rate (PID 0x5E)
+        - Gear (PID 0xA4) - for reverse camera auto-switch
 
     Ford Hybrid (if supported):
         - HV Battery SOC (DID 0x4801 via Mode 22)
@@ -121,6 +123,8 @@ class OBD2Handler(BoundedQueueHardwareHandler):
             'brake_pressure_output_bar': None,
             'fuel_level_percent': None,
             'fuel_rate_lph': None,
+            'gear': None,           # Current gear (0=N, 1-10=fwd, 126=R, 127=P)
+            'in_reverse': False,    # Convenience flag for reverse detection
         }
 
         # Smoothing histories
@@ -136,8 +140,8 @@ class OBD2Handler(BoundedQueueHardwareHandler):
         self.soc_read_attempts = 0
         self.soc_max_failures = 5
 
-        # Low-priority PID rotation (temps and fuel - don't need fast updates)
-        self.low_priority_pids = [PID_COOLANT_TEMP, PID_OIL_TEMP, PID_INTAKE_TEMP, PID_MAF, PID_FUEL_LEVEL, PID_FUEL_RATE]
+        # Low-priority PID rotation (temps, fuel, gear - don't need fast updates)
+        self.low_priority_pids = [PID_COOLANT_TEMP, PID_OIL_TEMP, PID_INTAKE_TEMP, PID_MAF, PID_FUEL_LEVEL, PID_FUEL_RATE, PID_GEAR]
         self.low_priority_index = 0
 
         if self.enabled:
@@ -380,6 +384,10 @@ class OBD2Handler(BoundedQueueHardwareHandler):
                                 self.current_data['fuel_level_percent'] = result[0] * 100 / 255
                             elif pid == PID_FUEL_RATE and len(result) >= 2:
                                 self.current_data['fuel_rate_lph'] = ((result[0] * 256) + result[1]) / 20
+                            elif pid == PID_GEAR:
+                                gear = result[0]
+                                self.current_data['gear'] = gear
+                                self.current_data['in_reverse'] = (gear == 126)
 
                     # Ford SOC (if supported)
                     if self.soc_read_attempts < self.soc_max_failures:
@@ -410,6 +418,14 @@ class OBD2Handler(BoundedQueueHardwareHandler):
     def get_rpm(self) -> int:
         """Get current engine RPM."""
         return self.current_data.get('engine_rpm', 0)
+
+    def is_in_reverse(self) -> bool:
+        """Check if vehicle is in reverse gear (requires PID 0xA4 support)."""
+        return self.current_data.get('in_reverse', False)
+
+    def get_gear(self) -> Optional[int]:
+        """Get current gear (0=N, 1-10=fwd, 126=R, 127=P), or None if unsupported."""
+        return self.current_data.get('gear')
 
     def get_data(self) -> Dict[str, Any]:
         """Get all current OBD2 data."""

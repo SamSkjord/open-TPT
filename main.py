@@ -239,6 +239,7 @@ class OpenTPT(
         self.top_bar = None
         self.bottom_bar = None
         self._top_bar_mode = "delta"  # "delta" or "boost" - tracks current configuration
+        self._was_in_reverse = False  # Track reverse gear state for auto camera switch
 
         if self.status_bar_enabled:
             bar_height = int(STATUS_BAR_HEIGHT * SCALE_Y)
@@ -410,6 +411,32 @@ class OpenTPT(
             lap_timing_active = (self.lap_timing is not None and
                                  self.lap_timing.track is not None)
             self.fuel_display.set_lap_timing_active(lap_timing_active)
+
+        # Auto-switch to rear camera when reverse gear detected
+        if self.obd2:
+            in_reverse = self.obd2.is_in_reverse()
+            if in_reverse and not self._was_in_reverse:
+                # Just entered reverse - switch to rear camera
+                self._pre_reverse_category = self.current_category
+                self._pre_reverse_camera = self.camera.current_camera
+                if self.current_category != "camera" or self.camera.current_camera != "rear":
+                    self.current_category = "camera"
+                    if not self.camera.is_active():
+                        self.camera.toggle()
+                    if self.camera.current_camera != "rear":
+                        self.camera.switch_to("rear")
+                    logger.info("Auto-switched to rear camera (reverse detected)")
+            elif not in_reverse and self._was_in_reverse:
+                # Just exited reverse - restore previous view
+                if hasattr(self, '_pre_reverse_category'):
+                    if self._pre_reverse_category != "camera":
+                        self.current_category = self._pre_reverse_category
+                        if self.camera.is_active():
+                            self.camera.toggle()
+                    elif self._pre_reverse_camera != "rear":
+                        self.camera.switch_to(self._pre_reverse_camera)
+                    logger.info("Restored previous view (exited reverse)")
+            self._was_in_reverse = in_reverse
 
         # Process input events (NeoKey and encoder)
         self._process_input_events()

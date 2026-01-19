@@ -172,22 +172,52 @@ class TelemetryRecorder:
             recorder.discard()
     """
 
-    def __init__(self, output_dir: str = "/home/pi/telemetry"):
+    # Storage locations in order of preference
+    USB_PATH = "/mnt/usb/telemetry"
+    FALLBACK_PATH = "/home/pi/telemetry"
+
+    def __init__(self, output_dir: Optional[str] = None):
         """
         Initialise the recorder.
 
         Args:
-            output_dir: Directory to save telemetry files
+            output_dir: Directory to save telemetry files. If None, auto-selects
+                        USB (/mnt/usb/telemetry) if mounted, else SD card fallback.
         """
-        self.output_dir = output_dir
         self.recording = False
         self.frames: List[TelemetryFrame] = []
         self.start_time: Optional[float] = None
         self.temp_filename: Optional[str] = None
         self.lock = threading.Lock()
 
+        # Select output directory
+        if output_dir:
+            self.output_dir = output_dir
+        else:
+            self.output_dir = self._select_output_dir()
+
         # Ensure output directory exists
-        os.makedirs(output_dir, exist_ok=True)
+        os.makedirs(self.output_dir, exist_ok=True)
+        logger.info("Telemetry recorder using: %s", self.output_dir)
+
+    def _select_output_dir(self) -> str:
+        """Select best available output directory (USB preferred, SD fallback)."""
+        # Check if USB is mounted and writable
+        usb_mount = "/mnt/usb"
+        if os.path.ismount(usb_mount):
+            try:
+                # Test write access
+                test_file = os.path.join(usb_mount, ".write_test")
+                with open(test_file, 'w') as f:
+                    f.write("test")
+                os.remove(test_file)
+                logger.info("USB storage available for telemetry")
+                return self.USB_PATH
+            except (IOError, OSError) as e:
+                logger.warning("USB mounted but not writable: %s", e)
+
+        logger.info("Using SD card fallback for telemetry")
+        return self.FALLBACK_PATH
 
     def start_recording(self):
         """Start a new recording session."""

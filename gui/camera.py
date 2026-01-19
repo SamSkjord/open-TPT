@@ -210,6 +210,14 @@ class Camera:
         logger.info("Switched to %s camera", self.current_camera)
         return True
 
+    def switch_to(self, camera_name: str) -> bool:
+        """Switch to a specific camera ('rear' or 'front')."""
+        if camera_name not in ('rear', 'front'):
+            return False
+        if self.current_camera == camera_name:
+            return True  # Already on requested camera
+        return self.switch_camera()
+
     def _start_capture_thread(self):
         """Start the capture thread."""
         if not self.thread_running and CV2_AVAILABLE and self.camera:
