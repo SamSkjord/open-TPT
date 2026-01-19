@@ -509,18 +509,24 @@ class InitializationMixin:
         if COPILOT_ENABLED and COPILOT_AVAILABLE and CoPilotHandler and self.gps:
             try:
                 from pathlib import Path
+                # Load user settings, falling back to config defaults
+                copilot_enabled = settings.get("copilot.enabled", True)
+                copilot_lookahead = settings.get("copilot.lookahead_m", COPILOT_LOOKAHEAD_M)
+                copilot_audio = settings.get("copilot.audio_enabled", COPILOT_AUDIO_ENABLED)
                 self.copilot = CoPilotHandler(
                     gps_handler=self.gps,
                     map_path=Path(COPILOT_MAP_DIR),
-                    lookahead_m=COPILOT_LOOKAHEAD_M,
+                    lookahead_m=copilot_lookahead,
                     update_interval_s=COPILOT_UPDATE_INTERVAL_S,
-                    audio_enabled=COPILOT_AUDIO_ENABLED,
+                    audio_enabled=copilot_audio,
                     audio_volume=COPILOT_AUDIO_VOLUME,
                     lap_timing_handler=self.lap_timing,
                 )
-                self.copilot.start()
+                # Only start if user has it enabled
+                if copilot_enabled:
+                    self.copilot.start()
                 self.copilot_display.set_handler(self.copilot)
-                logger.info("CoPilot initialised")
+                logger.info("CoPilot initialised (enabled=%s, lookahead=%dm)", copilot_enabled, copilot_lookahead)
             except (IOError, OSError, RuntimeError, ValueError, ImportError) as e:
                 logger.warning("Could not initialise CoPilot: %s", e)
                 self.copilot = None
