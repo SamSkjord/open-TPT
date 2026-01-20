@@ -6,6 +6,7 @@ Supports multiple sensor types for both tyres and brakes.
 
 import logging
 import queue
+import struct
 import time
 import threading
 import numpy as np
@@ -1041,11 +1042,31 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         """Get zone temperature data for a tyre position.
 
         Thread-safe: reads from atomic snapshot reference.
+        Applies flip inner/outer setting if enabled for this corner.
         """
         snapshot = self._latest_tyre_snapshot
         if snapshot is None:
             return None
-        return snapshot.get("data", {}).get(position)
+
+        data = snapshot.get("data", {}).get(position)
+        if data is None:
+            return None
+
+        # Check if flip is enabled for this corner
+        from utils.settings import get_settings
+        settings = get_settings()
+        if settings.get(f"tyre_temps.flip.{position}", False):
+            # Swap left and right zones
+            data = data.copy()  # Don't mutate cached snapshot
+            data["left_median"], data["right_median"] = (
+                data["right_median"],
+                data["left_median"],
+            )
+            # Also flip thermal array horizontally if present
+            if data.get("thermal_array") is not None:
+                data["thermal_array"] = np.fliplr(data["thermal_array"])
+
+        return data
 
     # Public API - Brake data access (backward compatible)
     def get_temps(self) -> Dict:
@@ -1071,6 +1092,98 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         Thread-safe: reads from atomic variable.
         """
         return self._current_update_rate
+
+    def get_sensor_info(self, position: str) -> Optional[Dict]:
+        """
+        Get sensor information for a specific corner.
+
+        Returns dict with:
+            - online: bool - whether sensor is responding (based on recent data)
+            - firmware_version: int - Pico firmware version (or None, cached)
+            - sensor_type: str - 'pico' or 'mlx90614'
+
+        Used for menu display of sensor status.
+        Note: Uses cached/snapshot data to avoid blocking I2C reads from main thread.
+        """
+        sensor_type = self.tyre_sensor_types.get(position)
+        if sensor_type is None:
+            return None
+
+        info = {
+            "online": False,
+            "firmware_version": None,
+            "sensor_type": sensor_type,
+        }
+
+        # Determine online status from recent snapshot data (non-blocking)
+        snapshot = self._latest_tyre_snapshot
+        if snapshot is not None:
+            data = snapshot.get("data", {}).get(position)
+            if data is not None:
+                info["online"] = True
+
+        # For Pico sensors, we could cache firmware version from init
+        # but for now just indicate online/offline based on data flow
+        if sensor_type == "mlx90614":
+            sensor = self.tyre_mlx_sensors.get(position)
+            if sensor:
+                info["online"] = True
+
+        return info
+
+    def read_full_frame(self, position: str) -> Optional[np.ndarray]:
+        """
+        Read full 24x32 thermal frame from Pico sensor.
+
+        Used for installation verification - displays raw sensor view.
+        Blocking I2C read (~150ms) - only call from menu action, not render loop.
+
+        Args:
+            position: Corner position ('FL', 'FR', 'RL', 'RR')
+
+        Returns:
+            24x32 numpy array of temperatures in Celsius, or None on error
+        """
+        channel = PICO_MUX_CHANNELS.get(position)
+        if channel is None or not self.i2c_smbus or not self.mux:
+            return None
+
+        # Only Pico sensors support full frame
+        if self.tyre_sensor_types.get(position) != "pico":
+            return None
+
+        try:
+            from smbus2 import i2c_msg
+
+            with self._i2c_lock:
+                # Select mux channel
+                self.i2c_smbus.write_byte(I2C_MUX_ADDRESS, 1 << channel)
+                time.sleep(I2C_SETTLE_DELAY_S)
+
+                # Use i2c_rdwr for efficient block transfer:
+                # 1. Write register 0x51 to initiate frame read
+                # 2. Read 1536 bytes (768 pixels * 2 bytes per int16)
+                write_msg = i2c_msg.write(self.PICO_I2C_ADDR, [0x51])
+                read_msg = i2c_msg.read(self.PICO_I2C_ADDR, 1536)
+                self.i2c_smbus.i2c_rdwr(write_msg, read_msg)
+                data = bytes(read_msg)
+
+            # Unpack as signed int16 little-endian, convert to Celsius
+            temps_tenths = struct.unpack('<768h', data)
+            temps_celsius = np.array(temps_tenths, dtype=np.float32) / 10.0
+            frame = temps_celsius.reshape(24, 32)
+
+            # Apply flip if enabled for this corner
+            from utils.settings import get_settings
+            settings = get_settings()
+            if settings.get(f"tyre_temps.flip.{position}", False):
+                frame = np.fliplr(frame)
+
+            return frame
+
+        except (IOError, OSError) as e:
+            logger.warning("Full frame read failed for %s: %s", position, e)
+            return None
 
     def stop(self):
         """Stop the handler and clean up GPIO and I2C resources."""

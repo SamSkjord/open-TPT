@@ -43,6 +43,7 @@ from gui.menu.oled import OLEDMenuMixin
 from gui.menu.pit_timer import PitTimerMenuMixin
 from gui.menu.settings import SettingsMenuMixin
 from gui.menu.system import SystemMenuMixin
+from gui.menu.tyre_temps import TyreTempsMenuMixin
 
 logger = logging.getLogger('openTPT.menu')
 
@@ -352,6 +353,7 @@ class MenuSystem(
     PitTimerMenuMixin,
     SettingsMenuMixin,
     SystemMenuMixin,
+    TyreTempsMenuMixin,
 ):
     """
     Complete menu system with predefined structure.
@@ -374,6 +376,7 @@ class MenuSystem(
         lap_timing_handler=None,
         copilot_handler=None,
         pit_timer_handler=None,
+        corner_sensors=None,
     ):
         """
         Initialise the menu system.
@@ -391,6 +394,7 @@ class MenuSystem(
             lap_timing_handler: Lap timing handler for track selection
             copilot_handler: CoPilot handler for rally callouts
             pit_timer_handler: Pit timer handler for pit lane timing
+            corner_sensors: Corner sensors handler for tyre temp menus
         """
         self.tpms_handler = tpms_handler
         self.encoder_handler = encoder_handler
@@ -404,6 +408,7 @@ class MenuSystem(
         self.lap_timing_handler = lap_timing_handler
         self.copilot_handler = copilot_handler
         self.pit_timer_handler = pit_timer_handler
+        self.corner_sensors = corner_sensors
         self.current_menu: Optional[Menu] = None
         self.root_menu: Optional[Menu] = None
 
@@ -1135,12 +1140,96 @@ class MenuSystem(
         hardware_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
         self.hardware_menu = hardware_menu
 
+        # --- Tyre Temps submenu ---
+        tyre_temps_menu = Menu("Tyre Temps")
+
+        # FL corner menu
+        fl_menu = Menu("FL")
+        fl_menu.add_item(MenuItem(
+            "Status",
+            dynamic_label=lambda: self._get_tyre_fl_label(),
+            enabled=False,
+        ))
+        fl_menu.add_item(MenuItem(
+            "Full Frame View",
+            action=lambda: self._show_full_frame_fl(),
+        ))
+        fl_menu.add_item(MenuItem(
+            "Flip Inner/Outer",
+            dynamic_label=lambda: self._get_flip_fl_label(),
+            action=lambda: self._toggle_flip_fl(),
+        ))
+        fl_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+
+        # FR corner menu
+        fr_menu = Menu("FR")
+        fr_menu.add_item(MenuItem(
+            "Status",
+            dynamic_label=lambda: self._get_tyre_fr_label(),
+            enabled=False,
+        ))
+        fr_menu.add_item(MenuItem(
+            "Full Frame View",
+            action=lambda: self._show_full_frame_fr(),
+        ))
+        fr_menu.add_item(MenuItem(
+            "Flip Inner/Outer",
+            dynamic_label=lambda: self._get_flip_fr_label(),
+            action=lambda: self._toggle_flip_fr(),
+        ))
+        fr_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+
+        # RL corner menu
+        rl_menu = Menu("RL")
+        rl_menu.add_item(MenuItem(
+            "Status",
+            dynamic_label=lambda: self._get_tyre_rl_label(),
+            enabled=False,
+        ))
+        rl_menu.add_item(MenuItem(
+            "Full Frame View",
+            action=lambda: self._show_full_frame_rl(),
+        ))
+        rl_menu.add_item(MenuItem(
+            "Flip Inner/Outer",
+            dynamic_label=lambda: self._get_flip_rl_label(),
+            action=lambda: self._toggle_flip_rl(),
+        ))
+        rl_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+
+        # RR corner menu
+        rr_menu = Menu("RR")
+        rr_menu.add_item(MenuItem(
+            "Status",
+            dynamic_label=lambda: self._get_tyre_rr_label(),
+            enabled=False,
+        ))
+        rr_menu.add_item(MenuItem(
+            "Full Frame View",
+            action=lambda: self._show_full_frame_rr(),
+        ))
+        rr_menu.add_item(MenuItem(
+            "Flip Inner/Outer",
+            dynamic_label=lambda: self._get_flip_rr_label(),
+            action=lambda: self._toggle_flip_rr(),
+        ))
+        rr_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+
+        # Add corner submenus to tyre temps menu
+        tyre_temps_menu.add_item(MenuItem("FL", submenu=fl_menu))
+        tyre_temps_menu.add_item(MenuItem("FR", submenu=fr_menu))
+        tyre_temps_menu.add_item(MenuItem("RL", submenu=rl_menu))
+        tyre_temps_menu.add_item(MenuItem("RR", submenu=rr_menu))
+        tyre_temps_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        self.tyre_temps_menu = tyre_temps_menu
+
         # Build System menu items
         system_menu.add_item(MenuItem("Bluetooth Audio", submenu=bt_menu))
         system_menu.add_item(MenuItem("Display", submenu=display_menu))
         system_menu.add_item(MenuItem("Cameras", submenu=camera_menu))
         system_menu.add_item(MenuItem("Light Strip", submenu=lights_menu))
         system_menu.add_item(MenuItem("OLED Display", submenu=oled_menu))
+        system_menu.add_item(MenuItem("Tyre Temps", submenu=tyre_temps_menu))
         system_menu.add_item(MenuItem("Units", submenu=units_menu))
         system_menu.add_item(MenuItem("Status", submenu=status_menu))
         system_menu.add_item(MenuItem("Hardware", submenu=hardware_menu))
@@ -1190,6 +1279,11 @@ class MenuSystem(
         hardware_menu.parent = system_menu
         tpms_menu.parent = hardware_menu
         imu_menu.parent = hardware_menu
+        tyre_temps_menu.parent = system_menu
+        fl_menu.parent = tyre_temps_menu
+        fr_menu.parent = tyre_temps_menu
+        rl_menu.parent = tyre_temps_menu
+        rr_menu.parent = tyre_temps_menu
 
     def _go_back(self):
         """Go back to parent menu."""

@@ -1,5 +1,39 @@
 # Changelog - openTPT
 
+## [v0.19.3] - 2026-01-20
+
+### Tyre Temps Menu
+
+New menu under System > Tyre Temps for tyre temperature sensor configuration and diagnostics.
+
+#### New Features
+
+- **Per-corner submenus** (FL, FR, RL, RR) with sensor status display
+- **Full Frame View** - 24×32 thermal heatmap modal for installation verification
+  - Auto-ranging colour map (blue→cyan→green→yellow→red)
+  - Shows min/avg/max temperature stats
+  - 5-second timeout or press any key to close
+  - Uses Pico register 0x51 with i2c_rdwr block transfer
+- **Flip Inner/Outer** - Per-corner toggle to swap left/right zone interpretation
+  - Persisted to settings (`tyre_temps.flip.{FL,FR,RL,RR}`)
+  - Applies to zone data, thermal array, and full frame view
+  - Useful when sensor mounted in opposite orientation
+
+#### New Files
+
+- `gui/menu/tyre_temps.py` - TyreTempsMenuMixin with all menu functionality
+
+#### Modified Files
+
+- `config.py` - Added `TYRE_FLIP_INNER_OUTER_DEFAULT`
+- `hardware/unified_corner_handler.py` - Added `get_sensor_info()`, `read_full_frame()`, flip support in `get_zone_data()`
+- `gui/menu/base.py` - Imported mixin, added to MenuSystem class, built submenu structure
+- `core/initialization.py` - Pass `corner_sensors` to MenuSystem
+- `CLAUDE.md` - Added 0x51 register documentation, tyre_temps.py to structure
+- `README.md` - Ticked off tyre temps menu TODO
+
+---
+
 ## [v0.19.2] - 2026-01-20
 
 ### Remove TOF Sensor Support

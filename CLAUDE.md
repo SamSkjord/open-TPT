@@ -104,7 +104,8 @@ openTPT/
 │   │   ├── oled.py                  # OLED Bonnet display settings
 │   │   ├── pit_timer.py             # Pit timer settings
 │   │   ├── settings.py              # Display, Units, Thresholds, Pages
-│   │   └── system.py                # GPS, IMU, Radar, System Status
+│   │   ├── system.py                # GPS, IMU, Radar, System Status
+│   │   └── tyre_temps.py            # Tyre temperature sensor settings
 │   ├── copilot_display.py           # CoPilot UI page
 │   ├── pit_timer_display.py         # Pit timer UI page
 │   └── radar_overlay.py             # Radar visualisation
@@ -175,8 +176,11 @@ openTPT/
 | `0x20-21` | Left Temp | int16, tenths °C |
 | `0x22-23` | Centre Temp | int16, tenths °C |
 | `0x24-25` | Right Temp | int16, tenths °C |
+| `0x51` | Full Frame Data | 1536 bytes (768 × int16), tenths °C |
 
 Convert: `temp_celsius = int16_value / 10.0`
+
+Full frame: 24×32 pixel thermal image, read via `i2c_rdwr` block transfer.
 
 ---
 

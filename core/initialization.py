@@ -612,6 +612,7 @@ class InitializationMixin:
             lap_timing_handler=self.lap_timing,
             copilot_handler=self.copilot,
             pit_timer_handler=self.pit_timer,
+            corner_sensors=self.corner_sensors,
         )
         logger.debug("menu init done t=%.1fs", time.time()-_boot_start)
 

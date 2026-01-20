@@ -315,6 +315,11 @@ MLX90614_MUX_CHANNELS = {
 # Used by Pico I2C slaves for full thermal imaging
 MLX_WIDTH = 32
 MLX_HEIGHT = 24
+
+# Tyre temperature display flip (swap inner/outer interpretation per corner)
+# When True, left and right zones are swapped for display
+# Useful when sensor is mounted in opposite orientation
+TYRE_FLIP_INNER_OUTER_DEFAULT = False
 MLX_POSITIONS = {
     "FL": scale_position((206, 50)),
     "FR": scale_position((443, 50)),

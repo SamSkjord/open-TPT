@@ -617,7 +617,7 @@ openTPT/
 - [x] Lap timing integration - GPS lap timing with persistence
 - [x] CoPilot integration
 - [ ] TPMS menu expansion - swap corners, view sensor data
-- [ ] Tyre temps menu - corner sensor details, full frame view for installation verification, flip inner/outer
+- [x] Tyre temps menu - corner sensor details, full frame view for installation verification, flip inner/outer
 - [x] Camera view options - mirror, rotate settings for front/rear cameras
 - [x] Units menu - C/F, PSI/BAR/kPa, km/h/mph switching
 - [x] Alerts/Warnings menu - temperature/pressure thresholds for visual warnings
