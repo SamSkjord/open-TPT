@@ -142,7 +142,7 @@ class OLEDBonnetHandler:
         self.button_select_pin = 1
         self.button_prev_pin = 2
         self.hold_time_ms = 500
-        self.debounce_ms = 50
+        self.debounce_ms = 75
 
         # Button state tracking
         self._button_states = {
@@ -210,8 +210,9 @@ class OLEDBonnetHandler:
                     self.width, self.height, self.i2c, addr=self.i2c_address
                 )
 
-                # Set contrast based on brightness
-                self.display.contrast(int(self.brightness * 255))
+                # Set dim mode based on brightness (contrast has minimal effect)
+                if self.brightness < 0.5:
+                    self.display.write_cmd(0xAC)  # Dim mode ON
 
                 # Clear display
                 self.display.fill(0)
@@ -495,10 +496,11 @@ class OLEDBonnetHandler:
                     self._on_page_action('next')
                 else:
                     # Next page
+                    old_index = self._mode_index
                     self._mode_index = (self._mode_index + 1) % len(self._modes)
                     self.mode = self._modes[self._mode_index]
                     self._last_cycle_time = time.time()
-                    logger.debug("OLED: Switched to %s mode", self.mode.value)
+                    logger.info("OLED: Page %d -> %d (%s)", old_index, self._mode_index, self.mode.value)
 
             elif button == 'select':
                 if self._page_selected:
@@ -546,18 +548,16 @@ class OLEDBonnetHandler:
                 logger.debug("OLED: Page %s", "selected" if self._page_selected else "deselected")
 
             elif button == 'prev':
-                # Bottom button - decrease brightness
-                new_brightness = max(0.1, self.brightness - 0.1)
-                self.set_brightness(new_brightness)
-                self._save_brightness(new_brightness)
-                logger.debug("OLED: Brightness decreased to %.0f%%", new_brightness * 100)
+                # Top button (A0) - bright mode
+                self.set_brightness(1.0)
+                self._save_brightness(1.0)
+                logger.info("OLED: Bright mode enabled")
 
             elif button == 'next':
-                # Top button - increase brightness
-                new_brightness = min(1.0, self.brightness + 0.1)
-                self.set_brightness(new_brightness)
-                self._save_brightness(new_brightness)
-                logger.debug("OLED: Brightness increased to %.0f%%", new_brightness * 100)
+                # Bottom button (A2) - dim mode
+                self.set_brightness(0.0)
+                self._save_brightness(0.0)
+                logger.info("OLED: Dim mode enabled")
 
     def _save_brightness(self, brightness: float):
         """Save brightness setting."""
@@ -1009,13 +1009,24 @@ class OLEDBonnetHandler:
             self._last_cycle_time = time.time()
 
     def set_brightness(self, brightness: float):
-        """Set display brightness/contrast (0.0-1.0)."""
+        """Set display brightness using dim mode (0.0-1.0).
+
+        Uses SSD1305 dim mode command (0xAC) for dim, and poweron() to
+        restore normal brightness (0xAD alone is incomplete command).
+        """
         self.brightness = max(0.0, min(1.0, brightness))
         if self.display:
             try:
-                self.display.contrast(int(self.brightness * 255))
+                if self.brightness < 0.5:
+                    # Dim mode ON (0xAC)
+                    self.display.write_cmd(0xAC)
+                    logger.info("OLED: Dim mode ON")
+                else:
+                    # Restore normal brightness - poweron resets to normal
+                    self.display.poweron()
+                    logger.info("OLED: Bright mode ON")
             except Exception as e:
-                logger.debug("OLED: Failed to set brightness: %s", e)
+                logger.warning("OLED: Failed to set brightness: %s", e)
 
     def is_available(self) -> bool:
         """Check if OLED hardware is available."""
@@ -1052,7 +1063,7 @@ class OLEDBonnetHandler:
         select_pin: int = 1,
         next_pin: int = 2,
         hold_time_ms: int = 500,
-        debounce_ms: int = 50,
+        debounce_ms: int = 75,
     ):
         """
         Configure MCP23017 button settings.

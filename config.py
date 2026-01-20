@@ -634,7 +634,7 @@ OLED_MCP23017_BUTTON_PREV = 0  # GPA0 - Previous (page or function)
 OLED_MCP23017_BUTTON_SELECT = 1  # GPA1 - Select (hold to enter/exit page)
 OLED_MCP23017_BUTTON_NEXT = 2  # GPA2 - Next (page or function)
 OLED_MCP23017_HOLD_TIME_MS = 500  # Hold duration for select button (milliseconds)
-OLED_MCP23017_DEBOUNCE_MS = 50  # Button debounce time (milliseconds)
+OLED_MCP23017_DEBOUNCE_MS = 75  # Button debounce time (milliseconds)
 
 
 # ##############################################################################
