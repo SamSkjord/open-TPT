@@ -578,7 +578,9 @@ class InitializationMixin:
         if self.encoder:
             self.encoder.start()  # Start encoder polling thread
         if self.oled_bonnet:
-            self.oled_bonnet.start()  # Start OLED update thread
+            # Only start if user has it enabled (default True)
+            if settings.get("oled.enabled", True):
+                self.oled_bonnet.start()  # Start OLED update thread
         self.tpms.start()
         self.corner_sensors.start()
         self._show_splash("Ready!", 1.0)

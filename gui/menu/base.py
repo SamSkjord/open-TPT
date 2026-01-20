@@ -787,6 +787,13 @@ class MenuSystem(
         oled_menu = Menu("OLED Display")
         oled_menu.add_item(
             MenuItem(
+                "Enabled",
+                dynamic_label=lambda: self._get_oled_enabled_label(),
+                action=lambda: self._toggle_oled_enabled(),
+            )
+        )
+        oled_menu.add_item(
+            MenuItem(
                 "Mode",
                 dynamic_label=lambda: self._get_oled_mode_label(),
                 action=lambda: self._cycle_oled_mode(),

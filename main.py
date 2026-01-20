@@ -608,6 +608,8 @@ class OpenTPT(
             self.encoder.stop()
         if self.neodriver:
             self.neodriver.stop()
+        if self.oled_bonnet:
+            self.oled_bonnet.stop()
         self.tpms.stop()
         self.corner_sensors.stop()
 

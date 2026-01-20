@@ -56,7 +56,7 @@ except ImportError:
 # Only try to import displayio/OLED if board is available
 if BOARD_AVAILABLE and PIL_AVAILABLE:
     try:
-        import adafruit_ssd1306
+        import adafruit_ssd1305
         import busio
         OLED_AVAILABLE = True
     except ImportError:
@@ -166,7 +166,7 @@ class OLEDBonnetHandler:
                     time.sleep(0.5)  # Wait between retries for I2C bus to settle
 
                 self.i2c = busio.I2C(board.SCL, board.SDA)
-                self.display = adafruit_ssd1306.SSD1306_I2C(
+                self.display = adafruit_ssd1305.SSD1305_I2C(
                     self.width, self.height, self.i2c, addr=self.i2c_address
                 )
 
@@ -181,6 +181,8 @@ class OLEDBonnetHandler:
                     "OLED Bonnet initialised at 0x%02X (%dx%d)",
                     self.i2c_address, self.width, self.height
                 )
+                # Show boot splash immediately
+                self._show_splash("openTPT", duration=0)
                 return True
 
             except Exception as e:
@@ -233,7 +235,7 @@ class OLEDBonnetHandler:
 
         for font_path in splash_font_paths:
             try:
-                self.font_splash = ImageFont.truetype(font_path, 9)
+                self.font_splash = ImageFont.truetype(font_path, 18)
                 logger.debug("OLED: Loaded splash font from %s", font_path)
                 break
             except (IOError, OSError):
@@ -301,9 +303,6 @@ class OLEDBonnetHandler:
             logger.warning("OLED Bonnet thread already running")
             return
 
-        # Show startup splash
-        self._show_splash("Skjord Motorsport", duration=5.0)
-
         self.running = True
         self._last_cycle_time = time.time()
         self.thread = threading.Thread(target=self._update_loop, daemon=True)
@@ -317,7 +316,7 @@ class OLEDBonnetHandler:
             self.thread.join(timeout=2.0)
 
         # Show shutdown splash then clear
-        self._show_splash("Skjord Motorsport", duration=5.0)
+        self._show_splash("openTPT", duration=1.0)
 
         # Clear display
         if self.display:

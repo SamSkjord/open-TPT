@@ -16,6 +16,29 @@ class OLEDMenuMixin:
         self.oled_handler: OLEDBonnetHandler instance
     """
 
+    def _get_oled_enabled_label(self) -> str:
+        """Get OLED enabled status label."""
+        if not hasattr(self, 'oled_handler') or self.oled_handler is None:
+            return "Enabled: N/A"
+        enabled = self._settings.get("oled.enabled", True)
+        return f"Enabled: {'Yes' if enabled else 'No'}"
+
+    def _toggle_oled_enabled(self) -> str:
+        """Toggle OLED enabled state."""
+        if not hasattr(self, 'oled_handler') or self.oled_handler is None:
+            return "OLED not available"
+
+        enabled = self._settings.get("oled.enabled", True)
+        new_state = not enabled
+        self._settings.set("oled.enabled", new_state)
+
+        if new_state:
+            self.oled_handler.start()
+        else:
+            self.oled_handler.stop()
+
+        return f"OLED {'enabled' if new_state else 'disabled'}"
+
     def _get_oled_mode_label(self) -> str:
         """Get current OLED mode for menu display."""
         if not hasattr(self, 'oled_handler') or self.oled_handler is None:
