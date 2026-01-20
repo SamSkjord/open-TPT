@@ -205,6 +205,12 @@ class TyreTempsMenuMixin:
                 if event.type == pygame.QUIT:
                     return "Full frame displayed"
 
+            # Check encoder button press
+            if hasattr(self, 'encoder_handler') and self.encoder_handler:
+                enc_event = self.encoder_handler.check_input()
+                if enc_event.short_press or enc_event.long_press:
+                    return "Full frame displayed"
+
             time.sleep(0.05)
 
         return "Full frame displayed"
@@ -342,7 +348,7 @@ class TyreTempsMenuMixin:
         screen.blit(stats_surface, stats_rect)
 
         # Instructions
-        hint = "Press any button to close"
+        hint = "Press encoder to close"
         hint_surface = font.render(hint, True, (150, 150, 150))
         hint_rect = hint_surface.get_rect(centerx=DISPLAY_WIDTH // 2, bottom=DISPLAY_HEIGHT - 20)
         screen.blit(hint_surface, hint_rect)

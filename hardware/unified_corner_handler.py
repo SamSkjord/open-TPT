@@ -1152,38 +1152,61 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         if self.tyre_sensor_types.get(position) != "pico":
             return None
 
-        try:
-            from smbus2 import i2c_msg
+        # Retry up to 3 times if we get invalid data
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                from smbus2 import i2c_msg
 
-            with self._i2c_lock:
-                # Select mux channel
-                self.i2c_smbus.write_byte(I2C_MUX_ADDRESS, 1 << channel)
-                time.sleep(I2C_SETTLE_DELAY_S)
+                with self._i2c_lock:
+                    # Select mux channel
+                    self.i2c_smbus.write_byte(I2C_MUX_ADDRESS, 1 << channel)
+                    time.sleep(I2C_SETTLE_DELAY_S)
 
-                # Use i2c_rdwr for efficient block transfer:
-                # 1. Write register 0x51 to initiate frame read
-                # 2. Read 1536 bytes (768 pixels * 2 bytes per int16)
-                write_msg = i2c_msg.write(self.PICO_I2C_ADDR, [0x51])
-                read_msg = i2c_msg.read(self.PICO_I2C_ADDR, 1536)
-                self.i2c_smbus.i2c_rdwr(write_msg, read_msg)
-                data = bytes(read_msg)
+                    # Give Pico time to prepare frame buffer
+                    time.sleep(0.05)
 
-            # Unpack as signed int16 little-endian, convert to Celsius
-            temps_tenths = struct.unpack('<768h', data)
-            temps_celsius = np.array(temps_tenths, dtype=np.float32) / 10.0
-            frame = temps_celsius.reshape(24, 32)
+                    # Use i2c_rdwr for efficient block transfer:
+                    # 1. Write register 0x51 to initiate frame read
+                    # 2. Read 1536 bytes (768 pixels * 2 bytes per int16)
+                    write_msg = i2c_msg.write(self.PICO_I2C_ADDR, [0x51])
+                    read_msg = i2c_msg.read(self.PICO_I2C_ADDR, 1536)
+                    self.i2c_smbus.i2c_rdwr(write_msg, read_msg)
+                    data = bytes(read_msg)
 
-            # Apply flip if enabled for this corner
-            from utils.settings import get_settings
-            settings = get_settings()
-            if settings.get(f"tyre_temps.flip.{position}", False):
-                frame = np.fliplr(frame)
+                # Unpack as signed int16 little-endian, convert to Celsius
+                temps_tenths = struct.unpack('<768h', data)
+                temps_celsius = np.array(temps_tenths, dtype=np.float32) / 10.0
 
-            return frame
+                # Validate data - reject if values are outside reasonable range
+                # MLX90640 range is -40C to 300C, allow some margin
+                if np.min(temps_celsius) < -50 or np.max(temps_celsius) > 350:
+                    logger.warning(
+                        "Full frame %s attempt %d: invalid range (%.1f to %.1f), retrying",
+                        position, attempt + 1, np.min(temps_celsius), np.max(temps_celsius)
+                    )
+                    time.sleep(0.1)  # Wait before retry
+                    continue
 
-        except (IOError, OSError) as e:
-            logger.warning("Full frame read failed for %s: %s", position, e)
-            return None
+                frame = temps_celsius.reshape(24, 32)
+
+                # Apply flip if enabled for this corner
+                from utils.settings import get_settings
+                settings = get_settings()
+                if settings.get(f"tyre_temps.flip.{position}", False):
+                    frame = np.fliplr(frame)
+
+                return frame
+
+            except (IOError, OSError) as e:
+                logger.warning("Full frame read failed for %s: %s", position, e)
+                if attempt < max_retries - 1:
+                    time.sleep(0.1)
+                    continue
+                return None
+
+        logger.warning("Full frame %s: all retries failed", position)
+        return None
 
     def stop(self):
         """Stop the handler and clean up GPIO and I2C resources."""

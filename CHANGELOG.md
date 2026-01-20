@@ -12,8 +12,9 @@ New menu under System > Tyre Temps for tyre temperature sensor configuration and
 - **Full Frame View** - 24×32 thermal heatmap modal for installation verification
   - Auto-ranging colour map (blue→cyan→green→yellow→red)
   - Shows min/avg/max temperature stats
-  - 5-second timeout or press any key to close
+  - 5-second timeout or encoder click to close
   - Uses Pico register 0x51 with i2c_rdwr block transfer
+  - Validates data range, retries up to 3 times if invalid
 - **Flip Inner/Outer** - Per-corner toggle to swap left/right zone interpretation
   - Persisted to settings (`tyre_temps.flip.{FL,FR,RL,RR}`)
   - Applies to zone data, thermal array, and full frame view
