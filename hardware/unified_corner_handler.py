@@ -50,6 +50,10 @@ from config import (
     I2C_BACKOFF_MAX_S,
     TOF_HISTORY_WINDOW_S,
     TOF_HISTORY_SAMPLES,
+    # Tyre temperature validation
+    TYRE_TEMP_VALID_MIN,
+    TYRE_TEMP_VALID_MAX,
+    TYRE_TEMP_MAX_SPIKE,
 )
 
 # Import for ADC hardware (ADS1115)
@@ -236,6 +240,14 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
 
         # EMA state for tyre MLX90614 smoothing
         self.tyre_mlx_ema = {
+            "FL": None,
+            "FR": None,
+            "RL": None,
+            "RR": None,
+        }
+
+        # Last valid tyre temps for Pico sensors (spike filtering)
+        self._last_valid_tyre_temps = {
             "FL": None,
             "FR": None,
             "RL": None,
@@ -790,6 +802,30 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             centre_temp = centre_raw / 10.0
             left_temp = left_raw / 10.0 if left_raw is not None else 0.0
             right_temp = right_raw / 10.0 if right_raw is not None else 0.0
+
+            # Validate temperature is within plausible range
+            # (Don't track as I2C failure - communication succeeded, just bad data)
+            if not (TYRE_TEMP_VALID_MIN <= centre_temp <= TYRE_TEMP_VALID_MAX):
+                logger.debug(
+                    "Pico %s: centre temp %.1f outside valid range [%.0f-%.0f], rejecting",
+                    position, centre_temp, TYRE_TEMP_VALID_MIN, TYRE_TEMP_VALID_MAX
+                )
+                return None
+
+            # Spike filter: reject sudden large changes
+            # (Don't track as I2C failure - communication succeeded, just bad data)
+            last_valid = self._last_valid_tyre_temps.get(position)
+            if last_valid is not None:
+                delta = abs(centre_temp - last_valid)
+                if delta > TYRE_TEMP_MAX_SPIKE:
+                    logger.debug(
+                        "Pico %s: spike detected (%.1f -> %.1f, delta=%.1f), rejecting",
+                        position, last_valid, centre_temp, delta
+                    )
+                    return None
+
+            # Update last valid temperature
+            self._last_valid_tyre_temps[position] = centre_temp
 
             # Create thermal array for display (simplified for Pico)
             thermal_array = np.full((24, 32), centre_temp, dtype=np.float32)
