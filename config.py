@@ -15,6 +15,7 @@ Organised into logical sections:
 10. Features - Fuel Tracking (tank, thresholds)
 11. Features - CoPilot (maps, callouts, audio)
 12. Threading & Performance (queues, timeouts)
+13. Features - Pit Timer (waypoints, countdown, speed)
 """
 
 import logging
@@ -100,6 +101,7 @@ UI_PAGES = [
     {"id": "lap_timing", "name": "Lap Timing", "default_enabled": True},
     {"id": "fuel", "name": "Fuel", "default_enabled": True},
     {"id": "copilot", "name": "CoPilot", "default_enabled": True},
+    {"id": "pit_timer", "name": "Pit Timer", "default_enabled": True},
 ]
 
 # ==============================================================================
@@ -1011,3 +1013,39 @@ PERFORMANCE_WARNING_HISTORY = 10  # Number of performance warnings to retain
 
 # Helper functions moved to utils/
 # - Emissivity correction: from utils.thermal import apply_emissivity_correction
+
+
+# ##############################################################################
+#
+#                        13. FEATURES - PIT TIMER
+#
+# ##############################################################################
+
+# ==============================================================================
+# PIT TIMER CONFIGURATION
+# ==============================================================================
+
+# Enable/disable pit timer system
+PIT_TIMER_ENABLED = True  # Set to False to disable pit timer
+
+# Pit lane speed limit defaults (user-configurable via menu)
+PIT_SPEED_LIMIT_DEFAULT_KMH = 60.0  # Default pit lane speed limit
+PIT_SPEED_WARNING_MARGIN_KMH = 5.0  # Warn when within this margin of limit
+
+# Timing modes
+# "entrance_to_exit" - Total pit time from entry line to exit line
+# "stationary_only" - Only time spent stationary in pit box
+PIT_TIMER_DEFAULT_MODE = "entrance_to_exit"
+
+# Pit line configuration
+PIT_LINE_WIDTH_M = 15.0  # Width of crossing detection lines (metres)
+
+# Stationary detection
+PIT_STATIONARY_SPEED_KMH = 2.0  # Speed below which car is considered stationary
+PIT_STATIONARY_DURATION_S = 1.0  # Seconds below threshold to trigger stationary
+
+# Minimum stop time (countdown target)
+PIT_MIN_STOP_TIME_DEFAULT_S = 0.0  # No minimum by default (user-configurable)
+
+# Data storage directory
+PIT_TIMER_DATA_DIR = os.path.expanduser("~/.opentpt/pit_timer")

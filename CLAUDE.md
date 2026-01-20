@@ -103,9 +103,11 @@ openTPT/
 │   │   ├── lights.py                # NeoDriver LED strip
 │   │   ├── map_theme.py             # Map view theme selection
 │   │   ├── oled.py                  # OLED Bonnet display settings
+│   │   ├── pit_timer.py             # Pit timer settings
 │   │   ├── settings.py              # Display, Units, Thresholds, Pages
 │   │   └── system.py                # GPS, IMU, Radar, System Status
 │   ├── copilot_display.py           # CoPilot UI page
+│   ├── pit_timer_display.py         # Pit timer UI page
 │   └── radar_overlay.py             # Radar visualisation
 ├── hardware/
 │   ├── unified_corner_handler.py    # All tyre sensors
@@ -116,6 +118,7 @@ openTPT/
 │   ├── neodriver_handler.py         # NeoDriver LED strip
 │   ├── oled_bonnet_handler.py       # OLED Bonnet secondary display
 │   ├── lap_timing_handler.py        # Lap timing logic
+│   ├── pit_timer_handler.py         # Pit lane timer logic
 │   └── copilot_handler.py           # CoPilot integration handler
 ├── assets/
 │   └── themes/                      # Map view colour themes (JSON)
@@ -124,6 +127,7 @@ openTPT/
 │   ├── hardware_base.py             # Bounded queue base class
 │   ├── fuel_tracker.py              # Fuel consumption tracking
 │   ├── lap_timing_store.py          # SQLite lap time persistence
+│   ├── pit_lane_store.py            # SQLite pit waypoint persistence
 │   ├── telemetry_recorder.py        # CSV telemetry recording
 │   └── theme_loader.py              # Map view theme loading
 └── opendbc/*.dbc                    # CAN message definitions
@@ -408,6 +412,28 @@ zip -r opentpt-patch.zip main.py config.py gui/
 cat ~/.opentpt/patch.log
 sudo journalctl -u usb-patch.service
 ```
+
+### Pit Timer (v0.19)
+- VBOX-style pit lane timer with GPS-based entry/exit detection
+- Two timing modes: Entrance-to-Exit (total pit time) vs Stationary-only (box time)
+- GPS waypoint marking via OLED buttons (hold Select on PIT page)
+- Crossing detection using same cross-product algorithm as lap timing
+- Countdown timer for minimum stop time
+- Speed monitoring with warning when approaching limit
+- Per-track storage of pit waypoints (`~/.opentpt/pit_timer/pit_waypoints.db`)
+- OLED display: PIT mode shows entry/exit status, timers, countdown
+- Main GUI page with large timer, speed bar, GO/WAIT indicators
+- Config: `PIT_TIMER_*` in config.py, `pit_timer.*` in settings
+
+**State Machine:**
+- ON_TRACK: Normal driving (waiting for entry line)
+- IN_PIT_LANE: Between entry line and pit box (speed monitored)
+- STATIONARY: Stopped in pit box (countdown active if min time set)
+
+**OLED Button Actions (on PIT page, selected):**
+- Prev (<): Mark entry line at current GPS position
+- Next (>): Mark exit line at current GPS position
+- Select: Toggle timing mode
 
 ---
 

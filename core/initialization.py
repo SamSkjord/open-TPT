@@ -57,6 +57,8 @@ from config import (
     OLED_MCP23017_BUTTON_NEXT,
     OLED_MCP23017_HOLD_TIME_MS,
     OLED_MCP23017_DEBOUNCE_MS,
+    # Pit Timer configuration
+    PIT_TIMER_ENABLED,
 )
 from utils.settings import get_settings
 
@@ -520,11 +522,34 @@ class InitializationMixin:
             if LAP_TIMING_ENABLED and not self.gps:
                 logger.warning("Lap timing disabled: GPS required but not available")
 
+        # Initialise Pit Timer handler (optional, requires GPS)
+        self._show_splash("Initialising pit timer...", 0.81)
+        self.pit_timer = None
+        if PIT_TIMER_ENABLED and self.gps:
+            try:
+                from hardware.pit_timer_handler import PitTimerHandler
+                pit_enabled = settings.get("pit_timer.enabled", True)
+                self.pit_timer = PitTimerHandler(
+                    gps_handler=self.gps,
+                    lap_timing_handler=self.lap_timing,
+                )
+                if pit_enabled:
+                    self.pit_timer.start()
+                self.pit_timer_display.set_handler(self.pit_timer)
+                logger.info("Pit timer handler initialised (enabled=%s)", pit_enabled)
+            except (IOError, OSError, RuntimeError, ValueError, ImportError) as e:
+                logger.warning("Could not initialise pit timer: %s", e)
+                self.pit_timer = None
+        else:
+            if PIT_TIMER_ENABLED and not self.gps:
+                logger.debug("Pit timer disabled: GPS required but not available")
+
         # Connect OLED Bonnet to data sources (late binding)
         if self.oled_bonnet:
             self.oled_bonnet.set_handlers(
                 lap_timing_handler=self.lap_timing,
                 fuel_tracker=self.fuel_tracker,
+                pit_timer_handler=self.pit_timer,
             )
 
         # Initialise CoPilot handler (optional, requires GPS for rally callouts)
@@ -586,6 +611,7 @@ class InitializationMixin:
             camera_handler=self.camera,
             lap_timing_handler=self.lap_timing,
             copilot_handler=self.copilot,
+            pit_timer_handler=self.pit_timer,
         )
         logger.debug("menu init done t=%.1fs", time.time()-_boot_start)
 

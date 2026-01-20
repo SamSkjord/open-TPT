@@ -40,6 +40,7 @@ from gui.menu.lap_timing import LapTimingMenuMixin
 from gui.menu.lights import LightsMenuMixin
 from gui.menu.map_theme import MapThemeMenuMixin
 from gui.menu.oled import OLEDMenuMixin
+from gui.menu.pit_timer import PitTimerMenuMixin
 from gui.menu.settings import SettingsMenuMixin
 from gui.menu.system import SystemMenuMixin
 
@@ -348,6 +349,7 @@ class MenuSystem(
     LightsMenuMixin,
     MapThemeMenuMixin,
     OLEDMenuMixin,
+    PitTimerMenuMixin,
     SettingsMenuMixin,
     SystemMenuMixin,
 ):
@@ -371,6 +373,7 @@ class MenuSystem(
         camera_handler=None,
         lap_timing_handler=None,
         copilot_handler=None,
+        pit_timer_handler=None,
     ):
         """
         Initialise the menu system.
@@ -387,6 +390,7 @@ class MenuSystem(
             camera_handler: Camera handler for camera settings
             lap_timing_handler: Lap timing handler for track selection
             copilot_handler: CoPilot handler for rally callouts
+            pit_timer_handler: Pit timer handler for pit lane timing
         """
         self.tpms_handler = tpms_handler
         self.encoder_handler = encoder_handler
@@ -399,6 +403,7 @@ class MenuSystem(
         self.camera_handler = camera_handler
         self.lap_timing_handler = lap_timing_handler
         self.copilot_handler = copilot_handler
+        self.pit_timer_handler = pit_timer_handler
         self.current_menu: Optional[Menu] = None
         self.root_menu: Optional[Menu] = None
 
@@ -514,6 +519,99 @@ class MenuSystem(
         self.track_timing_menu = track_timing_menu
         # Keep alias for backwards compatibility with lap_timing.py
         self.lap_timing_menu = track_timing_menu
+
+        # =====================================================================
+        # PIT TIMER MENU
+        # =====================================================================
+        pit_timer_menu = Menu("Pit Timer")
+        pit_timer_menu.add_item(
+            MenuItem(
+                "Enabled",
+                dynamic_label=lambda: self._get_pit_timer_enabled_label(),
+                action=lambda: self._toggle_pit_timer_enabled(),
+            )
+        )
+        pit_timer_menu.add_item(
+            MenuItem(
+                "Track",
+                dynamic_label=lambda: self._get_pit_track_label(),
+                enabled=False,
+            )
+        )
+        pit_timer_menu.add_item(
+            MenuItem(
+                "Waypoints",
+                dynamic_label=lambda: self._get_pit_waypoints_label(),
+                enabled=False,
+            )
+        )
+        pit_timer_menu.add_item(
+            MenuItem(
+                "Mark Entry Line",
+                action=lambda: self._mark_pit_entry(),
+            )
+        )
+        pit_timer_menu.add_item(
+            MenuItem(
+                "Mark Exit Line",
+                action=lambda: self._mark_pit_exit(),
+            )
+        )
+        pit_timer_menu.add_item(
+            MenuItem(
+                "Mode",
+                dynamic_label=lambda: self._get_pit_timer_mode_label(),
+                action=lambda: self._toggle_pit_timer_mode(),
+            )
+        )
+        pit_timer_menu.add_item(
+            MenuItem(
+                "Speed Limit +",
+                dynamic_label=lambda: self._get_pit_speed_limit_label(),
+                action=lambda: self._increase_pit_speed_limit(),
+            )
+        )
+        pit_timer_menu.add_item(
+            MenuItem(
+                "Speed Limit -",
+                action=lambda: self._decrease_pit_speed_limit(),
+            )
+        )
+        pit_timer_menu.add_item(
+            MenuItem(
+                "Min Stop Time +",
+                dynamic_label=lambda: self._get_pit_min_stop_label(),
+                action=lambda: self._increase_pit_min_stop(),
+            )
+        )
+        pit_timer_menu.add_item(
+            MenuItem(
+                "Min Stop Time -",
+                action=lambda: self._decrease_pit_min_stop(),
+            )
+        )
+        pit_timer_menu.add_item(
+            MenuItem(
+                "Last Pit",
+                dynamic_label=lambda: self._get_pit_last_time_label(),
+                enabled=False,
+            )
+        )
+        pit_timer_menu.add_item(
+            MenuItem(
+                "Clear Waypoints",
+                action=lambda: self._clear_pit_waypoints(),
+            )
+        )
+        pit_timer_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        pit_timer_menu.parent = track_timing_menu
+        self.pit_timer_menu = pit_timer_menu
+
+        # Add pit timer submenu to track & timing
+        track_timing_menu.items.insert(
+            5,  # After Map Theme
+            MenuItem("Pit Timer", submenu=pit_timer_menu)
+        )
 
         # =====================================================================
         # COPILOT MENU

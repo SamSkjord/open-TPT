@@ -79,6 +79,7 @@ class OLEDBonnetMode(Enum):
     """Display modes for the OLED Bonnet."""
     FUEL = "fuel"
     DELTA = "delta"
+    PIT = "pit"
 
 
 class OLEDBonnetHandler:
@@ -163,6 +164,7 @@ class OLEDBonnetHandler:
         # Late-bound handlers
         self.lap_timing_handler = None
         self.fuel_tracker = None
+        self.pit_timer_handler = None
 
         # Thread control
         self.thread = None
@@ -324,19 +326,22 @@ class OLEDBonnetHandler:
             self.button_next = None
             return False
 
-    def set_handlers(self, lap_timing_handler=None, fuel_tracker=None):
+    def set_handlers(self, lap_timing_handler=None, fuel_tracker=None, pit_timer_handler=None):
         """
         Set data source handlers (late binding).
 
         Args:
             lap_timing_handler: LapTimingHandler instance for delta data
             fuel_tracker: FuelTracker instance for fuel data
+            pit_timer_handler: PitTimerHandler instance for pit timer data
         """
         with self.state_lock:
             self.lap_timing_handler = lap_timing_handler
             self.fuel_tracker = fuel_tracker
-        logger.debug("OLED: Handlers set (lap_timing=%s, fuel=%s)",
-                     lap_timing_handler is not None, fuel_tracker is not None)
+            self.pit_timer_handler = pit_timer_handler
+        logger.debug("OLED: Handlers set (lap_timing=%s, fuel=%s, pit_timer=%s)",
+                     lap_timing_handler is not None, fuel_tracker is not None,
+                     pit_timer_handler is not None)
 
     def _show_splash(self, text: str, duration: float = 2.0):
         """
@@ -469,13 +474,30 @@ class OLEDBonnetHandler:
         """
         Handle page-specific button actions when page is selected.
 
-        Override or extend this for page-specific interactions like pit timer.
+        For PIT mode:
+        - prev: Mark entry line
+        - next: Mark exit line
+        - select: Toggle timing mode
 
         Args:
             action: 'prev', 'next', or 'select'
         """
-        # Placeholder for future page-specific actions
-        logger.debug("OLED: Page action '%s' on %s (not yet implemented)", action, self.mode.value)
+        if self.mode == OLEDBonnetMode.PIT and self.pit_timer_handler:
+            if action == 'prev':
+                # Mark entry line
+                result = self.pit_timer_handler.mark_entry_line()
+                logger.info("OLED: Mark entry line: %s", "success" if result else "failed")
+            elif action == 'next':
+                # Mark exit line
+                result = self.pit_timer_handler.mark_exit_line()
+                logger.info("OLED: Mark exit line: %s", "success" if result else "failed")
+            elif action == 'select':
+                # Toggle timing mode
+                self.pit_timer_handler.toggle_mode()
+                logger.info("OLED: Toggled pit timer mode")
+        else:
+            # No action for other modes
+            logger.debug("OLED: Page action '%s' on %s (no action)", action, self.mode.value)
 
     def _on_button_hold(self, button: str):
         """Handle long button press (hold)."""
@@ -571,6 +593,8 @@ class OLEDBonnetHandler:
             self._render_fuel()
         elif mode == OLEDBonnetMode.DELTA:
             self._render_delta()
+        elif mode == OLEDBonnetMode.PIT:
+            self._render_pit()
 
         # Draw selection indicator (small filled circle in top-right when selected)
         if page_selected:
@@ -730,6 +754,186 @@ class OLEDBonnetHandler:
         # Right-align best text
         best_width = _get_text_width(self.draw, best_text, self.font_small)
         self.draw.text((self.width - best_width - 2, y2), best_text, font=self.font_small, fill=1)
+
+    def _render_pit(self):
+        """
+        Render pit timer page.
+
+        Layout varies by state:
+
+        On Track (waypoints set):
+            PIT  Entry:SET  Exit:SET
+            Speed: 45 km/h  Lim: 60
+
+        On Track (selected, waypoints not set):
+            PIT  [<Entry]  [Exit>]
+            Press < or > to mark
+
+        In Pit Lane:
+            PIT LANE      00:12.3
+            Speed: 45/60  [====    ]
+
+        Stationary:
+            STOPPED       00:08.5
+            Leave in: 21.5s  [WAIT]
+
+        Safe to Leave:
+            STOPPED       00:30.0
+            Total: 00:45.2  [GO!]
+        """
+        state = "on_track"
+        elapsed_pit_time = 0.0
+        elapsed_stationary_time = 0.0
+        speed_kmh = 0.0
+        speed_limit_kmh = 60.0
+        countdown_remaining = None
+        safe_to_leave = False
+        has_entry_line = False
+        has_exit_line = False
+
+        # Get handler reference (lock-free after copy)
+        with self.state_lock:
+            handler = self.pit_timer_handler
+            page_selected = self._page_selected
+
+        # Get pit timer data (outside lock to avoid contention)
+        if handler:
+            data = handler.get_data()
+            state = data.get('state', 'on_track')
+            elapsed_pit_time = data.get('elapsed_pit_time_s', 0.0)
+            elapsed_stationary_time = data.get('elapsed_stationary_time_s', 0.0)
+            speed_kmh = data.get('speed_kmh', 0.0)
+            speed_limit_kmh = data.get('speed_limit_kmh', 60.0)
+            countdown_remaining = data.get('countdown_remaining_s')
+            safe_to_leave = data.get('safe_to_leave', False)
+            has_entry_line = data.get('has_entry_line', False)
+            has_exit_line = data.get('has_exit_line', False)
+
+        if state == "on_track":
+            self._render_pit_on_track(has_entry_line, has_exit_line, page_selected,
+                                       speed_kmh, speed_limit_kmh)
+        elif state == "in_pit_lane":
+            self._render_pit_in_lane(elapsed_pit_time, speed_kmh, speed_limit_kmh)
+        elif state == "stationary":
+            self._render_pit_stationary(elapsed_pit_time, elapsed_stationary_time,
+                                         countdown_remaining, safe_to_leave)
+
+    def _render_pit_on_track(self, has_entry, has_exit, page_selected, speed, limit):
+        """Render PIT page when on track."""
+        # Line 1: Header and waypoint status
+        if page_selected and (not has_entry or not has_exit):
+            # In edit mode - show button hints
+            self.draw.text((2, 0), "PIT", font=self.font, fill=1)
+            entry_text = "[<Entry]" if not has_entry else "Entry:SET"
+            exit_text = "[Exit>]" if not has_exit else "Exit:SET"
+            self.draw.text((45, 2), entry_text, font=self.font_small, fill=1)
+            exit_width = _get_text_width(self.draw, exit_text, self.font_small)
+            self.draw.text((self.width - exit_width - 2, 2), exit_text, font=self.font_small, fill=1)
+        else:
+            # Normal mode - show waypoint status
+            self.draw.text((2, 0), "PIT", font=self.font, fill=1)
+            entry_status = "SET" if has_entry else "---"
+            exit_status = "SET" if has_exit else "---"
+            status_text = f"E:{entry_status}  X:{exit_status}"
+            status_width = _get_text_width(self.draw, status_text, self.font_small)
+            self.draw.text((self.width - status_width - 2, 2), status_text, font=self.font_small, fill=1)
+
+        # Line 2: Current speed and limit (or hint text)
+        y2 = 18
+        if page_selected and (not has_entry or not has_exit):
+            hint_text = "Press < or > to mark"
+            self.draw.text((2, y2), hint_text, font=self.font_small, fill=1)
+        else:
+            speed_text = f"Spd:{speed:.0f}"
+            limit_text = f"Lim:{limit:.0f}"
+            self.draw.text((2, y2), speed_text, font=self.font_small, fill=1)
+            limit_width = _get_text_width(self.draw, limit_text, self.font_small)
+            self.draw.text((self.width - limit_width - 2, y2), limit_text, font=self.font_small, fill=1)
+
+    def _render_pit_in_lane(self, elapsed_time, speed, limit):
+        """Render PIT page when in pit lane."""
+        # Line 1: State and elapsed time
+        self.draw.text((2, 0), "PIT LANE", font=self.font, fill=1)
+
+        # Elapsed time right-aligned
+        time_text = self._format_pit_time(elapsed_time)
+        time_width = _get_text_width(self.draw, time_text, self.font)
+        self.draw.text((self.width - time_width - 2, 0), time_text, font=self.font, fill=1)
+
+        # Line 2: Speed ratio and progress bar
+        y2 = 18
+        speed_text = f"{speed:.0f}/{limit:.0f}"
+        self.draw.text((2, y2), speed_text, font=self.font_small, fill=1)
+
+        # Speed progress bar (warning if approaching limit)
+        bar_x = 55
+        bar_width = 70
+        bar_height = 10
+        bar_y = y2 + 1
+
+        # Draw bar outline
+        self.draw.rectangle(
+            (bar_x, bar_y, bar_x + bar_width, bar_y + bar_height),
+            outline=1, fill=0
+        )
+
+        # Fill based on speed vs limit
+        if limit > 0:
+            fill_ratio = min(1.0, speed / limit)
+            fill_width = int(fill_ratio * (bar_width - 2))
+            if fill_width > 0:
+                self.draw.rectangle(
+                    (bar_x + 1, bar_y + 1, bar_x + 1 + fill_width, bar_y + bar_height - 1),
+                    fill=1
+                )
+
+    def _render_pit_stationary(self, elapsed_pit, elapsed_stat, countdown, safe):
+        """Render PIT page when stationary."""
+        # Line 1: State and stationary time
+        self.draw.text((2, 0), "STOPPED", font=self.font, fill=1)
+
+        stat_time_text = self._format_pit_time(elapsed_stat)
+        stat_width = _get_text_width(self.draw, stat_time_text, self.font)
+        self.draw.text((self.width - stat_width - 2, 0), stat_time_text, font=self.font, fill=1)
+
+        # Line 2: Countdown or total time with GO/WAIT indicator
+        y2 = 18
+
+        if safe:
+            # Safe to leave - show total pit time and GO
+            total_text = f"Tot:{self._format_pit_time(elapsed_pit)}"
+            self.draw.text((2, y2), total_text, font=self.font_small, fill=1)
+
+            # GO indicator with inverted colours
+            go_text = "GO!"
+            go_width = _get_text_width(self.draw, go_text, self.font_small)
+            go_x = self.width - go_width - 8
+            # Draw inverted box
+            self.draw.rectangle((go_x - 2, y2, self.width - 2, y2 + 12), fill=1)
+            self.draw.text((go_x, y2), go_text, font=self.font_small, fill=0)
+        elif countdown is not None and countdown > 0:
+            # Countdown active
+            countdown_text = f"Leave in: {countdown:.1f}s"
+            self.draw.text((2, y2), countdown_text, font=self.font_small, fill=1)
+
+            # WAIT indicator
+            wait_text = "WAIT"
+            wait_width = _get_text_width(self.draw, wait_text, self.font_small)
+            self.draw.text((self.width - wait_width - 2, y2), wait_text, font=self.font_small, fill=1)
+        else:
+            # No countdown, just show total
+            total_text = f"Total: {self._format_pit_time(elapsed_pit)}"
+            self.draw.text((2, y2), total_text, font=self.font_small, fill=1)
+
+    def _format_pit_time(self, seconds):
+        """Format pit time as MM:SS.s or SS.s for short times."""
+        if seconds is None or seconds < 0:
+            return "--:--.-"
+        if seconds < 60:
+            return f"{seconds:05.1f}"
+        mins = int(seconds // 60)
+        secs = seconds % 60
+        return f"{mins}:{secs:04.1f}"
 
     # Public API
 

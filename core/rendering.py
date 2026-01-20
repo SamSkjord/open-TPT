@@ -121,6 +121,11 @@ class RenderingMixin:
             t0 = time.time()
             self.copilot_display.draw(self.screen)
             render_times['copilot'] = (time.time() - t0) * 1000
+        elif self.current_category == "ui" and self.current_ui_page == "pit_timer":
+            # Render Pit Timer page
+            t0 = time.time()
+            self.pit_timer_display.draw(self.screen)
+            render_times['pit_timer'] = (time.time() - t0) * 1000
         else:
             # Render the telemetry page (default UI view)
             self._render_telemetry_page(render_times)

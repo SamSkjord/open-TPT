@@ -31,6 +31,7 @@ from gui.gmeter import GMeterDisplay
 from gui.lap_timing_display import LapTimingDisplay
 from gui.fuel_display import FuelDisplay
 from gui.copilot_display import CoPilotDisplay
+from gui.pit_timer_display import PitTimerDisplay
 from gui.horizontal_bar import HorizontalBar, DualDirectionBar
 
 # Import optimised TPMS handler
@@ -232,7 +233,9 @@ class OpenTPT(
         self.lap_timing_display = LapTimingDisplay()
         self.fuel_display = FuelDisplay()
         self.copilot_display = CoPilotDisplay()
+        self.pit_timer_display = PitTimerDisplay()
         self.fuel_tracker = None
+        self.pit_timer = None
 
         # Status bars (top and bottom) - used across all pages
         self.status_bar_enabled = STATUS_BAR_ENABLED
@@ -632,6 +635,11 @@ class OpenTPT(
         if self.lap_timing:
             logger.debug("Stopping Lap Timing...")
             self.lap_timing.stop()
+
+        # Stop Pit Timer if enabled
+        if self.pit_timer:
+            logger.debug("Stopping Pit Timer...")
+            self.pit_timer.stop()
 
         # Stop CoPilot if enabled
         if self.copilot:

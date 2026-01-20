@@ -1,5 +1,79 @@
 # Changelog - openTPT
 
+## [v0.19.0] - 2026-01-20
+
+### Pit Lane Timer
+
+VBOX-style pit lane timer with GPS-based entry/exit detection, countdown timing, and speed monitoring.
+
+#### Features
+
+- **Two timing modes**: Entrance-to-Exit (total pit time) vs Stationary-only (box time)
+- **GPS waypoint marking**: Button press records pit entry/exit lines perpendicular to heading
+- **Crossing detection**: Uses cross-product algorithm (same as lap timing S/F line)
+- **Countdown timer**: Configurable minimum stop time with visual countdown
+- **Speed monitoring**: Warning when approaching limit, violation tracking
+- **Per-track storage**: Pit waypoints and session history saved per track in SQLite
+- **State machine**: ON_TRACK -> IN_PIT_LANE -> STATIONARY -> ON_TRACK
+
+#### OLED Bonnet Integration
+
+- New PIT mode added to OLED page rotation
+- Button actions when PIT page selected:
+  - Prev (<): Mark entry line at current GPS position
+  - Next (>): Mark exit line at current GPS position
+  - Select: Toggle timing mode
+
+#### Main GUI Page
+
+- Large timer display with colour-coded states (grey/orange/blue/green/red)
+- Speed bar with warning zone indicator
+- GO/WAIT indicators for countdown
+- Track name, waypoint status, mode, and last pit time display
+
+#### New Files
+
+- `hardware/pit_timer_handler.py` - Core handler with state machine and GPS crossing detection
+- `utils/pit_lane_store.py` - SQLite persistence for pit waypoints and session history
+- `gui/pit_timer_display.py` - Main GUI page with timer, speed bar, countdown
+- `gui/menu/pit_timer.py` - Menu mixin for pit timer settings
+
+#### Modified Files
+
+- `config.py` - Added PIT_TIMER_* constants (section 13), pit_timer to UI_PAGES
+- `hardware/oled_bonnet_handler.py` - Added PIT mode, _render_pit(), button actions
+- `core/initialization.py` - Pit timer handler initialisation and wiring
+- `core/rendering.py` - Added pit_timer page rendering case
+- `main.py` - PitTimerDisplay import/instantiation, cleanup
+- `gui/menu/base.py` - PitTimerMenuMixin, pit_timer_handler param, Pit Timer submenu
+- `CLAUDE.md` - Directory structure, Pit Timer documentation
+
+#### Configuration
+
+New constants in `config.py`:
+- `PIT_TIMER_ENABLED` - Enable/disable pit timer (default: True)
+- `PIT_SPEED_LIMIT_DEFAULT_KMH` - Default speed limit (default: 60)
+- `PIT_SPEED_WARNING_MARGIN_KMH` - Warning margin (default: 5)
+- `PIT_TIMER_DEFAULT_MODE` - Default timing mode (default: "entrance_to_exit")
+- `PIT_LINE_WIDTH_M` - Crossing line width in metres (default: 15)
+- `PIT_STATIONARY_SPEED_KMH` - Stationary threshold (default: 2)
+- `PIT_STATIONARY_DURATION_S` - Stationary detection time (default: 1)
+- `PIT_MIN_STOP_TIME_DEFAULT_S` - Countdown target (default: 0)
+- `PIT_TIMER_DATA_DIR` - SQLite database location
+
+#### Menu Settings
+
+Track & Timing > Pit Timer submenu provides:
+- Enable/disable pit timer
+- Mark entry/exit lines
+- Toggle timing mode
+- Adjust speed limit (+/- 5 km/h)
+- Adjust minimum stop time (+/- 5s)
+- Clear waypoints
+- View current track and last pit time
+
+---
+
 ## [v0.18.15] - 2026-01-20
 
 ### OLED Bonnet Button Support
