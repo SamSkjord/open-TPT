@@ -437,12 +437,10 @@ class OLEDBonnetHandler:
         with self.state_lock:
             if button == 'prev':
                 if self._page_selected:
-                    # Inside page - cycle function (currently just toggle auto-cycle)
-                    self.auto_cycle = not self.auto_cycle
-                    self._last_cycle_time = time.time()
-                    logger.debug("OLED: Auto-cycle %s", "enabled" if self.auto_cycle else "disabled")
+                    # Page-specific action (e.g., pit timer set entry)
+                    self._on_page_action('prev')
                 else:
-                    # Page level - previous page
+                    # Previous page
                     self._mode_index = (self._mode_index - 1) % len(self._modes)
                     self.mode = self._modes[self._mode_index]
                     self._last_cycle_time = time.time()
@@ -450,21 +448,34 @@ class OLEDBonnetHandler:
 
             elif button == 'next':
                 if self._page_selected:
-                    # Inside page - cycle function (currently just toggle auto-cycle)
-                    self.auto_cycle = not self.auto_cycle
-                    self._last_cycle_time = time.time()
-                    logger.debug("OLED: Auto-cycle %s", "enabled" if self.auto_cycle else "disabled")
+                    # Page-specific action (e.g., pit timer set exit)
+                    self._on_page_action('next')
                 else:
-                    # Page level - next page
+                    # Next page
                     self._mode_index = (self._mode_index + 1) % len(self._modes)
                     self.mode = self._modes[self._mode_index]
                     self._last_cycle_time = time.time()
                     logger.debug("OLED: Switched to %s mode", self.mode.value)
 
             elif button == 'select':
-                # Short press - currently unused at page level
-                # Could be used for quick actions in future
-                logger.debug("OLED: Select pressed (page_selected=%s)", self._page_selected)
+                if self._page_selected:
+                    # Page-specific select action
+                    self._on_page_action('select')
+                else:
+                    # Short press when not selected - currently unused
+                    pass
+
+    def _on_page_action(self, action: str):
+        """
+        Handle page-specific button actions when page is selected.
+
+        Override or extend this for page-specific interactions like pit timer.
+
+        Args:
+            action: 'prev', 'next', or 'select'
+        """
+        # Placeholder for future page-specific actions
+        logger.debug("OLED: Page action '%s' on %s (not yet implemented)", action, self.mode.value)
 
     def _on_button_hold(self, button: str):
         """Handle long button press (hold)."""

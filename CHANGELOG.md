@@ -1,5 +1,35 @@
 # Changelog - openTPT
 
+## [v0.18.15] - 2026-01-20
+
+### OLED Bonnet Button Support
+
+Added MCP23017 GPIO expander support for physical button control of the OLED Bonnet display.
+
+#### Features
+
+- **3-button navigation**: Prev (A0), Select (A1), Next (A2) via MCP23017 at 0x20
+- **Page cycling**: Prev/next buttons manually cycle between Fuel and Delta pages
+- **Selection mode**: Hold select (500ms) to enter "selected" mode, pausing auto-cycle
+- **Page-specific actions**: When selected, buttons reserved for future page interactions (e.g., pit timer)
+- **Visual indicator**: Small dot in top-right corner when page is selected
+- **Configurable**: Address, pins, hold time, debounce all configurable via config.py
+
+#### I2C Bus Speed
+
+Reduced I2C bus speed from 1MHz to 400kHz for improved reliability in motorsport EMI environment. Data throughput is only ~2.7 KB/s (7% capacity), so faster speeds provide no benefit while reducing noise margin.
+
+#### Modified Files
+
+- `config.py` - Added MCP23017 button configuration constants
+- `hardware/oled_bonnet_handler.py` - Button polling, navigation, page actions
+- `core/initialization.py` - Wire up MCP23017 config to handler
+- `CLAUDE.md` - Added MCP23017 to I2C address table, bus speed documentation
+- `DEPLOYMENT.md` - Added I2C bus speed configuration
+- `install.sh` - Added adafruit-circuitpython-mcp230xx dependency
+
+---
+
 ## [v0.18.14] - 2026-01-20
 
 ### USB Patch Deployment
