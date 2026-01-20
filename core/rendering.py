@@ -16,7 +16,6 @@ from config import (
     DISPLAY_HEIGHT,
     PRESSURE_UNIT,
     THERMAL_STALE_TIMEOUT,
-    TOF_ENABLED,
     BRAKE_DUAL_ZONE_MOCK,
     FONT_PATH,
     FONT_SIZE_MEDIUM,
@@ -286,28 +285,6 @@ class RenderingMixin:
         t0 = time.time()
         self.display.draw_mirroring_indicators(self.thermal)
         render_times['chevrons'] = (time.time() - t0) * 1000
-
-        # Get TOF distance data (LOCK-FREE snapshot access)
-        # Uses stale data cache to prevent flashing when display fps > data fps
-        if TOF_ENABLED:
-            t0 = time.time()
-            for position in ["FL", "FR", "RL", "RR"]:
-                distance = self.thermal.get_tof_distance(position)
-                min_distance = self.thermal.get_tof_min_distance(position)
-                if distance is not None:
-                    # Fresh data - update cache and display
-                    self._tof_cache[position] = {"distance": distance, "timestamp": now}
-                    self.display.draw_tof_distance(position, distance, min_distance)
-                elif position in self._tof_cache:
-                    # No fresh data - use cache if within timeout
-                    cache = self._tof_cache[position]
-                    if now - cache["timestamp"] < THERMAL_STALE_TIMEOUT:
-                        self.display.draw_tof_distance(position, cache["distance"], min_distance)
-                    else:
-                        self.display.draw_tof_distance(position, None, min_distance)
-                else:
-                    self.display.draw_tof_distance(position, None, min_distance)
-            render_times['tof'] = (time.time() - t0) * 1000
 
         # Get TPMS data (LOCK-FREE snapshot access)
         t0 = time.time()

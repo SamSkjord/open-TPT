@@ -57,7 +57,6 @@
 - NeoKey 1x4: Physical buttons
 - Rotary Encoder: I2C QT with NeoPixel (0x36)
 - Pico Thermal: 1/4 MLX90640 (FL)
-- TOF Distance: Disabled (VL53L0X unreliable for ride height)
 - Brake Temps: FL (MCP9601 dual 0x65/0x66), FR (ADC) - rear disabled
 - Toyota Radar: can_b1_0 (keep-alive), can_b1_1 (tracks)
 - OBD2: Speed, RPM, fuel level, Ford Mode 22 HV Battery SOC
@@ -142,7 +141,6 @@ openTPT/
 |---------|--------|---------|
 | `0x08` | Pico | MLX90640 thermal slave (per corner) |
 | `0x20` | MCP23017 | GPIO expander for OLED buttons |
-| `0x29` | VL53L0X | TOF distance (per corner) |
 | `0x30` | NeoKey | 1x4 button input with NeoPixels |
 | `0x36` | Seesaw | Rotary encoder with NeoPixel |
 | `0x3C` | SSD1305 | OLED Bonnet 128x32 |
@@ -154,7 +152,7 @@ openTPT/
 | `0x70` | TCA9548A | I2C mux (8 channels) |
 
 ### Bus Speed
-**400kHz (Fast Mode)** - chosen over 1MHz for motorsport EMI resilience. Data throughput is only ~2.7 KB/s (7% capacity), so extra speed provides no benefit while reducing noise margin. Long wire runs to wheel sensors and device compatibility (MCP9601, VL53L0X max 400kHz) also favour the lower speed.
+**400kHz (Fast Mode)** - chosen over 1MHz for motorsport EMI resilience. Data throughput is only ~2.7 KB/s (7% capacity), so extra speed provides no benefit while reducing noise margin. Long wire runs to wheel sensors and device compatibility (MCP9601 max 400kHz) also favour the lower speed.
 
 ### Mux Channels
 | Channel | Corner | Bitmask |
@@ -205,9 +203,6 @@ sudo i2cdetect -y 1
 # Select mux channel (FL=0x01, FR=0x02, RL=0x04, RR=0x08)
 sudo i2cset -y 1 0x70 0x01
 
-# TOF sensor check (FR)
-sudo python3 -c "import board,busio,adafruit_tca9548a,adafruit_vl53l0x; i2c=busio.I2C(board.SCL,board.SDA); mux=adafruit_tca9548a.TCA9548A(i2c); print(f'FR TOF: {adafruit_vl53l0x.VL53L0X(mux[1]).range}mm')"
-
 # Power status
 vcgencmd get_throttled  # 0x0=OK, 0x50000=historical undervoltage
 ```
@@ -215,7 +210,7 @@ vcgencmd get_throttled  # 0x0=OK, 0x50000=historical undervoltage
 ### Log Filtering
 ```bash
 # By component
-sudo journalctl -u openTPT.service -f | grep -iE "tof|pico|radar|imu"
+sudo journalctl -u openTPT.service -f | grep -iE "pico|radar|imu"
 
 # By corner
 sudo journalctl -u openTPT.service --since "30 min ago" | grep "FL"
@@ -231,7 +226,6 @@ sudo journalctl -u openTPT.service -f | grep -E "failures|error|backoff"
 | Issue | Solution |
 |-------|----------|
 | **IMU I/O errors** | Non-critical, auto-retries. Restart service if persistent |
-| **TOF dropouts** | Auto-reinit with backoff (v0.15.1+) |
 | **I2C bus lockup** | Auto mux reset on GPIO17 (v0.12+). Power cycle if severe |
 | **Heatmaps grey/offline** | Stale data cached 1s (v0.12+). Adjust `THERMAL_STALE_TIMEOUT` |
 | **6+ hour crashes** | Fixed v0.11+ (GC every 60s, surface clear every 10min) |
@@ -328,7 +322,7 @@ All settings in `config.py` (root level), organised into 12 sections:
 1. **Display & UI** - Resolution, colours, assets, scaling, layout
 2. **Units & Thresholds** - Temperature, pressure, speed
 3. **Hardware - I2C Bus** - Addresses, mux, timing, backoff
-4. **Hardware - Sensors** - Tyre, brake, TOF, TPMS, IMU
+4. **Hardware - Sensors** - Tyre, brake, TPMS, IMU
 5. **Hardware - Cameras** - Resolution, devices, transforms
 6. **Hardware - Input** - NeoKey, encoder, NeoDriver, OLED
 7. **Hardware - CAN Bus** - OBD2, Ford Hybrid, Radar

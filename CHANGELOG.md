@@ -1,5 +1,34 @@
 # Changelog - openTPT
 
+## [v0.19.2] - 2026-01-20
+
+### Remove TOF Sensor Support
+
+Removed all VL53L0X TOF (Time-of-Flight) distance sensor code. The sensors were unreliable for ride height measurement due to vibration and surface reflectivity issues in motorsport environments.
+
+#### Removed
+
+- TOF distance display on telemetry page
+- TOF sensor initialisation, reading, and reinitialisation logic
+- TOF-specific exponential backoff and history tracking
+- `TOF_ENABLED`, `TOF_SENSOR_ENABLED`, `TOF_MUX_CHANNELS` configuration
+- `TOF_DISPLAY_POSITIONS`, `TOF_DISTANCE_*` threshold constants
+- `TOF_HISTORY_WINDOW_S`, `TOF_HISTORY_SAMPLES` configuration
+- `get_tof_distance()`, `get_tof_distances()`, `get_tof_min_distance()` API methods
+- `draw_tof_distance()`, `_get_tof_colour()` display methods
+- VL53L0X from I2C address documentation
+
+#### Modified Files
+
+- `config.py` - Removed all TOF constants and configuration
+- `hardware/unified_corner_handler.py` - Removed TOF sensor handling, simplified to two-queue architecture
+- `core/rendering.py` - Removed TOF rendering block
+- `gui/display.py` - Removed TOF display methods
+- `main.py` - Removed TOF cache
+- `CLAUDE.md` - Updated documentation to remove TOF references
+
+---
+
 ## [v0.19.1] - 2026-01-20
 
 ### Thread Safety and Resource Management Fixes

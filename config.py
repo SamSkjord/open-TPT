@@ -6,7 +6,7 @@ Organised into logical sections:
 1. Display & UI (resolution, colours, assets, scaling, layout)
 2. Units & Thresholds (temperature, pressure, speed)
 3. Hardware - I2C Bus (addresses, mux, timing)
-4. Hardware - Sensors (tyre, brake, TOF, TPMS, IMU)
+4. Hardware - Sensors (tyre, brake, TPMS, IMU)
 5. Hardware - Cameras (resolution, devices, transforms)
 6. Hardware - Input Devices (NeoKey, encoder, NeoDriver, OLED)
 7. Hardware - CAN Bus (OBD2, Ford Hybrid, Radar)
@@ -222,17 +222,6 @@ PRESSURE_FRONT_OPTIMAL = 32.0  # Front tyre optimal pressure
 PRESSURE_REAR_OPTIMAL = 34.0  # Rear tyre optimal pressure
 # Low/high thresholds are now calculated as optimal +/- offset
 
-# ==============================================================================
-# TOF DISTANCE THRESHOLDS (millimetres)
-# ==============================================================================
-
-# Colour transitions for ride height display
-TOF_DISTANCE_MIN = 50  # Minimum expected distance (very compressed)
-TOF_DISTANCE_OPTIMAL = 120  # Optimal ride height (green)
-TOF_DISTANCE_RANGE = 20  # Range around optimal (±20mm = green zone)
-TOF_DISTANCE_MAX = 200  # Maximum expected distance (full extension)
-
-
 # ##############################################################################
 #
 #                           3. HARDWARE - I2C BUS
@@ -260,7 +249,6 @@ I2C_MUX_RESET_FAILURES = 3  # Consecutive failures before triggering mux reset
 # ==============================================================================
 
 ADS_ADDRESS = 0x48  # ADS1115/ADS1015 ADC default address
-TOF_I2C_ADDRESS = 0x29  # VL53L0X default address
 
 # MCP9601 thermocouple amplifier addresses (two per corner for inner/outer pads)
 MCP9601_ADDRESSES = {
@@ -445,49 +433,6 @@ BRAKE_ROTOR_EMISSIVITY = {
     "RL": 0.95,  # Rear Left
     "RR": 0.95,  # Rear Right
 }
-
-# ==============================================================================
-# TOF DISTANCE SENSORS (VL53L0X)
-# ==============================================================================
-
-# Enable/disable TOF distance sensors per corner
-# VL53L0X sensors measure distance to ground (ride height) in millimetres
-# Disabled: VL53L0X not reliable enough for ride height measurement
-TOF_ENABLED = False  # Master enable for all TOF sensors
-
-# Per-corner TOF sensor enable
-# Set to True/False to enable/disable individual corners
-TOF_SENSOR_ENABLED = {
-    "FL": True,  # Front Left
-    "FR": True,  # Front Right
-    "RL": True,  # Rear Left
-    "RR": True,  # Rear Right
-}
-
-# I2C multiplexer channel mapping for VL53L0X sensors
-# Shares same mux channels as tyre/brake sensors (one channel per corner)
-TOF_MUX_CHANNELS = {
-    "FL": 0,  # Channel 0 - shared with tyre sensor
-    "FR": 1,  # Channel 1 - shared with tyre sensor
-    "RL": 2,  # Channel 2 - shared with tyre sensor
-    "RR": 3,  # Channel 3 - shared with tyre sensor
-}
-
-# Display configuration for TOF distance readings
-# Positions are calculated relative to tyre thermal display positions
-# Distance text appears to the side of each tyre
-TOF_DISPLAY_POSITIONS = {
-    # Left side tyres: distance shown to the left of thermal display
-    "FL": scale_position((170, 130)),  # Left of FL thermal
-    "RL": scale_position((170, 338)),  # Left of RL thermal
-    # Right side tyres: distance shown to the right of thermal display
-    "FR": scale_position((630, 130)),  # Right of FR thermal
-    "RR": scale_position((630, 338)),  # Right of RR thermal
-}
-
-# TOF sensor history window (for smoothing/analysis)
-TOF_HISTORY_WINDOW_S = 10.0  # Seconds of TOF data to retain
-TOF_HISTORY_SAMPLES = 100  # Maximum number of samples to retain
 
 # ==============================================================================
 # TPMS (Tyre Pressure Monitoring System)
