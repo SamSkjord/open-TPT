@@ -181,19 +181,19 @@ class PitTimerDisplay:
             main_colour = GREEN
         elif not has_entry and not has_exit:
             main_text = "NO WAYPOINTS"
-            sub_text = "Set entry and exit lines from OLED menu (hold Select on PIT page)"
+            sub_text = "Set entry/exit lines via Menu > Track & Timing > Pit Timer"
             main_colour = YELLOW
         else:
             main_text = "INCOMPLETE"
             sub_text = f"{'Entry' if has_entry else 'Exit'} set, need {'exit' if has_entry else 'entry'} line"
             main_colour = YELLOW
 
-        main_surface = self.font_xlarge.render(main_text, True, main_colour)
+        main_surface = self.font_large.render(main_text, True, main_colour)
         main_rect = main_surface.get_rect(center=(self.width // 2, y_centre))
         screen.blit(main_surface, main_rect)
 
         sub_surface = self.font_small.render(sub_text, True, GREY)
-        sub_rect = sub_surface.get_rect(center=(self.width // 2, y_centre + int(60 * SCALE_Y)))
+        sub_rect = sub_surface.get_rect(center=(self.width // 2, y_centre + int(50 * SCALE_Y)))
         screen.blit(sub_surface, sub_rect)
 
         # Show current speed at bottom
