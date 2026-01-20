@@ -189,7 +189,7 @@ TYRE_TEMP_HOT = 100.0  # Yellow to red
 TYRE_TEMP_HOT_TO_BLACK = 50.0  # Range over which red fades to black after HOT
 
 # Tyre temperature validation (reject implausible readings from I2C corruption)
-TYRE_TEMP_VALID_MIN = 5.0  # Minimum valid reading (Celsius)
+TYRE_TEMP_VALID_MIN = -20.0  # Minimum valid reading (Celsius)
 TYRE_TEMP_VALID_MAX = 150.0  # Maximum valid reading (Celsius)
 TYRE_TEMP_MAX_SPIKE = 20.0  # Maximum change per reading (spike filter)
 
