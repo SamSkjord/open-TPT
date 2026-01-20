@@ -438,9 +438,14 @@ class OBD2Handler(BoundedQueueHardwareHandler):
         return self.current_data.get('gear')
 
     def get_data(self) -> Dict[str, Any]:
-        """Get all current OBD2 data."""
+        """Get all current OBD2 data.
+
+        Returns snapshot data if available, otherwise empty dict.
+        Does NOT fall back to self.current_data to avoid race conditions
+        with the worker thread modifying the dict during iteration.
+        """
         snapshot = self.get_snapshot()
-        return snapshot.data if snapshot else dict(self.current_data)
+        return snapshot.data if snapshot else {}
 
     def cleanup(self):
         """Clean up CAN bus resources."""

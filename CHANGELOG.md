@@ -1,5 +1,37 @@
 # Changelog - openTPT
 
+## [v0.19.1] - 2026-01-20
+
+### Thread Safety and Resource Management Fixes
+
+Addresses 9 critical and high priority issues related to thread safety, resource management, and error recovery.
+
+#### Critical Fixes
+
+- **Camera frame access race** (`gui/camera.py`) - `render()` now captures `self.frame` into local variable atomically to prevent race with capture thread
+- **Camera resource leak** (`gui/camera.py`) - `_stop_capture_thread()` returns bool; `switch_camera()` only releases camera if thread actually stopped
+- **OBD2 dict access race** (`hardware/obd2_handler.py`) - `get_data()` returns empty dict instead of iterating `self.current_data` during concurrent modification
+- **GPS serial port leak** (`hardware/gps_handler.py`) - `_initialise()` ensures serial port is closed in except block if opened before failure
+- **UnifiedCornerHandler thread sync** (`hardware/unified_corner_handler.py`) - Replaced three `deque(maxlen=2)` with `queue.Queue(maxsize=2)` and atomic snapshot references for lock-free consumer access
+- **Main loop crash recovery** (`main.py`) - Added inner try-except that recovers from pygame/IO errors up to 5 times before exiting
+
+#### High Priority Fixes
+
+- **Settings temp file cleanup** (`utils/settings.py`) - `_save()` cleans up temp file if `os.replace()` fails
+- **GPS time validation** (`hardware/gps_handler.py`) - `_sync_system_time()` validates year is 2024-2030 before syncing system time
+- **TOF init timeout** (`hardware/unified_corner_handler.py`) - VL53L0X constructor and range access wrapped in `_i2c_with_timeout()` to prevent indefinite blocking
+
+#### Modified Files
+
+- `gui/camera.py` - Frame access race fix, camera resource leak fix
+- `hardware/unified_corner_handler.py` - Thread-safe queues, atomic snapshots, TOF timeout
+- `hardware/gps_handler.py` - Serial port leak fix, time validation
+- `hardware/obd2_handler.py` - Dict access race fix
+- `utils/settings.py` - Temp file cleanup
+- `main.py` - Crash recovery with counter
+
+---
+
 ## [v0.19.0] - 2026-01-20
 
 ### Pit Lane Timer

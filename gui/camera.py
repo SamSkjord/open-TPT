@@ -171,15 +171,19 @@ class Camera:
 
         # Stop current camera capture thread
         was_active = self.active
+        thread_stopped = True
         if was_active:
-            self._stop_capture_thread()
+            thread_stopped = self._stop_capture_thread()
 
-        # Release old camera to free up the device
+        # Only release camera if thread actually stopped (safe to do so)
+        # If thread is still running, it may still be accessing the camera
         old_camera = self.current_camera
-        if self.cameras[old_camera]:
+        if thread_stopped and self.cameras[old_camera]:
             logger.info("Releasing %s camera", old_camera)
             self.cameras[old_camera].release()
             self.cameras[old_camera] = None
+        elif not thread_stopped and self.cameras[old_camera]:
+            logger.warning("Cannot release %s camera - capture thread still running", old_camera)
 
         # Switch camera
         self.current_camera = 'front' if self.current_camera == 'rear' else 'rear'
@@ -503,8 +507,13 @@ class Camera:
 
         return self.active
 
-    def _stop_capture_thread(self):
-        """Stop the capture thread if it's running."""
+    def _stop_capture_thread(self) -> bool:
+        """Stop the capture thread if it's running.
+
+        Returns:
+            True if thread stopped successfully or wasn't running,
+            False if thread failed to stop within timeout.
+        """
         if self.thread_running:
             self.thread_running = False
             if self.capture_thread and self.capture_thread.is_alive():
@@ -515,7 +524,7 @@ class Camera:
                     # Don't drain queue if thread still running (would race)
                     self.capture_thread = None
                     self.frame = None
-                    return
+                    return False  # Thread didn't stop - unsafe to release camera
             # Thread stopped - safe to drain queue
             while True:
                 try:
@@ -525,6 +534,7 @@ class Camera:
             self.capture_thread = None
             # Clear the last frame to avoid showing stale image on next activation
             self.frame = None
+        return True  # Thread stopped or wasn't running
 
     def close(self):
         """Close the camera and release resources."""
@@ -596,7 +606,11 @@ class Camera:
 
     def render(self):
         """Render the camera feed with optional radar overlay."""
-        if not self.active or self.frame is None:
+        # Capture frame reference atomically (Python assignment is atomic)
+        # to prevent race with capture thread modifying self.frame
+        frame = self.frame
+
+        if not self.active or frame is None:
             if self.error_message:
                 font = pygame.font.Font(FONT_PATH, 24)
                 text = font.render(self.error_message, True, (255, 0, 0))
@@ -608,13 +622,13 @@ class Camera:
 
         try:
             # Use frombuffer+blit for faster rendering (39% faster than direct pixel copy)
-            if isinstance(self.frame, dict):
+            if isinstance(frame, dict):
                 # Direct rendering from processed frame data
-                frame_data = self.frame["data"]
-                width = self.frame["width"]
-                height = self.frame["height"]
-                x_offset = self.frame["x_offset"]
-                y_offset = self.frame["y_offset"]
+                frame_data = frame["data"]
+                width = frame["width"]
+                height = frame["height"]
+                x_offset = frame["x_offset"]
+                y_offset = frame["y_offset"]
 
                 # Create surface from buffer and blit (faster than array copy)
                 frame_surface = pygame.image.frombuffer(
@@ -625,9 +639,9 @@ class Camera:
             else:
                 # Fallback for test pattern or direct frames
                 if not CV2_AVAILABLE:
-                    rgb_frame = self.frame
+                    rgb_frame = frame
                 else:
-                    rgb_frame = cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB)
+                    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
                 # Calculate scaling
                 h, w = rgb_frame.shape[:2]

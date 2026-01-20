@@ -5,6 +5,7 @@ Supports multiple sensor types for both tyres and brakes.
 """
 
 import logging
+import queue
 import time
 import threading
 import numpy as np
@@ -254,14 +255,26 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             "RR": None,
         }
 
-        # Separate bounded queues for each data type (tyres, brakes, TOF).
-        # maxlen=2 provides double-buffering: worker writes to one slot while
-        # render thread reads from the other. Oldest data is automatically
-        # discarded if consumer falls behind.
+        # Thread-safe queues for each data type (tyres, brakes, TOF).
+        # queue.Queue provides proper synchronisation vs deque which has
+        # race conditions between append() and [-1] access.
         # See class docstring for rationale on three-queue architecture.
-        self.tyre_queue = deque(maxlen=2)
-        self.brake_queue = deque(maxlen=2)
-        self.tof_queue = deque(maxlen=2)
+        self._tyre_queue = queue.Queue(maxsize=2)
+        self._brake_queue = queue.Queue(maxsize=2)
+        self._tof_queue = queue.Queue(maxsize=2)
+
+        # Latest snapshot storage for lock-free reads.
+        # Python object assignment is atomic, so main thread can safely read
+        # while worker thread writes. These are the authoritative values
+        # for get_thermal_data(), get_temps(), etc.
+        self._latest_tyre_snapshot = None
+        self._latest_brake_snapshot = None
+        self._latest_tof_snapshot = None
+
+        # Update rate tracking
+        self._update_count = 0
+        self._update_rate_start = time.time()
+        self._current_update_rate = 0.0
 
         # EMA state for TOF distance smoothing
         self.tof_ema_state = {
@@ -622,10 +635,17 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
 
         try:
             mux_channel = self.mux[channel]
-            sensor = adafruit_vl53l0x.VL53L0X(mux_channel, address=TOF_I2C_ADDRESS)
 
-            # Test read to verify sensor is working
-            distance = sensor.range
+            # Wrap constructor in timeout to prevent indefinite blocking on I2C issues
+            sensor = self._i2c_with_timeout(
+                lambda: adafruit_vl53l0x.VL53L0X(mux_channel, address=TOF_I2C_ADDRESS)
+            )
+            if sensor is None:
+                logger.error("TOF VL53L0X: Init timeout")
+                return
+
+            # Wrap range access in timeout as well
+            distance = self._i2c_with_timeout(lambda: sensor.range)
             if distance is not None and distance > 0:
                 self.tof_sensors[position] = sensor
                 self.tof_ema_state[position] = float(distance)
@@ -659,11 +679,18 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
                 mux_channel = self.mux[channel]
                 time.sleep(I2C_MUX_STABILISE_S)
 
-                # Create new sensor instance
-                sensor = adafruit_vl53l0x.VL53L0X(mux_channel, address=TOF_I2C_ADDRESS)
+                # Wrap constructor in timeout to prevent indefinite blocking
+                sensor = self._i2c_with_timeout(
+                    lambda: adafruit_vl53l0x.VL53L0X(mux_channel, address=TOF_I2C_ADDRESS)
+                )
+                if sensor is None:
+                    # Log only at key intervals
+                    if self._tof_reinit_count[position] in (1, 3, 10, 50) or self._tof_reinit_count[position] % 100 == 0:
+                        logger.error("TOF %s: Reinit timeout (%d)", position, self._tof_reinit_count[position])
+                    return False
 
-                # Test read to verify sensor is working
-                distance = sensor.range
+                # Wrap range access in timeout as well
+                distance = self._i2c_with_timeout(lambda: sensor.range)
 
             if distance is not None and 0 < distance < 8190:
                 self.tof_sensors[position] = sensor
@@ -741,10 +768,42 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             brake_data[position] = brake_reading
             tof_data[position] = tof_reading
 
-        # Publish separate snapshots for tyres, brakes, and TOF
-        self.tyre_queue.append({"data": tyre_data, "timestamp": time.time()})
-        self.brake_queue.append({"data": brake_data, "timestamp": time.time()})
-        self.tof_queue.append({"data": tof_data, "timestamp": time.time()})
+        # Create immutable snapshots
+        now = time.time()
+        tyre_snapshot = {"data": tyre_data, "timestamp": now}
+        brake_snapshot = {"data": brake_data, "timestamp": now}
+        tof_snapshot = {"data": tof_data, "timestamp": now}
+
+        # Publish to queues (drop oldest if full)
+        self._publish_to_queue(self._tyre_queue, tyre_snapshot)
+        self._publish_to_queue(self._brake_queue, brake_snapshot)
+        self._publish_to_queue(self._tof_queue, tof_snapshot)
+
+        # Update atomic snapshot references for lock-free consumer access
+        # Python object assignment is atomic, so no lock needed
+        self._latest_tyre_snapshot = tyre_snapshot
+        self._latest_brake_snapshot = brake_snapshot
+        self._latest_tof_snapshot = tof_snapshot
+
+        # Track update rate
+        self._update_count += 1
+        elapsed = now - self._update_rate_start
+        if elapsed >= 1.0:
+            self._current_update_rate = self._update_count / elapsed
+            self._update_count = 0
+            self._update_rate_start = now
+
+    def _publish_to_queue(self, q: queue.Queue, snapshot: dict):
+        """Publish snapshot to queue, dropping oldest if full."""
+        if q.full():
+            try:
+                q.get_nowait()
+            except queue.Empty:
+                pass
+        try:
+            q.put_nowait(snapshot)
+        except queue.Full:
+            pass
 
     def _read_tyre_sensor(self, position: str) -> Optional[Dict]:
         """Read tyre sensor for a position."""
@@ -1225,13 +1284,13 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
 
     # Public API - Tyre data access (backward compatible)
     def get_thermal_data(self, position: str) -> Optional[np.ndarray]:
-        """Get thermal array for a tyre position."""
-        try:
-            if not self.tyre_queue:
-                return None
-            # Copy to avoid race with worker thread modifying deque
-            snapshot = self.tyre_queue[-1]
-        except IndexError:
+        """Get thermal array for a tyre position.
+
+        Thread-safe: reads from atomic snapshot reference.
+        """
+        # Atomic read of snapshot reference (Python assignment is atomic)
+        snapshot = self._latest_tyre_snapshot
+        if snapshot is None:
             return None
 
         data = snapshot.get("data", {}).get(position)
@@ -1242,23 +1301,23 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         return None
 
     def get_zone_data(self, position: str) -> Optional[Dict]:
-        """Get zone temperature data for a tyre position."""
-        try:
-            if not self.tyre_queue:
-                return None
-            snapshot = self.tyre_queue[-1]
-        except IndexError:
+        """Get zone temperature data for a tyre position.
+
+        Thread-safe: reads from atomic snapshot reference.
+        """
+        snapshot = self._latest_tyre_snapshot
+        if snapshot is None:
             return None
         return snapshot.get("data", {}).get(position)
 
     # Public API - Brake data access (backward compatible)
     def get_temps(self) -> Dict:
-        """Get brake temperatures for all positions."""
-        try:
-            if not self.brake_queue:
-                return {pos: {"temp": None} for pos in ["FL", "FR", "RL", "RR"]}
-            snapshot = self.brake_queue[-1]
-        except IndexError:
+        """Get brake temperatures for all positions.
+
+        Thread-safe: reads from atomic snapshot reference.
+        """
+        snapshot = self._latest_brake_snapshot
+        if snapshot is None:
             return {pos: {"temp": None} for pos in ["FL", "FR", "RL", "RR"]}
         return snapshot.get("data", {pos: {"temp": None} for pos in ["FL", "FR", "RL", "RR"]})
 
@@ -1271,12 +1330,12 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
 
     # Public API - TOF distance data access
     def get_tof_distances(self) -> Dict:
-        """Get TOF distances for all positions."""
-        try:
-            if not self.tof_queue:
-                return {pos: {"distance": None} for pos in ["FL", "FR", "RL", "RR"]}
-            snapshot = self.tof_queue[-1]
-        except IndexError:
+        """Get TOF distances for all positions.
+
+        Thread-safe: reads from atomic snapshot reference.
+        """
+        snapshot = self._latest_tof_snapshot
+        if snapshot is None:
             return {pos: {"distance": None} for pos in ["FL", "FR", "RL", "RR"]}
         return snapshot.get("data", {pos: {"distance": None} for pos in ["FL", "FR", "RL", "RR"]})
 
@@ -1309,19 +1368,11 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         return min(valid_readings)
 
     def get_update_rate(self) -> float:
-        """Calculate update rate from recent snapshots."""
-        try:
-            if len(self.tyre_queue) < 2:
-                return 0.0
-            newest = self.tyre_queue[-1]["timestamp"]
-            oldest = self.tyre_queue[0]["timestamp"]
-        except (IndexError, KeyError):
-            return 0.0
+        """Get the current sensor update rate in Hz.
 
-        time_diff = newest - oldest
-        if time_diff > 0:
-            return (len(self.tyre_queue) - 1) / time_diff
-        return 0.0
+        Thread-safe: reads from atomic variable.
+        """
+        return self._current_update_rate
 
     def stop(self):
         """Stop the handler and clean up GPIO and I2C resources."""

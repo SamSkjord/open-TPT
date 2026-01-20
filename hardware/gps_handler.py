@@ -129,6 +129,12 @@ class GPSHandler(BoundedQueueHardwareHandler):
             self.consecutive_errors = 0
         except Exception as e:
             logger.warning("GPS: Failed to initialise: %s", e)
+            # Ensure serial port is closed if it was opened before failure
+            if self.serial_port:
+                try:
+                    self.serial_port.close()
+                except Exception:
+                    pass
             self.serial_port = None
             self.hardware_available = False
 
@@ -415,6 +421,20 @@ class GPSHandler(BoundedQueueHardwareHandler):
         import subprocess
 
         try:
+            # Validate GPS date is reasonable before syncing
+            # gps_date format is "YYYY-MM-DD"
+            if self.gps_date and len(self.gps_date) >= 4:
+                try:
+                    year = int(self.gps_date[:4])
+                    if not (2024 <= year <= 2030):
+                        logger.warning("GPS: Invalid year %d, skipping time sync", year)
+                        self.time_synced = True  # Don't retry with bad data
+                        return
+                except ValueError:
+                    logger.warning("GPS: Could not parse year from date %s", self.gps_date)
+                    self.time_synced = True
+                    return
+
             # Format: "YYYY-MM-DD HH:MM:SS"
             datetime_str = f"{self.gps_date} {self.gps_time}"
             result = subprocess.run(

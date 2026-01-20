@@ -85,14 +85,20 @@ class SettingsManager:
     def _save(self):
         """Save settings to JSON file atomically."""
         with self._save_lock:
+            temp_path = self._file_path + '.tmp'
             try:
                 # Write to temp file first, then rename for atomic operation
-                temp_path = self._file_path + '.tmp'
                 with open(temp_path, 'w', encoding='utf-8') as f:
                     json.dump(self._settings, f, indent=2)
                 os.replace(temp_path, self._file_path)
             except Exception as e:
                 logger.warning("Could not save settings: %s", e)
+                # Clean up temp file if it was created
+                try:
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
+                except OSError:
+                    pass
 
     def get(self, key: str, default: Any = None) -> Any:
         """

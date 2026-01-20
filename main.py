@@ -293,73 +293,90 @@ class OpenTPT(
         loop_times = {}
         first_frame = True
         boot_frame_count = 0
+        crash_count = 0
+        max_crashes = 5
 
         try:
             while self.running:
-                loop_start = time.time()
+                try:
+                    loop_start = time.time()
 
-                # Handle events
-                t0 = time.time()
-                self._handle_events()
-                loop_times['events'] = (time.time() - t0) * 1000
-                if first_frame:
-                    logger.debug("first frame events t=%.1fs", time.time()-_boot_start)
+                    # Handle events
+                    t0 = time.time()
+                    self._handle_events()
+                    loop_times['events'] = (time.time() - t0) * 1000
+                    if first_frame:
+                        logger.debug("first frame events t=%.1fs", time.time()-_boot_start)
 
-                # Update hardware (camera frame, input states, etc.)
-                t0 = time.time()
-                self._update_hardware()
-                loop_times['hardware'] = (time.time() - t0) * 1000
-                if first_frame:
-                    logger.debug("first frame hardware t=%.1fs", time.time()-_boot_start)
+                    # Update hardware (camera frame, input states, etc.)
+                    t0 = time.time()
+                    self._update_hardware()
+                    loop_times['hardware'] = (time.time() - t0) * 1000
+                    if first_frame:
+                        logger.debug("first frame hardware t=%.1fs", time.time()-_boot_start)
 
-                # Render the screen (with performance monitoring)
-                if self.perf_monitor:
-                    self.perf_monitor.start_render()
+                    # Render the screen (with performance monitoring)
+                    if self.perf_monitor:
+                        self.perf_monitor.start_render()
 
-                t0 = time.time()
-                self._render()
-                loop_times['render'] = (time.time() - t0) * 1000
-                boot_frame_count += 1
-                if first_frame:
-                    logger.debug("first frame render t=%.1fs", time.time()-_boot_start)
-                    first_frame = False
-                elif boot_frame_count == 10:
-                    logger.debug("10 frames t=%.1fs", time.time()-_boot_start)
-                elif boot_frame_count == 60:
-                    logger.debug("60 frames t=%.1fs", time.time()-_boot_start)
-                elif boot_frame_count == 300:
-                    logger.debug("300 frames t=%.1fs", time.time()-_boot_start)
-                elif boot_frame_count == 600:
-                    logger.debug("600 frames t=%.1fs", time.time()-_boot_start)
+                    t0 = time.time()
+                    self._render()
+                    loop_times['render'] = (time.time() - t0) * 1000
+                    boot_frame_count += 1
+                    if first_frame:
+                        logger.debug("first frame render t=%.1fs", time.time()-_boot_start)
+                        first_frame = False
+                    elif boot_frame_count == 10:
+                        logger.debug("10 frames t=%.1fs", time.time()-_boot_start)
+                    elif boot_frame_count == 60:
+                        logger.debug("60 frames t=%.1fs", time.time()-_boot_start)
+                    elif boot_frame_count == 300:
+                        logger.debug("300 frames t=%.1fs", time.time()-_boot_start)
+                    elif boot_frame_count == 600:
+                        logger.debug("600 frames t=%.1fs", time.time()-_boot_start)
 
-                if self.perf_monitor:
-                    self.perf_monitor.end_render()
+                    if self.perf_monitor:
+                        self.perf_monitor.end_render()
 
-                # Maintain frame rate
-                t0 = time.time()
-                self.clock.tick(FPS_TARGET)
-                # Explicit yield to reduce CPU usage (pygame tick can busy-wait on Linux)
-                time.sleep(0.001)
-                loop_times['clock_tick'] = (time.time() - t0) * 1000
+                    # Maintain frame rate
+                    t0 = time.time()
+                    self.clock.tick(FPS_TARGET)
+                    # Explicit yield to reduce CPU usage (pygame tick can busy-wait on Linux)
+                    time.sleep(0.001)
+                    loop_times['clock_tick'] = (time.time() - t0) * 1000
 
-                # Calculate FPS
-                self._calculate_fps()
+                    # Calculate FPS
+                    self._calculate_fps()
 
-                # Update performance metrics
-                self._update_performance_metrics()
+                    # Update performance metrics
+                    self._update_performance_metrics()
 
-                # Print loop profiling every 60 frames
-                loop_times['total'] = (time.time() - loop_start) * 1000
-                if self.frame_count % 60 == 1:
-                    logger.debug("Loop profile (ms): TOTAL=%.1f", loop_times['total'])
-                    for key in ['events', 'hardware', 'render', 'clock_tick']:
-                        val = loop_times.get(key, 0)
-                        pct = (val / loop_times['total'] * 100) if loop_times['total'] > 0 else 0
-                        logger.debug("  %15s: %6.2fms (%5.1f%%)", key, val, pct)
+                    # Print loop profiling every 60 frames
+                    loop_times['total'] = (time.time() - loop_start) * 1000
+                    if self.frame_count % 60 == 1:
+                        logger.debug("Loop profile (ms): TOTAL=%.1f", loop_times['total'])
+                        for key in ['events', 'hardware', 'render', 'clock_tick']:
+                            val = loop_times.get(key, 0)
+                            pct = (val / loop_times['total'] * 100) if loop_times['total'] > 0 else 0
+                            logger.debug("  %15s: %6.2fms (%5.1f%%)", key, val, pct)
 
-                # Ensure mouse cursor stays hidden (some systems may reset it)
-                if pygame.mouse.get_visible():
-                    pygame.mouse.set_visible(False)
+                    # Ensure mouse cursor stays hidden (some systems may reset it)
+                    if pygame.mouse.get_visible():
+                        pygame.mouse.set_visible(False)
+
+                    # Reset crash counter on successful frame
+                    crash_count = 0
+
+                except (pygame.error, IOError, OSError) as e:
+                    # Recoverable errors - pygame display issues, I/O errors
+                    crash_count += 1
+                    logger.error("Recoverable error in main loop (%d/%d): %s",
+                                crash_count, max_crashes, e)
+                    if crash_count >= max_crashes:
+                        logger.error("Too many consecutive errors, exiting")
+                        raise
+                    # Brief pause before retry
+                    time.sleep(0.1)
 
         except KeyboardInterrupt:
             logger.info("Exiting gracefully...")
