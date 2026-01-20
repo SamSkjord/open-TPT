@@ -12,7 +12,7 @@ from typing import Optional, Callable
 
 logger = logging.getLogger('openTPT.encoder')
 
-from config import DEFAULT_BRIGHTNESS
+from config import DEFAULT_BRIGHTNESS, INPUT_EVENT_QUEUE_SIZE
 from utils.settings import get_settings
 
 # Import board only if available
@@ -95,7 +95,7 @@ class EncoderInputHandler:
         self.brightness = self._settings.get("display.brightness", DEFAULT_BRIGHTNESS)
 
         # Thread-safe event queue
-        self.event_queue = deque(maxlen=10)
+        self.event_queue = deque(maxlen=INPUT_EVENT_QUEUE_SIZE)
         self.event_lock = threading.Lock()
 
         # Thread control

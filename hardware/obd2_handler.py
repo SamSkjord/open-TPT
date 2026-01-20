@@ -11,7 +11,17 @@ from typing import Optional, Dict, Any
 from utils.hardware_base import BoundedQueueHardwareHandler
 
 logger = logging.getLogger('openTPT.obd2')
-from config import OBD_CHANNEL, OBD_ENABLED, OBD_BITRATE
+from config import (
+    OBD_CHANNEL,
+    OBD_ENABLED,
+    OBD_BITRATE,
+    OBD_POLL_INTERVAL_S,
+    OBD_RECONNECT_INTERVAL_S,
+    OBD_SEND_TIMEOUT_S,
+    OBD_SPEED_SMOOTHING_SAMPLES,
+    OBD_RPM_SMOOTHING_SAMPLES,
+    OBD_THROTTLE_SMOOTHING_SAMPLES,
+)
 
 # Try to import CAN library
 try:
@@ -103,7 +113,7 @@ class OBD2Handler(BoundedQueueHardwareHandler):
         # Connection tracking
         self.consecutive_errors = 0
         self.max_consecutive_errors = 10
-        self.reconnect_interval = 5.0
+        self.reconnect_interval = OBD_RECONNECT_INTERVAL_S
         self.last_reconnect_attempt = 0.0
         self.hardware_available = False
 
@@ -127,10 +137,10 @@ class OBD2Handler(BoundedQueueHardwareHandler):
             'in_reverse': False,    # Convenience flag for reverse detection
         }
 
-        # Smoothing histories
-        self.speed_history = deque(maxlen=5)
-        self.rpm_history = deque(maxlen=3)
-        self.throttle_history = deque(maxlen=2)
+        # Smoothing histories (configurable window sizes)
+        self.speed_history = deque(maxlen=OBD_SPEED_SMOOTHING_SAMPLES)
+        self.rpm_history = deque(maxlen=OBD_RPM_SMOOTHING_SAMPLES)
+        self.throttle_history = deque(maxlen=OBD_THROTTLE_SMOOTHING_SAMPLES)
 
         # PID failure tracking (stop polling unsupported PIDs)
         self.pid_failures: Dict[int, int] = {}
@@ -227,7 +237,7 @@ class OBD2Handler(BoundedQueueHardwareHandler):
                 is_extended_id=False,
                 data=data
             )
-            self.bus.send(request, timeout=0.05)
+            self.bus.send(request, timeout=OBD_SEND_TIMEOUT_S)
 
             # Wait for response
             deadline = time.time() + timeout_s
@@ -272,7 +282,7 @@ class OBD2Handler(BoundedQueueHardwareHandler):
                 is_extended_id=False,
                 data=data
             )
-            self.bus.send(request, timeout=0.05)
+            self.bus.send(request, timeout=OBD_SEND_TIMEOUT_S)
 
             deadline = time.time() + timeout_s
             while time.time() < deadline:
@@ -308,7 +318,7 @@ class OBD2Handler(BoundedQueueHardwareHandler):
 
     def _worker_loop(self):
         """Background thread that polls OBD2 PIDs."""
-        poll_interval = 0.15
+        poll_interval = OBD_POLL_INTERVAL_S
 
         while self.running:
             start_time = time.time()

@@ -9,7 +9,7 @@ import pygame
 import math
 from typing import Dict, List, Tuple, Optional
 import time
-from config import FONT_PATH
+from config import FONT_PATH, TEXT_CACHE_MAX_SIZE
 
 # Overlay styling constants (3x larger, solid fill)
 ARROW_HEIGHT = 120  # 3x larger (was 40)
@@ -107,7 +107,7 @@ class RadarOverlayRenderer:
         self._overtake_surfaces: Dict[str, pygame.Surface] = {}
         self._overtake_alert: Optional[dict] = None
         self._text_cache: Dict[str, pygame.Surface] = {}
-        self._text_cache_max = 64  # LRU-ish limit
+        self._text_cache_max = TEXT_CACHE_MAX_SIZE
 
         # Font (Noto Sans)
         pygame.font.init()

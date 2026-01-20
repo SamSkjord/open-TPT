@@ -12,7 +12,13 @@ from collections import deque
 
 logger = logging.getLogger('openTPT.ford_hybrid')
 from utils.hardware_base import BoundedQueueHardwareHandler
-from config import FORD_HYBRID_ENABLED, FORD_HYBRID_CHANNEL, FORD_HYBRID_BITRATE
+from config import (
+    FORD_HYBRID_ENABLED,
+    FORD_HYBRID_CHANNEL,
+    FORD_HYBRID_BITRATE,
+    FORD_HYBRID_POLL_INTERVAL_S,
+    FORD_HYBRID_SEND_TIMEOUT_S,
+)
 
 
 class FordHybridHandler(BoundedQueueHardwareHandler):
@@ -172,7 +178,7 @@ class FordHybridHandler(BoundedQueueHardwareHandler):
 
     def _worker_loop(self):
         """Background thread that polls Ford Hybrid PIDs."""
-        poll_interval = 0.5  # Poll every 500ms (2 Hz) - don't stress the bus
+        poll_interval = FORD_HYBRID_POLL_INTERVAL_S
 
         # Cycle through PIDs on each poll
         pids_to_read = [
@@ -194,7 +200,7 @@ class FordHybridHandler(BoundedQueueHardwareHandler):
                 try:
                     # Send request
                     request = self._build_pid_request(pid)
-                    self.bus.send(request, timeout=0.1)
+                    self.bus.send(request, timeout=FORD_HYBRID_SEND_TIMEOUT_S)
 
                     # Wait for response
                     response = self._wait_for_response(timeout_s=0.15)

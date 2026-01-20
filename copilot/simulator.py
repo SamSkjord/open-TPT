@@ -10,6 +10,7 @@ from .gps import Position
 from .geometry import haversine_distance, bearing, point_along_bearing
 from .map_loader import RoadNetwork
 from .path_projector import PathProjector
+from config import COPILOT_SIMULATION_FETCH_RADIUS_M
 
 
 @dataclass
@@ -76,7 +77,7 @@ class GPSSimulator:
             self.current_lat,
             self.current_lon,
             self.current_heading,
-            max_distance=5000,  # 5km route
+            max_distance=COPILOT_SIMULATION_FETCH_RADIUS_M,
         )
 
         if path and path.points:

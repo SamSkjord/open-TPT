@@ -129,6 +129,21 @@ MCP9601_ADDRESSES = {
     "outer": 0x66,  # Outer pad sensor
 }
 
+# I2C timing configuration
+I2C_TIMEOUT_S = 0.5  # Timeout for I2C operations (seconds)
+I2C_SETTLE_DELAY_S = 0.005  # Delay after I2C operations for bus settle (seconds)
+I2C_MUX_RESET_PULSE_S = 0.001  # Mux reset pulse duration (seconds)
+I2C_MUX_STABILISE_S = 0.010  # Delay after mux reset for stabilisation (seconds)
+
+# I2C exponential backoff configuration (for error recovery)
+I2C_BACKOFF_INITIAL_S = 1.0  # Initial backoff delay (seconds)
+I2C_BACKOFF_MULTIPLIER = 2  # Backoff multiplier per failure
+I2C_BACKOFF_MAX_S = 64.0  # Maximum backoff delay (seconds)
+
+# TOF sensor history window (for smoothing/analysis)
+TOF_HISTORY_WINDOW_S = 10.0  # Seconds of TOF data to retain
+TOF_HISTORY_SAMPLES = 100  # Maximum number of samples to retain
+
 # ==============================================================================
 # CAMERA CONFIGURATION
 # ==============================================================================
@@ -154,6 +169,12 @@ CAMERA_REAR_MIRROR = True  # Default True for rear-view mirror effect
 CAMERA_REAR_ROTATE = 0  # 0, 90, 180, 270 degrees
 CAMERA_FRONT_MIRROR = False  # Default False for normal view
 CAMERA_FRONT_ROTATE = 0  # 0, 90, 180, 270 degrees
+
+# Camera field of view (used for radar overlay projection)
+CAMERA_FOV_DEGREES = 106.0  # Horizontal field of view in degrees
+
+# Camera FPS update interval (for display)
+CAMERA_FPS_UPDATE_INTERVAL_S = 1.0  # Seconds between FPS counter updates
 
 # ==============================================================================
 # DISPLAY SCALING (computed at startup)
@@ -192,6 +213,19 @@ FONT_SIZE_SMALL = int(18 * min(SCALE_X, SCALE_Y))
 ICON_SIZE = scale_size((40, 40))
 TYRE_ICON_POSITION = scale_position((725, 35))
 BRAKE_ICON_POSITION = scale_position((35, 35))
+
+# UI layout dimensions (reference coordinates, will be scaled)
+MENU_ITEM_HEIGHT = 40  # Menu item height in pixels (before scaling)
+SCALE_BAR_WIDTH = 200  # Scale bar width in pixels (before scaling)
+SCALE_BAR_HEIGHT = 30  # Scale bar height in pixels (before scaling)
+CAR_ICON_WIDTH = 100  # Car icon width in pixels (before scaling)
+CAR_ICON_HEIGHT = 200  # Car icon height in pixels (before scaling)
+
+# Text cache settings (for radar overlay and other cached text)
+TEXT_CACHE_MAX_SIZE = 64  # Maximum entries in text render cache (LRU)
+
+# Input event queue settings
+INPUT_EVENT_QUEUE_SIZE = 10  # Maximum queued input events
 
 # ==============================================================================
 # TYRE SENSOR CONFIGURATION
@@ -418,6 +452,12 @@ PRESSURE_FRONT_OPTIMAL = 32.0  # Front tyre optimal pressure
 PRESSURE_REAR_OPTIMAL = 34.0  # Rear tyre optimal pressure
 # Low/high thresholds are now calculated as optimal +/- offset
 
+# TPMS receiver thresholds (hardware alerts, in sensor native units)
+TPMS_HIGH_PRESSURE_KPA = 310  # High pressure alert threshold (kPa)
+TPMS_LOW_PRESSURE_KPA = 180  # Low pressure alert threshold (kPa)
+TPMS_HIGH_TEMP_C = 75  # High temperature alert threshold (Celsius)
+TPMS_DATA_TIMEOUT_S = 30.0  # Seconds before marking sensor as stale
+
 # TPMS positions on screen dynamically calculated based on MLX positions
 # The pressure text is centred above each tyre's thermal display
 TPMS_POSITIONS = {
@@ -499,6 +539,11 @@ GPS_ENABLED = True  # Set to False to disable GPS
 GPS_SERIAL_PORT = "/dev/ttyS0"
 GPS_BAUD_RATE = 38400  # 38400 for 10Hz update rate (configure GPS module to match)
 
+# GPS serial timeout settings
+GPS_SERIAL_TIMEOUT_S = 0.15  # Read timeout for serial port (seconds)
+GPS_SERIAL_WRITE_TIMEOUT_S = 0.5  # Write timeout for serial port (seconds)
+GPS_COMMAND_TIMEOUT_S = 5.0  # Timeout waiting for command response (seconds)
+
 # ==============================================================================
 # OBD2 CONFIGURATION (Vehicle Speed)
 # ==============================================================================
@@ -511,6 +556,16 @@ OBD_ENABLED = True  # Set to False to disable OBD2 speed
 # OBD-II is connected to can_b2_1 (Board 2, CAN_1 connector)
 OBD_CHANNEL = "can_b2_1"  # CAN channel for OBD2 data
 OBD_BITRATE = 500000  # Standard OBD2 bitrate (500 kbps)
+
+# OBD2 polling and timing
+OBD_POLL_INTERVAL_S = 0.15  # Seconds between OBD2 queries
+OBD_RECONNECT_INTERVAL_S = 5.0  # Seconds between reconnection attempts
+OBD_SEND_TIMEOUT_S = 0.05  # Timeout for CAN message sends (seconds)
+
+# OBD2 data smoothing (moving average window sizes)
+OBD_SPEED_SMOOTHING_SAMPLES = 5  # Samples for speed smoothing
+OBD_RPM_SMOOTHING_SAMPLES = 3  # Samples for RPM smoothing
+OBD_THROTTLE_SMOOTHING_SAMPLES = 2  # Samples for throttle smoothing
 
 # ==============================================================================
 # FORD HYBRID CONFIGURATION (Battery State of Charge)
@@ -526,6 +581,10 @@ FORD_HYBRID_ENABLED = (
 # Ford Hybrid module is on can_b2_0 (Board 2, CAN_0 connector)
 FORD_HYBRID_CHANNEL = "can_b2_0"  # CAN channel for Ford hybrid data
 FORD_HYBRID_BITRATE = 500000  # Standard CAN bitrate (500 kbps)
+
+# Ford Hybrid polling and timing
+FORD_HYBRID_POLL_INTERVAL_S = 0.5  # Seconds between Ford Hybrid queries (2 Hz)
+FORD_HYBRID_SEND_TIMEOUT_S = 0.1  # Timeout for CAN message sends (seconds)
 
 # ==============================================================================
 # RADAR CONFIGURATION (Toyota Radar Overlay)
@@ -565,6 +624,10 @@ RADAR_OVERTAKE_TIME_THRESHOLD = 1.0  # Time-to-overtake threshold (seconds)
 RADAR_OVERTAKE_MIN_CLOSING_KPH = 5.0  # Minimum closing speed (km/h)
 RADAR_OVERTAKE_MIN_LATERAL = 0.5  # Minimum lateral offset (metres)
 RADAR_OVERTAKE_ARROW_DURATION = 1.0  # Duration to show arrow (seconds)
+
+# Radar polling and timing
+RADAR_POLL_INTERVAL_S = 0.05  # Seconds between radar reads (20 Hz)
+RADAR_NOTIFIER_TIMEOUT_S = 0.1  # CAN notifier timeout (seconds)
 
 # ==============================================================================
 # INPUT CONFIGURATION (NeoKey 1x4)
@@ -732,6 +795,48 @@ COPILOT_OVERLAY_POSITION = (
 
 # Status bar settings
 COPILOT_STATUS_ENABLED = True  # Show last callout in status bar
+
+# Corner callout distances (metres) - at what distances to call corners
+COPILOT_CORNER_CALLOUT_DISTANCES = [1000, 500, 300, 200, 100]
+
+# Multi-hazard callout distances (metres) - for consecutive hazards
+COPILOT_MULTI_CALLOUT_DISTANCES = [500, 300, 100]
+
+# Default callout distance (metres) - used when no specific distance needed
+COPILOT_DEFAULT_CALLOUT_DISTANCE_M = 100
+
+# Note merging distance (metres) - merge notes closer than this
+COPILOT_NOTE_MERGE_DISTANCE_M = 50
+
+# Simulation mode settings
+COPILOT_SIMULATION_FETCH_RADIUS_M = 5000  # Radius for road data fetch in simulation
+COPILOT_REFETCH_THRESHOLD_M = 2500  # Distance before triggering refetch
+
+# Corner detector parameters (for pacenotes)
+COPILOT_CORNER_MIN_CUT_DISTANCE_M = 10.0  # Minimum distance between cuts
+COPILOT_CORNER_MAX_CHICANE_GAP_M = 15.0  # Maximum gap for chicane detection
+
+# ==============================================================================
+# HANDLER & THREADING CONFIGURATION
+# ==============================================================================
+
+# Bounded queue handler settings (used by all hardware handlers)
+HANDLER_QUEUE_DEPTH = 2  # Depth of snapshot queue (lock-free producer-consumer)
+HANDLER_STOP_TIMEOUT_S = 5.0  # Timeout waiting for handler thread to stop
+
+# Thread shutdown timeouts
+THREAD_JOIN_TIMEOUT_S = 2.0  # Default timeout for thread.join() calls
+THREAD_SHUTDOWN_TIMEOUT_S = 1.0  # Timeout for background thread shutdown
+
+# IMU handler settings
+IMU_RECONNECT_INTERVAL_S = 5.0  # Seconds between IMU reconnection attempts
+
+# NeoDriver LED strip timing
+NEODRIVER_UPDATE_RATE_HZ = 15  # LED update rate (Hz)
+NEODRIVER_STARTUP_DELAY_S = 0.05  # Delay per pixel during startup animation
+
+# Performance monitoring
+PERFORMANCE_WARNING_HISTORY = 10  # Number of performance warnings to retain
 
 # Helper functions moved to utils/
 # - Emissivity correction: from utils.thermal import apply_emissivity_correction

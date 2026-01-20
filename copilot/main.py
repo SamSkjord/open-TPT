@@ -16,6 +16,10 @@ from config import (
     COPILOT_UPDATE_INTERVAL_S,
     COPILOT_REFETCH_DISTANCE_M,
     COPILOT_ROAD_FETCH_RADIUS_M,
+    COPILOT_CORNER_MIN_CUT_DISTANCE_M,
+    COPILOT_CORNER_MAX_CHICANE_GAP_M,
+    COPILOT_SIMULATION_FETCH_RADIUS_M,
+    COPILOT_REFETCH_THRESHOLD_M,
 )
 
 
@@ -103,8 +107,8 @@ class CoPilot:
         # Tune corner detection for better square/chicane detection
         self.corner_detector = CornerDetector(
             merge_same_direction=False,  # Don't merge consecutive same-direction turns
-            min_cut_distance=10.0,        # More precise cuts (was 15)
-            max_chicane_gap=15.0,         # Tighter chicane merging (was 30)
+            min_cut_distance=COPILOT_CORNER_MIN_CUT_DISTANCE_M,
+            max_chicane_gap=COPILOT_CORNER_MAX_CHICANE_GAP_M,
         )
         self.pacenote_gen = PacenoteGenerator(distance_threshold_m=lookahead_m)
         self.visualize = visualize
@@ -261,13 +265,13 @@ class CoPilot:
         # In simulation mode, use larger threshold (half the load radius)
         # to avoid frequent reloads while still covering long routes
         if self.simulation_mode:
-            return distance > 2500  # Refetch when 2.5km from last load centre
+            return distance > COPILOT_REFETCH_THRESHOLD_M
 
         return distance > COPILOT_REFETCH_DISTANCE_M
 
     def _fetch_roads_sync(self, pos: Position) -> None:
         """Fetch road data synchronously (blocks until complete)."""
-        radius = 5000 if self.simulation_mode else COPILOT_ROAD_FETCH_RADIUS_M
+        radius = COPILOT_SIMULATION_FETCH_RADIUS_M if self.simulation_mode else COPILOT_ROAD_FETCH_RADIUS_M
 
         try:
             print(f"Loading roads near {pos.lat:.4f}, {pos.lon:.4f}...")
@@ -297,7 +301,7 @@ class CoPilot:
 
     def _fetch_roads_async(self, pos: Position) -> None:
         """Start background thread to fetch road data."""
-        radius = 5000 if self.simulation_mode else COPILOT_ROAD_FETCH_RADIUS_M
+        radius = COPILOT_SIMULATION_FETCH_RADIUS_M if self.simulation_mode else COPILOT_ROAD_FETCH_RADIUS_M
 
         def load_in_background():
             try:

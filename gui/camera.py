@@ -26,6 +26,8 @@ from config import (
     CAMERA_REAR_ROTATE,
     CAMERA_FRONT_MIRROR,
     CAMERA_FRONT_ROTATE,
+    CAMERA_FOV_DEGREES,
+    CAMERA_FPS_UPDATE_INTERVAL_S,
 )
 from utils.settings import get_settings
 
@@ -70,7 +72,7 @@ class Camera:
                 self.radar_overlay = RadarOverlayRenderer(
                     display_width=DISPLAY_WIDTH,
                     display_height=DISPLAY_HEIGHT,
-                    camera_fov=106.0,  # Adjust based on your camera
+                    camera_fov=CAMERA_FOV_DEGREES,
                     mirror_output=True,  # Match camera mirroring
                 )
                 logger.info("Radar overlay enabled for rear camera")
@@ -91,7 +93,7 @@ class Camera:
         self.frame_count = 0
         self.fps = 0
         self.last_time = time.time()
-        self.update_interval = 1.0  # Update FPS every 1 second
+        self.update_interval = CAMERA_FPS_UPDATE_INTERVAL_S
 
         # Persistent settings (with config.py as defaults)
         self._settings = get_settings()

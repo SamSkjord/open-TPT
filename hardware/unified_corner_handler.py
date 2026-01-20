@@ -40,6 +40,16 @@ from config import (
     MCP9601_DUAL_ZONE,
     MCP9601_ADDRESSES,
     MCP9601_MUX_CHANNELS,
+    # I2C timing config
+    I2C_TIMEOUT_S,
+    I2C_SETTLE_DELAY_S,
+    I2C_MUX_RESET_PULSE_S,
+    I2C_MUX_STABILISE_S,
+    I2C_BACKOFF_INITIAL_S,
+    I2C_BACKOFF_MULTIPLIER,
+    I2C_BACKOFF_MAX_S,
+    TOF_HISTORY_WINDOW_S,
+    TOF_HISTORY_SAMPLES,
 )
 
 # Import for ADC hardware (ADS1115)
@@ -269,13 +279,13 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             "RR": 0,
         }
 
-        # TOF minimum distance tracking (rolling 10-second window)
-        self._tof_min_window = 10.0  # seconds
+        # TOF minimum distance tracking (rolling window from config)
+        self._tof_min_window = TOF_HISTORY_WINDOW_S
         self._tof_history = {
-            "FL": deque(maxlen=100),  # (timestamp, distance) pairs
-            "FR": deque(maxlen=100),
-            "RL": deque(maxlen=100),
-            "RR": deque(maxlen=100),
+            "FL": deque(maxlen=TOF_HISTORY_SAMPLES),  # (timestamp, distance) pairs
+            "FR": deque(maxlen=TOF_HISTORY_SAMPLES),
+            "RL": deque(maxlen=TOF_HISTORY_SAMPLES),
+            "RR": deque(maxlen=TOF_HISTORY_SAMPLES),
         }
         self._tof_reinit_count = {
             "FL": 0,
@@ -307,9 +317,9 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
             "RL": 0,
             "RR": 0,
         }  # Current backoff in seconds
-        self._BACKOFF_INITIAL = 1.0  # Start with 1 second
-        self._BACKOFF_MULTIPLIER = 2  # Double each time
-        self._BACKOFF_MAX = 64.0  # Cap at 64 seconds
+        self._BACKOFF_INITIAL = I2C_BACKOFF_INITIAL_S
+        self._BACKOFF_MULTIPLIER = I2C_BACKOFF_MULTIPLIER
+        self._BACKOFF_MAX = I2C_BACKOFF_MAX_S
 
         # Separate backoff tracking for brake sensors
         self._brake_backoff_until = {
@@ -332,7 +342,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         }
 
         # I2C operation timeout (prevents bus hangs from blocking worker thread)
-        self._i2c_timeout = 0.5  # 500ms timeout for I2C operations
+        self._i2c_timeout = I2C_TIMEOUT_S
         self._i2c_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="i2c_timeout")
 
         # Initialise hardware
@@ -424,11 +434,11 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
 
         try:
             with self._i2c_lock:
-                # Pulse reset low for 1ms
+                # Pulse reset low
                 GPIO.output(I2C_MUX_RESET_PIN, GPIO.LOW)
-                time.sleep(0.001)
+                time.sleep(I2C_MUX_RESET_PULSE_S)
                 GPIO.output(I2C_MUX_RESET_PIN, GPIO.HIGH)
-                time.sleep(0.010)  # 10ms for mux to stabilise
+                time.sleep(I2C_MUX_STABILISE_S)
 
             self._mux_reset_count += 1
             logger.warning("I2C mux reset triggered (total resets: %d)", self._mux_reset_count)
@@ -635,7 +645,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
 
                 # Select mux channel and wait for it to settle
                 mux_channel = self.mux[channel]
-                time.sleep(0.010)
+                time.sleep(I2C_MUX_STABILISE_S)
 
                 # Create new sensor instance
                 sensor = adafruit_vl53l0x.VL53L0X(mux_channel, address=TOF_I2C_ADDRESS)
@@ -701,7 +711,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
                 last_read = current_time
                 self._read_all_corners()
 
-            time.sleep(0.005)
+            time.sleep(I2C_SETTLE_DELAY_S)
 
     def _read_all_corners(self):
         """Read all sensors for all corners in one pass."""
@@ -765,7 +775,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
                 if not mux_ok:
                     self._track_read_failure(position)
                     return None
-                time.sleep(0.005)  # Brief delay
+                time.sleep(I2C_SETTLE_DELAY_S)  # Brief delay
 
                 # Read temperature registers (left, centre, right)
                 left_raw = self._read_pico_int16(0x20)
@@ -844,7 +854,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         try:
             with self._i2c_lock:
                 self.mux[channel]
-                time.sleep(0.005)
+                time.sleep(I2C_SETTLE_DELAY_S)
 
                 temp = sensor.object_temperature
 
@@ -973,7 +983,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         try:
             with self._i2c_lock:
                 self.mux[channel]
-                time.sleep(0.005)
+                time.sleep(I2C_SETTLE_DELAY_S)
 
                 temp = sensor.object_temperature
 
@@ -1028,7 +1038,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         try:
             with self._i2c_lock:
                 self.mux[channel]
-                time.sleep(0.005)
+                time.sleep(I2C_SETTLE_DELAY_S)
 
                 # Read inner sensor
                 if "inner" in sensors:
@@ -1113,7 +1123,7 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
         try:
             with self._i2c_lock:
                 self.mux[channel]
-                time.sleep(0.005)
+                time.sleep(I2C_SETTLE_DELAY_S)
 
                 distance = sensor.range
 

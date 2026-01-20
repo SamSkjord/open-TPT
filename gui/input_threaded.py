@@ -25,6 +25,7 @@ from config import (
     DEFAULT_BRIGHTNESS,
     BRIGHTNESS_PRESETS,
     RECORDING_HOLD_DURATION,
+    INPUT_EVENT_QUEUE_SIZE,
 )
 
 # Only try to import NeoKey if board is available
@@ -81,7 +82,7 @@ class InputHandlerThreaded:
         self.recording_button_triggered = False
 
         # Thread-safe event queue (bounded to last 10 events)
-        self.event_queue = deque(maxlen=10)
+        self.event_queue = deque(maxlen=INPUT_EVENT_QUEUE_SIZE)
         self.event_lock = threading.Lock()
 
         # Thread control

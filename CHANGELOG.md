@@ -72,6 +72,79 @@ Fixed broken corner detection integration from the standalone lap-timing-system 
 - **ASCCornerDetector**: Removed incorrect `merge_same_direction` parameter mapping (was using chicane config for wrong purpose)
 - **CurveFinderDetector**: Now respects `LAP_TIMING_CORNER_MIN_RADIUS_M` and `LAP_TIMING_CORNER_MIN_ANGLE_DEG` config values
 
+### Magic Number Consolidation
+
+Moved all hardcoded values to config.py for easier tuning and consistency.
+
+#### New Config Sections Added
+
+**TPMS Thresholds:**
+- `TPMS_HIGH_PRESSURE_KPA`, `TPMS_LOW_PRESSURE_KPA`, `TPMS_HIGH_TEMP_C`, `TPMS_DATA_TIMEOUT_S`
+
+**I2C Timing Configuration:**
+- `I2C_TIMEOUT_S`, `I2C_SETTLE_DELAY_S`, `I2C_MUX_RESET_PULSE_S`, `I2C_MUX_STABILISE_S`
+- `I2C_BACKOFF_INITIAL_S`, `I2C_BACKOFF_MULTIPLIER`, `I2C_BACKOFF_MAX_S`
+- `TOF_HISTORY_WINDOW_S`, `TOF_HISTORY_SAMPLES`
+
+**OBD2 Timing and Smoothing:**
+- `OBD_POLL_INTERVAL_S`, `OBD_RECONNECT_INTERVAL_S`, `OBD_SEND_TIMEOUT_S`
+- `OBD_SPEED_SMOOTHING_SAMPLES`, `OBD_RPM_SMOOTHING_SAMPLES`, `OBD_THROTTLE_SMOOTHING_SAMPLES`
+
+**Ford Hybrid Timing:**
+- `FORD_HYBRID_POLL_INTERVAL_S`, `FORD_HYBRID_SEND_TIMEOUT_S`
+
+**Radar Timing:**
+- `RADAR_POLL_INTERVAL_S`, `RADAR_NOTIFIER_TIMEOUT_S`
+
+**GPS Serial Timeouts:**
+- `GPS_SERIAL_TIMEOUT_S`, `GPS_SERIAL_WRITE_TIMEOUT_S`, `GPS_COMMAND_TIMEOUT_S`
+
+**Handler & Threading:**
+- `HANDLER_QUEUE_DEPTH`, `HANDLER_STOP_TIMEOUT_S`
+- `THREAD_JOIN_TIMEOUT_S`, `THREAD_SHUTDOWN_TIMEOUT_S`
+- `IMU_RECONNECT_INTERVAL_S`, `NEODRIVER_UPDATE_RATE_HZ`, `NEODRIVER_STARTUP_DELAY_S`
+- `PERFORMANCE_WARNING_HISTORY`
+
+**Camera Settings:**
+- `CAMERA_FOV_DEGREES`, `CAMERA_FPS_UPDATE_INTERVAL_S`
+
+**UI Layout:**
+- `MENU_ITEM_HEIGHT`, `SCALE_BAR_WIDTH`, `SCALE_BAR_HEIGHT`
+- `CAR_ICON_WIDTH`, `CAR_ICON_HEIGHT`, `TEXT_CACHE_MAX_SIZE`, `INPUT_EVENT_QUEUE_SIZE`
+
+**CoPilot Callout Distances:**
+- `COPILOT_CORNER_CALLOUT_DISTANCES`, `COPILOT_MULTI_CALLOUT_DISTANCES`
+- `COPILOT_DEFAULT_CALLOUT_DISTANCE_M`, `COPILOT_NOTE_MERGE_DISTANCE_M`
+- `COPILOT_SIMULATION_FETCH_RADIUS_M`, `COPILOT_REFETCH_THRESHOLD_M`
+- `COPILOT_CORNER_MIN_CUT_DISTANCE_M`, `COPILOT_CORNER_MAX_CHICANE_GAP_M`
+
+#### Files Updated
+
+**Hardware:**
+- `hardware/tpms_input_optimized.py` - TPMS thresholds and timeout
+- `hardware/unified_corner_handler.py` - I2C timing and backoff
+- `hardware/obd2_handler.py` - OBD2 polling and smoothing
+- `hardware/ford_hybrid_handler.py` - Ford Hybrid timing
+- `hardware/radar_handler.py` - Radar polling
+- `hardware/gps_handler.py` - GPS serial timeouts
+- `hardware/neodriver_handler.py` - NeoDriver update rate
+- `hardware/imu_handler.py` - IMU reconnect interval
+- `utils/hardware_base.py` - Queue depth and stop timeout
+
+**GUI:**
+- `gui/camera.py` - Camera FOV and FPS interval
+- `gui/menu/base.py` - Menu item height
+- `gui/radar_overlay.py` - Text cache size
+- `gui/input_threaded.py` - Event queue size
+- `gui/encoder_input.py` - Event queue size
+
+**CoPilot:**
+- `copilot/pacenotes.py` - Callout distances and merge distance
+- `copilot/main.py` - Corner detection params, simulation fetch radius
+- `copilot/simulator.py` - Simulation fetch radius
+
+---
+
 ### Config Cleanup
 
 Removed standalone CLI code and consolidated configuration files into main config.py.

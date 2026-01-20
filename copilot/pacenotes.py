@@ -9,7 +9,14 @@ from .path_projector import (
     JunctionInfo, BridgeInfo, TunnelInfo, RailwayCrossingInfo,
     FordInfo, SpeedBumpInfo, SurfaceChangeInfo, BarrierInfo, NarrowInfo
 )
-from config import COPILOT_LOOKAHEAD_M, COPILOT_JUNCTION_WARN_DISTANCE_M
+from config import (
+    COPILOT_LOOKAHEAD_M,
+    COPILOT_JUNCTION_WARN_DISTANCE_M,
+    COPILOT_CORNER_CALLOUT_DISTANCES,
+    COPILOT_MULTI_CALLOUT_DISTANCES,
+    COPILOT_DEFAULT_CALLOUT_DISTANCE_M,
+    COPILOT_NOTE_MERGE_DISTANCE_M,
+)
 
 
 class NoteType(Enum):
@@ -55,10 +62,10 @@ class PacenoteGenerator:
     ]
 
     # Distance brackets for multi-callout features (called at each bracket)
-    MULTI_CALLOUT_DISTANCES = [500, 300, 100]  # Hazards: far, medium, close
+    MULTI_CALLOUT_DISTANCES = COPILOT_MULTI_CALLOUT_DISTANCES
     # Corners: 1000/500 for long-range, 300/200/100 for close range
     # Medium brackets (300/200) only trigger on clear runs (filtered if closer corner exists)
-    CORNER_CALLOUT_DISTANCES = [1000, 500, 300, 200, 100]
+    CORNER_CALLOUT_DISTANCES = COPILOT_CORNER_CALLOUT_DISTANCES
 
     # Severity names (index = severity number)
     SEVERITY_NAMES = [
@@ -76,7 +83,7 @@ class PacenoteGenerator:
         self,
         distance_threshold_m: float = COPILOT_LOOKAHEAD_M,
         junction_warn_distance: float = COPILOT_JUNCTION_WARN_DISTANCE_M,
-        callout_distance_m: float = 100,  # Only call corners within this distance
+        callout_distance_m: float = COPILOT_DEFAULT_CALLOUT_DISTANCE_M,
     ):
         self.distance_threshold = distance_threshold_m
         self.junction_warn_distance = junction_warn_distance
@@ -86,7 +93,7 @@ class PacenoteGenerator:
         self._corner_cache: Dict[str, str] = {}  # position_key -> callout_text
 
     # Distance threshold for merging adjacent notes (meters)
-    MERGE_DISTANCE_M = 50
+    MERGE_DISTANCE_M = COPILOT_NOTE_MERGE_DISTANCE_M
 
     def generate(
         self,

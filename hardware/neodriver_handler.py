@@ -18,6 +18,8 @@ from typing import Optional, Tuple, List
 
 logger = logging.getLogger('openTPT.neodriver')
 
+from config import NEODRIVER_UPDATE_RATE_HZ, NEODRIVER_STARTUP_DELAY_S
+
 # Import board only if available
 try:
     import board
@@ -103,7 +105,7 @@ class NeoDriverHandler:
         # Thread control
         self.thread = None
         self.running = False
-        self.update_rate = 15  # Hz (reduced to avoid I2C bus contention)
+        self.update_rate = NEODRIVER_UPDATE_RATE_HZ
 
         # Thread-safe state
         self.state_lock = threading.Lock()
@@ -246,7 +248,7 @@ class NeoDriverHandler:
                 if consecutive_errors == 3:
                     logger.debug("NeoDriver: I2C errors (%s), will retry silently", e)
                 # Back off slightly on errors
-                time.sleep(0.05)
+                time.sleep(NEODRIVER_STARTUP_DELAY_S)
             except Exception as e:
                 logger.warning("Error in NeoDriver update loop: %s", e)
 

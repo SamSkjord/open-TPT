@@ -9,6 +9,12 @@ import time
 
 logger = logging.getLogger('openTPT.tpms')
 
+from config import (
+    TPMS_HIGH_PRESSURE_KPA,
+    TPMS_LOW_PRESSURE_KPA,
+    TPMS_HIGH_TEMP_C,
+    TPMS_DATA_TIMEOUT_S,
+)
 from utils.hardware_base import BoundedQueueHardwareHandler
 
 # Import for actual TPMS hardware
@@ -32,7 +38,7 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
     - No blocking in consumer path
     """
 
-    def __init__(self, timeout_s: float = 30.0):
+    def __init__(self, timeout_s: float = TPMS_DATA_TIMEOUT_S):
         """
         Initialise the optimised TPMS handler.
 
@@ -104,10 +110,10 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
             self.tpms_device.register_tyre_state_callback(self._on_tyre_state_update)
             self.tpms_device.register_pairing_callback(self._on_pairing_complete)
 
-            # Set thresholds
-            self.tpms_device.set_high_pressure_threshold(310)  # 310 kPa
-            self.tpms_device.set_low_pressure_threshold(180)  # 180 kPa
-            self.tpms_device.set_high_temp_threshold(75)      # 75°C
+            # Set thresholds from config
+            self.tpms_device.set_high_pressure_threshold(TPMS_HIGH_PRESSURE_KPA)
+            self.tpms_device.set_low_pressure_threshold(TPMS_LOW_PRESSURE_KPA)
+            self.tpms_device.set_high_temp_threshold(TPMS_HIGH_TEMP_C)
 
             # Connect to device
             if self.tpms_device.connect():

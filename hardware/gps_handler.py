@@ -10,7 +10,14 @@ import serial
 from typing import Optional
 
 from utils.hardware_base import BoundedQueueHardwareHandler
-from config import GPS_ENABLED, GPS_SERIAL_PORT, GPS_BAUD_RATE
+from config import (
+    GPS_ENABLED,
+    GPS_SERIAL_PORT,
+    GPS_BAUD_RATE,
+    GPS_SERIAL_TIMEOUT_S,
+    GPS_SERIAL_WRITE_TIMEOUT_S,
+    GPS_COMMAND_TIMEOUT_S,
+)
 
 logger = logging.getLogger('openTPT.gps')
 
@@ -114,7 +121,7 @@ class GPSHandler(BoundedQueueHardwareHandler):
                 self.serial_port = serial.Serial(
                     port=GPS_SERIAL_PORT,
                     baudrate=GPS_BAUD_RATE,
-                    timeout=0.15
+                    timeout=GPS_SERIAL_TIMEOUT_S
                 )
                 logger.info("GPS: Connected to %s at %s baud", GPS_SERIAL_PORT, GPS_BAUD_RATE)
 
@@ -158,7 +165,7 @@ class GPSHandler(BoundedQueueHardwareHandler):
             self.serial_port = serial.Serial(
                 port=GPS_SERIAL_PORT,
                 baudrate=GPS_BAUD_RATE,
-                timeout=0.5
+                timeout=GPS_SERIAL_WRITE_TIMEOUT_S
             )
             # Check if we get valid NMEA data
             time.sleep(0.2)
@@ -187,7 +194,7 @@ class GPSHandler(BoundedQueueHardwareHandler):
             self.serial_port = serial.Serial(
                 port=GPS_SERIAL_PORT,
                 baudrate=MTK_DEFAULT_BAUD,
-                timeout=0.5
+                timeout=GPS_SERIAL_WRITE_TIMEOUT_S
             )
             time.sleep(0.1)
 
@@ -216,7 +223,7 @@ class GPSHandler(BoundedQueueHardwareHandler):
             self.serial_port = serial.Serial(
                 port=GPS_SERIAL_PORT,
                 baudrate=GPS_BAUD_RATE,
-                timeout=0.15
+                timeout=GPS_SERIAL_TIMEOUT_S
             )
             logger.info("GPS: Configured to %s baud / 10Hz", GPS_BAUD_RATE)
 
@@ -233,7 +240,7 @@ class GPSHandler(BoundedQueueHardwareHandler):
             self.serial_port = serial.Serial(
                 port=GPS_SERIAL_PORT,
                 baudrate=GPS_BAUD_RATE,
-                timeout=0.15
+                timeout=GPS_SERIAL_TIMEOUT_S
             )
 
     def _worker_loop(self):
@@ -413,7 +420,7 @@ class GPSHandler(BoundedQueueHardwareHandler):
             result = subprocess.run(
                 ['sudo', 'date', '-s', datetime_str],
                 capture_output=True,
-                timeout=5
+                timeout=GPS_COMMAND_TIMEOUT_S
             )
             if result.returncode == 0:
                 logger.info("GPS: System time set to %s UTC", datetime_str)

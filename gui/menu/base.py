@@ -20,6 +20,7 @@ from config import (
     WHITE,
     GREY,
     UI_PAGES,
+    MENU_ITEM_HEIGHT,
     # Threshold defaults
     TYRE_TEMP_COLD,
     TYRE_TEMP_OPTIMAL,
@@ -190,7 +191,7 @@ class Menu:
         menu_height = int(DISPLAY_HEIGHT * 0.7)
         title_area = 62  # Title + spacing
         hint_area = 30  # Status message area at bottom
-        item_height = 40
+        item_height = MENU_ITEM_HEIGHT
         available_height = menu_height - title_area - hint_area
         return max(1, available_height // item_height)
 
@@ -282,7 +283,7 @@ class Menu:
 
         # Draw items with scrolling
         item_start_y = title_y + 50
-        item_height = 40
+        item_height = MENU_ITEM_HEIGHT
         item_padding = 20
         max_visible = self._get_max_visible_items()
 

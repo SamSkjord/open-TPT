@@ -11,6 +11,7 @@ from typing import Dict, Optional, List
 
 logger = logging.getLogger('openTPT.radar')
 
+from config import RADAR_POLL_INTERVAL_S, RADAR_NOTIFIER_TIMEOUT_S
 from utils.hardware_base import BoundedQueueHardwareHandler
 
 # Try to import Toyota radar driver
@@ -112,7 +113,7 @@ class RadarHandlerOptimised(BoundedQueueHardwareHandler):
                 control_dbc=self.control_dbc,
                 track_timeout=self.track_timeout,
                 keepalive_rate_hz=100.0,
-                notifier_timeout=0.1,
+                notifier_timeout=RADAR_NOTIFIER_TIMEOUT_S,
                 auto_setup=False,  # CAN interfaces managed by systemd
                 use_sudo=False,
                 setup_extra_args=[],
@@ -174,7 +175,7 @@ class RadarHandlerOptimised(BoundedQueueHardwareHandler):
         Worker thread loop - reads radar tracks.
         Never blocks, publishes to queue for lock-free render access.
         """
-        read_interval = 0.05  # 20 Hz reading
+        read_interval = RADAR_POLL_INTERVAL_S
         last_read = 0
 
         logger.debug("Radar worker thread running")

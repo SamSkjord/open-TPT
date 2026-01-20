@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 import time
 
+from config import HANDLER_QUEUE_DEPTH, HANDLER_STOP_TIMEOUT_S
+
 logger = logging.getLogger('openTPT.hardware')
 
 
@@ -107,12 +109,12 @@ class BoundedQueueHardwareHandler:
     - No locks in consumer (render) path
     """
 
-    def __init__(self, queue_depth: int = 2):
+    def __init__(self, queue_depth: int = HANDLER_QUEUE_DEPTH):
         """
         Initialise the hardware handler.
 
         Args:
-            queue_depth: Maximum queue depth (default 2 for double-buffering)
+            queue_depth: Maximum queue depth (default from config for double-buffering)
         """
         self.queue_depth = queue_depth
         self.data_queue = queue.Queue(maxsize=queue_depth)
@@ -144,7 +146,7 @@ class BoundedQueueHardwareHandler:
         """Stop the hardware reading thread."""
         self.running = False
         if self.thread:
-            self.thread.join(timeout=5.0)  # Allow time for I2C operations to complete
+            self.thread.join(timeout=HANDLER_STOP_TIMEOUT_S)
         logger.info("%s worker thread stopped", self.__class__.__name__)
 
     def _worker_loop(self):

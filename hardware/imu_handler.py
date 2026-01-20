@@ -23,6 +23,7 @@ from config import (
     IMU_AXIS_VERTICAL,
     IMU_CALIBRATION_FILE,
     I2C_BUS,
+    IMU_RECONNECT_INTERVAL_S,
 )
 
 # Try to import IMU libraries
@@ -118,7 +119,7 @@ class IMUHandler(BoundedQueueHardwareHandler):
         # Error tracking for reconnection logic
         self.consecutive_errors = 0
         self.max_consecutive_errors = 5  # Report disconnection after 5 errors
-        self.reconnect_interval = 5.0  # Try to reconnect every 5 seconds
+        self.reconnect_interval = IMU_RECONNECT_INTERVAL_S
         self.last_reconnect_attempt = 0.0
         self.hardware_available = False
         self.last_successful_read = time.time()
