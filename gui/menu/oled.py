@@ -48,6 +48,7 @@ class OLEDMenuMixin:
         mode_names = {
             "fuel": "Fuel",
             "delta": "Delta",
+            "pit": "Pit Timer",
         }
         mode_name = mode_names.get(mode.value, mode.value.title())
         return f"Mode: {mode_name}"
@@ -79,6 +80,7 @@ class OLEDMenuMixin:
             mode_map = {
                 "fuel": OLEDBonnetMode.FUEL,
                 "delta": OLEDBonnetMode.DELTA,
+                "pit": OLEDBonnetMode.PIT,
             }
 
             if mode_str not in mode_map:
@@ -139,3 +141,49 @@ class OLEDMenuMixin:
             return "Status: Connected"
         else:
             return "Status: Mock Mode"
+
+    # OLED page enable/disable methods
+
+    def _get_oled_page_fuel_label(self) -> str:
+        """Get OLED Fuel page enabled status."""
+        enabled = self._settings.get("oled.pages.fuel.enabled", True)
+        return f"Fuel Page: {'On' if enabled else 'Off'}"
+
+    def _toggle_oled_page_fuel(self) -> str:
+        """Toggle OLED Fuel page enabled state."""
+        enabled = self._settings.get("oled.pages.fuel.enabled", True)
+        new_state = not enabled
+        self._settings.set("oled.pages.fuel.enabled", new_state)
+        self._refresh_oled_modes()
+        return f"Fuel page: {'On' if new_state else 'Off'}"
+
+    def _get_oled_page_delta_label(self) -> str:
+        """Get OLED Delta page enabled status."""
+        enabled = self._settings.get("oled.pages.delta.enabled", True)
+        return f"Delta Page: {'On' if enabled else 'Off'}"
+
+    def _toggle_oled_page_delta(self) -> str:
+        """Toggle OLED Delta page enabled state."""
+        enabled = self._settings.get("oled.pages.delta.enabled", True)
+        new_state = not enabled
+        self._settings.set("oled.pages.delta.enabled", new_state)
+        self._refresh_oled_modes()
+        return f"Delta page: {'On' if new_state else 'Off'}"
+
+    def _get_oled_page_pit_label(self) -> str:
+        """Get OLED Pit Timer page enabled status."""
+        enabled = self._settings.get("oled.pages.pit.enabled", True)
+        return f"Pit Page: {'On' if enabled else 'Off'}"
+
+    def _toggle_oled_page_pit(self) -> str:
+        """Toggle OLED Pit Timer page enabled state."""
+        enabled = self._settings.get("oled.pages.pit.enabled", True)
+        new_state = not enabled
+        self._settings.set("oled.pages.pit.enabled", new_state)
+        self._refresh_oled_modes()
+        return f"Pit page: {'On' if new_state else 'Off'}"
+
+    def _refresh_oled_modes(self):
+        """Refresh OLED enabled modes after settings change."""
+        if hasattr(self, 'oled_handler') and self.oled_handler is not None:
+            self.oled_handler.refresh_enabled_modes()

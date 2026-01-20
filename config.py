@@ -104,6 +104,14 @@ UI_PAGES = [
     {"id": "pit_timer", "name": "Pit Timer", "default_enabled": True},
 ]
 
+# Available OLED Bonnet pages with their internal ID and display name
+# Pages can be enabled/disabled via settings (oled.pages.<id>.enabled)
+OLED_PAGES = [
+    {"id": "fuel", "name": "Fuel", "default_enabled": True},
+    {"id": "delta", "name": "Delta", "default_enabled": True},
+    {"id": "pit", "name": "Pit Timer", "default_enabled": True},
+]
+
 # ==============================================================================
 # COLOURS
 # ==============================================================================

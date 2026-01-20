@@ -911,6 +911,27 @@ class MenuSystem(
                 enabled=False,
             )
         )
+        oled_menu.add_item(
+            MenuItem(
+                "Fuel Page",
+                dynamic_label=lambda: self._get_oled_page_fuel_label(),
+                action=lambda: self._toggle_oled_page_fuel(),
+            )
+        )
+        oled_menu.add_item(
+            MenuItem(
+                "Delta Page",
+                dynamic_label=lambda: self._get_oled_page_delta_label(),
+                action=lambda: self._toggle_oled_page_delta(),
+            )
+        )
+        oled_menu.add_item(
+            MenuItem(
+                "Pit Page",
+                dynamic_label=lambda: self._get_oled_page_pit_label(),
+                action=lambda: self._toggle_oled_page_pit(),
+            )
+        )
         oled_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
         self.oled_menu = oled_menu
 

@@ -173,8 +173,12 @@ class OLEDBonnetHandler:
 
         # Auto-cycle state
         self._last_cycle_time = 0.0
-        self._modes = list(OLEDBonnetMode)
-        self._mode_index = self._modes.index(default_mode)
+        self._modes = self._get_enabled_modes()
+        self._mode_index = 0
+        if default_mode in self._modes:
+            self._mode_index = self._modes.index(default_mode)
+        if self._modes:
+            self.mode = self._modes[self._mode_index]
 
         # Initialise hardware
         self._initialise()
@@ -284,6 +288,41 @@ class OLEDBonnetHandler:
             # Fallback to regular font
             self.font_splash = self.font
             logger.debug("OLED: Using regular font for splash")
+
+    def _get_enabled_modes(self) -> list:
+        """Get list of enabled OLED modes based on settings."""
+        from config import OLED_PAGES
+        from utils.settings import get_settings
+        settings = get_settings()
+
+        enabled = []
+        for page_config in OLED_PAGES:
+            page_id = page_config["id"]
+            default = page_config.get("default_enabled", True)
+            if settings.get(f"oled.pages.{page_id}.enabled", default):
+                # Map page ID to OLEDBonnetMode enum
+                try:
+                    mode = OLEDBonnetMode(page_id)
+                    enabled.append(mode)
+                except ValueError:
+                    logger.warning("OLED: Unknown page ID: %s", page_id)
+
+        # Always return at least one mode (fallback to FUEL)
+        return enabled if enabled else [OLEDBonnetMode.FUEL]
+
+    def refresh_enabled_modes(self):
+        """Refresh the list of enabled modes from settings."""
+        with self.state_lock:
+            old_mode = self.mode
+            self._modes = self._get_enabled_modes()
+
+            # Keep current mode if still enabled, otherwise switch to first
+            if old_mode in self._modes:
+                self._mode_index = self._modes.index(old_mode)
+            else:
+                self._mode_index = 0
+                self.mode = self._modes[0]
+                logger.debug("OLED: Current mode disabled, switched to %s", self.mode.value)
 
     def _initialise_buttons(self) -> bool:
         """Initialise MCP23017 GPIO expander for button input."""
