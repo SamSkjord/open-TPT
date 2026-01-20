@@ -315,10 +315,20 @@ class MyHandler(BoundedQueueHardwareHandler):
 ```
 
 ### Configuration
-All settings in `config.py` (root level):
-- Display/scaling, I2C addresses, sensor types
-- Camera devices, radar/OBD2 channels
-- Temperature thresholds, emissivity values
+All settings in `config.py` (root level), organised into 12 sections:
+
+1. **Display & UI** - Resolution, colours, assets, scaling, layout
+2. **Units & Thresholds** - Temperature, pressure, speed
+3. **Hardware - I2C Bus** - Addresses, mux, timing, backoff
+4. **Hardware - Sensors** - Tyre, brake, TOF, TPMS, IMU
+5. **Hardware - Cameras** - Resolution, devices, transforms
+6. **Hardware - Input** - NeoKey, encoder, NeoDriver, OLED
+7. **Hardware - CAN Bus** - OBD2, Ford Hybrid, Radar
+8. **Hardware - GPS** - Serial, timeouts
+9. **Features - Lap Timing** - Tracks, corners, sectors
+10. **Features - Fuel** - Tank, thresholds
+11. **Features - CoPilot** - Maps, callouts, audio
+12. **Threading & Performance** - Queues, timeouts
 
 ---
 

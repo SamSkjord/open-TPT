@@ -143,6 +143,33 @@ Moved all hardcoded values to config.py for easier tuning and consistency.
 - `copilot/main.py` - Corner detection params, simulation fetch radius
 - `copilot/simulator.py` - Simulation fetch radius
 
+### Config Reorganisation
+
+Restructured config.py from 23 mixed sections into 12 clear categories for better maintainability.
+
+#### New Structure
+
+1. **Display & UI** - Resolution, colours, assets, scaling, layout
+2. **Units & Thresholds** - Temperature, pressure, speed units and limits
+3. **Hardware - I2C Bus** - Addresses, mux, timing, backoff
+4. **Hardware - Sensors** - Tyre, brake, TOF, TPMS, IMU
+5. **Hardware - Cameras** - Resolution, devices, transforms
+6. **Hardware - Input Devices** - NeoKey, encoder, NeoDriver, OLED
+7. **Hardware - CAN Bus** - OBD2, Ford Hybrid, Radar
+8. **Hardware - GPS** - Serial, timeouts
+9. **Features - Lap Timing** - Tracks, corners, sectors
+10. **Features - Fuel Tracking** - Tank, thresholds
+11. **Features - CoPilot** - Maps, callouts, audio
+12. **Threading & Performance** - Queues, timeouts
+
+#### Key Improvements
+
+- Display scaling now at top with resolution (was buried after cameras)
+- Temperature thresholds grouped together (tyre/brake were 100 lines apart)
+- I2C timing/backoff clearly separated from device addresses
+- Hardware vs Features distinction makes adding new modules easier
+- Consistent numbered section headers throughout
+
 ---
 
 ### Config Cleanup
