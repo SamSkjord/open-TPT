@@ -1,18 +1,20 @@
 """
 Configuration settings for the openTPT system.
-Contains constants for display, positions, colours, and thresholds.
+Contains constants for display, hardware, and feature configuration.
 
 Organised into logical sections:
-1. Display & UI Settings
-2. Colours & Assets
-3. Unit Settings & Thresholds
-4. I2C Hardware Configuration
-5. Camera Configuration
-6. Per-Corner Sensor Configuration (Tyre, Brake, TOF, Pressure)
-7. IMU/G-Meter Configuration
-8. CAN Bus Configuration (OBD2, Ford Hybrid, Radar)
-9. Input Configuration
-10. Helper Functions
+1. Display & UI (resolution, colours, assets, scaling, layout)
+2. Units & Thresholds (temperature, pressure, speed)
+3. Hardware - I2C Bus (addresses, mux, timing)
+4. Hardware - Sensors (tyre, brake, TOF, TPMS, IMU)
+5. Hardware - Cameras (resolution, devices, transforms)
+6. Hardware - Input Devices (NeoKey, encoder, NeoDriver, OLED)
+7. Hardware - CAN Bus (OBD2, Ford Hybrid, Radar)
+8. Hardware - GPS (serial, timeouts)
+9. Features - Lap Timing (tracks, corners, sectors)
+10. Features - Fuel Tracking (tank, thresholds)
+11. Features - CoPilot (maps, callouts, audio)
+12. Threading & Performance (queues, timeouts)
 """
 
 import logging
@@ -20,15 +22,48 @@ import os
 
 logger = logging.getLogger("openTPT.config")
 
+# Project root for asset paths
+_PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+
+
+# ##############################################################################
+#
+#                              1. DISPLAY & UI
+#
+# ##############################################################################
+
 # ==============================================================================
-# DISPLAY & UI SETTINGS
+# REFERENCE RESOLUTION
 # ==============================================================================
 
 # Reference resolution for scaling (default 800x480)
 REFERENCE_WIDTH = 800
 REFERENCE_HEIGHT = 480
 
-# Frame rate and brightness
+# Display dimensions (Waveshare 1024x600 HDMI)
+# Change these values to match your display resolution
+DISPLAY_WIDTH = 1024
+DISPLAY_HEIGHT = 600
+
+# Calculate scaling factors based on reference resolution
+SCALE_X = DISPLAY_WIDTH / REFERENCE_WIDTH
+SCALE_Y = DISPLAY_HEIGHT / REFERENCE_HEIGHT
+
+
+def scale_position(pos):
+    """Scale a position tuple (x, y) according to the current display resolution."""
+    return (int(pos[0] * SCALE_X), int(pos[1] * SCALE_Y))
+
+
+def scale_size(size):
+    """Scale a size tuple (width, height) according to the current display resolution."""
+    return (int(size[0] * SCALE_X), int(size[1] * SCALE_Y))
+
+
+# ==============================================================================
+# FRAME RATE & BRIGHTNESS
+# ==============================================================================
+
 FPS_TARGET = 60  # Target frame rate
 DEFAULT_BRIGHTNESS = 0.8  # 0.0 to 1.0
 BRIGHTNESS_PRESETS = [0.3, 0.5, 0.7, 0.9, 1.0]  # Cycle through these brightness levels
@@ -53,7 +88,10 @@ MEMORY_MONITORING_ENABLED = True  # Log detailed memory stats every 60 seconds
 # Thermal display settings
 THERMAL_STALE_TIMEOUT = 1.0  # Seconds to show last good data before showing offline
 
-# UI Page configuration
+# ==============================================================================
+# UI PAGES
+# ==============================================================================
+
 # Available pages with their internal ID and display name
 # Pages can be enabled/disabled via settings (pages.<id>.enabled)
 UI_PAGES = [
@@ -65,10 +103,9 @@ UI_PAGES = [
 ]
 
 # ==============================================================================
-# COLOURS & ASSETS
+# COLOURS
 # ==============================================================================
 
-# Colours (RGB)
 GREY = (128, 128, 128)
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
@@ -77,16 +114,52 @@ GREEN = (0, 255, 0)
 YELLOW = (255, 255, 0)
 BLUE = (0, 0, 255)
 
-# Asset paths
+# ==============================================================================
+# ASSETS & FONTS
+# ==============================================================================
+
 OVERLAY_PATH = "assets/overlay.png"
 TYRE_ICON_PATH = "assets/icons/icons8-tire-60.png"
 BRAKE_ICON_PATH = "assets/icons/icons8-brake-discs-60.png"
 
-# Font configuration
-# Using Noto Sans for consistent cross-platform typography
-_PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+# Font configuration (Noto Sans for consistent cross-platform typography)
 FONT_PATH = os.path.join(_PROJECT_ROOT, "fonts", "NotoSans-Regular.ttf")
 FONT_PATH_BOLD = os.path.join(_PROJECT_ROOT, "fonts", "NotoSans-Bold.ttf")
+
+# Font sizes (scaled)
+FONT_SIZE_LARGE = int(60 * min(SCALE_X, SCALE_Y))
+FONT_SIZE_MEDARGE = int(24 * min(SCALE_X, SCALE_Y))  # TPMS pressure font
+FONT_SIZE_MEDIUM = int(24 * min(SCALE_X, SCALE_Y))
+FONT_SIZE_SMALL = int(18 * min(SCALE_X, SCALE_Y))
+
+# Icon settings (scaled)
+ICON_SIZE = scale_size((40, 40))
+TYRE_ICON_POSITION = scale_position((725, 35))
+BRAKE_ICON_POSITION = scale_position((35, 35))
+
+# ==============================================================================
+# UI LAYOUT DIMENSIONS
+# ==============================================================================
+
+# Reference coordinates (will be scaled)
+MENU_ITEM_HEIGHT = 40  # Menu item height in pixels (before scaling)
+SCALE_BAR_WIDTH = 200  # Scale bar width in pixels (before scaling)
+SCALE_BAR_HEIGHT = 30  # Scale bar height in pixels (before scaling)
+CAR_ICON_WIDTH = 100  # Car icon width in pixels (before scaling)
+CAR_ICON_HEIGHT = 200  # Car icon height in pixels (before scaling)
+
+# Text cache settings (for radar overlay and other cached text)
+TEXT_CACHE_MAX_SIZE = 64  # Maximum entries in text render cache (LRU)
+
+# Input event queue settings
+INPUT_EVENT_QUEUE_SIZE = 10  # Maximum queued input events
+
+
+# ##############################################################################
+#
+#                           2. UNITS & THRESHOLDS
+#
+# ##############################################################################
 
 # ==============================================================================
 # UNIT SETTINGS
@@ -106,20 +179,71 @@ SPEED_UNIT = "KMH"
 # - Pressure conversion: 1 PSI = 0.0689476 BAR = 6.89476 kPa
 
 # ==============================================================================
-# I2C HARDWARE CONFIGURATION
+# TYRE TEMPERATURE THRESHOLDS (Celsius)
 # ==============================================================================
 
-# I2C bus settings
+TYRE_TEMP_COLD = 40.0  # Blue
+TYRE_TEMP_OPTIMAL = 80.0  # Green
+TYRE_TEMP_OPTIMAL_RANGE = 7.5  # Range around optimal temperature
+TYRE_TEMP_HOT = 100.0  # Yellow to red
+TYRE_TEMP_HOT_TO_BLACK = 50.0  # Range over which red fades to black after HOT
+
+# ==============================================================================
+# BRAKE TEMPERATURE THRESHOLDS (Celsius)
+# ==============================================================================
+
+BRAKE_TEMP_MIN = 75.0  # Min temperature for scale
+BRAKE_TEMP_OPTIMAL = 200.0  # Optimal operating temperature
+BRAKE_TEMP_OPTIMAL_RANGE = 50.0  # Range around optimal temperature
+BRAKE_TEMP_HOT = 300.0  # Yellow to red
+BRAKE_TEMP_HOT_TO_BLACK = 100.0  # Range over which red fades to black after HOT
+
+# ==============================================================================
+# TYRE PRESSURE THRESHOLDS
+# ==============================================================================
+
+PRESSURE_OFFSET = 5.0  # Offset from optimal pressure (+/- this value)
+PRESSURE_FRONT_OPTIMAL = 32.0  # Front tyre optimal pressure
+PRESSURE_REAR_OPTIMAL = 34.0  # Rear tyre optimal pressure
+# Low/high thresholds are now calculated as optimal +/- offset
+
+# ==============================================================================
+# TOF DISTANCE THRESHOLDS (millimetres)
+# ==============================================================================
+
+# Colour transitions for ride height display
+TOF_DISTANCE_MIN = 50  # Minimum expected distance (very compressed)
+TOF_DISTANCE_OPTIMAL = 120  # Optimal ride height (green)
+TOF_DISTANCE_RANGE = 20  # Range around optimal (±20mm = green zone)
+TOF_DISTANCE_MAX = 200  # Maximum expected distance (full extension)
+
+
+# ##############################################################################
+#
+#                           3. HARDWARE - I2C BUS
+#
+# ##############################################################################
+
+# ==============================================================================
+# I2C BUS SETTINGS
+# ==============================================================================
+
 I2C_BUS = 1  # Default I2C bus on Raspberry Pi 4
 
-# TCA9548A I2C Multiplexer
+# ==============================================================================
+# I2C MULTIPLEXER (TCA9548A)
+# ==============================================================================
+
 I2C_MUX_ADDRESS = 0x70  # TCA9548A default address
 I2C_MUX_RESET_PIN = (
     17  # GPIO pin for TCA9548A reset (active-low, uses internal pull-up)
 )
 I2C_MUX_RESET_FAILURES = 3  # Consecutive failures before triggering mux reset
 
-# I2C device addresses
+# ==============================================================================
+# I2C DEVICE ADDRESSES
+# ==============================================================================
+
 ADS_ADDRESS = 0x48  # ADS1115/ADS1015 ADC default address
 TOF_I2C_ADDRESS = 0x29  # VL53L0X default address
 
@@ -129,106 +253,32 @@ MCP9601_ADDRESSES = {
     "outer": 0x66,  # Outer pad sensor
 }
 
-# I2C timing configuration
+# ==============================================================================
+# I2C TIMING CONFIGURATION
+# ==============================================================================
+
 I2C_TIMEOUT_S = 0.5  # Timeout for I2C operations (seconds)
 I2C_SETTLE_DELAY_S = 0.005  # Delay after I2C operations for bus settle (seconds)
 I2C_MUX_RESET_PULSE_S = 0.001  # Mux reset pulse duration (seconds)
 I2C_MUX_STABILISE_S = 0.010  # Delay after mux reset for stabilisation (seconds)
 
-# I2C exponential backoff configuration (for error recovery)
+# ==============================================================================
+# I2C EXPONENTIAL BACKOFF (for error recovery)
+# ==============================================================================
+
 I2C_BACKOFF_INITIAL_S = 1.0  # Initial backoff delay (seconds)
 I2C_BACKOFF_MULTIPLIER = 2  # Backoff multiplier per failure
 I2C_BACKOFF_MAX_S = 64.0  # Maximum backoff delay (seconds)
 
-# TOF sensor history window (for smoothing/analysis)
-TOF_HISTORY_WINDOW_S = 10.0  # Seconds of TOF data to retain
-TOF_HISTORY_SAMPLES = 100  # Maximum number of samples to retain
+
+# ##############################################################################
+#
+#                          4. HARDWARE - SENSORS
+#
+# ##############################################################################
 
 # ==============================================================================
-# CAMERA CONFIGURATION
-# ==============================================================================
-
-CAMERA_WIDTH = 800
-CAMERA_HEIGHT = 600
-CAMERA_FPS = 60  # Request max; each camera delivers what it can
-
-# Multi-camera configuration
-# Set which cameras are available in your system
-CAMERA_REAR_ENABLED = True  # Rear camera (with radar overlay if radar enabled)
-CAMERA_FRONT_ENABLED = True  # Front camera (no radar overlay)
-
-# Camera device paths (if using udev rules for persistent naming)
-# Leave as None to auto-detect
-CAMERA_REAR_DEVICE = "/dev/video-rear"  # or None for auto-detect
-CAMERA_FRONT_DEVICE = "/dev/video-front"  # or None for auto-detect
-
-# Camera transform settings
-# Mirror: horizontally flip the image (True = rear-view mirror effect)
-# Rotate: rotate image clockwise (0, 90, 180, 270 degrees)
-CAMERA_REAR_MIRROR = True  # Default True for rear-view mirror effect
-CAMERA_REAR_ROTATE = 0  # 0, 90, 180, 270 degrees
-CAMERA_FRONT_MIRROR = False  # Default False for normal view
-CAMERA_FRONT_ROTATE = 0  # 0, 90, 180, 270 degrees
-
-# Camera field of view (used for radar overlay projection)
-CAMERA_FOV_DEGREES = 106.0  # Horizontal field of view in degrees
-
-# Camera FPS update interval (for display)
-CAMERA_FPS_UPDATE_INTERVAL_S = 1.0  # Seconds between FPS counter updates
-
-# ==============================================================================
-# DISPLAY SCALING (computed at startup)
-# ==============================================================================
-
-# Display dimensions (Waveshare 1024x600 HDMI)
-# Change these values to match your display resolution
-DISPLAY_WIDTH = 1024
-DISPLAY_HEIGHT = 600
-
-# Calculate scaling factors based on reference resolution
-SCALE_X = DISPLAY_WIDTH / REFERENCE_WIDTH
-SCALE_Y = DISPLAY_HEIGHT / REFERENCE_HEIGHT
-
-
-def scale_position(pos):
-    """Scale a position tuple (x, y) according to the current display resolution."""
-    return (int(pos[0] * SCALE_X), int(pos[1] * SCALE_Y))
-
-
-def scale_size(size):
-    """Scale a size tuple (width, height) according to the current display resolution."""
-    return (int(size[0] * SCALE_X), int(size[1] * SCALE_Y))
-
-
-# Unit conversion functions moved to utils/conversions.py
-# Import them from there: from utils.conversions import celsius_to_fahrenheit, etc.
-
-# Font settings (scaled)
-FONT_SIZE_LARGE = int(60 * min(SCALE_X, SCALE_Y))
-FONT_SIZE_MEDARGE = int(24 * min(SCALE_X, SCALE_Y))  # TPMS pressure font
-FONT_SIZE_MEDIUM = int(24 * min(SCALE_X, SCALE_Y))
-FONT_SIZE_SMALL = int(18 * min(SCALE_X, SCALE_Y))
-
-# Icon settings (scaled)
-ICON_SIZE = scale_size((40, 40))
-TYRE_ICON_POSITION = scale_position((725, 35))
-BRAKE_ICON_POSITION = scale_position((35, 35))
-
-# UI layout dimensions (reference coordinates, will be scaled)
-MENU_ITEM_HEIGHT = 40  # Menu item height in pixels (before scaling)
-SCALE_BAR_WIDTH = 200  # Scale bar width in pixels (before scaling)
-SCALE_BAR_HEIGHT = 30  # Scale bar height in pixels (before scaling)
-CAR_ICON_WIDTH = 100  # Car icon width in pixels (before scaling)
-CAR_ICON_HEIGHT = 200  # Car icon height in pixels (before scaling)
-
-# Text cache settings (for radar overlay and other cached text)
-TEXT_CACHE_MAX_SIZE = 64  # Maximum entries in text render cache (LRU)
-
-# Input event queue settings
-INPUT_EVENT_QUEUE_SIZE = 10  # Maximum queued input events
-
-# ==============================================================================
-# TYRE SENSOR CONFIGURATION
+# TYRE SENSORS (Thermal)
 # ==============================================================================
 
 # Per-tyre sensor type selection
@@ -273,15 +323,8 @@ MLX_DISPLAY_WIDTH = int(
 )  # Width of displayed heatmap - to cover the complete tyre width
 MLX_DISPLAY_HEIGHT = int(172 * SCALE_Y)  # Height of displayed heatmap
 
-# Tyre Temperature thresholds (Celsius)
-TYRE_TEMP_COLD = 40.0  # Blue
-TYRE_TEMP_OPTIMAL = 80.0  # Green
-TYRE_TEMP_OPTIMAL_RANGE = 7.5  # Range around optimal temperature
-TYRE_TEMP_HOT = 100.0  # Yellow to red
-TYRE_TEMP_HOT_TO_BLACK = 50.0  # Range over which red fades to black after HOT
-
 # ==============================================================================
-# BRAKE SENSOR CONFIGURATION
+# BRAKE SENSORS
 # ==============================================================================
 
 # Per-corner brake sensor type selection
@@ -294,7 +337,6 @@ BRAKE_SENSOR_TYPES = {
     "RR": None,  # Rear Right - No sensor connected
 }
 
-# I2C multiplexer channel mapping for brake sensors
 # ADC channel mapping for IR brake sensors (ADS1115)
 # Used when sensor type is "adc"
 ADC_BRAKE_CHANNELS = {
@@ -355,13 +397,6 @@ BRAKE_POSITIONS = {
     "RR": scale_position((420, 344)),
 }
 
-# Brake temperature thresholds (Celsius)
-BRAKE_TEMP_MIN = 75.0  # Min temperature for scale
-BRAKE_TEMP_OPTIMAL = 200.0  # Optimal operating temperature
-BRAKE_TEMP_OPTIMAL_RANGE = 50.0  # Range around optimal temperature
-BRAKE_TEMP_HOT = 300.0  # Yellow to red
-BRAKE_TEMP_HOT_TO_BLACK = 100.0  # Range over which red fades to black after HOT
-
 # Brake rotor emissivity values
 # Emissivity ranges from 0.0 to 1.0, where 1.0 is a perfect black body
 #
@@ -397,7 +432,7 @@ BRAKE_ROTOR_EMISSIVITY = {
 }
 
 # ==============================================================================
-# TOF DISTANCE SENSOR CONFIGURATION (VL53L0X)
+# TOF DISTANCE SENSORS (VL53L0X)
 # ==============================================================================
 
 # Enable/disable TOF distance sensors per corner
@@ -435,22 +470,13 @@ TOF_DISPLAY_POSITIONS = {
     "RR": scale_position((630, 338)),  # Right of RR thermal
 }
 
-# Distance thresholds for colour coding (in millimetres)
-# These define the colour transitions for ride height display
-TOF_DISTANCE_MIN = 50  # Minimum expected distance (very compressed)
-TOF_DISTANCE_OPTIMAL = 120  # Optimal ride height (green)
-TOF_DISTANCE_RANGE = 20  # Range around optimal (±20mm = green zone)
-TOF_DISTANCE_MAX = 200  # Maximum expected distance (full extension)
+# TOF sensor history window (for smoothing/analysis)
+TOF_HISTORY_WINDOW_S = 10.0  # Seconds of TOF data to retain
+TOF_HISTORY_SAMPLES = 100  # Maximum number of samples to retain
 
 # ==============================================================================
-# PRESSURE SENSOR CONFIGURATION (TPMS)
+# TPMS (Tyre Pressure Monitoring System)
 # ==============================================================================
-
-# Tyre Pressure thresholds
-PRESSURE_OFFSET = 5.0  # Offset from optimal pressure (+/- this value)
-PRESSURE_FRONT_OPTIMAL = 32.0  # Front tyre optimal pressure
-PRESSURE_REAR_OPTIMAL = 34.0  # Rear tyre optimal pressure
-# Low/high thresholds are now calculated as optimal +/- offset
 
 # TPMS receiver thresholds (hardware alerts, in sensor native units)
 TPMS_HIGH_PRESSURE_KPA = 310  # High pressure alert threshold (kPa)
@@ -493,7 +519,7 @@ TPMS_POSITIONS = {
 }
 
 # ==============================================================================
-# IMU CONFIGURATION (G-Meter)
+# IMU (G-Meter)
 # ==============================================================================
 
 # IMU sensor type - supported types:
@@ -520,32 +546,138 @@ IMU_CALIBRATION_FILE = "config/imu_calibration.json"
 GMETER_MAX_G = 2.0  # Maximum G-force to display (±2g is typical for road cars)
 GMETER_HISTORY_SECONDS = 5.0  # How many seconds of history to show on trace
 
+# IMU reconnection interval
+IMU_RECONNECT_INTERVAL_S = 5.0  # Seconds between IMU reconnection attempts
+
+
+# ##############################################################################
+#
+#                          5. HARDWARE - CAMERAS
+#
+# ##############################################################################
+
 # ==============================================================================
-# SPEED CONFIGURATION
+# CAMERA RESOLUTION & FRAMERATE
+# ==============================================================================
+
+CAMERA_WIDTH = 800
+CAMERA_HEIGHT = 600
+CAMERA_FPS = 60  # Request max; each camera delivers what it can
+
+# Camera field of view (used for radar overlay projection)
+CAMERA_FOV_DEGREES = 106.0  # Horizontal field of view in degrees
+
+# Camera FPS update interval (for display)
+CAMERA_FPS_UPDATE_INTERVAL_S = 1.0  # Seconds between FPS counter updates
+
+# ==============================================================================
+# CAMERA DEVICES
+# ==============================================================================
+
+# Multi-camera configuration
+# Set which cameras are available in your system
+CAMERA_REAR_ENABLED = True  # Rear camera (with radar overlay if radar enabled)
+CAMERA_FRONT_ENABLED = True  # Front camera (no radar overlay)
+
+# Camera device paths (if using udev rules for persistent naming)
+# Leave as None to auto-detect
+CAMERA_REAR_DEVICE = "/dev/video-rear"  # or None for auto-detect
+CAMERA_FRONT_DEVICE = "/dev/video-front"  # or None for auto-detect
+
+# ==============================================================================
+# CAMERA TRANSFORMS
+# ==============================================================================
+
+# Mirror: horizontally flip the image (True = rear-view mirror effect)
+# Rotate: rotate image clockwise (0, 90, 180, 270 degrees)
+CAMERA_REAR_MIRROR = True  # Default True for rear-view mirror effect
+CAMERA_REAR_ROTATE = 0  # 0, 90, 180, 270 degrees
+CAMERA_FRONT_MIRROR = False  # Default False for normal view
+CAMERA_FRONT_ROTATE = 0  # 0, 90, 180, 270 degrees
+
+
+# ##############################################################################
+#
+#                       6. HARDWARE - INPUT DEVICES
+#
+# ##############################################################################
+
+# ==============================================================================
+# NEOKEY 1x4 (Physical Buttons)
+# ==============================================================================
+
+# NeoKey 1x4 button mappings (inverted - board mounted upside down)
+BUTTON_RECORDING = 3  # Start/stop telemetry recording (hold for 1 second)
+BUTTON_PAGE_SETTINGS = 2  # Toggle page-specific settings (context-sensitive per page)
+BUTTON_CATEGORY_SWITCH = 1  # Switch within category (camera↔camera OR UI page↔UI page)
+BUTTON_VIEW_MODE = 0  # Switch between categories (camera pages ↔ UI pages)
+
+# Recording configuration
+RECORDING_HOLD_DURATION = 1.0  # Seconds to hold button 0 to start/stop recording
+RECORDING_RATE_HZ = 10  # Telemetry recording rate (10 Hz matches sensor/GPS max rate)
+
+# ==============================================================================
+# ROTARY ENCODER (Adafruit I2C QT)
+# ==============================================================================
+
+ENCODER_ENABLED = True
+ENCODER_I2C_ADDRESS = 0x36  # Default address, can be 0x36-0x3D
+ENCODER_POLL_RATE = 20  # Hz - polling frequency
+ENCODER_LONG_PRESS_MS = 500  # Milliseconds for long press detection
+ENCODER_BRIGHTNESS_STEP = 0.05  # Brightness change per detent
+
+# ==============================================================================
+# NEODRIVER LED STRIP (Adafruit NeoDriver - I2C to NeoPixel)
+# ==============================================================================
+
+NEODRIVER_ENABLED = True
+NEODRIVER_I2C_ADDRESS = 0x60  # Default NeoDriver address
+NEODRIVER_NUM_PIXELS = 9  # Number of NeoPixels in strip
+NEODRIVER_BRIGHTNESS = 0.3  # LED brightness (0.0-1.0)
+NEODRIVER_DEFAULT_MODE = "shift"  # off, delta, overtake, shift, rainbow
+NEODRIVER_DEFAULT_DIRECTION = (
+    "centre_out"  # left_right, right_left, centre_out, edges_in
+)
+NEODRIVER_MAX_RPM = 7000  # Maximum RPM for shift light scale
+NEODRIVER_SHIFT_RPM = 6500  # RPM at which shift indicator flashes (redline)
+NEODRIVER_START_RPM = (
+    3000  # RPM at which shift lights begin illuminating (0 = always on)
+)
+
+# NeoDriver timing
+NEODRIVER_UPDATE_RATE_HZ = 15  # LED update rate (Hz)
+NEODRIVER_STARTUP_DELAY_S = 0.05  # Delay per pixel during startup animation
+
+# ==============================================================================
+# OLED BONNET (Adafruit 128x32 SSD1306)
+# ==============================================================================
+
+OLED_BONNET_ENABLED = True
+OLED_BONNET_I2C_ADDRESS = 0x3C  # Default SSD1306 address
+OLED_BONNET_WIDTH = 128  # Display width in pixels
+OLED_BONNET_HEIGHT = 32  # Display height in pixels
+OLED_BONNET_DEFAULT_MODE = "fuel"  # fuel, delta
+OLED_BONNET_AUTO_CYCLE = True  # Auto-cycle between modes
+OLED_BONNET_CYCLE_INTERVAL = 10.0  # Seconds between mode changes
+OLED_BONNET_BRIGHTNESS = 0.8  # Display contrast (0.0-1.0)
+OLED_BONNET_UPDATE_RATE = 5  # Display refresh rate in Hz
+
+
+# ##############################################################################
+#
+#                         7. HARDWARE - CAN BUS
+#
+# ##############################################################################
+
+# ==============================================================================
+# SPEED SOURCE
 # ==============================================================================
 
 # Speed source: "obd" for OBD2/CAN, "gps" for GPS module
 SPEED_SOURCE = "obd"
 
 # ==============================================================================
-# GPS CONFIGURATION
-# ==============================================================================
-
-# Enable/disable GPS module
-GPS_ENABLED = True  # Set to False to disable GPS
-
-# Serial port for GPS (Raspberry Pi UART)
-# GPIO 14 (TX) and GPIO 15 (RX) map to /dev/ttyS0 (mini UART on Pi 4/5)
-GPS_SERIAL_PORT = "/dev/ttyS0"
-GPS_BAUD_RATE = 38400  # 38400 for 10Hz update rate (configure GPS module to match)
-
-# GPS serial timeout settings
-GPS_SERIAL_TIMEOUT_S = 0.15  # Read timeout for serial port (seconds)
-GPS_SERIAL_WRITE_TIMEOUT_S = 0.5  # Write timeout for serial port (seconds)
-GPS_COMMAND_TIMEOUT_S = 5.0  # Timeout waiting for command response (seconds)
-
-# ==============================================================================
-# OBD2 CONFIGURATION (Vehicle Speed)
+# OBD2 (Vehicle Data)
 # ==============================================================================
 
 # Enable/disable OBD2 speed reading
@@ -568,7 +700,7 @@ OBD_RPM_SMOOTHING_SAMPLES = 3  # Samples for RPM smoothing
 OBD_THROTTLE_SMOOTHING_SAMPLES = 2  # Samples for throttle smoothing
 
 # ==============================================================================
-# FORD HYBRID CONFIGURATION (Battery State of Charge)
+# FORD HYBRID (Battery State of Charge)
 # ==============================================================================
 
 # Enable/disable Ford Hybrid battery monitoring
@@ -587,7 +719,7 @@ FORD_HYBRID_POLL_INTERVAL_S = 0.5  # Seconds between Ford Hybrid queries (2 Hz)
 FORD_HYBRID_SEND_TIMEOUT_S = 0.1  # Timeout for CAN message sends (seconds)
 
 # ==============================================================================
-# RADAR CONFIGURATION (Toyota Radar Overlay)
+# RADAR (Toyota Radar Overlay)
 # ==============================================================================
 
 # Enable/disable radar overlay
@@ -629,58 +761,36 @@ RADAR_OVERTAKE_ARROW_DURATION = 1.0  # Duration to show arrow (seconds)
 RADAR_POLL_INTERVAL_S = 0.05  # Seconds between radar reads (20 Hz)
 RADAR_NOTIFIER_TIMEOUT_S = 0.1  # CAN notifier timeout (seconds)
 
-# ==============================================================================
-# INPUT CONFIGURATION (NeoKey 1x4)
-# ==============================================================================
 
-# NeoKey 1x4 button mappings (inverted - board mounted upside down)
-BUTTON_RECORDING = 3  # Start/stop telemetry recording (hold for 1 second)
-BUTTON_PAGE_SETTINGS = 2  # Toggle page-specific settings (context-sensitive per page)
-BUTTON_CATEGORY_SWITCH = 1  # Switch within category (camera↔camera OR UI page↔UI page)
-BUTTON_VIEW_MODE = 0  # Switch between categories (camera pages ↔ UI pages)
-
-# Recording configuration
-RECORDING_HOLD_DURATION = 1.0  # Seconds to hold button 0 to start/stop recording
-RECORDING_RATE_HZ = 10  # Telemetry recording rate (10 Hz matches sensor/GPS max rate)
+# ##############################################################################
+#
+#                          8. HARDWARE - GPS
+#
+# ##############################################################################
 
 # ==============================================================================
-# ENCODER CONFIGURATION (Adafruit I2C QT Rotary Encoder)
+# GPS CONFIGURATION
 # ==============================================================================
 
-ENCODER_ENABLED = True
-ENCODER_I2C_ADDRESS = 0x36  # Default address, can be 0x36-0x3D
-ENCODER_POLL_RATE = 20  # Hz - polling frequency
-ENCODER_LONG_PRESS_MS = 500  # Milliseconds for long press detection
-ENCODER_BRIGHTNESS_STEP = 0.05  # Brightness change per detent
+# Enable/disable GPS module
+GPS_ENABLED = True  # Set to False to disable GPS
 
-# NeoDriver LED Strip (Adafruit NeoDriver - I2C to NeoPixel)
-NEODRIVER_ENABLED = True
-NEODRIVER_I2C_ADDRESS = 0x60  # Default NeoDriver address
-NEODRIVER_NUM_PIXELS = 9  # Number of NeoPixels in strip
-NEODRIVER_BRIGHTNESS = 0.3  # LED brightness (0.0-1.0)
-NEODRIVER_DEFAULT_MODE = "shift"  # off, delta, overtake, shift, rainbow
-NEODRIVER_DEFAULT_DIRECTION = (
-    "centre_out"  # left_right, right_left, centre_out, edges_in
-)
-NEODRIVER_MAX_RPM = 7000  # Maximum RPM for shift light scale
-NEODRIVER_SHIFT_RPM = 6500  # RPM at which shift indicator flashes (redline)
-NEODRIVER_START_RPM = (
-    3000  # RPM at which shift lights begin illuminating (0 = always on)
-)
+# Serial port for GPS (Raspberry Pi UART)
+# GPIO 14 (TX) and GPIO 15 (RX) map to /dev/ttyS0 (mini UART on Pi 4/5)
+GPS_SERIAL_PORT = "/dev/ttyS0"
+GPS_BAUD_RATE = 38400  # 38400 for 10Hz update rate (configure GPS module to match)
 
-# ==============================================================================
-# OLED BONNET CONFIGURATION (Adafruit 128x32 SSD1306)
-# ==============================================================================
+# GPS serial timeout settings
+GPS_SERIAL_TIMEOUT_S = 0.15  # Read timeout for serial port (seconds)
+GPS_SERIAL_WRITE_TIMEOUT_S = 0.5  # Write timeout for serial port (seconds)
+GPS_COMMAND_TIMEOUT_S = 5.0  # Timeout waiting for command response (seconds)
 
-OLED_BONNET_ENABLED = True
-OLED_BONNET_I2C_ADDRESS = 0x3C  # Default SSD1306 address
-OLED_BONNET_WIDTH = 128  # Display width in pixels
-OLED_BONNET_HEIGHT = 32  # Display height in pixels
-OLED_BONNET_DEFAULT_MODE = "fuel"  # fuel, delta
-OLED_BONNET_AUTO_CYCLE = True  # Auto-cycle between modes
-OLED_BONNET_CYCLE_INTERVAL = 10.0  # Seconds between mode changes
-OLED_BONNET_BRIGHTNESS = 0.8  # Display contrast (0.0-1.0)
-OLED_BONNET_UPDATE_RATE = 5  # Display refresh rate in Hz
+
+# ##############################################################################
+#
+#                        9. FEATURES - LAP TIMING
+#
+# ##############################################################################
 
 # ==============================================================================
 # LAP TIMING CONFIGURATION
@@ -721,6 +831,13 @@ LAP_TIMING_CORNER_MERGE_CHICANES = True  # Merge consecutive opposite-direction 
 # Map theme (theme files in assets/themes/)
 MAP_THEME_DEFAULT = "default"
 
+
+# ##############################################################################
+#
+#                       10. FEATURES - FUEL TRACKING
+#
+# ##############################################################################
+
 # ==============================================================================
 # FUEL TRACKING CONFIGURATION
 # ==============================================================================
@@ -743,6 +860,13 @@ FUEL_SMOOTHING_SAMPLES = 5
 # Number of laps to average for consumption estimate
 FUEL_LAP_HISTORY_COUNT = 5
 
+
+# ##############################################################################
+#
+#                        11. FEATURES - COPILOT
+#
+# ##############################################################################
+
 # ==============================================================================
 # COPILOT CONFIGURATION (Rally Callouts)
 # ==============================================================================
@@ -757,6 +881,10 @@ COPILOT_MAP_DIR = os.path.expanduser("~/.opentpt/copilot/maps")
 # Cache directory for CoPilot data
 COPILOT_CACHE_DIR = os.path.expanduser("~/.opentpt/copilot/cache")
 
+# ==============================================================================
+# COPILOT - LOOKAHEAD & ROAD FETCHING
+# ==============================================================================
+
 # Lookahead distance for corner detection (metres)
 # Higher values give earlier warnings but may be less accurate
 COPILOT_LOOKAHEAD_M = 1000
@@ -769,25 +897,42 @@ COPILOT_REFETCH_DISTANCE_M = 500  # Refetch roads when moved this far from last 
 # Lower values give more responsive callouts but use more CPU
 COPILOT_UPDATE_INTERVAL_S = 0.5
 
+# ==============================================================================
+# COPILOT - CORNER DETECTION
+# ==============================================================================
+
 # Corner detection (tuned for road driving - larger radii than track)
 COPILOT_CORNER_MIN_RADIUS_M = 300.0  # Minimum radius to consider a corner (metres)
 COPILOT_CORNER_MIN_ANGLE_DEG = (
     10.0  # Minimum total angle to consider a corner (degrees)
 )
 
-# Junction detection
+# Corner detector parameters (for pacenotes)
+COPILOT_CORNER_MIN_CUT_DISTANCE_M = 10.0  # Minimum distance between cuts
+COPILOT_CORNER_MAX_CHICANE_GAP_M = 15.0  # Maximum gap for chicane detection
+
+# ==============================================================================
+# COPILOT - JUNCTION DETECTION
+# ==============================================================================
+
 COPILOT_JUNCTION_WARN_DISTANCE_M = 200  # Warn about T-junctions this far ahead
 COPILOT_HEADING_TOLERANCE_DEG = (
     30.0  # Roads within this angle of heading are "straight on"
 )
 
-# Audio settings
+# ==============================================================================
+# COPILOT - AUDIO
+# ==============================================================================
+
 COPILOT_AUDIO_ENABLED = True  # Enable audio callouts
 COPILOT_AUDIO_VOLUME = 0.8  # Audio volume (0.0-1.0)
 COPILOT_TTS_VOICE = "Daniel"  # British male voice (macOS), falls back to en-gb on Linux
 COPILOT_TTS_SPEED = 210  # Words per minute (faster for rally style)
 
-# Corner indicator overlay settings
+# ==============================================================================
+# COPILOT - OVERLAY
+# ==============================================================================
+
 COPILOT_OVERLAY_ENABLED = True  # Show corner indicator on screen
 COPILOT_OVERLAY_POSITION = (
     "bottom-left"  # top-left, top-right, bottom-left, bottom-right
@@ -795,6 +940,10 @@ COPILOT_OVERLAY_POSITION = (
 
 # Status bar settings
 COPILOT_STATUS_ENABLED = True  # Show last callout in status bar
+
+# ==============================================================================
+# COPILOT - CALLOUT DISTANCES
+# ==============================================================================
 
 # Corner callout distances (metres) - at what distances to call corners
 COPILOT_CORNER_CALLOUT_DISTANCES = [1000, 500, 300, 200, 100]
@@ -808,35 +957,43 @@ COPILOT_DEFAULT_CALLOUT_DISTANCE_M = 100
 # Note merging distance (metres) - merge notes closer than this
 COPILOT_NOTE_MERGE_DISTANCE_M = 50
 
-# Simulation mode settings
+# ==============================================================================
+# COPILOT - SIMULATION MODE
+# ==============================================================================
+
 COPILOT_SIMULATION_FETCH_RADIUS_M = 5000  # Radius for road data fetch in simulation
 COPILOT_REFETCH_THRESHOLD_M = 2500  # Distance before triggering refetch
 
-# Corner detector parameters (for pacenotes)
-COPILOT_CORNER_MIN_CUT_DISTANCE_M = 10.0  # Minimum distance between cuts
-COPILOT_CORNER_MAX_CHICANE_GAP_M = 15.0  # Maximum gap for chicane detection
+
+# ##############################################################################
+#
+#                     12. THREADING & PERFORMANCE
+#
+# ##############################################################################
 
 # ==============================================================================
-# HANDLER & THREADING CONFIGURATION
+# BOUNDED QUEUE HANDLER SETTINGS
 # ==============================================================================
 
-# Bounded queue handler settings (used by all hardware handlers)
-HANDLER_QUEUE_DEPTH = 2  # Depth of snapshot queue (lock-free producer-consumer)
+# Used by all hardware handlers for lock-free producer-consumer pattern
+HANDLER_QUEUE_DEPTH = 2  # Depth of snapshot queue
 HANDLER_STOP_TIMEOUT_S = 5.0  # Timeout waiting for handler thread to stop
 
-# Thread shutdown timeouts
+# ==============================================================================
+# THREAD SHUTDOWN TIMEOUTS
+# ==============================================================================
+
 THREAD_JOIN_TIMEOUT_S = 2.0  # Default timeout for thread.join() calls
 THREAD_SHUTDOWN_TIMEOUT_S = 1.0  # Timeout for background thread shutdown
 
-# IMU handler settings
-IMU_RECONNECT_INTERVAL_S = 5.0  # Seconds between IMU reconnection attempts
+# ==============================================================================
+# PERFORMANCE MONITORING
+# ==============================================================================
 
-# NeoDriver LED strip timing
-NEODRIVER_UPDATE_RATE_HZ = 15  # LED update rate (Hz)
-NEODRIVER_STARTUP_DELAY_S = 0.05  # Delay per pixel during startup animation
-
-# Performance monitoring
 PERFORMANCE_WARNING_HISTORY = 10  # Number of performance warnings to retain
+
+# Unit conversion functions moved to utils/conversions.py
+# Import them from there: from utils.conversions import celsius_to_fahrenheit, etc.
 
 # Helper functions moved to utils/
 # - Emissivity correction: from utils.thermal import apply_emissivity_correction
