@@ -200,6 +200,45 @@ EOF
 sudo systemctl enable rtc-hctosys.service
 ```
 
+### 6. I2C Bus Speed Configuration
+
+The I2C bus runs at **400kHz (Fast Mode)** rather than 1MHz (Fast Mode Plus) for improved reliability in the motorsport environment.
+
+**Why 400kHz instead of 1MHz?**
+
+| Factor | Impact |
+|--------|--------|
+| EMI susceptibility | Higher frequencies pick up more engine/alternator noise |
+| Wire capacitance | Long runs to wheel sensors exceed FM+ limits (~50pF max) |
+| Device compatibility | MCP9601, VL53L0X rated for 400kHz max |
+| Signal integrity | Existing TOF dropouts and IMU errors suggest marginal timing |
+| Data throughput | Total I2C load is ~2.7 KB/s (only 7% of 400kHz capacity) |
+
+The data volume is trivial - even 100kHz would handle it comfortably. The extra speed of 1MHz provides no benefit while reducing noise margin.
+
+**Configuration** (set by install.sh in /boot/firmware/config.txt):
+```
+dtparam=i2c_arm_baudrate=400000
+```
+
+**If reliability issues persist**, try 100kHz:
+```bash
+# Edit config.txt
+sudo nano /boot/firmware/config.txt
+
+# Change to:
+dtparam=i2c_arm_baudrate=100000
+
+# Reboot
+sudo reboot
+```
+
+**Verify current speed:**
+```bash
+# Check kernel messages for I2C clock
+dmesg | grep -i i2c
+```
+
 ## Deployment Methods
 
 ### Method 1: Git Pull (Recommended for Updates)

@@ -173,6 +173,7 @@ else
 
 # ==== openTPT Dual Waveshare 2-CH CAN HAT+ ====
 dtparam=i2c_arm=on
+dtparam=i2c_arm_baudrate=400000  # 400kHz - better noise immunity for motorsport EMI
 dtparam=i2s=off        # Disabled to free GPIO19 for SPI1_MISO
 dtparam=spi=on
 dtoverlay=spi1-3cs

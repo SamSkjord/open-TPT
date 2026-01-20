@@ -649,11 +649,11 @@ NEODRIVER_UPDATE_RATE_HZ = 15  # LED update rate (Hz)
 NEODRIVER_STARTUP_DELAY_S = 0.05  # Delay per pixel during startup animation
 
 # ==============================================================================
-# OLED BONNET (Adafruit 128x32 SSD1306)
+# OLED BONNET (Adafruit 128x32 SSD1305)
 # ==============================================================================
 
 OLED_BONNET_ENABLED = True
-OLED_BONNET_I2C_ADDRESS = 0x3C  # Default SSD1306 address
+OLED_BONNET_I2C_ADDRESS = 0x3C  # Default SSD1305 address
 OLED_BONNET_WIDTH = 128  # Display width in pixels
 OLED_BONNET_HEIGHT = 32  # Display height in pixels
 OLED_BONNET_DEFAULT_MODE = "fuel"  # fuel, delta
@@ -661,6 +661,15 @@ OLED_BONNET_AUTO_CYCLE = True  # Auto-cycle between modes
 OLED_BONNET_CYCLE_INTERVAL = 10.0  # Seconds between mode changes
 OLED_BONNET_BRIGHTNESS = 0.8  # Display contrast (0.0-1.0)
 OLED_BONNET_UPDATE_RATE = 5  # Display refresh rate in Hz
+
+# MCP23017 GPIO Expander for OLED buttons
+OLED_MCP23017_ENABLED = True
+OLED_MCP23017_I2C_ADDRESS = 0x20  # Default MCP23017 address (A0-A2 grounded)
+OLED_MCP23017_BUTTON_PREV = 0  # GPA0 - Previous (page or function)
+OLED_MCP23017_BUTTON_SELECT = 1  # GPA1 - Select (hold to enter/exit page)
+OLED_MCP23017_BUTTON_NEXT = 2  # GPA2 - Next (page or function)
+OLED_MCP23017_HOLD_TIME_MS = 500  # Hold duration for select button (milliseconds)
+OLED_MCP23017_DEBOUNCE_MS = 50  # Button debounce time (milliseconds)
 
 
 # ##############################################################################

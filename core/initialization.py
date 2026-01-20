@@ -49,6 +49,14 @@ from config import (
     OLED_BONNET_CYCLE_INTERVAL,
     OLED_BONNET_BRIGHTNESS,
     OLED_BONNET_UPDATE_RATE,
+    # OLED MCP23017 button configuration
+    OLED_MCP23017_ENABLED,
+    OLED_MCP23017_I2C_ADDRESS,
+    OLED_MCP23017_BUTTON_PREV,
+    OLED_MCP23017_BUTTON_SELECT,
+    OLED_MCP23017_BUTTON_NEXT,
+    OLED_MCP23017_HOLD_TIME_MS,
+    OLED_MCP23017_DEBOUNCE_MS,
 )
 from utils.settings import get_settings
 
@@ -416,6 +424,16 @@ class InitializationMixin:
                     brightness=OLED_BONNET_BRIGHTNESS,
                     update_rate=OLED_BONNET_UPDATE_RATE,
                 )
+                # Configure MCP23017 buttons (settings applied before _initialise_buttons runs)
+                if OLED_MCP23017_ENABLED:
+                    self.oled_bonnet.configure_buttons(
+                        address=OLED_MCP23017_I2C_ADDRESS,
+                        prev_pin=OLED_MCP23017_BUTTON_PREV,
+                        select_pin=OLED_MCP23017_BUTTON_SELECT,
+                        next_pin=OLED_MCP23017_BUTTON_NEXT,
+                        hold_time_ms=OLED_MCP23017_HOLD_TIME_MS,
+                        debounce_ms=OLED_MCP23017_DEBOUNCE_MS,
+                    )
                 logger.info("OLED Bonnet initialised (mode=%s, auto_cycle=%s)", oled_mode_str, oled_auto_cycle)
             except (IOError, OSError, RuntimeError, ValueError) as e:
                 logger.warning("Could not initialise OLED Bonnet: %s", e)

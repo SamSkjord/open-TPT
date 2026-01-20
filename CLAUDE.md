@@ -63,7 +63,7 @@
 - OBD2: Speed, RPM, fuel level, Ford Mode 22 HV Battery SOC
 - GPS: PA1616S at 10Hz (serial /dev/ttyS0) for lap timing and CoPilot
 - NeoDriver: I2C LED strip at 0x60 (shift/delta/overtake modes)
-- OLED Bonnet: 128x32 SSD1305 at 0x3C for fuel/delta display
+- OLED Bonnet: 128x32 SSD1305 at 0x3C with MCP23017 buttons at 0x20 (fuel/delta display)
 - CoPilot: Rally callouts using OSM map data (USB/NVMe storage for 6.4GB roads.db)
 
 ---
@@ -137,6 +137,7 @@ openTPT/
 | Address | Device | Purpose |
 |---------|--------|---------|
 | `0x08` | Pico | MLX90640 thermal slave (per corner) |
+| `0x20` | MCP23017 | GPIO expander for OLED buttons |
 | `0x29` | VL53L0X | TOF distance (per corner) |
 | `0x30` | NeoKey | 1x4 button input with NeoPixels |
 | `0x36` | Seesaw | Rotary encoder with NeoPixel |
@@ -147,6 +148,9 @@ openTPT/
 | `0x65/0x66` | MCP9601 | Thermocouple (inner/outer brake) |
 | `0x68` | ICM20649 | IMU for G-meter |
 | `0x70` | TCA9548A | I2C mux (8 channels) |
+
+### Bus Speed
+**400kHz (Fast Mode)** - chosen over 1MHz for motorsport EMI resilience. Data throughput is only ~2.7 KB/s (7% capacity), so extra speed provides no benefit while reducing noise margin. Long wire runs to wheel sensors and device compatibility (MCP9601, VL53L0X max 400kHz) also favour the lower speed.
 
 ### Mux Channels
 | Channel | Corner | Bitmask |

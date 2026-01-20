@@ -64,6 +64,16 @@ if BOARD_AVAILABLE and PIL_AVAILABLE:
 else:
     OLED_AVAILABLE = False
 
+# MCP23017 GPIO expander for buttons
+MCP23017_AVAILABLE = False
+if BOARD_AVAILABLE:
+    try:
+        from adafruit_mcp230xx.mcp23017 import MCP23017
+        from digitalio import Direction, Pull
+        MCP23017_AVAILABLE = True
+    except ImportError:
+        pass
+
 
 class OLEDBonnetMode(Enum):
     """Display modes for the OLED Bonnet."""
@@ -118,6 +128,30 @@ class OLEDBonnetHandler:
         # Hardware references
         self.i2c = None
         self.display = None
+
+        # MCP23017 GPIO expander for buttons
+        self.mcp = None
+        self.button_prev = None
+        self.button_select = None
+        self.button_next = None
+
+        # Button configuration (can be overridden)
+        self.mcp_address = 0x20
+        self.button_prev_pin = 0
+        self.button_select_pin = 1
+        self.button_next_pin = 2
+        self.hold_time_ms = 500
+        self.debounce_ms = 50
+
+        # Button state tracking
+        self._button_states = {
+            'prev': {'pressed': False, 'last_change': 0.0},
+            'select': {'pressed': False, 'last_change': 0.0, 'hold_start': 0.0},
+            'next': {'pressed': False, 'last_change': 0.0},
+        }
+
+        # Navigation state
+        self._page_selected = False  # True when "inside" a page (editing)
 
         # PIL drawing objects
         self.image = None
@@ -181,6 +215,10 @@ class OLEDBonnetHandler:
                     "OLED Bonnet initialised at 0x%02X (%dx%d)",
                     self.i2c_address, self.width, self.height
                 )
+
+                # Initialise MCP23017 buttons (non-fatal if not present)
+                self._initialise_buttons()
+
                 # Show boot splash immediately
                 self._show_splash("openTPT", duration=0)
                 return True
@@ -245,6 +283,47 @@ class OLEDBonnetHandler:
             self.font_splash = self.font
             logger.debug("OLED: Using regular font for splash")
 
+    def _initialise_buttons(self) -> bool:
+        """Initialise MCP23017 GPIO expander for button input."""
+        if not MCP23017_AVAILABLE:
+            logger.debug("OLED: MCP23017 library not available - buttons disabled")
+            return False
+
+        if self.i2c is None:
+            logger.debug("OLED: No I2C bus - buttons disabled")
+            return False
+
+        try:
+            self.mcp = MCP23017(self.i2c, address=self.mcp_address)
+
+            # Configure button pins as inputs with pull-ups
+            self.button_prev = self.mcp.get_pin(self.button_prev_pin)
+            self.button_prev.direction = Direction.INPUT
+            self.button_prev.pull = Pull.UP
+
+            self.button_select = self.mcp.get_pin(self.button_select_pin)
+            self.button_select.direction = Direction.INPUT
+            self.button_select.pull = Pull.UP
+
+            self.button_next = self.mcp.get_pin(self.button_next_pin)
+            self.button_next.direction = Direction.INPUT
+            self.button_next.pull = Pull.UP
+
+            logger.info(
+                "OLED: MCP23017 buttons initialised at 0x%02X (pins %d/%d/%d)",
+                self.mcp_address, self.button_prev_pin,
+                self.button_select_pin, self.button_next_pin
+            )
+            return True
+
+        except Exception as e:
+            logger.warning("OLED: MCP23017 init failed: %s - buttons disabled", e)
+            self.mcp = None
+            self.button_prev = None
+            self.button_select = None
+            self.button_next = None
+            return False
+
     def set_handlers(self, lap_timing_handler=None, fuel_tracker=None):
         """
         Set data source handlers (late binding).
@@ -297,6 +376,104 @@ class OLEDBonnetHandler:
         if duration > 0:
             time.sleep(duration)
 
+    def _poll_buttons(self):
+        """Poll MCP23017 buttons with debouncing and hold detection."""
+        if self.mcp is None:
+            return
+
+        now = time.time()
+        debounce_s = self.debounce_ms / 1000.0
+        hold_s = self.hold_time_ms / 1000.0
+
+        try:
+            # Read button states (active low - pressed = False)
+            buttons = {
+                'prev': not self.button_prev.value,
+                'select': not self.button_select.value,
+                'next': not self.button_next.value,
+            }
+
+            for name, pressed in buttons.items():
+                state = self._button_states[name]
+
+                # Debounce check
+                if now - state['last_change'] < debounce_s:
+                    continue
+
+                if pressed and not state['pressed']:
+                    # Button just pressed
+                    state['pressed'] = True
+                    state['last_change'] = now
+                    if name == 'select':
+                        state['hold_start'] = now
+                    else:
+                        # Immediate action for prev/next
+                        self._on_button_press(name)
+
+                elif not pressed and state['pressed']:
+                    # Button just released
+                    state['pressed'] = False
+                    state['last_change'] = now
+                    if name == 'select':
+                        # Check if it was a short press (not a hold)
+                        if now - state['hold_start'] < hold_s:
+                            self._on_button_press('select')
+                        state['hold_start'] = 0.0
+
+            # Check for select hold
+            select_state = self._button_states['select']
+            if (select_state['pressed'] and select_state['hold_start'] > 0 and
+                    now - select_state['hold_start'] >= hold_s):
+                # Hold detected - trigger once
+                select_state['hold_start'] = 0.0  # Prevent repeat
+                self._on_button_hold('select')
+
+        except OSError:
+            # I2C error - will retry on next poll
+            pass
+
+    def _on_button_press(self, button: str):
+        """Handle short button press."""
+        with self.state_lock:
+            if button == 'prev':
+                if self._page_selected:
+                    # Inside page - cycle function (currently just toggle auto-cycle)
+                    self.auto_cycle = not self.auto_cycle
+                    self._last_cycle_time = time.time()
+                    logger.debug("OLED: Auto-cycle %s", "enabled" if self.auto_cycle else "disabled")
+                else:
+                    # Page level - previous page
+                    self._mode_index = (self._mode_index - 1) % len(self._modes)
+                    self.mode = self._modes[self._mode_index]
+                    self._last_cycle_time = time.time()
+                    logger.debug("OLED: Switched to %s mode", self.mode.value)
+
+            elif button == 'next':
+                if self._page_selected:
+                    # Inside page - cycle function (currently just toggle auto-cycle)
+                    self.auto_cycle = not self.auto_cycle
+                    self._last_cycle_time = time.time()
+                    logger.debug("OLED: Auto-cycle %s", "enabled" if self.auto_cycle else "disabled")
+                else:
+                    # Page level - next page
+                    self._mode_index = (self._mode_index + 1) % len(self._modes)
+                    self.mode = self._modes[self._mode_index]
+                    self._last_cycle_time = time.time()
+                    logger.debug("OLED: Switched to %s mode", self.mode.value)
+
+            elif button == 'select':
+                # Short press - currently unused at page level
+                # Could be used for quick actions in future
+                logger.debug("OLED: Select pressed (page_selected=%s)", self._page_selected)
+
+    def _on_button_hold(self, button: str):
+        """Handle long button press (hold)."""
+        with self.state_lock:
+            if button == 'select':
+                # Toggle page selected state
+                self._page_selected = not self._page_selected
+                logger.debug("OLED: Page %s", "selected" if self._page_selected else "deselected")
+
     def start(self):
         """Start the background update thread."""
         if self.thread and self.thread.is_alive():
@@ -337,9 +514,12 @@ class OLEDBonnetHandler:
             start_time = time.time()
 
             try:
-                # Handle auto-cycling
+                # Poll buttons
+                self._poll_buttons()
+
+                # Handle auto-cycling (only when not page-selected)
                 with self.state_lock:
-                    if self.auto_cycle:
+                    if self.auto_cycle and not self._page_selected:
                         if time.time() - self._last_cycle_time >= self.cycle_interval:
                             self._mode_index = (self._mode_index + 1) % len(self._modes)
                             self.mode = self._modes[self._mode_index]
@@ -374,11 +554,16 @@ class OLEDBonnetHandler:
 
         with self.state_lock:
             mode = self.mode
+            page_selected = self._page_selected
 
         if mode == OLEDBonnetMode.FUEL:
             self._render_fuel()
         elif mode == OLEDBonnetMode.DELTA:
             self._render_delta()
+
+        # Draw selection indicator (small filled circle in top-right when selected)
+        if page_selected:
+            self.draw.ellipse((self.width - 6, 2, self.width - 2, 6), fill=1)
 
         # Update physical display if available
         if self.display:
@@ -409,7 +594,7 @@ class OLEDBonnetHandler:
             laps_remaining = state.get('estimated_laps_remaining')
 
         # Line 1: Progress bar and percentage
-        bar_width = 80
+        bar_width = 70
         bar_height = 10
         bar_x = 2
         bar_y = 2
@@ -478,7 +663,7 @@ class OLEDBonnetHandler:
             best_lap_time = data.get('best_lap_time')
 
         # Line 1: Delta bar and value
-        bar_width = 80
+        bar_width = 70
         bar_height = 10
         bar_x = 2
         bar_y = 2
@@ -572,3 +757,51 @@ class OLEDBonnetHandler:
         """Get auto-cycle state."""
         with self.state_lock:
             return self.auto_cycle
+
+    def get_page_selected(self) -> bool:
+        """Get page selected (editing) state."""
+        with self.state_lock:
+            return self._page_selected
+
+    def set_page_selected(self, selected: bool):
+        """Set page selected (editing) state."""
+        with self.state_lock:
+            self._page_selected = selected
+
+    def buttons_available(self) -> bool:
+        """Check if MCP23017 buttons are available."""
+        return self.mcp is not None
+
+    def configure_buttons(
+        self,
+        address: int = 0x20,
+        prev_pin: int = 0,
+        select_pin: int = 1,
+        next_pin: int = 2,
+        hold_time_ms: int = 500,
+        debounce_ms: int = 50,
+    ):
+        """
+        Configure MCP23017 button settings.
+
+        Call this after creation to override default settings. If the I2C bus
+        is already available, buttons will be reinitialised with new settings.
+
+        Args:
+            address: I2C address of MCP23017 (default 0x20)
+            prev_pin: GPIO pin for previous button (default 0 = GPA0)
+            select_pin: GPIO pin for select button (default 1 = GPA1)
+            next_pin: GPIO pin for next button (default 2 = GPA2)
+            hold_time_ms: Hold duration for select button (default 500ms)
+            debounce_ms: Button debounce time (default 50ms)
+        """
+        self.mcp_address = address
+        self.button_prev_pin = prev_pin
+        self.button_select_pin = select_pin
+        self.button_next_pin = next_pin
+        self.hold_time_ms = hold_time_ms
+        self.debounce_ms = debounce_ms
+
+        # Reinitialise buttons if I2C is already available
+        if self.i2c is not None:
+            self._initialise_buttons()
