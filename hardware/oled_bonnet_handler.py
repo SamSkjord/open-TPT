@@ -138,17 +138,17 @@ class OLEDBonnetHandler:
 
         # Button configuration (can be overridden)
         self.mcp_address = 0x20
-        self.button_prev_pin = 0
+        self.button_next_pin = 0
         self.button_select_pin = 1
-        self.button_next_pin = 2
+        self.button_prev_pin = 2
         self.hold_time_ms = 500
         self.debounce_ms = 50
 
         # Button state tracking
         self._button_states = {
-            'prev': {'pressed': False, 'last_change': 0.0},
-            'select': {'pressed': False, 'last_change': 0.0, 'hold_start': 0.0},
-            'next': {'pressed': False, 'last_change': 0.0},
+            'prev': {'pressed': False, 'last_change': 0.0, 'hold_start': 0.0, 'hold_triggered': False},
+            'select': {'pressed': False, 'last_change': 0.0, 'hold_start': 0.0, 'hold_triggered': False},
+            'next': {'pressed': False, 'last_change': 0.0, 'hold_start': 0.0, 'hold_triggered': False},
         }
 
         # Navigation state
@@ -448,29 +448,28 @@ class OLEDBonnetHandler:
                     # Button just pressed
                     state['pressed'] = True
                     state['last_change'] = now
-                    if name == 'select':
-                        state['hold_start'] = now
-                    else:
-                        # Immediate action for prev/next
-                        self._on_button_press(name)
+                    state['hold_start'] = now
+                    state['hold_triggered'] = False
 
                 elif not pressed and state['pressed']:
                     # Button just released
                     state['pressed'] = False
                     state['last_change'] = now
-                    if name == 'select':
-                        # Check if it was a short press (not a hold)
-                        if now - state['hold_start'] < hold_s:
-                            self._on_button_press('select')
-                        state['hold_start'] = 0.0
+                    # Check if it was a short press (not a hold)
+                    if not state.get('hold_triggered', False):
+                        self._on_button_press(name)
+                    state['hold_start'] = 0.0
+                    state['hold_triggered'] = False
 
-            # Check for select hold
-            select_state = self._button_states['select']
-            if (select_state['pressed'] and select_state['hold_start'] > 0 and
-                    now - select_state['hold_start'] >= hold_s):
-                # Hold detected - trigger once
-                select_state['hold_start'] = 0.0  # Prevent repeat
-                self._on_button_hold('select')
+            # Check for button holds
+            for name in ['select', 'prev', 'next']:
+                state = self._button_states[name]
+                if (state['pressed'] and state['hold_start'] > 0 and
+                        not state.get('hold_triggered', False) and
+                        now - state['hold_start'] >= hold_s):
+                    # Hold detected - trigger once
+                    state['hold_triggered'] = True
+                    self._on_button_hold(name)
 
         except OSError:
             # I2C error - will retry on next poll
@@ -545,6 +544,26 @@ class OLEDBonnetHandler:
                 # Toggle page selected state
                 self._page_selected = not self._page_selected
                 logger.debug("OLED: Page %s", "selected" if self._page_selected else "deselected")
+
+            elif button == 'prev':
+                # Bottom button - decrease brightness
+                new_brightness = max(0.1, self.brightness - 0.1)
+                self.set_brightness(new_brightness)
+                self._save_brightness(new_brightness)
+                logger.debug("OLED: Brightness decreased to %.0f%%", new_brightness * 100)
+
+            elif button == 'next':
+                # Top button - increase brightness
+                new_brightness = min(1.0, self.brightness + 0.1)
+                self.set_brightness(new_brightness)
+                self._save_brightness(new_brightness)
+                logger.debug("OLED: Brightness increased to %.0f%%", new_brightness * 100)
+
+    def _save_brightness(self, brightness: float):
+        """Save brightness setting."""
+        from utils.settings import get_settings
+        settings = get_settings()
+        settings.set("oled.brightness", brightness)
 
     def start(self):
         """Start the background update thread."""
