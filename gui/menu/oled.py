@@ -49,6 +49,13 @@ class OLEDMenuMixin:
             "fuel": "Fuel",
             "delta": "Delta",
             "pit": "Pit Timer",
+            "speed": "Speed",
+            "max_speed": "Max Speed",
+            "lap_timing": "Lap Timing",
+            "lap_count": "Lap Count",
+            "predictive": "Predictive",
+            "longitudinal_g": "Long. G",
+            "lateral_g": "Lateral G",
         }
         mode_name = mode_names.get(mode.value, mode.value.title())
         return f"Mode: {mode_name}"
@@ -81,6 +88,13 @@ class OLEDMenuMixin:
                 "fuel": OLEDBonnetMode.FUEL,
                 "delta": OLEDBonnetMode.DELTA,
                 "pit": OLEDBonnetMode.PIT,
+                "speed": OLEDBonnetMode.SPEED,
+                "max_speed": OLEDBonnetMode.MAX_SPEED,
+                "lap_timing": OLEDBonnetMode.LAP_TIMING,
+                "lap_count": OLEDBonnetMode.LAP_COUNT,
+                "predictive": OLEDBonnetMode.PREDICTIVE,
+                "longitudinal_g": OLEDBonnetMode.LONGITUDINAL_G,
+                "lateral_g": OLEDBonnetMode.LATERAL_G,
             }
 
             if mode_str not in mode_map:
@@ -182,6 +196,97 @@ class OLEDMenuMixin:
         self._settings.set("oled.pages.pit.enabled", new_state)
         self._refresh_oled_modes()
         return f"Pit page: {'On' if new_state else 'Off'}"
+
+    def _get_oled_page_speed_label(self) -> str:
+        """Get OLED Speed page enabled status."""
+        enabled = self._settings.get("oled.pages.speed.enabled", True)
+        return f"Speed Page: {'On' if enabled else 'Off'}"
+
+    def _toggle_oled_page_speed(self) -> str:
+        """Toggle OLED Speed page enabled state."""
+        enabled = self._settings.get("oled.pages.speed.enabled", True)
+        new_state = not enabled
+        self._settings.set("oled.pages.speed.enabled", new_state)
+        self._refresh_oled_modes()
+        return f"Speed page: {'On' if new_state else 'Off'}"
+
+    def _get_oled_page_max_speed_label(self) -> str:
+        """Get OLED Max Speed page enabled status."""
+        enabled = self._settings.get("oled.pages.max_speed.enabled", False)
+        return f"Max Speed Page: {'On' if enabled else 'Off'}"
+
+    def _toggle_oled_page_max_speed(self) -> str:
+        """Toggle OLED Max Speed page enabled state."""
+        enabled = self._settings.get("oled.pages.max_speed.enabled", False)
+        new_state = not enabled
+        self._settings.set("oled.pages.max_speed.enabled", new_state)
+        self._refresh_oled_modes()
+        return f"Max Speed page: {'On' if new_state else 'Off'}"
+
+    def _get_oled_page_lap_timing_label(self) -> str:
+        """Get OLED Lap Timing page enabled status."""
+        enabled = self._settings.get("oled.pages.lap_timing.enabled", False)
+        return f"Lap Timing Page: {'On' if enabled else 'Off'}"
+
+    def _toggle_oled_page_lap_timing(self) -> str:
+        """Toggle OLED Lap Timing page enabled state."""
+        enabled = self._settings.get("oled.pages.lap_timing.enabled", False)
+        new_state = not enabled
+        self._settings.set("oled.pages.lap_timing.enabled", new_state)
+        self._refresh_oled_modes()
+        return f"Lap Timing page: {'On' if new_state else 'Off'}"
+
+    def _get_oled_page_lap_count_label(self) -> str:
+        """Get OLED Lap Count page enabled status."""
+        enabled = self._settings.get("oled.pages.lap_count.enabled", False)
+        return f"Lap Count Page: {'On' if enabled else 'Off'}"
+
+    def _toggle_oled_page_lap_count(self) -> str:
+        """Toggle OLED Lap Count page enabled state."""
+        enabled = self._settings.get("oled.pages.lap_count.enabled", False)
+        new_state = not enabled
+        self._settings.set("oled.pages.lap_count.enabled", new_state)
+        self._refresh_oled_modes()
+        return f"Lap Count page: {'On' if new_state else 'Off'}"
+
+    def _get_oled_page_predictive_label(self) -> str:
+        """Get OLED Predictive page enabled status."""
+        enabled = self._settings.get("oled.pages.predictive.enabled", False)
+        return f"Predictive Page: {'On' if enabled else 'Off'}"
+
+    def _toggle_oled_page_predictive(self) -> str:
+        """Toggle OLED Predictive page enabled state."""
+        enabled = self._settings.get("oled.pages.predictive.enabled", False)
+        new_state = not enabled
+        self._settings.set("oled.pages.predictive.enabled", new_state)
+        self._refresh_oled_modes()
+        return f"Predictive page: {'On' if new_state else 'Off'}"
+
+    def _get_oled_page_longitudinal_g_label(self) -> str:
+        """Get OLED Longitudinal G page enabled status."""
+        enabled = self._settings.get("oled.pages.longitudinal_g.enabled", False)
+        return f"Long. G Page: {'On' if enabled else 'Off'}"
+
+    def _toggle_oled_page_longitudinal_g(self) -> str:
+        """Toggle OLED Longitudinal G page enabled state."""
+        enabled = self._settings.get("oled.pages.longitudinal_g.enabled", False)
+        new_state = not enabled
+        self._settings.set("oled.pages.longitudinal_g.enabled", new_state)
+        self._refresh_oled_modes()
+        return f"Long. G page: {'On' if new_state else 'Off'}"
+
+    def _get_oled_page_lateral_g_label(self) -> str:
+        """Get OLED Lateral G page enabled status."""
+        enabled = self._settings.get("oled.pages.lateral_g.enabled", False)
+        return f"Lateral G Page: {'On' if enabled else 'Off'}"
+
+    def _toggle_oled_page_lateral_g(self) -> str:
+        """Toggle OLED Lateral G page enabled state."""
+        enabled = self._settings.get("oled.pages.lateral_g.enabled", False)
+        new_state = not enabled
+        self._settings.set("oled.pages.lateral_g.enabled", new_state)
+        self._refresh_oled_modes()
+        return f"Lateral G page: {'On' if new_state else 'Off'}"
 
     def _refresh_oled_modes(self):
         """Refresh OLED enabled modes after settings change."""

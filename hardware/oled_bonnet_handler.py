@@ -80,6 +80,13 @@ class OLEDBonnetMode(Enum):
     FUEL = "fuel"
     DELTA = "delta"
     PIT = "pit"
+    SPEED = "speed"
+    MAX_SPEED = "max_speed"
+    LAP_TIMING = "lap_timing"
+    LAP_COUNT = "lap_count"
+    PREDICTIVE = "predictive"
+    LONGITUDINAL_G = "longitudinal_g"
+    LATERAL_G = "lateral_g"
 
 
 class OLEDBonnetHandler:
@@ -165,6 +172,11 @@ class OLEDBonnetHandler:
         self.lap_timing_handler = None
         self.fuel_tracker = None
         self.pit_timer_handler = None
+        self.gps_handler = None
+        self.imu_handler = None
+
+        # Session tracking for max speed page
+        self._max_speed_kmh = 0.0
 
         # Thread control
         self.thread = None
@@ -366,7 +378,8 @@ class OLEDBonnetHandler:
             self.button_next = None
             return False
 
-    def set_handlers(self, lap_timing_handler=None, fuel_tracker=None, pit_timer_handler=None):
+    def set_handlers(self, lap_timing_handler=None, fuel_tracker=None, pit_timer_handler=None,
+                     gps_handler=None, imu_handler=None):
         """
         Set data source handlers (late binding).
 
@@ -374,14 +387,19 @@ class OLEDBonnetHandler:
             lap_timing_handler: LapTimingHandler instance for delta data
             fuel_tracker: FuelTracker instance for fuel data
             pit_timer_handler: PitTimerHandler instance for pit timer data
+            gps_handler: GPSHandler instance for speed data
+            imu_handler: IMUHandler instance for G-force data
         """
         with self.state_lock:
             self.lap_timing_handler = lap_timing_handler
             self.fuel_tracker = fuel_tracker
             self.pit_timer_handler = pit_timer_handler
-        logger.debug("OLED: Handlers set (lap_timing=%s, fuel=%s, pit_timer=%s)",
+            self.gps_handler = gps_handler
+            self.imu_handler = imu_handler
+        logger.debug("OLED: Handlers set (lap_timing=%s, fuel=%s, pit_timer=%s, gps=%s, imu=%s)",
                      lap_timing_handler is not None, fuel_tracker is not None,
-                     pit_timer_handler is not None)
+                     pit_timer_handler is not None, gps_handler is not None,
+                     imu_handler is not None)
 
     def _show_splash(self, text: str, duration: float = 2.0):
         """
@@ -519,6 +537,12 @@ class OLEDBonnetHandler:
         - next: Mark exit line
         - select: Toggle timing mode
 
+        For MAX_SPEED mode:
+        - select: Reset max speed
+
+        For LONGITUDINAL_G/LATERAL_G mode:
+        - select: Reset peak G values
+
         Args:
             action: 'prev', 'next', or 'select'
         """
@@ -535,6 +559,20 @@ class OLEDBonnetHandler:
                 # Toggle timing mode
                 self.pit_timer_handler.toggle_mode()
                 logger.info("OLED: Toggled pit timer mode")
+
+        elif self.mode == OLEDBonnetMode.MAX_SPEED:
+            if action == 'select':
+                # Reset max speed
+                with self.state_lock:
+                    self._max_speed_kmh = 0.0
+                logger.info("OLED: Max speed reset")
+
+        elif self.mode in (OLEDBonnetMode.LONGITUDINAL_G, OLEDBonnetMode.LATERAL_G):
+            if action == 'select' and self.imu_handler:
+                # Reset peak G values
+                self.imu_handler.reset_peaks()
+                logger.info("OLED: Peak G values reset")
+
         else:
             # No action for other modes
             logger.debug("OLED: Page action '%s' on %s (no action)", action, self.mode.value)
@@ -653,6 +691,20 @@ class OLEDBonnetHandler:
             self._render_delta()
         elif mode == OLEDBonnetMode.PIT:
             self._render_pit()
+        elif mode == OLEDBonnetMode.SPEED:
+            self._render_speed()
+        elif mode == OLEDBonnetMode.MAX_SPEED:
+            self._render_max_speed()
+        elif mode == OLEDBonnetMode.LAP_TIMING:
+            self._render_lap_timing()
+        elif mode == OLEDBonnetMode.LAP_COUNT:
+            self._render_lap_count()
+        elif mode == OLEDBonnetMode.PREDICTIVE:
+            self._render_predictive()
+        elif mode == OLEDBonnetMode.LONGITUDINAL_G:
+            self._render_longitudinal_g()
+        elif mode == OLEDBonnetMode.LATERAL_G:
+            self._render_lateral_g()
 
         # Draw selection indicator (small filled circle in top-right when selected)
         if page_selected:
@@ -992,6 +1044,403 @@ class OLEDBonnetHandler:
         mins = int(seconds // 60)
         secs = seconds % 60
         return f"{mins}:{secs:04.1f}"
+
+    def _render_speed(self):
+        """
+        Render speed page.
+
+        Layout (128x32):
+            [  123  ]        (large, centred)
+        km/h           GPS   (unit + source)
+        """
+        speed_kmh = 0.0
+        has_fix = False
+
+        # Get handler reference (lock-free after copy)
+        with self.state_lock:
+            handler = self.gps_handler
+
+        # Get GPS data (outside lock to avoid contention)
+        if handler:
+            data = handler.get_data()
+            speed_kmh = data.get('speed_kmh', 0.0)
+            has_fix = data.get('has_fix', False)
+
+        # Large centred speed value
+        speed_text = f"{speed_kmh:.0f}"
+        speed_width = _get_text_width(self.draw, speed_text, self.font)
+        x = (self.width - speed_width) // 2
+        self.draw.text((x, 2), speed_text, font=self.font, fill=1)
+
+        # Line 2: Unit and source indicator
+        y2 = 18
+        self.draw.text((2, y2), "km/h", font=self.font_small, fill=1)
+
+        # GPS indicator right-aligned
+        gps_text = "GPS" if has_fix else "---"
+        gps_width = _get_text_width(self.draw, gps_text, self.font_small)
+        self.draw.text((self.width - gps_width - 2, y2), gps_text, font=self.font_small, fill=1)
+
+    def _render_max_speed(self):
+        """
+        Render max speed page.
+
+        Layout (128x32):
+        MAX  156      km/h   (label + max + unit)
+        Now:123    [OK=RST]  (current + hint when selected)
+        """
+        speed_kmh = 0.0
+
+        # Get handler reference (lock-free after copy)
+        with self.state_lock:
+            handler = self.gps_handler
+            page_selected = self._page_selected
+
+        # Get GPS data (outside lock to avoid contention)
+        if handler:
+            data = handler.get_data()
+            speed_kmh = data.get('speed_kmh', 0.0)
+
+        # Update max speed tracking
+        with self.state_lock:
+            if speed_kmh > self._max_speed_kmh:
+                self._max_speed_kmh = speed_kmh
+            max_speed = self._max_speed_kmh
+
+        # Line 1: Label, max speed, and unit
+        self.draw.text((2, 0), "MAX", font=self.font, fill=1)
+
+        max_text = f"{max_speed:.0f}"
+        max_width = _get_text_width(self.draw, max_text, self.font)
+        self.draw.text((45, 0), max_text, font=self.font, fill=1)
+
+        unit_text = "km/h"
+        unit_width = _get_text_width(self.draw, unit_text, self.font_small)
+        self.draw.text((self.width - unit_width - 2, 2), unit_text, font=self.font_small, fill=1)
+
+        # Line 2: Current speed and reset hint
+        y2 = 18
+        now_text = f"Now:{speed_kmh:.0f}"
+        self.draw.text((2, y2), now_text, font=self.font_small, fill=1)
+
+        if page_selected:
+            hint_text = "[OK=RST]"
+            hint_width = _get_text_width(self.draw, hint_text, self.font_small)
+            self.draw.text((self.width - hint_width - 2, y2), hint_text, font=self.font_small, fill=1)
+
+    def _render_lap_timing(self):
+        """
+        Render lap timing page.
+
+        Layout (128x32):
+        LAP 5      1:23.456  (lap number + current time)
+        L:1:24.1    B:1:22.3 (last + best)
+        """
+        lap_number = 0
+        current_lap_time = 0.0
+        last_lap_time = None
+        best_lap_time = None
+
+        # Get handler reference (lock-free after copy)
+        with self.state_lock:
+            handler = self.lap_timing_handler
+
+        # Get lap timing data (outside lock to avoid contention)
+        if handler:
+            data = handler.get_data()
+            lap_number = data.get('lap_number', 0)
+            current_lap_time = data.get('current_lap_time', 0.0)
+            last_lap_time = data.get('last_lap_time')
+            best_lap_time = data.get('best_lap_time')
+
+        # Line 1: Lap number and current lap time
+        lap_text = f"LAP {lap_number}"
+        self.draw.text((2, 0), lap_text, font=self.font, fill=1)
+
+        current_text = _format_lap_time(current_lap_time)
+        current_width = _get_text_width(self.draw, current_text, self.font)
+        self.draw.text((self.width - current_width - 2, 0), current_text, font=self.font, fill=1)
+
+        # Line 2: Last and best lap times
+        y2 = 18
+        last_text = f"L:{_format_lap_time(last_lap_time)}"
+        best_text = f"B:{_format_lap_time(best_lap_time)}"
+
+        self.draw.text((2, y2), last_text, font=self.font_small, fill=1)
+        best_width = _get_text_width(self.draw, best_text, self.font_small)
+        self.draw.text((self.width - best_width - 2, y2), best_text, font=self.font_small, fill=1)
+
+    def _render_lap_count(self):
+        """
+        Render lap count page.
+
+        Layout (128x32):
+              [ 5 ]          (large, centred)
+        LAPS        Total:12 (label + session total)
+        """
+        lap_number = 0
+        total_laps = 0
+
+        # Get handler reference (lock-free after copy)
+        with self.state_lock:
+            handler = self.lap_timing_handler
+
+        # Get lap timing data (outside lock to avoid contention)
+        if handler:
+            data = handler.get_data()
+            lap_number = data.get('lap_number', 0)
+            total_laps = data.get('total_laps', lap_number)
+
+        # Large centred lap number
+        lap_text = f"{lap_number}"
+        lap_width = _get_text_width(self.draw, lap_text, self.font)
+        x = (self.width - lap_width) // 2
+        self.draw.text((x, 2), lap_text, font=self.font, fill=1)
+
+        # Line 2: Label and total
+        y2 = 18
+        self.draw.text((2, y2), "LAPS", font=self.font_small, fill=1)
+
+        total_text = f"Total:{total_laps}"
+        total_width = _get_text_width(self.draw, total_text, self.font_small)
+        self.draw.text((self.width - total_width - 2, y2), total_text, font=self.font_small, fill=1)
+
+    def _render_predictive(self):
+        """
+        Render predictive lap time page.
+
+        Layout (128x32):
+        [====|    ]  +1.23   (delta bar + value)
+        P:1:23.4    B:1:22.1 (predicted + best)
+        """
+        delta_seconds = 0.0
+        predicted_lap_time = None
+        best_lap_time = None
+
+        # Get handler reference (lock-free after copy)
+        with self.state_lock:
+            handler = self.lap_timing_handler
+
+        # Get lap timing data (outside lock to avoid contention)
+        if handler:
+            data = handler.get_data()
+            delta_seconds = data.get('delta_seconds', 0.0)
+            best_lap_time = data.get('best_lap_time')
+
+            # Calculate predicted time (best + delta if best exists)
+            if best_lap_time is not None and best_lap_time > 0:
+                predicted_lap_time = best_lap_time + delta_seconds
+
+        # Line 1: Delta bar and value (same as delta page)
+        bar_width = 70
+        bar_height = 10
+        bar_x = 2
+        bar_y = 2
+        centre_x = bar_x + bar_width // 2
+
+        # Draw bar outline
+        self.draw.rectangle(
+            (bar_x, bar_y, bar_x + bar_width, bar_y + bar_height),
+            outline=1, fill=0
+        )
+
+        # Draw centre line
+        self.draw.line(
+            (centre_x, bar_y + 1, centre_x, bar_y + bar_height - 1),
+            fill=1
+        )
+
+        # Draw delta bar (clamped to +/- 5 seconds)
+        max_delta = 5.0
+        clamped_delta = max(-max_delta, min(max_delta, delta_seconds))
+        delta_fraction = clamped_delta / max_delta
+
+        if abs(delta_fraction) > 0.01:
+            half_bar = (bar_width - 4) // 2
+            if delta_fraction > 0:
+                fill_start = centre_x + 1
+                fill_end = centre_x + int(delta_fraction * half_bar)
+            else:
+                fill_end = centre_x - 1
+                fill_start = centre_x + int(delta_fraction * half_bar)
+
+            if fill_start < fill_end:
+                self.draw.rectangle(
+                    (fill_start, bar_y + 1, fill_end, bar_y + bar_height - 1),
+                    fill=1
+                )
+
+        # Delta text
+        sign = "+" if delta_seconds >= 0 else ""
+        delta_text = f"{sign}{delta_seconds:.2f}"
+        self.draw.text((bar_x + bar_width + 4, bar_y - 2), delta_text, font=self.font, fill=1)
+
+        # Line 2: Predicted and best times
+        y2 = 18
+        pred_text = f"P:{_format_lap_time(predicted_lap_time)}"
+        best_text = f"B:{_format_lap_time(best_lap_time)}"
+
+        self.draw.text((2, y2), pred_text, font=self.font_small, fill=1)
+        best_width = _get_text_width(self.draw, best_text, self.font_small)
+        self.draw.text((self.width - best_width - 2, y2), best_text, font=self.font_small, fill=1)
+
+    def _render_longitudinal_g(self):
+        """
+        Render longitudinal G page.
+
+        Layout (128x32):
+        [  |====]   +0.85g   (bar + current G)
+        LONG        Pk:1.20  (label + peak)
+        """
+        accel_y = 0.0
+        peak_longitudinal = 0.0
+
+        # Get handler reference (lock-free after copy)
+        with self.state_lock:
+            handler = self.imu_handler
+            page_selected = self._page_selected
+
+        # Get IMU data (outside lock to avoid contention)
+        if handler:
+            snapshot = handler.get_snapshot()
+            if snapshot:
+                accel_y = snapshot.data.get('accel_y', 0.0)  # Longitudinal G (positive = forward)
+                peak_longitudinal = snapshot.data.get('peak_longitudinal', 0.0)
+
+        # Line 1: G-force bar and current value
+        bar_width = 70
+        bar_height = 10
+        bar_x = 2
+        bar_y = 2
+        centre_x = bar_x + bar_width // 2
+
+        # Draw bar outline
+        self.draw.rectangle(
+            (bar_x, bar_y, bar_x + bar_width, bar_y + bar_height),
+            outline=1, fill=0
+        )
+
+        # Draw centre line
+        self.draw.line(
+            (centre_x, bar_y + 1, centre_x, bar_y + bar_height - 1),
+            fill=1
+        )
+
+        # Draw G bar (clamped to +/- 2G)
+        max_g = 2.0
+        clamped_g = max(-max_g, min(max_g, accel_y))
+        g_fraction = clamped_g / max_g
+
+        if abs(g_fraction) > 0.01:
+            half_bar = (bar_width - 4) // 2
+            if g_fraction > 0:
+                fill_start = centre_x + 1
+                fill_end = centre_x + int(g_fraction * half_bar)
+            else:
+                fill_end = centre_x - 1
+                fill_start = centre_x + int(g_fraction * half_bar)
+
+            if fill_start < fill_end:
+                self.draw.rectangle(
+                    (fill_start, bar_y + 1, fill_end, bar_y + bar_height - 1),
+                    fill=1
+                )
+
+        # G value text
+        sign = "+" if accel_y >= 0 else ""
+        g_text = f"{sign}{accel_y:.2f}g"
+        self.draw.text((bar_x + bar_width + 4, bar_y - 2), g_text, font=self.font, fill=1)
+
+        # Line 2: Label and peak
+        y2 = 18
+        self.draw.text((2, y2), "LONG", font=self.font_small, fill=1)
+
+        # Peak value (with reset hint if selected)
+        if page_selected:
+            peak_text = f"Pk:{peak_longitudinal:.2f} [RST]"
+        else:
+            peak_text = f"Pk:{peak_longitudinal:.2f}"
+        peak_width = _get_text_width(self.draw, peak_text, self.font_small)
+        self.draw.text((self.width - peak_width - 2, y2), peak_text, font=self.font_small, fill=1)
+
+    def _render_lateral_g(self):
+        """
+        Render lateral G page.
+
+        Layout (128x32):
+        [====|  ]   -0.72g   (bar + current G)
+        LAT         Pk:0.95  (label + peak)
+        """
+        accel_x = 0.0
+        peak_lateral = 0.0
+
+        # Get handler reference (lock-free after copy)
+        with self.state_lock:
+            handler = self.imu_handler
+            page_selected = self._page_selected
+
+        # Get IMU data (outside lock to avoid contention)
+        if handler:
+            snapshot = handler.get_snapshot()
+            if snapshot:
+                accel_x = snapshot.data.get('accel_x', 0.0)  # Lateral G (positive = right)
+                peak_lateral = snapshot.data.get('peak_lateral', 0.0)
+
+        # Line 1: G-force bar and current value
+        bar_width = 70
+        bar_height = 10
+        bar_x = 2
+        bar_y = 2
+        centre_x = bar_x + bar_width // 2
+
+        # Draw bar outline
+        self.draw.rectangle(
+            (bar_x, bar_y, bar_x + bar_width, bar_y + bar_height),
+            outline=1, fill=0
+        )
+
+        # Draw centre line
+        self.draw.line(
+            (centre_x, bar_y + 1, centre_x, bar_y + bar_height - 1),
+            fill=1
+        )
+
+        # Draw G bar (clamped to +/- 2G)
+        max_g = 2.0
+        clamped_g = max(-max_g, min(max_g, accel_x))
+        g_fraction = clamped_g / max_g
+
+        if abs(g_fraction) > 0.01:
+            half_bar = (bar_width - 4) // 2
+            if g_fraction > 0:
+                fill_start = centre_x + 1
+                fill_end = centre_x + int(g_fraction * half_bar)
+            else:
+                fill_end = centre_x - 1
+                fill_start = centre_x + int(g_fraction * half_bar)
+
+            if fill_start < fill_end:
+                self.draw.rectangle(
+                    (fill_start, bar_y + 1, fill_end, bar_y + bar_height - 1),
+                    fill=1
+                )
+
+        # G value text
+        sign = "+" if accel_x >= 0 else ""
+        g_text = f"{sign}{accel_x:.2f}g"
+        self.draw.text((bar_x + bar_width + 4, bar_y - 2), g_text, font=self.font, fill=1)
+
+        # Line 2: Label and peak
+        y2 = 18
+        self.draw.text((2, y2), "LAT", font=self.font_small, fill=1)
+
+        # Peak value (with reset hint if selected)
+        if page_selected:
+            peak_text = f"Pk:{peak_lateral:.2f} [RST]"
+        else:
+            peak_text = f"Pk:{peak_lateral:.2f}"
+        peak_width = _get_text_width(self.draw, peak_text, self.font_small)
+        self.draw.text((self.width - peak_width - 2, y2), peak_text, font=self.font_small, fill=1)
 
     # Public API
 

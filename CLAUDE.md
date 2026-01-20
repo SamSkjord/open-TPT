@@ -62,7 +62,7 @@
 - OBD2: Speed, RPM, fuel level, Ford Mode 22 HV Battery SOC
 - GPS: PA1616S at 10Hz (serial /dev/ttyS0) for lap timing and CoPilot
 - NeoDriver: I2C LED strip at 0x60 (shift/delta/overtake modes)
-- OLED Bonnet: 128x32 SSD1305 at 0x3C with MCP23017 buttons at 0x20 (fuel/delta display)
+- OLED Bonnet: 128x32 SSD1305 at 0x3C with MCP23017 buttons at 0x20 (10 VBOX-style pages)
 - CoPilot: Rally callouts using OSM map data (USB/NVMe storage for 6.4GB roads.db)
 
 ---

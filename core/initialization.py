@@ -550,6 +550,8 @@ class InitializationMixin:
                 lap_timing_handler=self.lap_timing,
                 fuel_tracker=self.fuel_tracker,
                 pit_timer_handler=self.pit_timer,
+                gps_handler=self.gps,
+                imu_handler=self.imu,
             )
 
         # Initialise CoPilot handler (optional, requires GPS for rally callouts)

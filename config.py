@@ -110,6 +110,13 @@ OLED_PAGES = [
     {"id": "fuel", "name": "Fuel", "default_enabled": True},
     {"id": "delta", "name": "Delta", "default_enabled": True},
     {"id": "pit", "name": "Pit Timer", "default_enabled": True},
+    {"id": "speed", "name": "Speed", "default_enabled": True},
+    {"id": "max_speed", "name": "Max Speed", "default_enabled": False},
+    {"id": "lap_timing", "name": "Lap Timing", "default_enabled": False},
+    {"id": "lap_count", "name": "Lap Count", "default_enabled": False},
+    {"id": "predictive", "name": "Predictive", "default_enabled": False},
+    {"id": "longitudinal_g", "name": "Long. G", "default_enabled": False},
+    {"id": "lateral_g", "name": "Lateral G", "default_enabled": False},
 ]
 
 # ==============================================================================

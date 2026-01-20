@@ -1,5 +1,38 @@
 # Changelog - openTPT
 
+## [v0.19.4] - 2026-01-20
+
+### VBOX-Style OLED Pages
+
+Added 7 new OLED Bonnet display pages inspired by VBOX OLED Display DSP07-L modes.
+
+#### New Pages
+
+| Page | Description | Button Action |
+|------|-------------|---------------|
+| **Speed** | Large GPS speed with fix indicator | None |
+| **Max Speed** | Session max speed tracking | Select = reset max |
+| **Lap Timing** | Lap number, current/last/best times | None |
+| **Lap Count** | Large lap number with session total | None |
+| **Predictive** | Delta bar with predicted finish time | None |
+| **Longitudinal G** | Accel/brake G-force with bar and peak | Select = reset peaks |
+| **Lateral G** | Cornering G-force with bar and peak | Select = reset peaks |
+
+#### Layout Consistency
+
+All new pages follow the existing fuel/delta layout pattern:
+- Line 1: Bar/value display
+- Line 2: Labels and secondary data
+
+#### Modified Files
+
+- `config.py` - Added 7 new entries to `OLED_PAGES`
+- `hardware/oled_bonnet_handler.py` - Extended enum, added GPS/IMU handlers, 7 render methods, button actions
+- `core/initialization.py` - Wire GPS and IMU handlers to OLED Bonnet
+- `gui/menu/oled.py` - Added mode names and 14 toggle methods for new pages
+
+---
+
 ## [v0.19.3] - 2026-01-20
 
 ### Tyre Temps Menu
