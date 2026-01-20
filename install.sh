@@ -240,6 +240,21 @@ else
   echo "WARNING: Missing $GPS_CONFIG_SRC; skipping GPS 10Hz configuration."
 fi
 
+# Install USB patch deployment service
+echo -e "\n==== Installing USB patch deployment service ===="
+PATCH_SCRIPT_SRC="$SCRIPT_DIR/services/patch/usb-patch.sh"
+PATCH_SERVICE_SRC="$SCRIPT_DIR/services/patch/usb-patch.service"
+
+if [[ -f "$PATCH_SCRIPT_SRC" ]]; then
+  sudo install -m 0755 "$PATCH_SCRIPT_SRC" /usr/local/bin/usb-patch.sh
+  sudo install -m 0644 "$PATCH_SERVICE_SRC" /etc/systemd/system/usb-patch.service
+  sudo systemctl daemon-reload
+  sudo systemctl enable usb-patch.service
+  echo "USB patch service installed (checks for patches at boot)"
+else
+  echo "WARNING: Missing $PATCH_SCRIPT_SRC; skipping USB patch service."
+fi
+
 # Install persistent CAN naming rule
 echo -e "\n==== Installing persistent CAN interface naming rule ===="
 UDEV_RULE_SRC="$SCRIPT_DIR/config/can/80-can-persistent-names.rules"

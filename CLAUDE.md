@@ -1,6 +1,6 @@
 # Claude Context - openTPT Project
 
-**Version:** 0.18.12 | **Updated:** 2026-01-19
+**Version:** 0.18.14 | **Updated:** 2026-01-20
 
 ---
 
@@ -377,6 +377,33 @@ All settings in `config.py` (root level), organised into 12 sections:
 - Route integration: Uses lap timing track centerline when available
 - Supports both circuit tracks (KMZ) and point-to-point stages (GPX)
 - Config: `COPILOT_*` in config.py, `copilot.*` in settings
+
+### USB Patch Deployment (v0.18.14)
+- Offline updates for vehicle-mounted Pi without network access
+- Checks `/mnt/usb` at boot for `opentpt-patch.tar.gz` or `opentpt-patch.zip`
+- Extracts to `/home/pi/open-TPT`, renames archive to prevent re-application
+- Log file: `~/.opentpt/patch.log`
+- Boot sequence: `usb-patch.service` runs before `splash.service` and `openTPT.service`
+
+**Creating patches:**
+```bash
+# Patch specific files
+tar -czvf opentpt-patch.tar.gz main.py hardware/gps_handler.py
+
+# Patch entire directory
+tar -czvf opentpt-patch.tar.gz hardware/
+
+# Using zip
+zip -r opentpt-patch.zip main.py config.py gui/
+```
+
+**Deploying:** Copy archive to USB root, insert into Pi, reboot.
+
+**Verifying:**
+```bash
+cat ~/.opentpt/patch.log
+sudo journalctl -u usb-patch.service
+```
 
 ---
 

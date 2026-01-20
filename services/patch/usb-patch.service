@@ -1,0 +1,15 @@
+[Unit]
+Description=Apply USB patch to openTPT (if present)
+DefaultDependencies=no
+After=local-fs.target
+Before=splash.service openTPT.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/usb-patch.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=sysinit.target

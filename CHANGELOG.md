@@ -1,5 +1,52 @@
 # Changelog - openTPT
 
+## [v0.18.14] - 2026-01-20
+
+### USB Patch Deployment
+
+Added boot-time USB patch system for updating openTPT on a vehicle-mounted Pi without network access.
+
+#### Features
+
+- **Boot-time patching**: Checks `/mnt/usb` for patch archive before hardware initialisation
+- **Archive formats**: Supports both `.tar.gz` and `.zip` formats
+- **Auto-rename**: Archives renamed after application to prevent re-extraction on subsequent boots
+- **Logging**: All patch operations logged to `~/.opentpt/patch.log`
+- **Integrity check**: Archives verified before extraction (corrupt archives skipped)
+
+#### Boot Sequence
+
+```
+Power On -> [sysinit.target] -> [usb-patch.service] -> [splash.service] -> [openTPT.service]
+```
+
+#### Creating Patches
+
+```bash
+# Patch specific files
+tar -czvf opentpt-patch.tar.gz main.py hardware/gps_handler.py
+
+# Patch entire directory
+tar -czvf opentpt-patch.tar.gz hardware/
+
+# Using zip
+zip -r opentpt-patch.zip main.py config.py gui/
+```
+
+#### New Files
+
+- `services/patch/usb-patch.sh` - Boot script for USB patch extraction
+- `services/patch/usb-patch.service` - Systemd service unit
+
+#### Modified Files
+
+- `openTPT.service` - Added `usb-patch.service` to After directive
+- `install.sh` - Added USB patch service installation
+- `CLAUDE.md` - Added USB Patch Deployment subsystem reference
+- `QUICKSTART.md` - Added USB patch deployment workflow
+
+---
+
 ## [v0.18.13] - 2026-01-19
 
 ### OLED Bonnet Handler

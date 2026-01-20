@@ -4,7 +4,7 @@
 - **Pi IP:** `192.168.199.246`
 - **User:** `pi`
 - **Path:** `/home/pi/open-TPT`
-- **Status:** Production Ready (v0.17.9)
+- **Status:** Production Ready (v0.18.14)
 
 ## Quick Deploy & Run
 
@@ -225,6 +225,36 @@ sudo systemctl start openTPT.service
 sudo systemctl status openTPT.service
 ```
 
+### USB Patch Deployment (Offline Updates)
+
+For vehicle-mounted Pi without network access:
+
+```bash
+# Create patch on dev machine
+cd /Users/sam/git/open-TPT
+
+# Patch specific files
+tar -czvf opentpt-patch.tar.gz main.py hardware/gps_handler.py
+
+# Patch entire directory
+tar -czvf opentpt-patch.tar.gz hardware/
+
+# Using zip format
+zip -r opentpt-patch.zip main.py config.py gui/
+```
+
+**Deploy:**
+1. Copy `opentpt-patch.tar.gz` (or `.zip`) to USB drive root
+2. Insert USB into Pi
+3. Reboot - patch applied before app starts
+4. Archive renamed to prevent re-application
+
+**Verify:**
+```bash
+cat ~/.opentpt/patch.log
+sudo journalctl -u usb-patch.service
+```
+
 ## Documentation References
 
 | Document | Purpose |
@@ -234,7 +264,7 @@ sudo systemctl status openTPT.service
 | `DEPLOYMENT.md` | Detailed deployment workflow |
 | `CHANGELOG.md` | Version history and features |
 
-## Key Features (v0.17.9)
+## Key Features (v0.18.14)
 
 - Real-time TPMS monitoring with auto-pairing
 - Dual USB camera support with seamless switching
@@ -267,4 +297,4 @@ Use British spelling throughout:
 ---
 
 **Status:** System operational with full telemetry stack
-**Last Updated:** 2026-01-16 (v0.17.9)
+**Last Updated:** 2026-01-20 (v0.18.14)
