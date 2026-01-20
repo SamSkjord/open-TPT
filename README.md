@@ -608,7 +608,7 @@ openTPT/
 - [x] Adafruit NeoDriver - LED strip control (delta, overtake, shift, rainbow modes)
 - [x] MCP9601 Thermocouples - brake temperature sensors (per corner)
 - [ ] LTR-559 Auto brightness - ambient light sensor for automatic display brightness (enable/disable + offset settings)
-- [ ] Mini OLED display - secondary display for delta time and fuel data
+- [x] Mini OLED display - secondary display for delta time and fuel data (OLED Bonnet)
 - [ ] I2C bus reorganisation - main bus for IO, mux ch0 for external display/IO, ch1-4 for corners, ch5 for engine sensors, ch6 reserved (pedal sensors etc)
 
 ### Software TODO
@@ -636,7 +636,7 @@ openTPT/
 - [ ] Status bar configuration - choose which PIDs/data to display on status bars
 
 - [ ] Lap corner analysis logging - per lap, per corner: min speeds, yaw acceleration
-- [ ] Pitlane timer - countdown/countup timer for pitlane speed limits and pit stop duration
+- [x] Pitlane timer - countdown/countup timer for pitlane speed limits and pit stop duration
 - [x] Fuel tracking page - average fuel per lap, laps remaining, fuel used this session
 - [ ] Tyre temp graphs - show tyre temperature graphs on edges of track timer and camera views
 
