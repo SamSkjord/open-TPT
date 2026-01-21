@@ -16,12 +16,20 @@ Organised into logical sections:
 11. Features - CoPilot (maps, callouts, audio)
 12. Threading & Performance (queues, timeouts)
 13. Features - Pit Timer (waypoints, countdown, speed)
+14. Hardware - Ford Hybrid (HV battery SOC)
 """
 
 import logging
 import os
 
 logger = logging.getLogger("openTPT.config")
+
+# ==============================================================================
+# APPLICATION VERSION
+# ==============================================================================
+# Update this when releasing new versions
+# Format: MAJOR.MINOR.PATCH (e.g., "0.19.0")
+APP_VERSION = "0.19.8"
 
 # Project root for asset paths
 _PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -863,11 +871,21 @@ FUEL_LOW_THRESHOLD_PERCENT = 20.0  # Yellow warning threshold
 FUEL_CRITICAL_THRESHOLD_PERCENT = 10.0  # Red warning threshold
 
 # Smoothing for fuel level readings (number of samples to average)
-# Higher values = smoother but slower response
-FUEL_SMOOTHING_SAMPLES = 5
+# Higher values = smoother but slower response to actual fuel changes
+# 30 samples at 0.15s poll interval = ~4.5 seconds of smoothing
+# Motorsport fuel slosh requires significant smoothing for stable readings
+FUEL_SMOOTHING_SAMPLES = 30
+
+# Use median filter for fuel level smoothing (better at rejecting outliers from fuel slosh)
+# If False, uses simple moving average
+FUEL_USE_MEDIAN_FILTER = True
 
 # Number of laps to average for consumption estimate
 FUEL_LAP_HISTORY_COUNT = 5
+
+# Minimum distance (km) before calculating range estimates
+# Prevents garbage data from short trips with unreliable consumption calculation
+FUEL_MIN_DISTANCE_FOR_ESTIMATE_KM = 5.0
 
 
 # ##############################################################################
@@ -926,8 +944,9 @@ COPILOT_CORNER_MAX_CHICANE_GAP_M = 15.0  # Maximum gap for chicane detection
 
 COPILOT_JUNCTION_WARN_DISTANCE_M = 200  # Warn about T-junctions this far ahead
 COPILOT_HEADING_TOLERANCE_DEG = (
-    30.0  # Roads within this angle of heading are "straight on"
+    45.0  # Roads within this angle of heading are "straight on" (increased for real-world use)
 )
+COPILOT_ROAD_SEARCH_RADIUS_M = 150  # Maximum distance from GPS to search for current road
 
 # ==============================================================================
 # COPILOT - AUDIO
@@ -1042,3 +1061,27 @@ PIT_MIN_STOP_TIME_DEFAULT_S = 0.0  # No minimum by default (user-configurable)
 
 # Data storage directory
 PIT_TIMER_DATA_DIR = os.path.expanduser("~/.opentpt/pit_timer")
+
+
+# ##############################################################################
+#
+#                       14. HARDWARE - FORD HYBRID
+#
+# ##############################################################################
+
+# ==============================================================================
+# FORD HYBRID CAN (HV Battery SOC via Mode 22 PIDs)
+# ==============================================================================
+
+# Enable/disable Ford Hybrid CAN handler
+# Reads HV battery state of charge and power data via Ford-specific PIDs
+FORD_HYBRID_ENABLED = True
+
+# Ford Hybrid CAN configuration
+# Uses the same OBD2 channel (HS-CAN) since Ford Mode 22 PIDs go over standard OBD
+FORD_HYBRID_CHANNEL = "can_b2_1"  # Same as OBD_CHANNEL (HS-CAN)
+FORD_HYBRID_BITRATE = 500000  # Standard CAN bitrate (500 kbps)
+
+# Ford Hybrid polling and timing
+FORD_HYBRID_POLL_INTERVAL_S = 0.2  # Seconds between PID queries (slower to avoid bus flooding)
+FORD_HYBRID_SEND_TIMEOUT_S = 0.05  # Timeout for CAN message sends (seconds)

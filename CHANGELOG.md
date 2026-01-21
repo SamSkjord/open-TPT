@@ -1,5 +1,104 @@
 # Changelog - openTPT
 
+## [v0.19.8] - 2026-01-21
+
+### OLED Fuel Display: Range When No Track
+
+The OLED fuel page now shows estimated range (km) instead of laps remaining when no track is selected. This provides useful information during road driving or when a track hasn't been loaded yet.
+
+- **Track selected:** Shows "5.2 laps" (existing behaviour)
+- **No track:** Shows "125km" estimated range
+
+Modified: `hardware/oled_bonnet_handler.py` - `_render_fuel()` checks for track and displays range accordingly
+
+---
+
+### Shift Light RPM Thresholds in Menu
+
+Added user-configurable RPM thresholds for the NeoDriver shift light to the Thresholds menu.
+
+#### New Menu Items
+
+**Thresholds > Shift Light:**
+- **Start RPM** - RPM at which lights begin illuminating (default: 3000, range: 1000-8000, step: 100)
+- **Shift RPM** - RPM at which redline flash activates (default: 6500, range: 2000-10000, step: 100)
+- **Max RPM** - Maximum RPM for the shift light scale (default: 7000, range: 3000-12000, step: 100)
+
+#### Features
+
+- **Live preview** - Shift light updates immediately as values are adjusted
+- **Persistent settings** - Values saved to `thresholds.shift.start`, `thresholds.shift.light`, `thresholds.shift.max`
+- **Boot-time loading** - NeoDriver initialises with user settings instead of config defaults
+
+#### Modified Files
+
+- `config.py` - Bumped APP_VERSION to 0.19.8
+- `gui/menu/base.py` - Added shift light threshold definitions, submenu, and parent assignment
+- `gui/menu/settings.py` - Added live NeoDriver update when shift thresholds change
+- `core/initialization.py` - NeoDriver loads RPM settings from user preferences
+
+---
+
+## [v0.19.7] - 2026-01-21
+
+### In-Car Test Fixes
+
+First in-car test revealed several issues that are now fixed.
+
+#### Bug Fixes
+
+- **Ford Hybrid SOC bar not showing data** - Added missing configuration constants (`FORD_HYBRID_ENABLED`, `FORD_HYBRID_CHANNEL`, `FORD_HYBRID_BITRATE`, `FORD_HYBRID_POLL_INTERVAL_S`, `FORD_HYBRID_SEND_TIMEOUT_S`) to `config.py`. The handler was importing these but they didn't exist.
+
+- **CoPilot stuck on 'no path found'** - Increased heading tolerance from 30 to 45 degrees and search radius from 100m to 150m. Added fallback to find nearest road (within 30m) when no heading-aligned road is found. This handles cases where GPS heading is unreliable at low speeds.
+
+- **Lap timer "Failed to load" track** - `select_track_by_name()` now falls back to searching the full track database when the track isn't found in nearby tracks (which requires GPS proximity). Previously only worked if you were physically near the track.
+
+- **Fuel level jumping causing garbage estimates** - Implemented proper fuel smoothing for motorsport use:
+  - Increased smoothing samples from 5 to 30 (now ~4.5 seconds of data at OBD2 poll rate)
+  - Added median filter option (enabled by default) which is better at rejecting outliers from fuel slosh
+  - Added minimum distance requirement (5km) before calculating range estimates
+
+#### New Features
+
+- **Version number on splash screen** - Application version now displays in the top-right corner of the splash screen during boot. This allows visual confirmation that USB patches have been applied.
+
+- **USB log sync** - New service to export openTPT logs to USB drive for offline review:
+  - Automatic sync on shutdown (full logs since boot)
+  - Optional periodic sync every 30 minutes (recent logs only)
+  - Logs written to `/mnt/usb/logs/opentpt_TIMESTAMP.log`
+  - Keeps last 10 log files, auto-cleans older ones
+  - Enable with: `sudo systemctl enable usb-log-sync.service`
+  - Enable periodic: `sudo systemctl enable usb-log-sync.timer`
+
+#### New Configuration Constants
+
+| Constant | Default | Purpose |
+|----------|---------|---------|
+| `APP_VERSION` | `"0.19.7"` | Application version displayed on splash |
+| `FORD_HYBRID_ENABLED` | `True` | Enable Ford Hybrid CAN handler |
+| `FORD_HYBRID_CHANNEL` | `can_b2_1` | CAN channel (same as OBD2) |
+| `FORD_HYBRID_BITRATE` | `500000` | CAN bitrate |
+| `FORD_HYBRID_POLL_INTERVAL_S` | `0.2` | PID query interval |
+| `FORD_HYBRID_SEND_TIMEOUT_S` | `0.05` | CAN send timeout |
+| `COPILOT_ROAD_SEARCH_RADIUS_M` | `150` | Max distance to search for current road |
+| `FUEL_USE_MEDIAN_FILTER` | `True` | Use median filter for fuel smoothing |
+| `FUEL_MIN_DISTANCE_FOR_ESTIMATE_KM` | `5.0` | Min distance before range estimates |
+
+#### Modified Files
+
+- `config.py` - Added APP_VERSION, Ford Hybrid config section, CoPilot search radius, fuel smoothing options
+- `core/initialization.py` - Display version on splash screen
+- `copilot/path_projector.py` - Configurable search radius, fallback road finding
+- `hardware/lap_timing_handler.py` - Fallback to full database search for tracks
+- `utils/fuel_tracker.py` - Median filter, minimum distance check
+- `install.sh` - Install USB log sync service
+- `services/logging/usb-log-sync.sh` - Log export script
+- `services/logging/usb-log-sync.service` - Shutdown sync service
+- `services/logging/usb-log-sync.timer` - Periodic sync timer
+- `services/logging/usb-log-sync-periodic.service` - Periodic sync service
+
+---
+
 ## [v0.19.6] - 2026-01-21
 
 ### Config Scaffolding for CAN Corner Sensors

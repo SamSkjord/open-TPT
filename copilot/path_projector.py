@@ -12,7 +12,11 @@ from .geometry import (
     cumulative_distances,
 )
 from .map_loader import RoadNetwork, Junction, Way
-from config import COPILOT_HEADING_TOLERANCE_DEG, COPILOT_LOOKAHEAD_M
+from config import (
+    COPILOT_HEADING_TOLERANCE_DEG,
+    COPILOT_LOOKAHEAD_M,
+    COPILOT_ROAD_SEARCH_RADIUS_M,
+)
 
 
 @dataclass
@@ -169,6 +173,9 @@ class PathProjector:
                  direction of travel along the way.
         """
         candidates = []
+        fallback_candidates = []  # For when heading doesn't match
+
+        search_radius = COPILOT_ROAD_SEARCH_RADIUS_M
 
         for way_id, way in self.network.ways.items():
             geometry = self.network.get_way_geometry(way_id)
@@ -182,7 +189,7 @@ class PathProjector:
                 closest, t = closest_point_on_segment((lat, lon), p1, p2)
                 dist = haversine_distance(lat, lon, closest[0], closest[1])
 
-                if dist > 100:  # More than 100m away, skip
+                if dist > search_radius:
                     continue
 
                 # Check heading alignment
@@ -194,20 +201,26 @@ class PathProjector:
                 if not forward:
                     heading_diff = 180 - heading_diff
 
-                if heading_diff > self.heading_tolerance:
-                    continue
-
                 # Get road priority (prefer main roads)
                 priority = self.ROAD_PRIORITY.get(way.highway_type, 10)
 
-                # Score: heavily prioritize road type over distance
+                # Score: heavily prioritise road type over distance
                 # A primary road 100m away should beat a service road 30m away
                 score = priority * 50 + dist
 
+                if heading_diff > self.heading_tolerance:
+                    # Doesn't match heading - add to fallback (only if very close)
+                    if dist < 30:  # Only fallback for very close roads
+                        fallback_candidates.append((score + 500, way_id, i, forward))
+                    continue
+
                 candidates.append((score, way_id, i, forward))
 
+        # Use heading-aligned candidates if available, otherwise fallback
         if not candidates:
-            return None
+            if not fallback_candidates:
+                return None
+            candidates = fallback_candidates
 
         # Return best candidate (lowest score)
         candidates.sort(key=lambda x: x[0])

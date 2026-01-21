@@ -1,0 +1,19 @@
+[Unit]
+Description=Sync openTPT logs to USB drive
+# Run after openTPT stops (on shutdown) or on demand
+After=openTPT.service
+DefaultDependencies=no
+Before=umount.target
+# Only run if USB is mounted
+ConditionPathIsMountPoint=/mnt/usb
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/usb-log-sync.sh --full
+TimeoutStartSec=30
+# Run as root to read journald
+User=root
+
+[Install]
+# Run on shutdown
+WantedBy=halt.target reboot.target poweroff.target

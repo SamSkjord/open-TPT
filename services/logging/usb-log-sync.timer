@@ -1,0 +1,13 @@
+[Unit]
+Description=Periodic USB log sync for openTPT
+# Only run if USB is mounted
+ConditionPathIsMountPoint=/mnt/usb
+
+[Timer]
+# Sync every 30 minutes
+OnBootSec=5min
+OnUnitActiveSec=30min
+Unit=usb-log-sync-periodic.service
+
+[Install]
+WantedBy=timers.target

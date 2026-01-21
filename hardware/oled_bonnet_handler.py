@@ -721,15 +721,25 @@ class OLEDBonnetHandler:
 
         Layout (128x32):
         Line 1: [==========     ] 75%
-        Line 2: 5.2 laps         12.3L
+        Line 2: 5.2 laps         12.3L   (when track selected)
+                125km            12.3L   (when no track)
         """
         fuel_percent = None
         fuel_litres = None
         laps_remaining = None
+        estimated_range_km = None
+        has_track = False
 
-        # Get handler reference (lock-free after copy)
+        # Get handler references (lock-free after copy)
         with self.state_lock:
             tracker = self.fuel_tracker
+            lap_handler = self.lap_timing_handler
+
+        # Check if a track is selected
+        if lap_handler:
+            snapshot = lap_handler.get_snapshot()
+            if snapshot and snapshot.data:
+                has_track = snapshot.data.get('track_name') is not None
 
         # Get fuel data (outside lock to avoid contention)
         if tracker:
@@ -737,6 +747,7 @@ class OLEDBonnetHandler:
             fuel_percent = state.get('fuel_level_percent')
             fuel_litres = state.get('fuel_level_litres')
             laps_remaining = state.get('estimated_laps_remaining')
+            estimated_range_km = state.get('estimated_range_km')
 
         # Line 1: Progress bar and percentage
         bar_width = 70
@@ -766,20 +777,27 @@ class OLEDBonnetHandler:
 
         self.draw.text((bar_x + bar_width + 4, bar_y - 2), pct_text, font=self.font, fill=1)
 
-        # Line 2: Laps remaining and fuel litres
+        # Line 2: Laps/range and fuel litres
         y2 = 18
 
-        if laps_remaining is not None:
-            laps_text = f"{laps_remaining:.1f} laps"
+        # Show laps when track selected, range when no track
+        if has_track:
+            if laps_remaining is not None:
+                left_text = f"{laps_remaining:.1f} laps"
+            else:
+                left_text = "-- laps"
         else:
-            laps_text = "-- laps"
+            if estimated_range_km is not None:
+                left_text = f"{estimated_range_km:.0f}km"
+            else:
+                left_text = "--km"
 
         if fuel_litres is not None:
             litres_text = f"{fuel_litres:.1f}L"
         else:
             litres_text = "--.-L"
 
-        self.draw.text((2, y2), laps_text, font=self.font_small, fill=1)
+        self.draw.text((2, y2), left_text, font=self.font_small, fill=1)
         # Right-align litres text
         litres_width = _get_text_width(self.draw, litres_text, self.font_small)
         self.draw.text((self.width - litres_width - 2, y2), litres_text, font=self.font_small, fill=1)

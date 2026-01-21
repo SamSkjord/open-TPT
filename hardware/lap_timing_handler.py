@@ -734,12 +734,16 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
         """
         Select a specific track by name.
 
+        First searches nearby tracks (if GPS is available), then falls back
+        to searching all available tracks in the database.
+
         Args:
             track_name: Name of the track to select
 
         Returns:
             True if track was loaded successfully
         """
+        # First try nearby tracks (if GPS available)
         nearby = self.get_nearby_tracks()
         for track_info in nearby:
             if track_info['name'] == track_name:
@@ -754,6 +758,19 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
                     except Exception as e:
                         logger.warning("Lap timing: Error loading track: %s", e)
                         return False
+
+        # Fallback: search all tracks in database by name
+        if self.track_selector:
+            try:
+                track = self.track_selector.get_track_by_name(track_name)
+                if track:
+                    self.set_track(track)
+                    logger.info("Lap timing: Selected track from database: %s", track.name)
+                    return True
+            except Exception as e:
+                logger.warning("Lap timing: Error loading track from database: %s", e)
+
+        logger.warning("Lap timing: Track '%s' not found", track_name)
         return False
 
     def load_track_from_file(self, file_path: str) -> bool:

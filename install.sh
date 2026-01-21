@@ -256,6 +256,27 @@ else
   echo "WARNING: Missing $PATCH_SCRIPT_SRC; skipping USB patch service."
 fi
 
+# Install USB log sync service
+echo -e "\n==== Installing USB log sync service ===="
+LOG_SCRIPT_SRC="$SCRIPT_DIR/services/logging/usb-log-sync.sh"
+LOG_SERVICE_SRC="$SCRIPT_DIR/services/logging/usb-log-sync.service"
+LOG_TIMER_SRC="$SCRIPT_DIR/services/logging/usb-log-sync.timer"
+LOG_PERIODIC_SRC="$SCRIPT_DIR/services/logging/usb-log-sync-periodic.service"
+
+if [[ -f "$LOG_SCRIPT_SRC" ]]; then
+  sudo install -m 0755 "$LOG_SCRIPT_SRC" /usr/local/bin/usb-log-sync.sh
+  sudo install -m 0644 "$LOG_SERVICE_SRC" /etc/systemd/system/usb-log-sync.service
+  sudo install -m 0644 "$LOG_TIMER_SRC" /etc/systemd/system/usb-log-sync.timer
+  sudo install -m 0644 "$LOG_PERIODIC_SRC" /etc/systemd/system/usb-log-sync-periodic.service
+  sudo systemctl daemon-reload
+  # Enable shutdown sync (writes logs to USB on shutdown)
+  sudo systemctl enable usb-log-sync.service
+  echo "USB log sync service installed (syncs logs to USB on shutdown)"
+  echo "  Optional: sudo systemctl enable usb-log-sync.timer  # For periodic sync every 30min"
+else
+  echo "WARNING: Missing $LOG_SCRIPT_SRC; skipping USB log sync service."
+fi
+
 # Install persistent CAN naming rule
 echo -e "\n==== Installing persistent CAN interface naming rule ===="
 UDEV_RULE_SRC="$SCRIPT_DIR/config/can/80-can-persistent-names.rules"

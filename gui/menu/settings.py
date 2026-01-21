@@ -145,6 +145,17 @@ class SettingsMenuMixin:
         new_val = max(min_val, min(max_val, new_val))
         self._settings.set(settings_key, new_val)
 
+        # Live update NeoDriver shift light settings
+        if key.startswith("shift_") and self.neodriver_handler:
+            start_rpm = int(self._get_threshold_value("shift_start"))
+            shift_rpm = int(self._get_threshold_value("shift_light"))
+            max_rpm = int(self._get_threshold_value("shift_max"))
+            self.neodriver_handler.set_rpm_config(
+                max_rpm=max_rpm,
+                shift_rpm=shift_rpm,
+                start_rpm=start_rpm,
+            )
+
     # Page toggle methods
 
     def _get_page_enabled_label(self, page_id: str, page_name: str) -> str:

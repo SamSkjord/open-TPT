@@ -11,6 +11,7 @@ import time
 import pygame
 
 from config import (
+    APP_VERSION,
     DISPLAY_WIDTH,
     DISPLAY_HEIGHT,
     FONT_PATH,
@@ -137,7 +138,7 @@ class InitializationMixin:
     """
 
     def _show_splash(self, status_text, progress=None):
-        """Show splash screen with optional progress bar."""
+        """Show splash screen with optional progress bar and version."""
         # Fill with dark background
         self.screen.fill((20, 20, 30))
 
@@ -155,6 +156,16 @@ class InitializationMixin:
                 self.screen.blit(splash_img, img_rect)
         except (pygame.error, FileNotFoundError, IOError, OSError):
             pass  # Continue without splash image
+
+        # Draw version number in top-right corner
+        try:
+            version_font = pygame.font.Font(FONT_PATH, 18)
+        except (pygame.error, FileNotFoundError, IOError, OSError):
+            version_font = pygame.font.Font(None, 18)
+        version_text = f"v{APP_VERSION}"
+        version_surface = version_font.render(version_text, True, (120, 120, 140))
+        version_rect = version_surface.get_rect(topright=(DISPLAY_WIDTH - 15, 10))
+        self.screen.blit(version_surface, version_rect)
 
         # Draw status text
         try:
@@ -379,15 +390,20 @@ class InitializationMixin:
                 default_mode = mode_map.get(neodriver_mode_str, NeoDriverMode.OFF)
                 default_direction = direction_map.get(neodriver_direction_str, NeoDriverDirection.CENTRE_OUT)
 
+                # Load shift light RPM settings (user settings override config defaults)
+                shift_start_rpm = int(settings.get("thresholds.shift.start", NEODRIVER_START_RPM))
+                shift_light_rpm = int(settings.get("thresholds.shift.light", NEODRIVER_SHIFT_RPM))
+                shift_max_rpm = int(settings.get("thresholds.shift.max", NEODRIVER_MAX_RPM))
+
                 self.neodriver = NeoDriverHandler(
                     i2c_address=NEODRIVER_I2C_ADDRESS,
                     num_pixels=NEODRIVER_NUM_PIXELS,
                     brightness=NEODRIVER_BRIGHTNESS,
                     default_mode=default_mode,
                     default_direction=default_direction,
-                    max_rpm=NEODRIVER_MAX_RPM,
-                    shift_rpm=NEODRIVER_SHIFT_RPM,
-                    start_rpm=NEODRIVER_START_RPM,
+                    max_rpm=shift_max_rpm,
+                    shift_rpm=shift_light_rpm,
+                    start_rpm=shift_start_rpm,
                 )
                 if self.neodriver.is_available():
                     self.neodriver.start()

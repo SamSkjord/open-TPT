@@ -29,6 +29,10 @@ from config import (
     BRAKE_TEMP_HOT,
     PRESSURE_FRONT_OPTIMAL,
     PRESSURE_REAR_OPTIMAL,
+    # Shift light defaults
+    NEODRIVER_START_RPM,
+    NEODRIVER_SHIFT_RPM,
+    NEODRIVER_MAX_RPM,
 )
 from utils.settings import get_settings
 
@@ -462,6 +466,10 @@ class MenuSystem(
             # Boost gauge range (stored in PSI, converted for display)
             "boost_min": ("thresholds.boost.min", -15, -30, 0, 1, "Min (vacuum)"),
             "boost_max": ("thresholds.boost.max", 25, 5, 50, 1, "Max (boost)"),
+            # Shift light RPM thresholds
+            "shift_start": ("thresholds.shift.start", NEODRIVER_START_RPM, 1000, 8000, 100, "Start RPM"),
+            "shift_light": ("thresholds.shift.light", NEODRIVER_SHIFT_RPM, 2000, 10000, 100, "Shift RPM"),
+            "shift_max": ("thresholds.shift.max", NEODRIVER_MAX_RPM, 3000, 12000, 100, "Max RPM"),
         }
 
         # Check Bluetooth audio dependencies
@@ -751,11 +759,37 @@ class MenuSystem(
         )
         boost_thresh_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
 
+        # Shift light RPM thresholds
+        shift_thresh_menu = Menu("Shift Light")
+        shift_thresh_menu.add_item(
+            MenuItem(
+                "Start RPM",
+                dynamic_label=lambda: self._get_threshold_label("shift_start"),
+                action=lambda: self._toggle_threshold_editing("shift_start"),
+            )
+        )
+        shift_thresh_menu.add_item(
+            MenuItem(
+                "Shift RPM",
+                dynamic_label=lambda: self._get_threshold_label("shift_light"),
+                action=lambda: self._toggle_threshold_editing("shift_light"),
+            )
+        )
+        shift_thresh_menu.add_item(
+            MenuItem(
+                "Max RPM",
+                dynamic_label=lambda: self._get_threshold_label("shift_max"),
+                action=lambda: self._toggle_threshold_editing("shift_max"),
+            )
+        )
+        shift_thresh_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+
         # Add submenus to thresholds menu
         thresholds_menu.add_item(MenuItem("Tyre Temps", submenu=tyre_thresh_menu))
         thresholds_menu.add_item(MenuItem("Brake Temps", submenu=brake_thresh_menu))
         thresholds_menu.add_item(MenuItem("Pressures", submenu=pressure_thresh_menu))
         thresholds_menu.add_item(MenuItem("Boost Range", submenu=boost_thresh_menu))
+        thresholds_menu.add_item(MenuItem("Shift Light", submenu=shift_thresh_menu))
         thresholds_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
         self.thresholds_menu = thresholds_menu
 
@@ -1262,6 +1296,7 @@ class MenuSystem(
         brake_thresh_menu.parent = thresholds_menu
         pressure_thresh_menu.parent = thresholds_menu
         boost_thresh_menu.parent = thresholds_menu
+        shift_thresh_menu.parent = thresholds_menu
 
         # System submenus
         bt_menu.parent = system_menu

@@ -24,8 +24,22 @@ from config import (
     FUEL_CRITICAL_THRESHOLD_PERCENT,
     FUEL_SMOOTHING_SAMPLES,
     FUEL_LAP_HISTORY_COUNT,
+    FUEL_USE_MEDIAN_FILTER,
+    FUEL_MIN_DISTANCE_FOR_ESTIMATE_KM,
 )
 from utils.settings import get_settings
+
+
+def _median(values):
+    """Calculate median of a list of values."""
+    if not values:
+        return None
+    sorted_values = sorted(values)
+    n = len(sorted_values)
+    mid = n // 2
+    if n % 2 == 0:
+        return (sorted_values[mid - 1] + sorted_values[mid]) / 2
+    return sorted_values[mid]
 
 
 class FuelTracker:
@@ -140,8 +154,13 @@ class FuelTracker:
             # Add to smoothing history
             self._fuel_level_history.append(fuel_level_percent)
 
-            # Calculate smoothed fuel level
-            self._fuel_level_percent = sum(self._fuel_level_history) / len(self._fuel_level_history)
+            # Calculate smoothed fuel level using median or average
+            if FUEL_USE_MEDIAN_FILTER:
+                # Median filter is better at rejecting outliers from fuel slosh
+                self._fuel_level_percent = _median(list(self._fuel_level_history))
+            else:
+                # Simple moving average
+                self._fuel_level_percent = sum(self._fuel_level_history) / len(self._fuel_level_history)
 
             # Track session start
             if self._session_start_fuel_percent is None:
@@ -357,6 +376,10 @@ class FuelTracker:
 
     def get_estimated_range_km(self) -> Optional[float]:
         """Get estimated remaining range in km based on consumption rate."""
+        # Require minimum distance driven for reliable estimate
+        if self._session_distance_km < FUEL_MIN_DISTANCE_FOR_ESTIMATE_KM:
+            return None
+
         consumption_per_100km = self.get_consumption_per_100km()
         fuel_remaining = self.get_fuel_level_litres()
 
