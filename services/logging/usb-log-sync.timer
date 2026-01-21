@@ -4,10 +4,11 @@ Description=Periodic USB log sync for openTPT
 ConditionPathIsMountPoint=/mnt/usb
 
 [Timer]
-# Sync every 30 minutes
-OnBootSec=5min
-OnUnitActiveSec=30min
+# Sync every 30 seconds for near real-time logging
+OnBootSec=30s
+OnUnitActiveSec=30s
 Unit=usb-log-sync-periodic.service
+AccuracySec=5s
 
 [Install]
 WantedBy=timers.target

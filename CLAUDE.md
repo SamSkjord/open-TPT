@@ -411,6 +411,25 @@ cat ~/.opentpt/patch.log
 sudo journalctl -u usb-patch.service
 ```
 
+### USB Log Sync (v0.19.7)
+- Exports openTPT service logs to USB drive for offline review
+- Daily log files: `/mnt/usb/logs/opentpt_YYYYMMDD.log`
+- Incremental sync every 30 seconds (only new entries appended)
+- Full sync on shutdown/reboot
+- Keeps last 7 days of logs
+
+**Enabling:**
+```bash
+sudo systemctl enable usb-log-sync.service   # Shutdown sync
+sudo systemctl enable usb-log-sync.timer     # 30s incremental sync
+```
+
+**Checking status:**
+```bash
+sudo systemctl status usb-log-sync.timer
+ls -la /mnt/usb/logs/
+```
+
 ### Pit Timer (v0.19)
 - VBOX-style pit lane timer with GPS-based entry/exit detection
 - Two timing modes: Entrance-to-Exit (total pit time) vs Stationary-only (box time)

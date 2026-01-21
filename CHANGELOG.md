@@ -63,12 +63,12 @@ First in-car test revealed several issues that are now fixed.
 - **Version number on splash screen** - Application version now displays in the top-right corner of the splash screen during boot. This allows visual confirmation that USB patches have been applied.
 
 - **USB log sync** - New service to export openTPT logs to USB drive for offline review:
-  - Automatic sync on shutdown (full logs since boot)
-  - Optional periodic sync every 30 minutes (recent logs only)
-  - Logs written to `/mnt/usb/logs/opentpt_TIMESTAMP.log`
-  - Keeps last 10 log files, auto-cleans older ones
-  - Enable with: `sudo systemctl enable usb-log-sync.service`
-  - Enable periodic: `sudo systemctl enable usb-log-sync.timer`
+  - Automatic full sync on shutdown/reboot
+  - Incremental sync every 30 seconds (only new log entries appended)
+  - Daily log files: `/mnt/usb/logs/opentpt_YYYYMMDD.log`
+  - Keeps last 7 days of logs, auto-cleans older ones
+  - Enable with: `sudo systemctl enable usb-log-sync.service` (shutdown sync)
+  - Enable periodic: `sudo systemctl enable usb-log-sync.timer` (30s incremental)
 
 #### New Configuration Constants
 

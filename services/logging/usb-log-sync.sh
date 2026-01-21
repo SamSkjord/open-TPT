@@ -2,66 +2,61 @@
 #
 # USB Log Sync Script for openTPT
 #
-# Exports recent openTPT service logs to a USB drive for easy offline review.
-# Logs are written to /mnt/usb/logs/ with timestamped filenames.
+# Exports openTPT service logs to a USB drive for easy offline review.
+# Appends new log entries to a daily file to build complete history.
 #
 # Usage:
 #   usb-log-sync.sh [--full]
 #
 # Options:
-#   --full    Export all logs since boot (not just last 2 hours)
+#   --full    Export all logs since boot (for shutdown sync)
 #
 
 set -euo pipefail
 
 USB_MOUNT="/mnt/usb"
 LOG_DIR="$USB_MOUNT/logs"
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-LOG_FILE="$LOG_DIR/opentpt_${TIMESTAMP}.log"
+DATE=$(date +%Y%m%d)
+LOG_FILE="$LOG_DIR/opentpt_${DATE}.log"
+CURSOR_FILE="$LOG_DIR/.last_cursor"
 
 # Check if USB is mounted
 if ! mountpoint -q "$USB_MOUNT" 2>/dev/null; then
-    echo "USB not mounted at $USB_MOUNT - skipping log sync"
-    exit 0
+    exit 0  # Silent exit if USB not mounted
 fi
 
 # Create log directory if needed
 mkdir -p "$LOG_DIR"
 
-# Determine time range
+# Determine export mode
 if [[ "${1:-}" == "--full" ]]; then
-    TIME_ARGS="--boot"
-    echo "Exporting all logs since boot..."
+    # Full export on shutdown - get everything since boot
+    {
+        echo ""
+        echo "======== Log sync: $(date) (full) ========"
+        journalctl -u openTPT.service --boot --no-pager 2>/dev/null || true
+    } >> "$LOG_FILE"
 else
-    TIME_ARGS="--since=-2h"
-    echo "Exporting last 2 hours of logs..."
+    # Incremental export - only new entries since last sync
+    if [[ -f "$CURSOR_FILE" ]]; then
+        CURSOR=$(cat "$CURSOR_FILE")
+        {
+            journalctl -u openTPT.service --after-cursor="$CURSOR" --no-pager 2>/dev/null || true
+        } >> "$LOG_FILE"
+    else
+        # First run - get last 5 minutes
+        {
+            echo "======== Log sync started: $(date) ========"
+            journalctl -u openTPT.service --since=-5min --no-pager 2>/dev/null || true
+        } >> "$LOG_FILE"
+    fi
+
+    # Save cursor for next incremental sync
+    journalctl -u openTPT.service --show-cursor -n 0 2>/dev/null | grep -oP '(?<=-- cursor: ).*' > "$CURSOR_FILE" || true
 fi
-
-# Export openTPT service logs
-echo "Writing logs to $LOG_FILE"
-journalctl -u openTPT.service $TIME_ARGS --no-pager > "$LOG_FILE" 2>/dev/null || true
-
-# Also export related services for context
-{
-    echo ""
-    echo "======== CAN Setup Service ========"
-    journalctl -u can-setup.service $TIME_ARGS --no-pager 2>/dev/null || true
-
-    echo ""
-    echo "======== GPS Config Service ========"
-    journalctl -u gps-config.service $TIME_ARGS --no-pager 2>/dev/null || true
-
-    echo ""
-    echo "======== USB Patch Service ========"
-    journalctl -u usb-patch.service $TIME_ARGS --no-pager 2>/dev/null || true
-} >> "$LOG_FILE"
 
 # Sync to ensure writes complete
 sync
 
-# Clean up old logs (keep last 10)
-cd "$LOG_DIR"
-ls -t opentpt_*.log 2>/dev/null | tail -n +11 | xargs -r rm -f
-
-LOG_SIZE=$(du -h "$LOG_FILE" | cut -f1)
-echo "Log sync complete: $LOG_FILE ($LOG_SIZE)"
+# Clean up old daily logs (keep last 7 days)
+find "$LOG_DIR" -name "opentpt_*.log" -mtime +7 -delete 2>/dev/null || true
