@@ -610,6 +610,7 @@ openTPT/
 - [ ] LTR-559 Auto brightness - ambient light sensor for automatic display brightness (enable/disable + offset settings)
 - [x] Mini OLED display - secondary display for delta time and fuel data (OLED Bonnet)
 - [ ] I2C bus reorganisation - main bus for IO, mux ch0 for external display/IO, ch1-4 for corners, ch5 for engine sensors, ch6 reserved (pedal sensors etc)
+- [ ] Migrate corner sensors to CAN bus - I2C over long runs is fragile (PCA9615 failures from hot-plugging, EMI sensitivity); CAN is more robust for automotive environments
 
 ### Software TODO
 - [x] Bluetooth audio menu - scan, pair, connect, disconnect, forget (requires PulseAudio)
