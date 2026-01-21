@@ -1,5 +1,44 @@
 # Changelog - openTPT
 
+## [v0.19.6] - 2026-01-21
+
+### Config Scaffolding for CAN Corner Sensors
+
+Added configuration foundation for future CAN-based corner sensors. The `can_b2_0` channel (previously allocated to Ford Hybrid, which uses HS-CAN via OBD2) is now designated for corner sensor CAN bus.
+
+#### New Configuration Constants
+
+| Constant | Default | Purpose |
+|----------|---------|---------|
+| `CORNER_SENSOR_CAN_ENABLED` | `False` | Master enable for CAN corner sensors |
+| `CORNER_SENSOR_CAN_CHANNEL` | `can_b2_0` | CAN interface (Board 2, CAN_0) |
+| `CORNER_SENSOR_CAN_BITRATE` | `500000` | Standard 500 kbps |
+| `CORNER_SENSOR_CAN_IDS` | `0x100-0x103` | Tyre temp message IDs (FL/FR/RL/RR) |
+| `CORNER_SENSOR_CAN_BRAKE_IDS` | `0x110-0x113` | Brake temp message IDs |
+| `CORNER_SENSOR_CAN_TIMEOUT_S` | `0.5` | Stale data timeout |
+
+#### CAN Message Format (8 bytes)
+
+**Tyre temps (0x100-0x103):**
+- Bytes 0-1: Left temp (int16, tenths C, big-endian)
+- Bytes 2-3: Centre temp (int16, tenths C, big-endian)
+- Bytes 4-5: Right temp (int16, tenths C, big-endian)
+- Byte 6: Confidence (0-100%)
+- Byte 7: Flags (bit 0: tyre detected)
+
+**Brake temps (0x110-0x113):**
+- Bytes 0-1: Inner temp (int16, tenths C, big-endian)
+- Bytes 2-3: Outer temp (int16, tenths C, big-endian)
+- Bytes 4-7: Reserved
+
+#### Modified Files
+
+- `config.py` - New CORNER_SENSOR_CAN_* section, updated section list
+- `hardware/unified_corner_handler.py` - Added TODO for CAN implementation
+- `CLAUDE.md` - Updated CAN bus section reference
+
+---
+
 ## [v0.19.5] - 2026-01-21
 
 ### Bug Fixes

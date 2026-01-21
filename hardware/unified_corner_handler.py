@@ -2,6 +2,10 @@
 Unified Corner Sensor Handler for openTPT.
 Reads all sensors per mux channel in one pass to eliminate I2C bus contention.
 Supports multiple sensor types for both tyres and brakes.
+
+TODO: Add CAN bus support as alternative to I2C (see CORNER_SENSOR_CAN_* in config.py)
+      When CORNER_SENSOR_CAN_ENABLED is True, read from can_b2_0 instead of I2C mux.
+      CAN message format defined in config.py (0x100-0x103 for tyres, 0x110-0x113 for brakes).
 """
 
 import logging

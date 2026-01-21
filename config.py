@@ -9,7 +9,7 @@ Organised into logical sections:
 4. Hardware - Sensors (tyre, brake, TPMS, IMU)
 5. Hardware - Cameras (resolution, devices, transforms)
 6. Hardware - Input Devices (NeoKey, encoder, NeoDriver, OLED)
-7. Hardware - CAN Bus (OBD2, Ford Hybrid, Radar)
+7. Hardware - CAN Bus (OBD2, Corner Sensors CAN, Radar)
 8. Hardware - GPS (serial, timeouts)
 9. Features - Lap Timing (tracks, corners, sectors)
 10. Features - Fuel Tracking (tank, thresholds)
@@ -681,23 +681,51 @@ OBD_RPM_SMOOTHING_SAMPLES = 3  # Samples for RPM smoothing
 OBD_THROTTLE_SMOOTHING_SAMPLES = 2  # Samples for throttle smoothing
 
 # ==============================================================================
-# FORD HYBRID (Battery State of Charge)
+# CORNER SENSORS CAN (Future: Tyre/Brake temps via CAN bus)
 # ==============================================================================
 
-# Enable/disable Ford Hybrid battery monitoring
-FORD_HYBRID_ENABLED = (
-    False  # Set to True to enable Ford hybrid SOC and power monitoring
-)
+# Enable/disable CAN-based corner sensors
+# When enabled, corner sensor data is read from CAN instead of I2C
+# Requires Pico firmware with CAN support (MCP2515 or similar)
+CORNER_SENSOR_CAN_ENABLED = False  # Set to True when CAN sensors are ready
 
-# Ford Hybrid CAN configuration
+# Corner sensor CAN configuration
 # Available interfaces: can_b1_0, can_b1_1, can_b2_0, can_b2_1
-# Ford Hybrid module is on can_b2_0 (Board 2, CAN_0 connector)
-FORD_HYBRID_CHANNEL = "can_b2_0"  # CAN channel for Ford hybrid data
-FORD_HYBRID_BITRATE = 500000  # Standard CAN bitrate (500 kbps)
+# Corner sensors use Board 2, CAN_0 connector (can_b2_0)
+# This channel was previously allocated to Ford Hybrid (now on HS-CAN via OBD2)
+CORNER_SENSOR_CAN_CHANNEL = "can_b2_0"
+CORNER_SENSOR_CAN_BITRATE = 500000  # Standard CAN bitrate (500 kbps)
 
-# Ford Hybrid polling and timing
-FORD_HYBRID_POLL_INTERVAL_S = 0.5  # Seconds between Ford Hybrid queries (2 Hz)
-FORD_HYBRID_SEND_TIMEOUT_S = 0.1  # Timeout for CAN message sends (seconds)
+# CAN message IDs for each corner (standard 11-bit IDs)
+# Each corner sends one message containing tyre temperature data
+# Message format (8 bytes):
+#   Bytes 0-1: Left temp (int16, tenths of degrees C, big-endian)
+#   Bytes 2-3: Centre temp (int16, tenths of degrees C, big-endian)
+#   Bytes 4-5: Right temp (int16, tenths of degrees C, big-endian)
+#   Byte 6: Confidence (0-100%)
+#   Byte 7: Flags (bit 0: tyre detected, bits 1-7: reserved)
+CORNER_SENSOR_CAN_IDS = {
+    "FL": 0x100,  # Front Left
+    "FR": 0x101,  # Front Right
+    "RL": 0x102,  # Rear Left
+    "RR": 0x103,  # Rear Right
+}
+
+# Optional: Brake temperature message IDs (separate messages)
+# Message format (8 bytes):
+#   Bytes 0-1: Inner temp (int16, tenths of degrees C, big-endian)
+#   Bytes 2-3: Outer temp (int16, tenths of degrees C, big-endian)
+#   Bytes 4-7: Reserved
+CORNER_SENSOR_CAN_BRAKE_IDS = {
+    "FL": 0x110,  # Front Left brake
+    "FR": 0x111,  # Front Right brake
+    "RL": 0x112,  # Rear Left brake
+    "RR": 0x113,  # Rear Right brake
+}
+
+# Corner sensor CAN timing
+CORNER_SENSOR_CAN_TIMEOUT_S = 0.5  # Data considered stale after this time
+CORNER_SENSOR_CAN_NOTIFIER_TIMEOUT_S = 0.1  # CAN notifier timeout
 
 # ==============================================================================
 # RADAR (Toyota Radar Overlay)

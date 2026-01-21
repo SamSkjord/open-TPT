@@ -329,7 +329,7 @@ All settings in `config.py` (root level), organised into 12 sections:
 4. **Hardware - Sensors** - Tyre, brake, TPMS, IMU
 5. **Hardware - Cameras** - Resolution, devices, transforms
 6. **Hardware - Input** - NeoKey, encoder, NeoDriver, OLED
-7. **Hardware - CAN Bus** - OBD2, Ford Hybrid, Radar
+7. **Hardware - CAN Bus** - OBD2, Corner Sensors CAN, Radar
 8. **Hardware - GPS** - Serial, timeouts
 9. **Features - Lap Timing** - Tracks, corners, sectors
 10. **Features - Fuel** - Tank, thresholds
