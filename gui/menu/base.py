@@ -971,6 +971,55 @@ class MenuSystem(
                 action=lambda: self._toggle_oled_page_pit(),
             )
         )
+        oled_menu.add_item(
+            MenuItem(
+                "Speed Page",
+                dynamic_label=lambda: self._get_oled_page_speed_label(),
+                action=lambda: self._toggle_oled_page_speed(),
+            )
+        )
+        oled_menu.add_item(
+            MenuItem(
+                "Max Speed Page",
+                dynamic_label=lambda: self._get_oled_page_max_speed_label(),
+                action=lambda: self._toggle_oled_page_max_speed(),
+            )
+        )
+        oled_menu.add_item(
+            MenuItem(
+                "Lap Timing Page",
+                dynamic_label=lambda: self._get_oled_page_lap_timing_label(),
+                action=lambda: self._toggle_oled_page_lap_timing(),
+            )
+        )
+        oled_menu.add_item(
+            MenuItem(
+                "Lap Count Page",
+                dynamic_label=lambda: self._get_oled_page_lap_count_label(),
+                action=lambda: self._toggle_oled_page_lap_count(),
+            )
+        )
+        oled_menu.add_item(
+            MenuItem(
+                "Predictive Page",
+                dynamic_label=lambda: self._get_oled_page_predictive_label(),
+                action=lambda: self._toggle_oled_page_predictive(),
+            )
+        )
+        oled_menu.add_item(
+            MenuItem(
+                "Long. G Page",
+                dynamic_label=lambda: self._get_oled_page_longitudinal_g_label(),
+                action=lambda: self._toggle_oled_page_longitudinal_g(),
+            )
+        )
+        oled_menu.add_item(
+            MenuItem(
+                "Lateral G Page",
+                dynamic_label=lambda: self._get_oled_page_lateral_g_label(),
+                action=lambda: self._toggle_oled_page_lateral_g(),
+            )
+        )
         oled_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
         self.oled_menu = oled_menu
 
