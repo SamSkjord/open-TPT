@@ -14,11 +14,12 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
+from config import LAP_TIMING_DATA_DIR
+
 logger = logging.getLogger('openTPT.lap_timing')
 
 
-# Default data directory
-LAP_TIMING_DATA_DIR = os.path.expanduser("~/.opentpt/lap_timing")
+# Database file path (uses USB if available via config)
 DATABASE_FILE = os.path.join(LAP_TIMING_DATA_DIR, "lap_timing.db")
 
 

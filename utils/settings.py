@@ -3,8 +3,8 @@ Persistent settings manager for openTPT.
 Stores user preferences in a JSON file that persists across restarts.
 
 Settings file location:
-    Linux/Pi: ~/.opentpt_settings.json (typically /home/pi/.opentpt_settings.json)
-    macOS: ~/.opentpt_settings.json
+    USB mounted: /mnt/usb/.opentpt/settings.json (preferred for read-only rootfs)
+    Fallback: ~/.opentpt/settings.json
 
 If the settings file is corrupt (invalid JSON), it will be deleted and
 defaults will be used. A warning is logged on startup in this case.
@@ -16,10 +16,12 @@ import os
 import threading
 from typing import Any, Optional
 
+from config import DATA_DIR
+
 logger = logging.getLogger('openTPT.settings')
 
-# Default settings file location
-SETTINGS_FILE = os.path.expanduser("~/.opentpt_settings.json")
+# Settings file location (uses USB if available via DATA_DIR)
+SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
 
 
 class SettingsManager:

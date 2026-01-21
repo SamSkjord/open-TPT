@@ -29,10 +29,47 @@ logger = logging.getLogger("openTPT.config")
 # ==============================================================================
 # Update this when releasing new versions
 # Format: MAJOR.MINOR.PATCH (e.g., "0.19.0")
-APP_VERSION = "0.19.8"
+APP_VERSION = "0.19.9"
 
 # Project root for asset paths
 _PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+
+# ==============================================================================
+# DATA STORAGE (USB preferred for read-only rootfs robustness)
+# ==============================================================================
+# USB mount point for persistent data storage
+USB_MOUNT_PATH = "/mnt/usb"
+USB_DATA_DIR = os.path.join(USB_MOUNT_PATH, ".opentpt")
+
+# Local fallback (used if USB not mounted)
+LOCAL_DATA_DIR = os.path.expanduser("~/.opentpt")
+
+
+def _is_usb_mounted() -> bool:
+    """Check if USB drive is mounted at the expected path."""
+    return os.path.ismount(USB_MOUNT_PATH)
+
+
+def get_data_dir() -> str:
+    """
+    Get the base data directory for persistent storage.
+
+    Returns USB path if mounted, otherwise local fallback.
+    For read-only rootfs setups, USB should always be used.
+    """
+    if _is_usb_mounted():
+        return USB_DATA_DIR
+    return LOCAL_DATA_DIR
+
+
+def is_usb_storage_available() -> bool:
+    """Check if USB storage is available for persistent data."""
+    return _is_usb_mounted()
+
+
+# Resolve data directory at import time
+DATA_DIR = get_data_dir()
+USB_STORAGE_AVAILABLE = is_usb_storage_available()
 
 
 # ##############################################################################
@@ -823,8 +860,8 @@ TRACK_SEARCH_RADIUS_KM = 10.0  # Search radius for nearby tracks (kilometres)
 # Delta bar display range
 DELTA_BAR_RANGE = 10.0  # Maximum delta to display (seconds, +/-)
 
-# Lap timing data directory
-LAP_TIMING_DATA_DIR = os.path.expanduser("~/.opentpt/lap_timing")
+# Lap timing data directory (uses USB if available)
+LAP_TIMING_DATA_DIR = os.path.join(DATA_DIR, "lap_timing")
 
 # Track database paths (relative to LAP_TIMING_DATA_DIR)
 LAP_TIMING_TRACKS_DIR = os.path.join(LAP_TIMING_DATA_DIR, "tracks")
@@ -903,10 +940,11 @@ COPILOT_ENABLED = True  # Set to False to disable CoPilot
 
 # Map data directory (SQLite .roads.db files)
 # Download regional PBF files from Geofabrik and convert to .roads.db
-COPILOT_MAP_DIR = os.path.expanduser("~/.opentpt/copilot/maps")
+# Note: Maps are large (6+ GB) so always on USB, not affected by DATA_DIR
+COPILOT_MAP_DIR = os.path.join(USB_MOUNT_PATH, ".opentpt/copilot/maps")
 
-# Cache directory for CoPilot data
-COPILOT_CACHE_DIR = os.path.expanduser("~/.opentpt/copilot/cache")
+# Cache directory for CoPilot data (uses USB if available)
+COPILOT_CACHE_DIR = os.path.join(DATA_DIR, "copilot/cache")
 
 # ==============================================================================
 # COPILOT - LOOKAHEAD & ROAD FETCHING
@@ -1059,8 +1097,8 @@ PIT_STATIONARY_DURATION_S = 1.0  # Seconds below threshold to trigger stationary
 # Minimum stop time (countdown target)
 PIT_MIN_STOP_TIME_DEFAULT_S = 0.0  # No minimum by default (user-configurable)
 
-# Data storage directory
-PIT_TIMER_DATA_DIR = os.path.expanduser("~/.opentpt/pit_timer")
+# Data storage directory (uses USB if available)
+PIT_TIMER_DATA_DIR = os.path.join(DATA_DIR, "pit_timer")
 
 
 # ##############################################################################

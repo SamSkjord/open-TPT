@@ -12,6 +12,8 @@ import pygame
 
 from config import (
     APP_VERSION,
+    USB_STORAGE_AVAILABLE,
+    DATA_DIR,
     DISPLAY_WIDTH,
     DISPLAY_HEIGHT,
     FONT_PATH,
@@ -167,6 +169,17 @@ class InitializationMixin:
         version_rect = version_surface.get_rect(topright=(DISPLAY_WIDTH - 15, 10))
         self.screen.blit(version_surface, version_rect)
 
+        # Draw USB storage warning if not available
+        if not USB_STORAGE_AVAILABLE:
+            try:
+                warn_font = pygame.font.Font(FONT_PATH, 16)
+            except (pygame.error, FileNotFoundError, IOError, OSError):
+                warn_font = pygame.font.Font(None, 16)
+            warn_text = "NO USB - Settings will not persist"
+            warn_surface = warn_font.render(warn_text, True, (255, 180, 0))
+            warn_rect = warn_surface.get_rect(topright=(DISPLAY_WIDTH - 15, 32))
+            self.screen.blit(warn_surface, warn_rect)
+
         # Draw status text
         try:
             font = pygame.font.Font(FONT_PATH, 24)
@@ -223,6 +236,13 @@ class InitializationMixin:
         if _boot_start is None:
             _boot_start = time.time()
             logger.warning("Boot start time not set, using current time")
+
+        # Log storage location
+        if USB_STORAGE_AVAILABLE:
+            logger.info("Data storage: USB (%s)", DATA_DIR)
+        else:
+            logger.warning("USB not mounted - using local storage (%s)", DATA_DIR)
+            logger.warning("Settings and lap times will not persist on read-only rootfs")
 
         # Import optional handlers
         try:

@@ -1,5 +1,37 @@
 # Changelog - openTPT
 
+## [v0.19.9] - 2026-01-21
+
+### USB-Based Persistent Storage
+
+All persistent data now stored on USB drive for read-only rootfs robustness. Protects against SD card corruption from random power loss.
+
+#### Storage Locations
+
+| Data | USB Path |
+|------|----------|
+| Settings | `/mnt/usb/.opentpt/settings.json` |
+| Lap times | `/mnt/usb/.opentpt/lap_timing/lap_timing.db` |
+| Pit waypoints | `/mnt/usb/.opentpt/pit_timer/pit_waypoints.db` |
+| CoPilot cache | `/mnt/usb/.opentpt/copilot/cache/` |
+| CoPilot maps | `/mnt/usb/.opentpt/copilot/maps/` (always USB) |
+
+#### Startup Warning
+
+If USB is not mounted at boot:
+- Yellow warning on splash: "NO USB - Settings will not persist"
+- Log warning with fallback path
+- Falls back to `~/.opentpt/` (won't persist on read-only rootfs)
+
+#### Modified Files
+
+- `config.py` - Added USB_MOUNT_PATH, DATA_DIR, get_data_dir(), is_usb_storage_available()
+- `core/initialization.py` - USB warning on splash, storage location logging
+- `utils/settings.py` - Uses DATA_DIR from config
+- `utils/lap_timing_store.py` - Uses LAP_TIMING_DATA_DIR from config
+
+---
+
 ## [v0.19.8] - 2026-01-21
 
 ### OLED Fuel Display: Range When No Track
