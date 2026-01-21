@@ -24,6 +24,8 @@ from config import (
     LAP_TIMING_CORNER_MIN_CUT_DISTANCE_M,
     LAP_TIMING_CORNER_STRAIGHT_FILL_M,
     LAP_TIMING_CORNER_MERGE_CHICANES,
+    ensure_tracks_available,
+    DATA_DIR,
 )
 from utils.settings import get_settings
 from utils.lap_timing_store import get_lap_timing_store, LapRecord
@@ -133,6 +135,9 @@ class LapTimingHandler(BoundedQueueHardwareHandler):
             return
 
         try:
+            # Ensure tracks are available (copies bundled tracks to data dir if needed)
+            ensure_tracks_available(DATA_DIR)
+
             # Initialise track selector for auto-detection
             tracks_dir = os.path.join(LAP_TIMING_DATA_DIR, "tracks")
             tracks_db_path = os.path.join(tracks_dir, "tracks.db")

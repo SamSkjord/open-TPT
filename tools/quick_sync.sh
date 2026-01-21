@@ -21,7 +21,7 @@ rsync -avz --progress --delete \
     --exclude='.venv/' \
     --exclude='.claude/' \
     --exclude='*.webp' \
-    --exclude='assets/tracks/' \
+    --exclude='usb_data/' \
     ./ "${PI_HOST}:${REMOTE_PATH}/"
 
 echo ""

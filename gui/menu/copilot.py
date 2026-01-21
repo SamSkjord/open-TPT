@@ -6,6 +6,8 @@ import logging
 import threading
 from pathlib import Path
 
+from config import COPILOT_ROUTES_DIR
+
 logger = logging.getLogger('openTPT.menu.copilot')
 
 
@@ -174,8 +176,8 @@ class CoPilotMenuMixin:
                     )
                 )
 
-        # Scan for GPX files in routes directory
-        routes_dir = Path.home() / ".opentpt" / "copilot" / "routes"
+        # Scan for GPX files in routes directory (uses USB if available)
+        routes_dir = Path(COPILOT_ROUTES_DIR)
 
         if routes_dir.exists():
             gpx_files = sorted(routes_dir.glob("*.gpx"))

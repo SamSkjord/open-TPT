@@ -29,10 +29,17 @@ logger = logging.getLogger("openTPT.config")
 # ==============================================================================
 # Update this when releasing new versions
 # Format: MAJOR.MINOR.PATCH (e.g., "0.19.0")
-APP_VERSION = "0.19.9"
+APP_VERSION = "0.19.10"
 
 # Project root for asset paths
 _PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+
+# Bundled assets directory (read-only, shipped with application)
+BUNDLED_ASSETS_DIR = os.path.join(_PROJECT_ROOT, "assets")
+
+# USB data template (for setting up new USB drives)
+USB_DATA_TEMPLATE_DIR = os.path.join(_PROJECT_ROOT, "usb_data", ".opentpt")
+BUNDLED_TRACKS_DIR = os.path.join(USB_DATA_TEMPLATE_DIR, "lap_timing", "tracks")
 
 # ==============================================================================
 # DATA STORAGE (USB preferred for read-only rootfs robustness)
@@ -65,6 +72,83 @@ def get_data_dir() -> str:
 def is_usb_storage_available() -> bool:
     """Check if USB storage is available for persistent data."""
     return _is_usb_mounted()
+
+
+def ensure_tracks_available(data_dir: str) -> bool:
+    """
+    Ensure track data is available in the data directory.
+
+    Copies bundled tracks to the data directory if they don't exist.
+    This allows read-only rootfs installations to have tracks on USB.
+
+    Args:
+        data_dir: The data directory to check/populate
+
+    Returns:
+        True if tracks are available (either existed or were copied)
+    """
+    import shutil
+
+    tracks_dir = os.path.join(data_dir, "lap_timing", "tracks")
+    tracks_db = os.path.join(tracks_dir, "tracks.db")
+    racelogic_db = os.path.join(tracks_dir, "racelogic.db")
+
+    # Check if tracks already exist
+    if os.path.exists(tracks_db) and os.path.exists(racelogic_db):
+        return True
+
+    # Check if bundled tracks exist
+    if not os.path.exists(BUNDLED_TRACKS_DIR):
+        logger.warning("No bundled tracks found at %s", BUNDLED_TRACKS_DIR)
+        return False
+
+    bundled_tracks_db = os.path.join(BUNDLED_TRACKS_DIR, "tracks.db")
+    bundled_racelogic_db = os.path.join(BUNDLED_TRACKS_DIR, "racelogic.db")
+
+    if not os.path.exists(bundled_tracks_db):
+        logger.warning("Bundled tracks.db not found")
+        return False
+
+    # Create tracks directory
+    try:
+        os.makedirs(tracks_dir, exist_ok=True)
+    except Exception as e:
+        logger.error("Could not create tracks directory: %s", e)
+        return False
+
+    # Copy bundled tracks to data directory
+    try:
+        logger.info("Copying bundled tracks to %s", tracks_dir)
+
+        # Copy databases
+        if not os.path.exists(tracks_db) and os.path.exists(bundled_tracks_db):
+            shutil.copy2(bundled_tracks_db, tracks_db)
+            logger.info("Copied tracks.db")
+
+        if not os.path.exists(racelogic_db) and os.path.exists(bundled_racelogic_db):
+            shutil.copy2(bundled_racelogic_db, racelogic_db)
+            logger.info("Copied racelogic.db")
+
+        # Copy maps directory (custom tracks)
+        bundled_maps = os.path.join(BUNDLED_TRACKS_DIR, "maps")
+        maps_dir = os.path.join(tracks_dir, "maps")
+        if not os.path.exists(maps_dir) and os.path.exists(bundled_maps):
+            shutil.copytree(bundled_maps, maps_dir)
+            logger.info("Copied custom tracks (maps/)")
+
+        # Copy racelogic directory (KMZ files)
+        bundled_racelogic = os.path.join(BUNDLED_TRACKS_DIR, "racelogic")
+        racelogic_dir = os.path.join(tracks_dir, "racelogic")
+        if not os.path.exists(racelogic_dir) and os.path.exists(bundled_racelogic):
+            shutil.copytree(bundled_racelogic, racelogic_dir)
+            logger.info("Copied racelogic tracks")
+
+        logger.info("Track data copied successfully")
+        return True
+
+    except Exception as e:
+        logger.error("Error copying bundled tracks: %s", e)
+        return False
 
 
 # Resolve data directory at import time
@@ -870,6 +954,9 @@ LAP_TIMING_RACELOGIC_DB = os.path.join(LAP_TIMING_TRACKS_DIR, "racelogic.db")
 LAP_TIMING_CUSTOM_TRACKS_DIR = os.path.join(LAP_TIMING_TRACKS_DIR, "maps")
 LAP_TIMING_RACELOGIC_TRACKS_DIR = os.path.join(LAP_TIMING_TRACKS_DIR, "racelogic")
 
+# Routes directory for GPX/KMZ files (uses USB if available)
+LAP_TIMING_ROUTES_DIR = os.path.join(DATA_DIR, "routes")
+
 # Sector configuration
 LAP_TIMING_SECTOR_COUNT = 3  # Number of sectors per lap
 
@@ -942,6 +1029,9 @@ COPILOT_ENABLED = True  # Set to False to disable CoPilot
 # Download regional PBF files from Geofabrik and convert to .roads.db
 # Note: Maps are large (6+ GB) so always on USB, not affected by DATA_DIR
 COPILOT_MAP_DIR = os.path.join(USB_MOUNT_PATH, ".opentpt/copilot/maps")
+
+# Routes directory for GPX files (uses USB if available)
+COPILOT_ROUTES_DIR = os.path.join(DATA_DIR, "copilot/routes")
 
 # Cache directory for CoPilot data (uses USB if available)
 COPILOT_CACHE_DIR = os.path.join(DATA_DIR, "copilot/cache")

@@ -425,22 +425,23 @@ CoPilot provides rally-style audio callouts for upcoming corners, junctions, bri
 **Map Data Setup:**
 
 1. Download a pre-processed roads database or create one from OSM PBF data
-2. Place the `.roads.db` file in the maps directory:
+2. Place the `.roads.db` file on the USB drive:
    ```bash
-   mkdir -p ~/.opentpt/copilot/maps
-   # Copy or symlink your roads.db file
-   ln -s /mnt/usb/britain-and-ireland.roads.db ~/.opentpt/copilot/maps/
+   mkdir -p /mnt/usb/.opentpt/copilot/maps
+   cp britain-and-ireland.roads.db /mnt/usb/.opentpt/copilot/maps/
    ```
 
 **Route Files:**
 
-Place GPX or KMZ route files in `~/.opentpt/routes/` for loading via the menu.
+Place GPX or KMZ route files on the USB drive:
+- Lap timing routes: `/mnt/usb/.opentpt/routes/`
+- CoPilot routes: `/mnt/usb/.opentpt/copilot/routes/`
 
 **Configuration in `config.py`:**
 
 ```python
 COPILOT_ENABLED = True              # Enable/disable CoPilot
-COPILOT_MAP_DIR = "~/.opentpt/copilot/maps"  # Path to roads.db files
+COPILOT_MAP_DIR = "/mnt/usb/.opentpt/copilot/maps"  # Path to roads.db files
 COPILOT_LOOKAHEAD_M = 1000          # Corner detection distance (metres)
 COPILOT_AUDIO_ENABLED = True        # Enable audio callouts
 COPILOT_OVERLAY_ENABLED = True      # Show corner indicator on all pages
@@ -560,6 +561,11 @@ openTPT/
 │   ├── telemetry_recorder.py            # CSV telemetry recording
 │   ├── theme_loader.py                  # Map view theme loading
 │   └── performance.py                   # Performance monitoring
+├── usb_data/                            # USB drive data template
+│   └── .opentpt/                        # Copy to USB to set up new drive
+│       ├── lap_timing/tracks/           # Track databases + KMZ files
+│       ├── routes/                      # Lap timing GPX/KMZ routes
+│       └── copilot/routes/              # CoPilot GPX routes
 └── opendbc/                             # CAN message definitions (DBC files)
 ```
 

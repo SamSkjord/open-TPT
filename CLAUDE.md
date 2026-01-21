@@ -122,6 +122,12 @@ openTPT/
 │   └── copilot_handler.py           # CoPilot integration handler
 ├── assets/
 │   └── themes/                      # Map view colour themes (JSON)
+├── usb_data/                        # USB drive data template
+│   └── .opentpt/                    # Copy to USB root to set up new drive
+│       ├── lap_timing/tracks/       # Track databases and KMZ files
+│       ├── routes/                  # Lap timing GPX/KMZ routes
+│       ├── copilot/routes/          # CoPilot GPX routes
+│       └── pit_timer/               # Pit lane waypoints
 ├── utils/
 │   ├── settings.py                  # Persistent user settings
 │   ├── hardware_base.py             # Bounded queue base class
@@ -376,7 +382,8 @@ All settings in `config.py` (root level), organised into 12 sections:
 ### CoPilot Rally Callouts (v0.18.1)
 - OSM-based corner detection with audio callouts
 - Uses GPS heading for road path projection
-- Map data: `~/.opentpt/copilot/maps/*.roads.db` (symlinked to USB/NVMe)
+- Map data: `/mnt/usb/.opentpt/copilot/maps/*.roads.db` (always on USB)
+- Routes: `/mnt/usb/.opentpt/copilot/routes/*.gpx` (USB if available)
 - Audio: espeak-ng TTS or Janne Laahanen rally samples
 - Modes: Just Drive (follow current road), Route Follow (track/GPX)
 - Corner severity: ASC 1-6 scale (1=flat, 6=hairpin)
@@ -451,6 +458,44 @@ ls -la /mnt/usb/logs/
 - Prev (<): Mark entry line at current GPS position
 - Next (>): Mark exit line at current GPS position
 - Select: Toggle timing mode
+
+### USB Data Storage (v0.19.10)
+All persistent data uses USB storage when available for read-only rootfs robustness.
+On boot, if USB not mounted at `/mnt/usb`, a warning is shown on splash screen.
+
+**Directory Structure (USB at `/mnt/usb/.opentpt/`):**
+```
+.opentpt/
+├── settings.json           # User preferences
+├── lap_timing/
+│   ├── lap_timing.db       # Lap times database
+│   └── tracks/
+│       ├── tracks.db       # Track database (copied from bundled)
+│       ├── racelogic.db    # Racelogic database (copied from bundled)
+│       ├── maps/           # Custom track files
+│       └── racelogic/      # Racelogic KMZ files
+├── routes/                 # Lap timing GPX/KMZ files
+├── pit_timer/
+│   └── pit_waypoints.db    # Pit lane GPS waypoints
+├── copilot/
+│   ├── maps/               # OSM roads.db files (always USB, 6+ GB)
+│   ├── routes/             # CoPilot GPX route files
+│   └── cache/              # Road data cache
+└── logs/                   # Service logs (daily files)
+```
+
+**Setting Up a New USB Drive:**
+```bash
+cp -r usb_data/.opentpt /mnt/usb/
+```
+
+**Track Data:**
+- Template tracks in `usb_data/.opentpt/lap_timing/tracks/`
+- Auto-copied to USB on first run if missing
+- User tracks added to USB persist across app updates
+
+**Fallback:**
+If USB not available, falls back to `~/.opentpt/` on local filesystem.
 
 ---
 

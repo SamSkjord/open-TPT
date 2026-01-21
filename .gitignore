@@ -4,7 +4,10 @@
 /hardware/__pycache__
 /utils/__pycache__
 *.pyc
-/assets/tracks/racelogic
+
+# Racelogic data (copyrighted - obtain from racelogic.co.uk)
+/usb_data/.opentpt/lap_timing/tracks/racelogic.db
+/usb_data/.opentpt/lap_timing/tracks/racelogic/
 
 # Test coverage
 .coverage

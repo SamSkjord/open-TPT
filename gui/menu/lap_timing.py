@@ -5,6 +5,8 @@ Lap Timing menu mixin for openTPT.
 import logging
 from pathlib import Path
 
+from config import LAP_TIMING_ROUTES_DIR
+
 logger = logging.getLogger('openTPT.menu.lap_timing')
 
 
@@ -164,7 +166,7 @@ class LapTimingMenuMixin:
         # Build route file submenu dynamically
         route_menu = Menu("Load Route File")
 
-        routes_dir = Path.home() / ".opentpt" / "routes"
+        routes_dir = Path(LAP_TIMING_ROUTES_DIR)
 
         files_found = []
         if routes_dir.exists():
@@ -196,7 +198,7 @@ class LapTimingMenuMixin:
                 MenuItem("Add .gpx/.kmz to", enabled=False)
             )
             route_menu.add_item(
-                MenuItem("~/.opentpt/routes/", enabled=False)
+                MenuItem(f"{routes_dir}/", enabled=False)
             )
             # Try to create the directory
             try:

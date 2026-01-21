@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from utils.hardware_base import BoundedQueueHardwareHandler
+from config import COPILOT_MAP_DIR
 
 try:
     from copilot.gps import Position
@@ -144,8 +145,8 @@ class CoPilotHandler(BoundedQueueHardwareHandler):
 
         # Map loading
         if map_path is None:
-            # Default map path
-            map_path = Path.home() / ".opentpt" / "copilot" / "maps"
+            # Default map path (uses USB if available via config)
+            map_path = Path(COPILOT_MAP_DIR)
         self.map_path = Path(map_path)
         self._map_loader: Optional[MapLoader] = None
         self._network: Optional[RoadNetwork] = None

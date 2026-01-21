@@ -1,5 +1,52 @@
 # Changelog - openTPT
 
+## [v0.19.10] - 2026-01-21
+
+### USB Data Template Folder
+
+Created `usb_data/` folder containing the complete USB drive structure for easy setup of new drives.
+
+#### New Folder Structure
+
+```
+usb_data/
+├── README.md                    # Setup instructions
+└── .opentpt/
+    ├── lap_timing/tracks/       # Track databases + KMZ files (13MB)
+    │   ├── tracks.db
+    │   ├── racelogic.db
+    │   ├── maps/                # Custom tracks
+    │   └── racelogic/           # 75 racelogic tracks by country
+    ├── routes/                  # Lap timing GPX/KMZ files
+    ├── copilot/routes/          # CoPilot GPX routes
+    └── pit_timer/               # Pit lane waypoints
+```
+
+#### Key Changes
+
+- **Moved tracks** - Track data moved from `assets/tracks/` to `usb_data/.opentpt/lap_timing/tracks/`
+- **Auto-copy on first run** - `ensure_tracks_available()` copies template tracks to USB if missing
+- **Routes use USB** - GPX/KMZ route files for both lap timing and CoPilot stored on USB
+- **Excluded from sync** - `usb_data/` not synced to Pi (tracks live on USB only)
+
+#### Setting Up a New USB Drive
+
+```bash
+cp -r usb_data/.opentpt /mnt/usb/
+```
+
+#### Modified Files
+
+- `config.py` - Added `USB_DATA_TEMPLATE_DIR`, `BUNDLED_TRACKS_DIR`, `ensure_tracks_available()`, route dir constants
+- `hardware/lap_timing_handler.py` - Calls `ensure_tracks_available()` on init
+- `hardware/copilot_handler.py` - Uses `COPILOT_MAP_DIR` from config
+- `gui/menu/lap_timing.py` - Uses `LAP_TIMING_ROUTES_DIR`
+- `gui/menu/copilot.py` - Uses `COPILOT_ROUTES_DIR`
+- `tools/quick_sync.sh` - Excludes `usb_data/` from sync
+- `CLAUDE.md` - Added USB data storage section, updated directory structure
+
+---
+
 ## [v0.19.9] - 2026-01-21
 
 ### USB-Based Persistent Storage
