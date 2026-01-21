@@ -432,7 +432,7 @@ class OpenTPT(
             self.fuel_display.set_lap_timing_active(lap_timing_active)
 
         # Auto-switch to rear camera when reverse gear detected
-        if self.obd2:
+        if self.obd2 and self.camera:
             in_reverse = self.obd2.is_in_reverse()
             if in_reverse and not self._was_in_reverse:
                 # Just entered reverse - switch to rear camera

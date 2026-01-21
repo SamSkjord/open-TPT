@@ -1,5 +1,13 @@
 # Changelog - openTPT
 
+## [v0.19.5] - 2026-01-21
+
+### Bug Fixes
+
+- **Fix null check for camera in reverse-gear auto-switch** - Added guard to prevent `AttributeError` if camera handler failed to initialise when OBD2 detects reverse gear (`main.py:435`)
+
+---
+
 ## [v0.19.4] - 2026-01-20
 
 ### VBOX-Style OLED Pages
