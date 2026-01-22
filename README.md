@@ -418,6 +418,33 @@ When enabled, the radar overlay shows on the **rear camera only**:
 
 Chevrons are **3x larger (120×108px) and solid-filled** for high visibility.
 
+### Read-Only Root Filesystem (SD Card Protection)
+
+openTPT supports a read-only root filesystem to protect the SD card from corruption due to sudden power loss - critical for vehicle-mounted systems where the Pi may lose power when the ignition is turned off.
+
+**How it works:**
+- Uses the `overlayroot` package (standard on Debian)
+- Root filesystem is mounted read-only (protected)
+- All writes go to a RAM overlay (tmpfs)
+- User data persists on USB drive at `/mnt/usb/.opentpt/`
+
+**Enable read-only mode:**
+```bash
+sudo ./services/boot/setup-readonly.sh
+sudo reboot
+```
+
+**Disable for maintenance:**
+```bash
+sudo ./services/boot/disable-readonly.sh
+sudo reboot
+```
+
+**USB Patch Updates:**
+With read-only mode enabled, updates are applied via USB patch files. Place `opentpt-patch.tar.gz` on the USB root and reboot - the patch service automatically uses `overlayroot-chroot` to update the underlying filesystem.
+
+See `CLAUDE.md` for detailed documentation.
+
 ### CoPilot Configuration
 
 CoPilot provides rally-style audio callouts for upcoming corners, junctions, bridges, and hazards using OpenStreetMap road data and GPS position.
@@ -598,12 +625,15 @@ openTPT/
 - Config hot-reload via menu
 - CoPilot rally callouts (corners, junctions, hazards from OSM data)
 - Unified route system (GPX stages and KMZ circuit tracks)
+- Read-only root filesystem with overlayroot (SD card corruption protection)
+- USB-based persistent storage (settings, lap times, tracks survive rootfs changes)
+- USB patch deployment (offline updates with automatic overlay handling)
 
 ### Future Enhancements
 - CAN bus scheduler for multi-bus OBD-II data
 - Web-based remote monitoring
 - Additional radar compatibility (other manufacturers)
-- Buildroot image - minimal Linux for sub-5s boot, read-only root, tiny footprint
+- Buildroot image - minimal Linux for sub-5s boot, tiny footprint
 
 ### Might Get Round To It One Day
 - SDL2 hardware rendering - use opengles2 renderer instead of software blitting for GPU acceleration
