@@ -69,6 +69,7 @@ openTPT features a high-performance architecture optimised for real-time telemet
 | 15 | UART RX | UART | GPS PA1616S |
 | 16 | SPI1 CE2 | SPI | CAN HAT Board 1, CAN_1 |
 | 17 | SPI1 CE1 | SPI | CAN HAT Board 1, CAN_0 |
+| 18 | PPS | GPIO | GPS pulse-per-second for chrony time sync |
 | 19 | SPI1 MISO | SPI | CAN HAT Board 1 (I2S disabled) |
 | 20 | SPI1 MOSI | SPI | CAN HAT Board 1 |
 | 21 | SPI1 SCLK | SPI | CAN HAT Board 1 |
@@ -84,7 +85,6 @@ openTPT features a high-performance architecture optimised for real-time telemet
 | 4, 5 | **Free** | UART3 - preferred for TPMS |
 | 6 | Free | - |
 | 12 | Free | UART5 TX |
-| 18 | SPI1 CE0 (unused) | - |
 | 24 | Free | - |
 | 26, 27 | Free | - |
 
