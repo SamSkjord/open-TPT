@@ -669,6 +669,9 @@ openTPT/
 - [x] Track selection - for lap timing
 - [x] Config persistence - persistent settings via ~/.opentpt_settings.json
 - [x] Config hot-reload - reload settings from menu without restart
+- [x] Read-only rootfs - overlayroot-based SD card corruption protection
+- [x] USB persistent storage - settings, lap times, tracks on USB drive
+- [x] USB patch deployment - offline updates with automatic overlay handling
 - [ ] Configurable OBD2 PIDs - move to config.py with key, mode, pid, bytes, formula, priority, smoothing
 - [ ] Status bar configuration - choose which PIDs/data to display on status bars
 
