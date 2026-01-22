@@ -162,13 +162,6 @@ When using physical NeoKey 1x4 (board mounted upside down, so physical positions
 - Button 2: Page settings (context-sensitive: hide overlay, reset peaks, toggle map view, etc.)
 - Button 3: Toggle telemetry recording (hold 1 second to activate)
 
-Keyboard controls (for development):
-- Up arrow: Switch view mode (camera ↔ UI)
-- Down arrow or 'T' key: Page settings
-- Spacebar: Switch within category
-- Right arrow: Toggle telemetry recording
-- ESC: Exit application
-
 ## Configuration
 
 ### Display Configuration
