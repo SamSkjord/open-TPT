@@ -156,7 +156,7 @@ sudo python3 ./main.py --windowed
 
 ### Controls
 
-When using physical NeoKey 1x4 (board mounted upside down, so physical positions inverted):
+When using physical NeoKey 1x4 (board mounted upside down for LED orientation, so physical positions inverted):
 - Button 0: Switch view mode (camera pages ↔ UI pages)
 - Button 1: Switch within category (camera: rear↔front | UI: cycles through enabled pages)
 - Button 2: Page settings (context-sensitive: hide overlay, reset peaks, toggle map view, etc.)
