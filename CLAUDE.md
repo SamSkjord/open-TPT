@@ -236,7 +236,7 @@ sudo journalctl -u openTPT.service -f | grep -E "failures|error|backoff"
 | Issue | Solution |
 |-------|----------|
 | **IMU I/O errors** | Non-critical, auto-retries. Restart service if persistent |
-| **I2C bus lockup** | Auto mux reset on GPIO17 (v0.12+). Power cycle if severe |
+| **I2C bus lockup** | Mux reset not wired (GPIO17 conflicts with CAN HAT). Power cycle if severe |
 | **Heatmaps grey/offline** | Stale data cached 1s (v0.12+). Adjust `THERMAL_STALE_TIMEOUT` |
 | **6+ hour crashes** | Fixed v0.11+ (GC every 60s, surface clear every 10min) |
 | **Brake temps wrong** | Check `BRAKE_ROTOR_EMISSIVITY` in config.py (default 0.95) |

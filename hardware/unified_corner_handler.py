@@ -380,6 +380,10 @@ class UnifiedCornerHandler(BoundedQueueHardwareHandler):
 
     def _init_mux_reset(self):
         """Initialise GPIO for mux reset pin with internal pull-up."""
+        if I2C_MUX_RESET_PIN is None:
+            logger.info("Mux reset pin not configured - mux reset disabled")
+            return
+
         if not GPIO_AVAILABLE:
             logger.info("GPIO not available - mux reset disabled")
             return
