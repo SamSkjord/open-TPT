@@ -79,13 +79,13 @@ openTPT features a high-performance architecture optimised for real-time telemet
 
 **Available GPIOs:**
 
-| GPIO | Potential Use | UART Option |
-|------|---------------|-------------|
-| 0, 1 | Reserved (I2C0 HAT EEPROM) | UART2 - avoid |
-| 4, 5 | **Free** | UART3 - preferred for TPMS |
-| 6 | Free | - |
-| 12 | Free | UART5 TX |
-| 24 | Free | - |
+| GPIO | Potential Use | Notes |
+|------|---------------|-------|
+| 0, 1 | Reserved | I2C0 HAT EEPROM - avoid |
+| 4, 5 | **Free** | UART3 (/dev/ttyAMA3) - preferred for TPMS |
+| 6 | Free | Good for mux reset if wired |
+| 12 | Free | UART5 TX only (RX on GPIO13 used by CAN IRQ) |
+| 24 | Free | Good for mux reset if wired |
 | 26, 27 | Free | - |
 
 ## Software Requirements
