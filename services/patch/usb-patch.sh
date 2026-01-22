@@ -1,7 +1,7 @@
 #!/bin/bash
 # USB Patch Deployment Script for openTPT
 # Checks for patch archive on USB at boot and performs full replacement
-# Handles read-only rootfs by temporarily remounting as read-write
+# Handles read-only rootfs with overlayroot using overlayroot-chroot
 #
 # Full replacement ensures clean updates with no orphaned files from old versions.
 # User data (settings, lap times, tracks) is safe on USB at /mnt/usb/.opentpt/
@@ -11,7 +11,6 @@ USB_MOUNT="/mnt/usb"
 APP_DIR="/home/pi/open-TPT"
 PATCH_LOG="$USB_MOUNT/.opentpt/patch.log"  # Log to USB (rootfs may be read-only)
 PATCH_NAMES=("opentpt-patch.tar.gz" "opentpt-patch.zip")
-REMOUNTED_RW=false
 
 # Check USB mounted first (needed for logging)
 if ! mountpoint -q "$USB_MOUNT"; then
@@ -27,32 +26,9 @@ log() {
     echo "$msg" >> "$PATCH_LOG"
 }
 
-cleanup() {
-    # Remount rootfs as read-only if we changed it
-    if [[ "$REMOUNTED_RW" == true ]]; then
-        log "Remounting rootfs as read-only"
-        mount -o remount,ro / 2>/dev/null || log "WARNING: Failed to remount rootfs read-only"
-    fi
-}
-trap cleanup EXIT
-
-is_rootfs_readonly() {
-    # Check if root filesystem is mounted read-only
-    grep -q ' / .*\bro\b' /proc/mounts
-}
-
-remount_rw_if_needed() {
-    if is_rootfs_readonly; then
-        log "Rootfs is read-only, remounting as read-write"
-        if mount -o remount,rw /; then
-            REMOUNTED_RW=true
-            log "Rootfs remounted read-write"
-        else
-            log "ERROR: Failed to remount rootfs read-write"
-            return 1
-        fi
-    fi
-    return 0
+is_overlayroot_active() {
+    # Check if overlayroot overlay is active (/ mounted as overlay)
+    grep -q ' / overlay' /proc/mounts 2>/dev/null
 }
 
 # Find patch archive
@@ -65,9 +41,6 @@ done
 
 log "Found patch: $PATCH_FILE"
 
-# Remount filesystem read-write if needed
-remount_rw_if_needed || exit 0
-
 # Verify archive before making changes
 log "Verifying archive integrity..."
 if [[ "$PATCH_FILE" == *.tar.gz ]]; then
@@ -77,26 +50,71 @@ elif [[ "$PATCH_FILE" == *.zip ]]; then
 fi
 log "Archive verified OK"
 
-# Full replacement: delete existing and extract fresh
-# User data is safe on USB at /mnt/usb/.opentpt/
-log "Removing existing installation..."
+# Determine extraction method based on overlay status
+if is_overlayroot_active; then
+    log "Overlayroot active - using overlayroot-chroot to patch underlying filesystem"
+
+    # Copy patch file to a location accessible within chroot
+    # USB mount may not be visible inside chroot, so copy to /tmp (which is overlay)
+    cp "$PATCH_FILE" /tmp/opentpt-patch-temp
+
+    # Create extraction script to run inside chroot
+    cat > /tmp/apply-patch.sh << 'PATCHSCRIPT'
+#!/bin/bash
+set -e
+APP_DIR="/home/pi/open-TPT"
+PATCH_FILE="/tmp/opentpt-patch-temp"
+
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR"
 cd "$APP_DIR"
 
-log "Extracting new version..."
-if [[ "$PATCH_FILE" == *.tar.gz ]]; then
+if [[ "$PATCH_FILE" == *.tar.gz ]] || file "$PATCH_FILE" | grep -q gzip; then
     tar -xzf "$PATCH_FILE"
-    log "Extracted $(tar -tzf "$PATCH_FILE" | wc -l) files"
-elif [[ "$PATCH_FILE" == *.zip ]]; then
+elif [[ "$PATCH_FILE" == *.zip ]] || file "$PATCH_FILE" | grep -q Zip; then
     unzip -q "$PATCH_FILE"
-    log "Extracted $(unzip -l "$PATCH_FILE" | tail -1 | awk '{print $2}') files"
+fi
+
+chown -R pi:pi "$APP_DIR"
+rm -f "$PATCH_FILE"
+PATCHSCRIPT
+    chmod +x /tmp/apply-patch.sh
+
+    # Apply patch to underlying filesystem via overlayroot-chroot
+    # The chroot provides write access to the lower (read-only) filesystem
+    if overlayroot-chroot /tmp/apply-patch.sh; then
+        log "Patch applied to underlying filesystem"
+        rm -f /tmp/apply-patch.sh /tmp/opentpt-patch-temp
+    else
+        log "ERROR: Failed to apply patch via overlayroot-chroot"
+        rm -f /tmp/apply-patch.sh /tmp/opentpt-patch-temp
+        exit 0
+    fi
+else
+    log "Normal filesystem - applying patch directly"
+
+    # Full replacement: delete existing and extract fresh
+    # User data is safe on USB at /mnt/usb/.opentpt/
+    log "Removing existing installation..."
+    rm -rf "$APP_DIR"
+    mkdir -p "$APP_DIR"
+    cd "$APP_DIR"
+
+    log "Extracting new version..."
+    if [[ "$PATCH_FILE" == *.tar.gz ]]; then
+        tar -xzf "$PATCH_FILE"
+        log "Extracted $(tar -tzf "$PATCH_FILE" | wc -l) files"
+    elif [[ "$PATCH_FILE" == *.zip ]]; then
+        unzip -q "$PATCH_FILE"
+        log "Extracted $(unzip -l "$PATCH_FILE" | tail -1 | awk '{print $2}') files"
+    fi
+
+    chown -R pi:pi "$APP_DIR"
 fi
 
 # Delete patch file after successful install
 rm -f "$PATCH_FILE"
 log "Removed patch archive"
 
-chown -R pi:pi "$APP_DIR"
 log "Patch complete"
 exit 0

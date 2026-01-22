@@ -1,6 +1,6 @@
 # Claude Context - openTPT Project
 
-**Version:** 0.19.9 | **Updated:** 2026-01-21
+**Version:** 0.19.11 | **Updated:** 2026-01-22
 
 ---
 
@@ -494,6 +494,49 @@ cp -r usb_data/.opentpt /mnt/usb/
 
 **Fallback:**
 If USB not available, falls back to `~/.opentpt/` on local filesystem.
+
+### Read-Only Root Filesystem (v0.19.11)
+
+Protects SD card from corruption due to sudden power loss using the `overlayroot` package.
+
+**How It Works:**
+- **Lower layer**: Read-only root filesystem on SD card (protected)
+- **Upper layer**: tmpfs (RAM) captures all writes transparently
+- **Result**: SD card never written to during normal operation
+
+**Enabling:**
+```bash
+sudo ./services/boot/setup-readonly.sh
+sudo reboot
+```
+
+**Verifying:**
+```bash
+mount | grep overlay   # Should show / as overlay
+```
+
+**Disabling (for maintenance):**
+```bash
+sudo ./services/boot/disable-readonly.sh
+sudo reboot
+```
+
+**Temporary Write Access:**
+```bash
+sudo overlayroot-chroot    # Opens shell with write access to lower fs
+```
+
+**Patching with Overlay Active:**
+USB patches automatically use `overlayroot-chroot` to apply changes to the underlying filesystem - no manual intervention needed.
+
+**What's Protected:**
+- All system files and application code on SD card
+- Runtime writes go to RAM (lost on reboot, which is fine)
+
+**What Persists (on USB):**
+- Settings, lap times, pit waypoints, tracks
+- Telemetry recordings, logs
+- CoPilot maps and routes
 
 ---
 

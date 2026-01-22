@@ -1,5 +1,66 @@
 # Changelog - openTPT
 
+## [v0.19.11] - 2026-01-22
+
+### Read-Only Root Filesystem with overlayroot
+
+Protects SD card from corruption due to sudden power loss using the standard `overlayroot` package.
+
+#### How It Works
+
+- **Lower layer**: Read-only root filesystem on SD card (protected)
+- **Upper layer**: tmpfs (RAM) captures all writes transparently
+- **Result**: SD card never written to during normal operation
+
+This is more robust than the simple `ro` kernel flag because systemd and services need to write to various locations. OverlayFS provides a transparent write layer in RAM that satisfies all write operations while protecting the SD card.
+
+#### Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `setup-readonly.sh` | Install overlayroot and enable read-only mode |
+| `disable-readonly.sh` | Disable read-only mode for maintenance |
+
+#### USB Patch Integration
+
+USB patches now automatically detect if overlayroot is active and use `overlayroot-chroot` to apply changes to the underlying filesystem - single reboot, no manual intervention.
+
+#### What's Protected (SD card)
+
+- All system files and application code
+- Runtime writes go to RAM (lost on reboot)
+
+#### What Persists (USB at /mnt/usb/.opentpt/)
+
+- Settings, lap times, pit waypoints, tracks
+- Telemetry recordings, logs
+- CoPilot maps and routes
+
+#### Commands
+
+```bash
+# Enable read-only mode
+sudo ./services/boot/setup-readonly.sh && sudo reboot
+
+# Verify overlay active
+mount | grep overlay
+
+# Temporary write access (while overlay active)
+sudo overlayroot-chroot
+
+# Disable read-only mode
+sudo ./services/boot/disable-readonly.sh && sudo reboot
+```
+
+#### Modified Files
+
+- `services/boot/setup-readonly.sh` - Rewritten to use overlayroot package
+- `services/boot/disable-readonly.sh` - New script to disable read-only mode
+- `services/patch/usb-patch.sh` - Added overlayroot detection and overlayroot-chroot patching
+- `CLAUDE.md` - Added Read-Only Root Filesystem documentation
+
+---
+
 ## [v0.19.10] - 2026-01-21
 
 ### USB Data Template Folder

@@ -1,24 +1,29 @@
 #!/bin/bash
-# setup-readonly.sh - Configure read-only root filesystem with overlay
-# This provides faster boot (no journal replay) and power-loss protection
+# setup-readonly.sh - Enable read-only root filesystem using overlayroot
 #
-# IMPORTANT: Run this AFTER testing that openTPT works correctly
-# This script modifies critical system files - ensure you have a backup!
+# Uses the standard overlayroot package (Debian Trixie) which provides:
+# - Lower layer: Read-only root filesystem on SD card
+# - Upper layer: tmpfs (RAM) captures all writes
+# - Result: SD card never written to during normal operation
 #
-# How it works:
-# - Root filesystem mounted read-only
-# - Overlay filesystem for writes (tmpfs in RAM)
-# - /var/log, /tmp use tmpfs
-# - Config persistence via bind mount from data partition
+# All persistent data uses USB storage at /mnt/usb/.opentpt/
 #
-# To revert: Boot with cmdline "rw" or use recovery mode
+# To disable: Run disable-readonly.sh or edit /etc/overlayroot.conf
+# To patch with overlay active: USB patches use overlayroot-chroot automatically
 
 set -e
 
-echo "=== Read-Only Root Filesystem Setup ==="
+echo "=== Read-Only Root Filesystem Setup (overlayroot) ==="
 echo ""
-echo "WARNING: This modifies critical boot configuration!"
-echo "Ensure you have a backup before proceeding."
+echo "This will install and configure overlayroot to protect the SD card."
+echo "All writes during runtime will go to RAM (tmpfs overlay)."
+echo ""
+echo "Prerequisites:"
+echo "  - USB drive mounted at /mnt/usb with persistent data"
+echo "  - All user data already migrated to /mnt/usb/.opentpt/"
+echo ""
+echo "WARNING: After reboot, the root filesystem cannot be modified!"
+echo "         Use disable-readonly.sh or USB patch to make changes."
 echo ""
 read -p "Continue? (yes/no): " CONFIRM
 if [ "$CONFIRM" != "yes" ]; then
@@ -32,77 +37,63 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-# Determine boot partition location
-if [ -d /boot/firmware ]; then
-    BOOT_DIR="/boot/firmware"
-else
-    BOOT_DIR="/boot"
-fi
-
-echo "[1/4] Creating overlay directories..."
-mkdir -p /overlay
-mkdir -p /overlay/upper
-mkdir -p /overlay/work
-echo "  Created /overlay/{upper,work}"
-
-echo ""
-echo "[2/4] Configuring tmpfs for volatile directories..."
-
-# Add tmpfs entries to fstab if not present
-if ! grep -q "tmpfs.*\/var\/log" /etc/fstab; then
-    echo "tmpfs /var/log tmpfs defaults,noatime,nosuid,nodev,noexec,mode=0755,size=32M 0 0" >> /etc/fstab
-    echo "  Added: tmpfs /var/log (32M)"
-fi
-
-if ! grep -q "tmpfs.*\/tmp" /etc/fstab; then
-    echo "tmpfs /tmp tmpfs defaults,noatime,nosuid,nodev,mode=1777,size=64M 0 0" >> /etc/fstab
-    echo "  Added: tmpfs /tmp (64M)"
-fi
-
-if ! grep -q "tmpfs.*\/var\/tmp" /etc/fstab; then
-    echo "tmpfs /var/tmp tmpfs defaults,noatime,nosuid,nodev,mode=1777,size=32M 0 0" >> /etc/fstab
-    echo "  Added: tmpfs /var/tmp (32M)"
+# Check USB is mounted (persistent storage required)
+if ! mountpoint -q /mnt/usb; then
+    echo "WARNING: USB not mounted at /mnt/usb"
+    echo "         Settings and data will not persist across reboots!"
+    echo ""
+    read -p "Continue anyway? (yes/no): " CONFIRM_USB
+    if [ "$CONFIRM_USB" != "yes" ]; then
+        echo "Aborted. Mount USB and try again."
+        exit 1
+    fi
 fi
 
 echo ""
-echo "[3/4] Updating cmdline.txt for read-only root..."
-CMDLINE_FILE="$BOOT_DIR/cmdline.txt"
-CMDLINE=$(cat "$CMDLINE_FILE")
-
-# Change rootwait to ro (read-only)
-if ! echo "$CMDLINE" | grep -q " ro "; then
-    CMDLINE=$(echo "$CMDLINE" | sed 's/rootwait/rootwait ro/')
-    echo "$CMDLINE" > "$CMDLINE_FILE"
-    echo "  Added: ro (read-only root)"
-else
-    echo "  Already configured: ro"
-fi
+echo "[1/3] Installing overlayroot package..."
+apt-get update
+apt-get install -y overlayroot
+echo "  overlayroot installed"
 
 echo ""
-echo "[4/4] Creating data persistence directory..."
+echo "[2/3] Configuring overlayroot..."
+# Enable tmpfs overlay - all writes go to RAM
+cat > /etc/overlayroot.conf << 'EOF'
+# overlayroot configuration for openTPT
+# Protects SD card from corruption due to power loss
+#
+# overlayroot="tmpfs" - Uses RAM for overlay (writes lost on reboot)
+# overlayroot=""      - Disabled (normal read-write operation)
+#
+# To modify root filesystem:
+#   1. Run disable-readonly.sh, reboot, make changes, run setup-readonly.sh
+#   2. Or use USB patch which handles overlay automatically
+#   3. Or use: sudo overlayroot-chroot (temporary access to lower fs)
 
-# Create directory for persistent data (telemetry, config)
-mkdir -p /home/pi/open-TPT/data
-chown pi:pi /home/pi/open-TPT/data
+overlayroot="tmpfs"
+EOF
+echo "  /etc/overlayroot.conf configured"
 
-# Update openTPT config to use this directory for recordings
-echo "  Created: /home/pi/open-TPT/data (for recordings and config)"
+echo ""
+echo "[3/3] Updating initramfs..."
+update-initramfs -u
+echo "  initramfs updated"
 
 echo ""
 echo "=== Read-Only Root Setup Complete ==="
 echo ""
-echo "Changes made:"
-echo "  - Created /overlay directories for overlay filesystem"
-echo "  - Added tmpfs for /var/log, /tmp, /var/tmp"
-echo "  - Added 'ro' flag to cmdline.txt"
-echo "  - Created /home/pi/open-TPT/data for persistent storage"
+echo "After reboot:"
+echo "  - Root filesystem will be read-only (protected)"
+echo "  - All writes go to RAM overlay (lost on reboot)"
+echo "  - USB at /mnt/usb remains read-write (persistent data)"
 echo ""
-echo "IMPORTANT: The root filesystem will be read-only after reboot."
+echo "To verify overlay is active after reboot:"
+echo "  mount | grep overlay"
 echo ""
-echo "To temporarily enable writes:"
-echo "  sudo mount -o remount,rw /"
+echo "To temporarily write to root filesystem:"
+echo "  sudo overlayroot-chroot"
 echo ""
-echo "To permanently revert to read-write:"
-echo "  Edit $CMDLINE_FILE and remove 'ro'"
+echo "To permanently disable read-only mode:"
+echo "  Run disable-readonly.sh and reboot"
 echo ""
-echo "Reboot to apply: sudo reboot"
+echo "Reboot to activate: sudo reboot"
