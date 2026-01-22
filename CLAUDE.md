@@ -39,6 +39,7 @@
 5. **Lock-free rendering** - No blocking in render path
 6. **Bounded queues** - All hardware handlers extend `BoundedQueueHardwareHandler`
 7. **No emojis** - Never use emojis in code, comments, or documentation
+8. **GPIO pin assignments** - Record all pin usage in README.md GPIO Pin Allocation table
 
 ---
 
