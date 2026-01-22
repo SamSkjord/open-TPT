@@ -14,6 +14,7 @@ from config import (
     TPMS_LOW_PRESSURE_KPA,
     TPMS_HIGH_TEMP_C,
     TPMS_DATA_TIMEOUT_S,
+    TPMS_SERIAL_PORT,
 )
 from utils.hardware_base import BoundedQueueHardwareHandler
 
@@ -115,9 +116,10 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
             self.tpms_device.set_low_pressure_threshold(TPMS_LOW_PRESSURE_KPA)
             self.tpms_device.set_high_temp_threshold(TPMS_HIGH_TEMP_C)
 
-            # Connect to device
-            if self.tpms_device.connect():
-                logger.info("TPMS device initialised and connected")
+            # Connect to device (use configured port or auto-detect)
+            if self.tpms_device.connect(port=TPMS_SERIAL_PORT):
+                logger.info("TPMS device initialised and connected on %s",
+                            TPMS_SERIAL_PORT or "auto-detected port")
                 self.tpms_device.query_sensor_ids()
                 return True
             else:

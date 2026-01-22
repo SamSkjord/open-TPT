@@ -59,6 +59,8 @@ openTPT features a high-performance architecture optimised for real-time telemet
 |------|----------|-----------|-------|
 | 2 | I2C1 SDA | I2C | All I2C devices (mux, sensors, input) |
 | 3 | I2C1 SCL | I2C | All I2C devices |
+| 4 | UART3 TX | UART | TPMS receiver (/dev/ttyAMA3) |
+| 5 | UART3 RX | UART | TPMS receiver |
 | 7 | SPI0 CE1 | SPI | CAN HAT Board 2, CAN_1 (OBD-II) |
 | 8 | SPI0 CE0 | SPI | CAN HAT Board 2, CAN_0 |
 | 9 | SPI0 MISO | SPI | CAN HAT Board 2 |
@@ -82,7 +84,6 @@ openTPT features a high-performance architecture optimised for real-time telemet
 | GPIO | Potential Use | Notes |
 |------|---------------|-------|
 | 0, 1 | Reserved | I2C0 HAT EEPROM - avoid |
-| 4, 5 | **Free** | UART3 (/dev/ttyAMA3) - preferred for TPMS |
 | 6 | Free | Good for mux reset if wired |
 | 12 | Free | UART5 TX only (RX on GPIO13 used by CAN IRQ) |
 | 24 | Free | Good for mux reset if wired |
@@ -682,7 +683,7 @@ openTPT/
 - [x] Mini OLED display - secondary display for delta time and fuel data (OLED Bonnet)
 - [ ] I2C bus reorganisation - main bus for IO, mux ch0 for external display/IO, ch1-4 for corners, ch5 for engine sensors, ch6 reserved (pedal sensors etc)
 - [ ] Migrate corner sensors to CAN bus - I2C over long runs is fragile (PCA9615 failures from hot-plugging, EMI sensitivity); CAN is more robust for automotive environments
-- [ ] Direct TPMS serial connection - TPMS receiver via UART3 (GPIO4/5, confirmed free) at 19200 baud; frees USB port, tested working
+- [x] Direct TPMS serial connection - TPMS receiver via UART3 (GPIO4/5) at 19200 baud; frees USB port
 - [ ] Wire TCA9548A mux reset - connect to free GPIO (6, 24, 26, or 27) for I2C bus recovery; code ready, just needs wiring
 
 ### Software TODO
@@ -691,7 +692,7 @@ openTPT/
 - [x] Lap timing integration - GPS lap timing with persistence
 - [x] CoPilot integration
 - [ ] TPMS menu expansion - swap corners, view sensor data
-- [ ] TPMS serial port config - add TPMS_SERIAL_PORT to config.py for direct UART connection (/dev/ttyAMA3)
+- [x] TPMS serial port config - TPMS_SERIAL_PORT in config.py for direct UART connection (/dev/ttyAMA3)
 - [x] Tyre temps menu - corner sensor details, full frame view for installation verification, flip inner/outer
 - [x] Camera view options - mirror, rotate settings for front/rear cameras
 - [x] Units menu - C/F, PSI/BAR/kPa, km/h/mph switching

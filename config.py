@@ -583,6 +583,7 @@ TPMS_HIGH_PRESSURE_KPA = 310  # High pressure alert threshold (kPa)
 TPMS_LOW_PRESSURE_KPA = 180  # Low pressure alert threshold (kPa)
 TPMS_HIGH_TEMP_C = 75  # High temperature alert threshold (Celsius)
 TPMS_DATA_TIMEOUT_S = 30.0  # Seconds before marking sensor as stale
+TPMS_SERIAL_PORT = "/dev/ttyAMA3"  # UART3 on GPIO4/5 (None for USB auto-detect)
 
 # TPMS positions on screen dynamically calculated based on MLX positions
 # The pressure text is centred above each tyre's thermal display
