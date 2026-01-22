@@ -391,30 +391,28 @@ All settings in `config.py` (root level), organised into 12 sections:
 - Supports both circuit tracks (KMZ) and point-to-point stages (GPX)
 - Config: `COPILOT_*` in config.py, `copilot.*` in settings
 
-### USB Patch Deployment (v0.18.14)
+### USB Patch Deployment (v0.19.10)
 - Offline updates for vehicle-mounted Pi without network access
+- Full replacement: deletes existing app and extracts fresh (no orphaned files)
+- User data safe on USB at `/mnt/usb/.opentpt/`
 - Checks `/mnt/usb` at boot for `opentpt-patch.tar.gz` or `opentpt-patch.zip`
-- Extracts to `/home/pi/open-TPT`, renames archive to prevent re-application
-- Log file: `~/.opentpt/patch.log`
+- Log file: `/mnt/usb/.opentpt/patch.log`
 - Boot sequence: `usb-patch.service` runs before `splash.service` and `openTPT.service`
 
 **Creating patches:**
 ```bash
-# Patch specific files
-tar -czvf opentpt-patch.tar.gz main.py hardware/gps_handler.py
+# From repo root - create full release archive
+tar -czvf opentpt-patch.tar.gz --exclude='.git' --exclude='usb_data' --exclude='__pycache__' .
 
-# Patch entire directory
-tar -czvf opentpt-patch.tar.gz hardware/
-
-# Using zip
-zip -r opentpt-patch.zip main.py config.py gui/
+# Or using zip
+zip -r opentpt-patch.zip . -x '.git/*' -x 'usb_data/*' -x '__pycache__/*'
 ```
 
 **Deploying:** Copy archive to USB root, insert into Pi, reboot.
 
 **Verifying:**
 ```bash
-cat ~/.opentpt/patch.log
+cat /mnt/usb/.opentpt/patch.log
 sudo journalctl -u usb-patch.service
 ```
 

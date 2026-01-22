@@ -12,11 +12,11 @@ Created `usb_data/` folder containing the complete USB drive structure for easy 
 usb_data/
 ├── README.md                    # Setup instructions
 └── .opentpt/
-    ├── lap_timing/tracks/       # Track databases + KMZ files (13MB)
-    │   ├── tracks.db
-    │   ├── racelogic.db
-    │   ├── maps/                # Custom tracks
-    │   └── racelogic/           # 75 racelogic tracks by country
+    ├── lap_timing/tracks/       # Track databases + KMZ files
+    │   ├── tracks.db            # Track database (included)
+    │   ├── racelogic.db         # Racelogic database (obtain separately)
+    │   ├── maps/                # Custom tracks (included)
+    │   └── racelogic/           # Racelogic KMZ files (obtain separately)
     ├── routes/                  # Lap timing GPX/KMZ files
     ├── copilot/routes/          # CoPilot GPX routes
     └── pit_timer/               # Pit lane waypoints
@@ -25,6 +25,7 @@ usb_data/
 #### Key Changes
 
 - **Moved tracks** - Track data moved from `assets/tracks/` to `usb_data/.opentpt/lap_timing/tracks/`
+- **Racelogic excluded** - `racelogic.db` and `racelogic/` folder not included (copyrighted - obtain from racelogic.co.uk)
 - **Auto-copy on first run** - `ensure_tracks_available()` copies template tracks to USB if missing
 - **Routes use USB** - GPX/KMZ route files for both lap timing and CoPilot stored on USB
 - **Excluded from sync** - `usb_data/` not synced to Pi (tracks live on USB only)
@@ -33,6 +34,20 @@ usb_data/
 
 ```bash
 cp -r usb_data/.opentpt /mnt/usb/
+# Then add racelogic data from racelogic.co.uk
+```
+
+### Full Replacement USB Patches
+
+USB patch deployment now performs full replacement instead of overlay extraction.
+
+- **Clean updates** - Deletes existing app directory before extracting (no orphaned files)
+- **User data safe** - Settings, lap times, tracks all on USB at `/mnt/usb/.opentpt/`
+- **Simpler patches** - Always create full release archive, no need for delta patches
+
+**Creating patches:**
+```bash
+tar -czvf opentpt-patch.tar.gz --exclude='.git' --exclude='usb_data' --exclude='__pycache__' .
 ```
 
 #### Modified Files
@@ -43,6 +58,7 @@ cp -r usb_data/.opentpt /mnt/usb/
 - `gui/menu/lap_timing.py` - Uses `LAP_TIMING_ROUTES_DIR`
 - `gui/menu/copilot.py` - Uses `COPILOT_ROUTES_DIR`
 - `tools/quick_sync.sh` - Excludes `usb_data/` from sync
+- `services/patch/usb-patch.sh` - Full replacement instead of overlay
 - `CLAUDE.md` - Added USB data storage section, updated directory structure
 
 ---

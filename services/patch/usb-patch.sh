@@ -1,7 +1,10 @@
 #!/bin/bash
 # USB Patch Deployment Script for openTPT
-# Checks for patch archive on USB at boot and extracts to application directory
+# Checks for patch archive on USB at boot and performs full replacement
 # Handles read-only rootfs by temporarily remounting as read-write
+#
+# Full replacement ensures clean updates with no orphaned files from old versions.
+# User data (settings, lap times, tracks) is safe on USB at /mnt/usb/.opentpt/
 set -euo pipefail
 
 USB_MOUNT="/mnt/usb"
@@ -65,14 +68,29 @@ log "Found patch: $PATCH_FILE"
 # Remount filesystem read-write if needed
 remount_rw_if_needed || exit 0
 
-# Verify and extract
-cd "$APP_DIR"
+# Verify archive before making changes
+log "Verifying archive integrity..."
 if [[ "$PATCH_FILE" == *.tar.gz ]]; then
     tar -tzf "$PATCH_FILE" > /dev/null 2>&1 || { log "ERROR: Corrupt archive"; exit 0; }
-    tar -xzvf "$PATCH_FILE" 2>&1 | while read -r f; do log "  extracted: $f"; done
 elif [[ "$PATCH_FILE" == *.zip ]]; then
     unzip -t "$PATCH_FILE" > /dev/null 2>&1 || { log "ERROR: Corrupt archive"; exit 0; }
-    unzip -o "$PATCH_FILE" 2>&1 | grep -E "inflating:|extracting:" | while read -r f; do log "  $f"; done
+fi
+log "Archive verified OK"
+
+# Full replacement: delete existing and extract fresh
+# User data is safe on USB at /mnt/usb/.opentpt/
+log "Removing existing installation..."
+rm -rf "$APP_DIR"
+mkdir -p "$APP_DIR"
+cd "$APP_DIR"
+
+log "Extracting new version..."
+if [[ "$PATCH_FILE" == *.tar.gz ]]; then
+    tar -xzf "$PATCH_FILE"
+    log "Extracted $(tar -tzf "$PATCH_FILE" | wc -l) files"
+elif [[ "$PATCH_FILE" == *.zip ]]; then
+    unzip -q "$PATCH_FILE"
+    log "Extracted $(unzip -l "$PATCH_FILE" | tail -1 | awk '{print $2}') files"
 fi
 
 # Rename to prevent re-application

@@ -60,6 +60,22 @@ CoPilot requires OSM map data (`.roads.db` files). These are large (6+ GB for UK
 2. Convert to `.roads.db` using the CoPilot tools
 3. Place in `copilot/maps/`
 
+## Updating openTPT
+
+The Pi checks for update archives on USB at boot and performs a full replacement.
+
+**Creating an update archive (from repo root):**
+```bash
+tar -czvf opentpt-patch.tar.gz --exclude='.git' --exclude='usb_data' --exclude='__pycache__' .
+```
+
+**Deploying:**
+1. Copy `opentpt-patch.tar.gz` to USB root
+2. Insert USB into Pi and reboot
+3. Check `/mnt/usb/.opentpt/patch.log` to verify
+
+User data in `.opentpt/` is preserved - only the app is replaced.
+
 ## Notes
 
 - USB should be mounted at `/mnt/usb` on the Pi
