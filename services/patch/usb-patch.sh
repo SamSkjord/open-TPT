@@ -93,10 +93,9 @@ elif [[ "$PATCH_FILE" == *.zip ]]; then
     log "Extracted $(unzip -l "$PATCH_FILE" | tail -1 | awk '{print $2}') files"
 fi
 
-# Rename to prevent re-application
-mv "$PATCH_FILE" "${PATCH_FILE%.tar.gz}-applied-$(date '+%Y%m%d_%H%M%S').archive" 2>/dev/null || \
-mv "$PATCH_FILE" "${PATCH_FILE%.zip}-applied-$(date '+%Y%m%d_%H%M%S').archive" 2>/dev/null || \
-log "WARNING: Could not rename archive"
+# Delete patch file after successful install
+rm -f "$PATCH_FILE"
+log "Removed patch archive"
 
 chown -R pi:pi "$APP_DIR"
 log "Patch complete"
