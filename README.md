@@ -11,7 +11,7 @@ A modular GUI system for live motorsport telemetry using a Raspberry Pi 4/5 with
 openTPT provides real-time monitoring of:
 - Tyre pressure and temperature (via TPMS)
 - Brake rotor temperatures (via IR sensors + ADC)
-- Tyre surface thermal imaging (via Pico I2C slave modules with MLX90640, or MLX90614 sensors)
+- Tyre surface thermal imaging (via Pico CAN corner sensors with MLX90640)
 - Multi-camera support with seamless switching (dual USB UVC cameras)
 - Toyota radar overlay on rear camera (CAN bus radar with collision warnings)
 - Fuel tracking with consumption rate and laps remaining estimation
@@ -36,12 +36,10 @@ openTPT features a high-performance architecture optimised for real-time telemet
 - Raspberry Pi 4 or 5 (2GB+ RAM recommended)
 - Waveshare 1024x600 HDMI display (or other HDMI displays - UI designed for 800x480, scales to fit)
 - TPMS receivers and sensors
-- ADS1115/ADS1015 ADC for IR brake temperature sensors
-- Tyre temperature sensors (configurable per tyre):
-  - Raspberry Pi Pico with MLX90640 thermal camera (pico-tyre-temp I2C slave modules), OR
-  - MLX90614 single-point IR sensors
-  - **Mix and match**: Use Pico modules on front tyres and MLX90614 on rear tyres (or any combination)
-- TCA9548A I2C multiplexer for tyre temperature sensors (channels 0-3)
+- Tyre/Brake temperature sensors via CAN bus:
+  - Adafruit RP2040 CAN Bus Feather with MLX90640 thermal camera (pico-tyre-temp firmware)
+  - Four sensors (FL, FR, RL, RR) on dedicated CAN bus (can_b2_0)
+  - Provides tyre temps, brake temps, detection status, and full thermal frames
 - Adafruit NeoKey 1x4 for input control
 
 ### Optional Components
@@ -57,12 +55,12 @@ openTPT features a high-performance architecture optimised for real-time telemet
 
 | GPIO | Function | Interface | Notes |
 |------|----------|-----------|-------|
-| 2 | I2C1 SDA | I2C | All I2C devices (mux, sensors, input) |
-| 3 | I2C1 SCL | I2C | All I2C devices |
+| 2 | I2C1 SDA | I2C | NeoKey, encoder, OLED, NeoDriver, IMU |
+| 3 | I2C1 SCL | I2C | NeoKey, encoder, OLED, NeoDriver, IMU |
 | 4 | UART3 TX | UART | TPMS receiver (/dev/ttyAMA3) |
 | 5 | UART3 RX | UART | TPMS receiver |
 | 7 | SPI0 CE1 | SPI | CAN HAT Board 2, CAN_1 (OBD-II) |
-| 8 | SPI0 CE0 | SPI | CAN HAT Board 2, CAN_0 |
+| 8 | SPI0 CE0 | SPI | CAN HAT Board 2, CAN_0 (Corner Sensors) |
 | 9 | SPI0 MISO | SPI | CAN HAT Board 2 |
 | 10 | SPI0 MOSI | SPI | CAN HAT Board 2 |
 | 11 | SPI0 SCLK | SPI | CAN HAT Board 2 |
@@ -76,7 +74,7 @@ openTPT features a high-performance architecture optimised for real-time telemet
 | 20 | SPI1 MOSI | SPI | CAN HAT Board 1 |
 | 21 | SPI1 SCLK | SPI | CAN HAT Board 1 |
 | 22 | CAN1_0 IRQ | IRQ | CAN HAT Board 1, CAN_0 interrupt |
-| 23 | CAN2_0 IRQ | IRQ | CAN HAT Board 2, CAN_0 interrupt |
+| 23 | CAN2_0 IRQ | IRQ | CAN HAT Board 2, CAN_0 interrupt (Corner Sensors) |
 | 25 | CAN2_1 IRQ | IRQ | CAN HAT Board 2, CAN_1 interrupt (OBD-II) |
 
 **Available GPIOs:**
@@ -84,9 +82,9 @@ openTPT features a high-performance architecture optimised for real-time telemet
 | GPIO | Potential Use | Notes |
 |------|---------------|-------|
 | 0, 1 | Reserved | I2C0 HAT EEPROM - avoid |
-| 6 | Free | Good for mux reset if wired |
+| 6 | Free | - |
 | 12 | Free | UART5 TX only (RX on GPIO13 used by CAN IRQ) |
-| 24 | Free | Good for mux reset if wired |
+| 24 | Free | - |
 | 26, 27 | Free | - |
 
 ## Software Requirements
@@ -188,105 +186,45 @@ User preferences changed via the on-screen menu are saved to `~/.opentpt_setting
 
 Settings are saved immediately when changed. If the file doesn't exist, defaults from `config.py` are used.
 
-### Tyre Sensor Configuration
+### Corner Sensor Configuration (CAN Bus)
 
-openTPT supports per-tyre sensor type configuration, allowing you to mix Pico I2C slave modules (with MLX90640 thermal cameras) and MLX90614 single-point IR sensors.
+openTPT uses CAN-based corner sensors for tyre and brake temperature monitoring. Each corner has an Adafruit RP2040 CAN Bus Feather running pico-tyre-temp firmware.
 
-**Emissivity Note:** Pico modules with MLX90640 sensors have emissivity pre-configured in the Pico firmware (default 0.95 for rubber tyres, configurable via I2C register). This is applied during temperature calculation on the Pico itself, not in openTPT.
+**Features:**
+- Tyre thermal imaging (24x32 MLX90640)
+- Left/Centre/Right zone temperatures
+- Brake temperature monitoring (inner/outer)
+- Tyre detection with confidence percentage
+- Full frame transfer for installation verification
 
-Edit `config.py` and configure the `TYRE_SENSOR_TYPES` dictionary:
+**CAN Bus Configuration** in `config.py`:
 
 ```python
-TYRE_SENSOR_TYPES = {
-    "FL": "pico",      # Front Left - Pico module with MLX90640
-    "FR": "pico",      # Front Right - Pico module with MLX90640
-    "RL": "mlx90614",  # Rear Left - MLX90614 single-point IR
-    "RR": "mlx90614",  # Rear Right - MLX90614 single-point IR
-}
+CORNER_SENSOR_CAN_ENABLED = True
+CORNER_SENSOR_CAN_CHANNEL = "can_b2_0"
+CORNER_SENSOR_CAN_BITRATE = 500000
+CORNER_SENSOR_CAN_DBC = "opendbc/pico_tyre_temp.dbc"
 ```
 
-**Sensor type options:**
-- `"pico"` - Raspberry Pi Pico I2C slave module with MLX90640 thermal camera
-  - Provides detailed thermal imaging with left/centre/right zone data
-  - Requires pico-tyre-temp firmware on the Pico
-  - Connected via I2C multiplexer (TCA9548A)
+**Message IDs per corner:**
 
-- `"mlx90614"` - MLX90614 single-point IR temperature sensor
-  - Simpler, lower-cost alternative
-  - Single temperature reading per tyre
-  - Connected via I2C multiplexer (TCA9548A)
+| Corner | TyreTemps | Detection | BrakeTemps | Status |
+|--------|-----------|-----------|------------|--------|
+| FL | 0x100 | 0x101 | 0x102 | 0x110 |
+| FR | 0x120 | 0x121 | 0x122 | 0x130 |
+| RL | 0x140 | 0x141 | 0x142 | 0x150 |
+| RR | 0x160 | 0x161 | 0x162 | 0x170 |
 
-**I2C multiplexer channel assignments:**
+**Emissivity Note:** Emissivity is configured in the sensor firmware (default 0.95 for rubber tyres) and reported via the Status message. This is applied during temperature calculation on the sensor itself.
 
-Configure channels for each sensor type in `config.py`:
+### Brake Temperature Sensors
 
-```python
-# Pico I2C slave modules (MLX90640 thermal cameras)
-PICO_MUX_CHANNELS = {
-    "FL": 0,  # Front Left on channel 0
-    "FR": 1,  # Front Right on channel 1
-    "RL": 2,  # Rear Left on channel 2
-    "RR": 3,  # Rear Right on channel 3
-}
+Brake temperatures are provided by the CAN-based corner sensors alongside tyre temperatures. Each corner sensor reports:
+- Inner brake temperature
+- Outer brake temperature (dual-zone support)
+- Sensor status (OK, Disconnected, Error, NotFound)
 
-# MLX90614 single-point IR sensors
-MLX90614_MUX_CHANNELS = {
-    "FL": 0,  # Front Left on channel 0
-    "FR": 1,  # Front Right on channel 1
-    "RL": 2,  # Rear Left on channel 2
-    "RR": 3,  # Rear Right on channel 3
-}
-```
-
-**Note:** Both sensor types can share the same channel numbers if they're not used on the same positions. For example, if FL/FR use Pico modules on channels 0/1, and RL/RR use MLX90614 sensors, they can also use channels 0/1 (or 2/3).
-
-### Brake Temperature Sensor Configuration
-
-openTPT supports per-corner brake sensor type configuration with automatic emissivity correction for accurate temperature readings.
-
-#### Sensor Types
-
-Edit `config.py` to configure the `BRAKE_SENSOR_TYPES` dictionary:
-
-```python
-BRAKE_SENSOR_TYPES = {
-    "FL": "mlx90614",  # Front Left - MLX90614 IR sensor
-    "FR": "adc",       # Front Right - ADC IR sensor
-    "RL": "adc",       # Rear Left - ADC IR sensor
-    "RR": "adc",       # Rear Right - ADC IR sensor
-}
-```
-
-**Sensor type options:**
-- `"mlx90614"` - MLX90614 single-point IR sensor via I2C multiplexer
-- `"adc"` - IR sensor via ADS1115 ADC (4 channels available)
-- `"obd"` - CAN/OBD-II (rarely available, most vehicles don't broadcast brake temps)
-
-#### Emissivity Correction
-
-**All IR sensors assume perfect black body emissivity (ε = 1.0) by default.** Since brake rotors have lower emissivity (typically 0.95 for oxidised cast iron), the sensors will read lower than actual temperature. openTPT automatically applies software emissivity correction to compensate.
-
-**Note on Tyre vs Brake Emissivity Handling:**
-- **Tyre sensors (MLX90640 via Pico):** Emissivity is configured in the Pico firmware (default 0.95 for rubber) and applied during temperature calculation by the MLX90640 API. No additional correction needed in openTPT.
-- **Brake sensors (MLX90614/ADC):** Sensors use factory default ε = 1.0, so openTPT applies software correction to compensate for actual rotor emissivity (typically 0.95 for cast iron).
-
-Both approaches achieve the same result - accurate temperature readings - using different implementation methods appropriate to each sensor type.
-
-**How it works:**
-1. MLX90614/IR sensor has factory default ε = 1.0 (not changed in hardware)
-2. Actual brake rotor has lower emissivity (e.g., ε = 0.95)
-3. Sensor reads lower than actual due to less radiation from non-black-body surface
-4. Software correction adjusts reading upward: `T_actual = T_measured / ε^0.25`
-
-Configure per-corner emissivity values in `config.py`:
-
-```python
-BRAKE_ROTOR_EMISSIVITY = {
-    "FL": 0.95,  # Front Left - typical oxidised cast iron
-    "FR": 0.95,  # Front Right
-    "RL": 0.95,  # Rear Left
-    "RR": 0.95,  # Rear Right
-}
+**Emissivity** is configured in the corner sensor firmware (default 0.95) and reported via the Status message.
 ```
 
 **Typical rotor emissivity values:**
@@ -586,17 +524,15 @@ openTPT/
 │   ├── icon_handler.py                  # Icon rendering
 │   └── scale_bars.py                    # Temperature/pressure scale bars
 ├── hardware/
-│   ├── unified_corner_handler.py        # Unified handler for all tyre sensors
+│   ├── unified_corner_handler.py        # Corner sensors via CAN (tyre/brake temps)
 │   ├── tpms_input_optimized.py          # TPMS with bounded queues
-│   ├── mlx90614_handler.py              # MLX90614 single-point IR sensors
 │   ├── radar_handler.py                 # Toyota radar CAN handler
 │   ├── obd2_handler.py                  # OBD2/CAN vehicle data
 │   ├── gps_handler.py                   # GPS serial NMEA parsing
 │   ├── imu_handler.py                   # ICM-20649 IMU for G-meter
 │   ├── neodriver_handler.py             # NeoDriver LED strip
 │   ├── lap_timing_handler.py            # Lap timing logic
-│   ├── copilot_handler.py               # CoPilot integration handler
-│   └── i2c_mux.py                       # TCA9548A Mux control
+│   └── copilot_handler.py               # CoPilot integration handler
 ├── lap_timing/                          # Lap timing subsystem
 │   ├── data/
 │   │   ├── track_loader.py              # KMZ/GPX track loading
@@ -629,8 +565,8 @@ openTPT/
 
 ### Completed
 - Real-time TPMS monitoring (auto-pairing support)
-- Brake temperature monitoring with IR sensors (MCP9601 thermocouples and MLX90614)
-- Tyre thermal imaging via Pico I2C slaves (MLX90640) or MLX90614 sensors
+- Brake temperature monitoring via CAN corner sensors (inner/outer zones)
+- Tyre thermal imaging via CAN corner sensors (MLX90640 24x32 thermal cameras)
 - Dual USB camera support with seamless switching (up to 26fps depending on camera hardware)
 - Deterministic camera identification via udev rules
 - NeoKey 1x4 physical controls
@@ -674,10 +610,8 @@ openTPT/
 - [x] MCP9601 Thermocouples - brake temperature sensors (per corner)
 - [ ] LTR-559 Auto brightness - ambient light sensor for automatic display brightness (enable/disable + offset settings)
 - [x] Mini OLED display - secondary display for delta time and fuel data (OLED Bonnet)
-- [ ] I2C bus reorganisation - main bus for IO, mux ch0 for external display/IO, ch1-4 for corners, ch5 for engine sensors, ch6 reserved (pedal sensors etc)
-- [ ] Migrate corner sensors to CAN bus - I2C over long runs is fragile (PCA9615 failures from hot-plugging, EMI sensitivity); CAN is more robust for automotive environments
+- [x] Migrate corner sensors to CAN bus - CAN more robust than I2C for automotive environments; all four corners on can_b2_0
 - [x] Direct TPMS serial connection - TPMS receiver via UART3 (GPIO4/5) at 19200 baud; frees USB port
-- [ ] Wire TCA9548A mux reset - connect to free GPIO (6, 24, 26, or 27) for I2C bus recovery; code ready, just needs wiring
 
 ### Software TODO
 - [x] Bluetooth audio menu - scan, pair, connect, disconnect, forget (requires PulseAudio)

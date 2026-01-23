@@ -210,7 +210,7 @@ The I2C bus runs at **400kHz (Fast Mode)** rather than 1MHz (Fast Mode Plus) for
 |--------|--------|
 | EMI susceptibility | Higher frequencies pick up more engine/alternator noise |
 | Wire capacitance | Long runs to wheel sensors exceed FM+ limits (~50pF max) |
-| Device compatibility | MCP9601, VL53L0X rated for 400kHz max |
+| Device compatibility | Most Adafruit I2C devices rated for 400kHz max |
 | Signal integrity | Existing TOF dropouts and IMU errors suggest marginal timing |
 | Data throughput | Total I2C load is ~2.7 KB/s (only 7% of 400kHz capacity) |
 

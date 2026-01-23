@@ -417,9 +417,8 @@ if best_lap and best_lap > 0:  # 0 treated as falsy
 
 **Violations Found:**
 1. `gui/template.py:59` - "tire" instead of "tyre"
-2. `hardware/mlx90614_handler.py:83, 247, 253, 280, 283, 293, 298` - "tire"
-3. `hardware/tpms_input_optimized.py:131-132` - "TirePosition", "TireState"
-4. `config.py:82` - "icons8-tire-60.png"
+2. `hardware/tpms_input_optimized.py:131-132` - "TirePosition", "TireState"
+3. `config.py:82` - "icons8-tire-60.png"
 
 ---
 
