@@ -154,7 +154,7 @@ echo "  Configured: volatile journal (RAM only, 16M max)"
 echo ""
 echo "[6/8] Installing optimised service files..."
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SERVICE_SRC="$SCRIPT_DIR/../../openTPT.service"
+SERVICE_SRC="$SCRIPT_DIR/../systemd/openTPT.service"
 CAN_SERVICE_SRC="$SCRIPT_DIR/../systemd/can-setup.service"
 CAN_SCRIPT_SRC="$SCRIPT_DIR/../systemd/can-setup.sh"
 

@@ -609,7 +609,7 @@ For production deployment, enable the systemd service:
 ssh pi@192.168.199.246
 
 # Copy service file
-sudo cp /home/pi/open-TPT/openTPT.service /etc/systemd/system/
+sudo cp /home/pi/open-TPT/services/systemd/openTPT.service /etc/systemd/system/
 
 # Enable and start service
 sudo systemctl enable openTPT.service

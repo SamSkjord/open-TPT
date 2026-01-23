@@ -319,7 +319,7 @@ echo "CAN interface service installed"
 
 echo -e "\n==== Enabling systemd services ===="
 cd "$SCRIPT_DIR"
-sudo cp "$SCRIPT_DIR/openTPT.service" /etc/systemd/system/
+sudo cp "$SCRIPT_DIR/services/systemd/openTPT.service" /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable can-setup.service
 sudo systemctl enable openTPT.service
