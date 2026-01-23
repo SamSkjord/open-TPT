@@ -21,7 +21,7 @@ This test plan covers in-vehicle testing of the lap timing and CoPilot systems. 
 
 ### Data
 - [ ] Track file loaded (KMZ) or auto-detect enabled
-- [ ] CoPilot map data available for region (`~/.opentpt/copilot/maps/`)
+- [ ] CoPilot map data available for region (`/mnt/usb/.opentpt/copilot/maps/`)
 - [ ] Audio samples installed (if using Janne samples)
 
 ---
@@ -270,7 +270,7 @@ Display issues: _____
 ## Post-Test Checklist
 
 - [ ] Download logs: `scp pi@192.168.199.246:/home/pi/open-TPT/logs/* ./`
-- [ ] Export lap times: Check `~/.opentpt/lap_timing/lap_timing.db`
+- [ ] Export lap times: Check `/mnt/usb/.opentpt/lap_timing/lap_timing.db`
 - [ ] Note any issues for bug reports
 - [ ] Check for throttling: `vcgencmd get_throttled` (0x0 = OK)
 - [ ] Back up telemetry recordings if enabled

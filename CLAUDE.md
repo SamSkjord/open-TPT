@@ -209,11 +209,11 @@ sudo journalctl -u openTPT.service -f       # Live logs
 
 ### Debug Commands
 ```bash
-# I2C scan
+# I2C scan (NeoKey, encoder, OLED, NeoDriver, IMU)
 sudo i2cdetect -y 1
 
-# Select mux channel (FL=0x01, FR=0x02, RL=0x04, RR=0x08)
-sudo i2cset -y 1 0x70 0x01
+# Corner sensor CAN traffic
+candump can_b2_0
 
 # Power status
 vcgencmd get_throttled  # 0x0=OK, 0x50000=historical undervoltage

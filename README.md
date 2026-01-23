@@ -97,7 +97,7 @@ openTPT features a high-performance architecture optimised for real-time telemet
   - python-can (CAN bus interface, optional for radar)
   - cantools (DBC decoding, optional for radar)
   - tpms-python (TPMS sensor communication)
-  - Adafruit libraries (NeoKey, ADS1x15, TCA9548A, MLX90614)
+  - Adafruit libraries (NeoKey, Seesaw, NeoDriver, ICM-20649)
 
 See `requirements.txt` for the complete list.
 
@@ -607,7 +607,7 @@ openTPT/
 ### Hardware TODO
 - [x] PA1616S Adafruit GPS - for lap timing and position logging
 - [x] Adafruit NeoDriver - LED strip control (delta, overtake, shift, rainbow modes)
-- [x] MCP9601 Thermocouples - brake temperature sensors (per corner)
+- [x] Brake temperature sensors - now via CAN corner sensors (inner/outer zones)
 - [ ] LTR-559 Auto brightness - ambient light sensor for automatic display brightness (enable/disable + offset settings)
 - [x] Mini OLED display - secondary display for delta time and fuel data (OLED Bonnet)
 - [x] Migrate corner sensors to CAN bus - CAN more robust than I2C for automotive environments; all four corners on can_b2_0

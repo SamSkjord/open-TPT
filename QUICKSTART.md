@@ -4,7 +4,7 @@
 - **Pi IP:** `192.168.199.246`
 - **User:** `pi`
 - **Path:** `/home/pi/open-TPT`
-- **Status:** Production Ready (v0.18.14)
+- **Status:** Production Ready
 
 ## Quick Deploy & Run
 
@@ -76,7 +76,7 @@ ssh pi@192.168.199.246 "sudo systemctl status openTPT.service"
 
 ## Hardware Status
 
-### Current Setup (v0.17.9)
+### Current Setup
 - **TPMS:** 4/4 sensors auto-paired (FL, FR, RL, RR)
 - **Multi-Camera:** Dual USB cameras with seamless switching
 - **NeoKey 1x4:** All buttons functional
@@ -263,7 +263,7 @@ sudo journalctl -u usb-patch.service
 | `DEPLOYMENT.md` | Detailed deployment workflow |
 | `CHANGELOG.md` | Version history and features |
 
-## Key Features (v0.18.14)
+## Key Features
 
 - Real-time TPMS monitoring with auto-pairing
 - Dual USB camera support with seamless switching
@@ -296,4 +296,3 @@ Use British spelling throughout:
 ---
 
 **Status:** System operational with full telemetry stack
-**Last Updated:** 2026-01-20 (v0.18.14)

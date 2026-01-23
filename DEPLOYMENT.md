@@ -12,7 +12,7 @@ Development is done on Mac, then deployed to Raspberry Pi for testing.
 
 ### On Raspberry Pi
 - SSH enabled (`sudo raspi-config` → Interface Options → SSH)
-- Python 3.7+ installed
+- Python 3.11+ installed
 - Network connectivity
 
 ## Initial Setup
