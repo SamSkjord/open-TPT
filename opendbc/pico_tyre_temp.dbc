@@ -1,0 +1,376 @@
+VERSION ""
+
+NS_ :
+	NS_DESC_
+	CM_
+	BA_DEF_
+	BA_
+	VAL_
+	CAT_DEF_
+	CAT_
+	FILTER
+	BA_DEF_DEF_
+	EV_DATA_
+	ENVVAR_DATA_
+	SGTYPE_
+	SGTYPE_VAL_
+	BA_DEF_SGTYPE_
+	BA_SGTYPE_
+	SIG_TYPE_REF_
+	VAL_TABLE_
+	SIG_GROUP_
+	SIG_VALTYPE_
+	SIGTYPE_VALTYPE_
+	BO_TX_BU_
+	BA_REL_
+	BA_SGTYPE_REL_
+	SG_MUL_VAL_
+
+BS_:
+
+BU_: TyreTempSensor DataLogger
+
+VAL_TABLE_ SensorStatus 0 "OK" 1 "Disconnected" 2 "Error" 3 "NotFound" ;
+VAL_TABLE_ ChannelMode 0 "TyreDetect" 4 "4Channel" 8 "8Channel" 16 "16Channel" ;
+VAL_TABLE_ BroadcastMode 0 "OnRequest" 1 "Auto" ;
+VAL_TABLE_ WheelPosition 0 "FrontLeft" 1 "FrontRight" 2 "RearLeft" 3 "RearRight" ;
+
+BO_ 256 FL_TyreTemps: 8 TyreTempSensor
+ SG_ LeftMedianTemp : 0|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ CentreMedianTemp : 16|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ RightMedianTemp : 32|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ LateralGradient : 48|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+
+BO_ 257 FL_TyreDetection: 8 TyreTempSensor
+ SG_ Detected : 0|1@1+ (1,0) [0|1] "" DataLogger
+ SG_ Warnings : 1|7@1+ (1,0) [0|127] "" DataLogger
+ SG_ Confidence : 8|8@1+ (1,0) [0|100] "%" DataLogger
+ SG_ TyreWidth : 16|8@1+ (1,0) [0|32] "pixels" DataLogger
+ SG_ SpanStart : 24|8@1+ (1,0) [0|31] "pixel" DataLogger
+ SG_ SpanEnd : 32|8@1+ (1,0) [0|31] "pixel" DataLogger
+ SG_ FrameNumber : 48|16@1+ (1,0) [0|65535] "" DataLogger
+
+BO_ 258 FL_BrakeTemps: 8 TyreTempSensor
+ SG_ InnerBrakeTemp : 0|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ OuterBrakeTemp : 16|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ InnerStatus : 32|8@1+ (1,0) [0|3] "" DataLogger
+ SG_ OuterStatus : 40|8@1+ (1,0) [0|3] "" DataLogger
+
+BO_ 272 FL_Status: 8 TyreTempSensor
+ SG_ FPS : 0|8@1+ (1,0) [0|255] "Hz" DataLogger
+ SG_ FirmwareVersion : 8|8@1+ (1,0) [0|255] "" DataLogger
+ SG_ WheelID : 16|8@1+ (1,0) [0|3] "" DataLogger
+ SG_ Emissivity : 24|8@1+ (1,0) [0|100] "%" DataLogger
+ SG_ FrameNumberFull : 32|32@1+ (1,0) [0|4294967295] "" DataLogger
+
+BO_ 280 FL_RawChA: 8 TyreTempSensor
+ SG_ Channel0 : 0|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel1 : 16|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel2 : 32|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel3 : 48|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+
+BO_ 281 FL_RawChB: 8 TyreTempSensor
+ SG_ Channel4 : 0|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel5 : 16|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel6 : 32|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel7 : 48|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+
+BO_ 282 FL_RawChC: 8 TyreTempSensor
+ SG_ Channel8 : 0|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel9 : 16|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel10 : 32|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel11 : 48|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+
+BO_ 283 FL_RawChD: 8 TyreTempSensor
+ SG_ Channel12 : 0|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel13 : 16|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel14 : 32|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel15 : 48|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+
+BO_ 284 FL_FrameData: 8 TyreTempSensor
+ SG_ SegmentIndex : 0|16@1+ (1,0) [0|255] "" DataLogger
+ SG_ Pixel0 : 16|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Pixel1 : 32|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Pixel2 : 48|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+
+BO_ 288 FR_TyreTemps: 8 TyreTempSensor
+ SG_ LeftMedianTemp : 0|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ CentreMedianTemp : 16|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ RightMedianTemp : 32|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ LateralGradient : 48|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+
+BO_ 289 FR_TyreDetection: 8 TyreTempSensor
+ SG_ Detected : 0|1@1+ (1,0) [0|1] "" DataLogger
+ SG_ Warnings : 1|7@1+ (1,0) [0|127] "" DataLogger
+ SG_ Confidence : 8|8@1+ (1,0) [0|100] "%" DataLogger
+ SG_ TyreWidth : 16|8@1+ (1,0) [0|32] "pixels" DataLogger
+ SG_ SpanStart : 24|8@1+ (1,0) [0|31] "pixel" DataLogger
+ SG_ SpanEnd : 32|8@1+ (1,0) [0|31] "pixel" DataLogger
+ SG_ FrameNumber : 48|16@1+ (1,0) [0|65535] "" DataLogger
+
+BO_ 290 FR_BrakeTemps: 8 TyreTempSensor
+ SG_ InnerBrakeTemp : 0|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ OuterBrakeTemp : 16|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ InnerStatus : 32|8@1+ (1,0) [0|3] "" DataLogger
+ SG_ OuterStatus : 40|8@1+ (1,0) [0|3] "" DataLogger
+
+BO_ 304 FR_Status: 8 TyreTempSensor
+ SG_ FPS : 0|8@1+ (1,0) [0|255] "Hz" DataLogger
+ SG_ FirmwareVersion : 8|8@1+ (1,0) [0|255] "" DataLogger
+ SG_ WheelID : 16|8@1+ (1,0) [0|3] "" DataLogger
+ SG_ Emissivity : 24|8@1+ (1,0) [0|100] "%" DataLogger
+ SG_ FrameNumberFull : 32|32@1+ (1,0) [0|4294967295] "" DataLogger
+
+BO_ 312 FR_RawChA: 8 TyreTempSensor
+ SG_ Channel0 : 0|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel1 : 16|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel2 : 32|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel3 : 48|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+
+BO_ 313 FR_RawChB: 8 TyreTempSensor
+ SG_ Channel4 : 0|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel5 : 16|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel6 : 32|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel7 : 48|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+
+BO_ 314 FR_RawChC: 8 TyreTempSensor
+ SG_ Channel8 : 0|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel9 : 16|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel10 : 32|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel11 : 48|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+
+BO_ 315 FR_RawChD: 8 TyreTempSensor
+ SG_ Channel12 : 0|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel13 : 16|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel14 : 32|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel15 : 48|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+
+BO_ 316 FR_FrameData: 8 TyreTempSensor
+ SG_ SegmentIndex : 0|16@1+ (1,0) [0|255] "" DataLogger
+ SG_ Pixel0 : 16|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Pixel1 : 32|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Pixel2 : 48|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+
+BO_ 320 RL_TyreTemps: 8 TyreTempSensor
+ SG_ LeftMedianTemp : 0|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ CentreMedianTemp : 16|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ RightMedianTemp : 32|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ LateralGradient : 48|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+
+BO_ 321 RL_TyreDetection: 8 TyreTempSensor
+ SG_ Detected : 0|1@1+ (1,0) [0|1] "" DataLogger
+ SG_ Warnings : 1|7@1+ (1,0) [0|127] "" DataLogger
+ SG_ Confidence : 8|8@1+ (1,0) [0|100] "%" DataLogger
+ SG_ TyreWidth : 16|8@1+ (1,0) [0|32] "pixels" DataLogger
+ SG_ SpanStart : 24|8@1+ (1,0) [0|31] "pixel" DataLogger
+ SG_ SpanEnd : 32|8@1+ (1,0) [0|31] "pixel" DataLogger
+ SG_ FrameNumber : 48|16@1+ (1,0) [0|65535] "" DataLogger
+
+BO_ 322 RL_BrakeTemps: 8 TyreTempSensor
+ SG_ InnerBrakeTemp : 0|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ OuterBrakeTemp : 16|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ InnerStatus : 32|8@1+ (1,0) [0|3] "" DataLogger
+ SG_ OuterStatus : 40|8@1+ (1,0) [0|3] "" DataLogger
+
+BO_ 336 RL_Status: 8 TyreTempSensor
+ SG_ FPS : 0|8@1+ (1,0) [0|255] "Hz" DataLogger
+ SG_ FirmwareVersion : 8|8@1+ (1,0) [0|255] "" DataLogger
+ SG_ WheelID : 16|8@1+ (1,0) [0|3] "" DataLogger
+ SG_ Emissivity : 24|8@1+ (1,0) [0|100] "%" DataLogger
+ SG_ FrameNumberFull : 32|32@1+ (1,0) [0|4294967295] "" DataLogger
+
+BO_ 344 RL_RawChA: 8 TyreTempSensor
+ SG_ Channel0 : 0|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel1 : 16|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel2 : 32|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel3 : 48|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+
+BO_ 345 RL_RawChB: 8 TyreTempSensor
+ SG_ Channel4 : 0|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel5 : 16|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel6 : 32|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel7 : 48|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+
+BO_ 346 RL_RawChC: 8 TyreTempSensor
+ SG_ Channel8 : 0|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel9 : 16|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel10 : 32|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel11 : 48|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+
+BO_ 347 RL_RawChD: 8 TyreTempSensor
+ SG_ Channel12 : 0|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel13 : 16|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel14 : 32|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel15 : 48|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+
+BO_ 348 RL_FrameData: 8 TyreTempSensor
+ SG_ SegmentIndex : 0|16@1+ (1,0) [0|255] "" DataLogger
+ SG_ Pixel0 : 16|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Pixel1 : 32|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Pixel2 : 48|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+
+BO_ 352 RR_TyreTemps: 8 TyreTempSensor
+ SG_ LeftMedianTemp : 0|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ CentreMedianTemp : 16|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ RightMedianTemp : 32|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ LateralGradient : 48|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+
+BO_ 353 RR_TyreDetection: 8 TyreTempSensor
+ SG_ Detected : 0|1@1+ (1,0) [0|1] "" DataLogger
+ SG_ Warnings : 1|7@1+ (1,0) [0|127] "" DataLogger
+ SG_ Confidence : 8|8@1+ (1,0) [0|100] "%" DataLogger
+ SG_ TyreWidth : 16|8@1+ (1,0) [0|32] "pixels" DataLogger
+ SG_ SpanStart : 24|8@1+ (1,0) [0|31] "pixel" DataLogger
+ SG_ SpanEnd : 32|8@1+ (1,0) [0|31] "pixel" DataLogger
+ SG_ FrameNumber : 48|16@1+ (1,0) [0|65535] "" DataLogger
+
+BO_ 354 RR_BrakeTemps: 8 TyreTempSensor
+ SG_ InnerBrakeTemp : 0|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ OuterBrakeTemp : 16|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ InnerStatus : 32|8@1+ (1,0) [0|3] "" DataLogger
+ SG_ OuterStatus : 40|8@1+ (1,0) [0|3] "" DataLogger
+
+BO_ 368 RR_Status: 8 TyreTempSensor
+ SG_ FPS : 0|8@1+ (1,0) [0|255] "Hz" DataLogger
+ SG_ FirmwareVersion : 8|8@1+ (1,0) [0|255] "" DataLogger
+ SG_ WheelID : 16|8@1+ (1,0) [0|3] "" DataLogger
+ SG_ Emissivity : 24|8@1+ (1,0) [0|100] "%" DataLogger
+ SG_ FrameNumberFull : 32|32@1+ (1,0) [0|4294967295] "" DataLogger
+
+BO_ 376 RR_RawChA: 8 TyreTempSensor
+ SG_ Channel0 : 0|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel1 : 16|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel2 : 32|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel3 : 48|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+
+BO_ 377 RR_RawChB: 8 TyreTempSensor
+ SG_ Channel4 : 0|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel5 : 16|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel6 : 32|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel7 : 48|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+
+BO_ 378 RR_RawChC: 8 TyreTempSensor
+ SG_ Channel8 : 0|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel9 : 16|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel10 : 32|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel11 : 48|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+
+BO_ 379 RR_RawChD: 8 TyreTempSensor
+ SG_ Channel12 : 0|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel13 : 16|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel14 : 32|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Channel15 : 48|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+
+BO_ 380 RR_FrameData: 8 TyreTempSensor
+ SG_ SegmentIndex : 0|16@1+ (1,0) [0|255] "" DataLogger
+ SG_ Pixel0 : 16|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Pixel1 : 32|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+ SG_ Pixel2 : 48|16@1- (0.1,0) [-3276.8|3276.7] "degC" DataLogger
+
+BO_ 2032 ConfigSetWheel: 8 DataLogger
+ SG_ TargetSerial : 0|32@1+ (1,0) [0|4294967295] "" TyreTempSensor
+ SG_ NewWheelID : 32|8@1+ (1,0) [0|3] "" TyreTempSensor
+
+BO_ 2033 ConfigRequest: 8 DataLogger
+ SG_ RequestType : 0|8@1+ (1,0) [0|255] "" TyreTempSensor
+
+BO_ 2034 ConfigResponse: 8 TyreTempSensor
+ SG_ WheelID : 0|8@1+ (1,0) [0|3] "" DataLogger
+ SG_ BoardSerial : 8|32@1+ (1,0) [0|4294967295] "" DataLogger
+ SG_ FirmwareVersion : 40|8@1+ (1,0) [0|255] "" DataLogger
+ SG_ Emissivity : 48|8@1+ (1,0) [0|100] "%" DataLogger
+ SG_ ChannelMode : 56|8@1+ (1,0) [0|16] "" DataLogger
+
+BO_ 2035 FrameRequest: 8 DataLogger
+ SG_ TargetWheelID : 0|8@1+ (1,0) [0|255] "" TyreTempSensor
+
+BO_ 2036 ConfigSetEmissivity: 8 DataLogger
+ SG_ TargetSerial : 0|32@1+ (1,0) [0|4294967295] "" TyreTempSensor
+ SG_ Emissivity : 32|8@1+ (1,0) [10|100] "%" TyreTempSensor
+
+BO_ 2037 ConfigSetMode: 8 DataLogger
+ SG_ TargetSerial : 0|32@1+ (1,0) [0|4294967295] "" TyreTempSensor
+ SG_ ChannelMode : 32|8@1+ (1,0) [0|16] "" TyreTempSensor
+
+BO_ 2038 ConfigSetBroadcast: 8 DataLogger
+ SG_ TargetSerial : 0|32@1+ (1,0) [0|4294967295] "" TyreTempSensor
+ SG_ BroadcastMode : 32|8@1+ (1,0) [0|1] "" TyreTempSensor
+
+BO_ 2039 DataRequest: 8 DataLogger
+ SG_ TargetWheelID : 0|8@1+ (1,0) [0|255] "" TyreTempSensor
+
+BO_ 2040 ConfigSetCanSpeed: 8 DataLogger
+ SG_ TargetSerial : 0|32@1+ (1,0) [0|4294967295] "" TyreTempSensor
+ SG_ CanSpeedKbps : 32|16@1+ (1,0) [125|1000] "kbps" TyreTempSensor
+
+CM_ BU_ TyreTempSensor "Pico Tyre Temperature Sensor (Adafruit RP2040 CAN Bus Feather)";
+CM_ BU_ DataLogger "Data logging system or ECU";
+
+CM_ BO_ 256 "Front Left tyre temperatures - 10Hz in detect mode";
+CM_ BO_ 257 "Front Left tyre detection status - 10Hz in detect mode";
+CM_ BO_ 258 "Front Left brake pad temperatures - 10Hz";
+CM_ BO_ 272 "Front Left sensor status - 1Hz";
+CM_ BO_ 280 "Front Left raw channels 0-3 - 10Hz in channel mode";
+CM_ BO_ 281 "Front Left raw channels 4-7 - 10Hz in 8/16 channel mode";
+CM_ BO_ 282 "Front Left raw channels 8-11 - 10Hz in 16 channel mode";
+CM_ BO_ 283 "Front Left raw channels 12-15 - 10Hz in 16 channel mode";
+CM_ BO_ 284 "Front Left full frame data segment - on request";
+
+CM_ BO_ 2032 "Set wheel ID for specific board (by serial number)";
+CM_ BO_ 2033 "Request configuration from all sensors";
+CM_ BO_ 2034 "Configuration response from sensor";
+CM_ BO_ 2035 "Request full 768-pixel thermal frame";
+CM_ BO_ 2036 "Set emissivity for specific board";
+CM_ BO_ 2037 "Set channel mode for specific board";
+CM_ BO_ 2038 "Set broadcast mode for specific board";
+CM_ BO_ 2039 "Request single data transmission (for on-request mode)";
+CM_ BO_ 2040 "Set CAN bus speed for specific board (requires reboot)";
+
+CM_ SG_ 257 Warnings "Bit flags: 0x01=HighGradient, 0x02=HighVariance, 0x04=EdgeTyre, 0x08=NoDetection";
+CM_ SG_ 258 InnerStatus "0=OK, 1=Disconnected, 2=Error, 3=NotFound";
+CM_ SG_ 258 OuterStatus "0=OK, 1=Disconnected, 2=Error, 3=NotFound";
+CM_ SG_ 2035 TargetWheelID "0-3 for specific wheel, 0xFF for any/all";
+CM_ SG_ 2039 TargetWheelID "0-3 for specific wheel, 0xFF for any/all";
+
+VAL_ 258 InnerStatus 0 "OK" 1 "Disconnected" 2 "Error" 3 "NotFound" ;
+VAL_ 258 OuterStatus 0 "OK" 1 "Disconnected" 2 "Error" 3 "NotFound" ;
+VAL_ 272 WheelID 0 "FrontLeft" 1 "FrontRight" 2 "RearLeft" 3 "RearRight" ;
+VAL_ 290 InnerStatus 0 "OK" 1 "Disconnected" 2 "Error" 3 "NotFound" ;
+VAL_ 290 OuterStatus 0 "OK" 1 "Disconnected" 2 "Error" 3 "NotFound" ;
+VAL_ 304 WheelID 0 "FrontLeft" 1 "FrontRight" 2 "RearLeft" 3 "RearRight" ;
+VAL_ 322 InnerStatus 0 "OK" 1 "Disconnected" 2 "Error" 3 "NotFound" ;
+VAL_ 322 OuterStatus 0 "OK" 1 "Disconnected" 2 "Error" 3 "NotFound" ;
+VAL_ 336 WheelID 0 "FrontLeft" 1 "FrontRight" 2 "RearLeft" 3 "RearRight" ;
+VAL_ 354 InnerStatus 0 "OK" 1 "Disconnected" 2 "Error" 3 "NotFound" ;
+VAL_ 354 OuterStatus 0 "OK" 1 "Disconnected" 2 "Error" 3 "NotFound" ;
+VAL_ 368 WheelID 0 "FrontLeft" 1 "FrontRight" 2 "RearLeft" 3 "RearRight" ;
+VAL_ 2034 WheelID 0 "FrontLeft" 1 "FrontRight" 2 "RearLeft" 3 "RearRight" ;
+VAL_ 2034 ChannelMode 0 "TyreDetect" 4 "4Channel" 8 "8Channel" 16 "16Channel" ;
+VAL_ 2037 ChannelMode 0 "TyreDetect" 4 "4Channel" 8 "8Channel" 16 "16Channel" ;
+VAL_ 2038 BroadcastMode 0 "OnRequest" 1 "Auto" ;
+VAL_ 2040 CanSpeedKbps 125 "125kbps" 250 "250kbps" 500 "500kbps" 1000 "1Mbps" ;
+
+BA_DEF_ BO_ "GenMsgCycleTime" INT 0 10000;
+BA_DEF_DEF_ "GenMsgCycleTime" 0;
+
+BA_ "GenMsgCycleTime" BO_ 256 100;
+BA_ "GenMsgCycleTime" BO_ 257 100;
+BA_ "GenMsgCycleTime" BO_ 258 100;
+BA_ "GenMsgCycleTime" BO_ 272 1000;
+BA_ "GenMsgCycleTime" BO_ 280 100;
+BA_ "GenMsgCycleTime" BO_ 288 100;
+BA_ "GenMsgCycleTime" BO_ 289 100;
+BA_ "GenMsgCycleTime" BO_ 290 100;
+BA_ "GenMsgCycleTime" BO_ 304 1000;
+BA_ "GenMsgCycleTime" BO_ 312 100;
+BA_ "GenMsgCycleTime" BO_ 320 100;
+BA_ "GenMsgCycleTime" BO_ 321 100;
+BA_ "GenMsgCycleTime" BO_ 322 100;
+BA_ "GenMsgCycleTime" BO_ 336 1000;
+BA_ "GenMsgCycleTime" BO_ 344 100;
+BA_ "GenMsgCycleTime" BO_ 352 100;
+BA_ "GenMsgCycleTime" BO_ 353 100;
+BA_ "GenMsgCycleTime" BO_ 354 100;
+BA_ "GenMsgCycleTime" BO_ 368 1000;
+BA_ "GenMsgCycleTime" BO_ 376 100;
+

@@ -46,7 +46,7 @@ class TelemetryMixin:
                 frame.tpms_rr_pressure = pressure
                 frame.tpms_rr_temp = temp
 
-        # Tyre thermal data (3-zone temps from Pico/MLX90614)
+        # Tyre thermal data (3-zone temps from CAN corner sensors)
         for position in ["FL", "FR", "RL", "RR"]:
             zone_data = self.thermal.get_zone_data(position)
             if zone_data:

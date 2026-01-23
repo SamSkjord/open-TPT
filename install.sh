@@ -125,13 +125,6 @@ PYTHON_DEPS=(
   "pillow>=9.0.0"
   "pyserial>=3.5"
   "adafruit-circuitpython-neokey>=1.1.7"
-  "adafruit-circuitpython-tca9548a>=0.8.3"
-  "adafruit-circuitpython-ads1x15>=2.2.0"
-  # Thermal sensors: MLX90640 for Pico slaves, MLX90614 for direct Pi reading
-  "adafruit-circuitpython-mlx90640>=1.2.0"
-  "adafruit-circuitpython-mlx90614>=1.2.0"
-  # Thermocouple amplifier for brake temperature probes
-  "adafruit-circuitpython-mcp9600>=2.0.0"
   "tpms==2.0.1"
   "pytest>=7.0.0"
   "opencv-python"

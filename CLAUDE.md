@@ -57,8 +57,7 @@
 - Multi-Camera: Dual USB (`/dev/video-rear`, `/dev/video-front`)
 - NeoKey 1x4: Physical buttons
 - Rotary Encoder: I2C QT with NeoPixel (0x36)
-- Pico Thermal: 1/4 MLX90640 (FL)
-- Brake Temps: FL (MCP9601 dual 0x65/0x66), FR (ADC) - rear disabled
+- Corner Sensors: CAN bus (can_b2_0) - Pico RP2040 CAN with MLX90640 thermal + brake temps
 - Toyota Radar: can_b1_0 (keep-alive), can_b1_1 (tracks)
 - OBD2: Speed, RPM, fuel level, Ford Mode 22 HV Battery SOC
 - GPS: PA1616S at 10Hz (serial /dev/ttyS0) for lap timing and CoPilot
@@ -111,7 +110,7 @@ openTPT/
 │   ├── pit_timer_display.py         # Pit timer UI page
 │   └── radar_overlay.py             # Radar visualisation
 ├── hardware/
-│   ├── unified_corner_handler.py    # All tyre sensors
+│   ├── corner_sensor_handler.py     # Corner sensors via CAN
 │   ├── tpms_input_optimized.py      # TPMS (tpms>=2.1.0)
 │   ├── radar_handler.py             # Toyota radar
 │   ├── obd2_handler.py              # OBD2/CAN
@@ -147,47 +146,49 @@ openTPT/
 ### Addresses
 | Address | Device | Purpose |
 |---------|--------|---------|
-| `0x08` | Pico | MLX90640 thermal slave (per corner) |
 | `0x20` | MCP23017 | GPIO expander for OLED buttons |
 | `0x30` | NeoKey | 1x4 button input with NeoPixels |
 | `0x36` | Seesaw | Rotary encoder with NeoPixel |
 | `0x3C` | SSD1305 | OLED Bonnet 128x32 |
-| `0x48` | ADS1115 | ADC for brake IR sensors |
-| `0x5A` | MLX90614 | Single-point IR (per corner) |
 | `0x60` | NeoDriver | I2C to NeoPixel LED strip |
-| `0x65/0x66` | MCP9601 | Thermocouple (inner/outer brake) |
 | `0x68` | ICM20649 | IMU for G-meter |
-| `0x70` | TCA9548A | I2C mux (8 channels) |
 
 ### Bus Speed
-**400kHz (Fast Mode)** - chosen over 1MHz for motorsport EMI resilience. Data throughput is only ~2.7 KB/s (7% capacity), so extra speed provides no benefit while reducing noise margin. Long wire runs to wheel sensors and device compatibility (MCP9601 max 400kHz) also favour the lower speed.
-
-### Mux Channels
-| Channel | Corner | Bitmask |
-|---------|--------|---------|
-| 0 | FL | `0x01` |
-| 1 | FR | `0x02` |
-| 2 | RL | `0x04` |
-| 3 | RR | `0x08` |
+**400kHz (Fast Mode)** - chosen over 1MHz for motorsport EMI resilience.
 
 ---
 
-## Pico I2C Registers (Address 0x08)
+## Corner Sensors CAN (pico_tyre_temp.dbc)
 
-### Key Registers
-| Register | Name | Notes |
-|----------|------|-------|
-| `0x10` | Firmware Version | Read-only |
-| `0x14` | Tyre Detected | 0/1 flag |
-| `0x15` | Confidence | 0-100% |
-| `0x20-21` | Left Temp | int16, tenths °C |
-| `0x22-23` | Centre Temp | int16, tenths °C |
-| `0x24-25` | Right Temp | int16, tenths °C |
-| `0x51` | Full Frame Data | 1536 bytes (768 × int16), tenths °C |
+Corner sensors (tyre temps, brake temps, detection) use CAN bus instead of I2C for improved reliability and simplified wiring.
 
-Convert: `temp_celsius = int16_value / 10.0`
+### CAN Configuration
+| Setting | Value |
+|---------|-------|
+| Channel | `can_b2_0` |
+| Bitrate | 500 kbps |
+| DBC File | `opendbc/pico_tyre_temp.dbc` |
 
-Full frame: 24×32 pixel thermal image, read via `i2c_rdwr` block transfer.
+### Message IDs per Corner
+| Corner | TyreTemps | Detection | BrakeTemps | Status | FrameData |
+|--------|-----------|-----------|------------|--------|-----------|
+| FL | 0x100 | 0x101 | 0x102 | 0x110 | 0x11C |
+| FR | 0x120 | 0x121 | 0x122 | 0x130 | 0x13C |
+| RL | 0x140 | 0x141 | 0x142 | 0x150 | 0x15C |
+| RR | 0x160 | 0x161 | 0x162 | 0x170 | 0x17C |
+
+### Message Contents
+- **TyreTemps** (10Hz): Left/Centre/Right median temps + lateral gradient (int16, 0.1 degC)
+- **TyreDetection** (10Hz): Detected flag, Warnings, Confidence, TyreWidth
+- **BrakeTemps** (10Hz): Inner/Outer temps + status (0=OK, 1=Disconnected, 2=Error, 3=NotFound)
+- **Status** (1Hz): FPS, FirmwareVersion, WheelID, Emissivity
+- **FrameData** (on request): 256 segments x 3 pixels for full 768-pixel thermal frame
+
+### Command IDs
+| ID | Name | Purpose |
+|----|------|---------|
+| 0x7F3 | FrameRequest | Request full thermal frame from specific wheel |
+| 0x7F1 | ConfigRequest | Request configuration from all sensors |
 
 ---
 
@@ -237,10 +238,9 @@ sudo journalctl -u openTPT.service -f | grep -E "failures|error|backoff"
 | Issue | Solution |
 |-------|----------|
 | **IMU I/O errors** | Non-critical, auto-retries. Restart service if persistent |
-| **I2C bus lockup** | Mux reset not wired (GPIO17 conflicts with CAN HAT). Power cycle if severe |
-| **Heatmaps grey/offline** | Stale data cached 1s (v0.12+). Adjust `THERMAL_STALE_TIMEOUT` |
+| **Corner sensor offline** | Check CAN bus connection and `candump can_b2_0` for messages |
+| **Heatmaps grey/offline** | Stale data cached 0.5s. Check `CORNER_SENSOR_CAN_TIMEOUT_S` |
 | **6+ hour crashes** | Fixed v0.11+ (GC every 60s, surface clear every 10min) |
-| **Brake temps wrong** | Check `BRAKE_ROTOR_EMISSIVITY` in config.py (default 0.95) |
 | **throttled=0x50000** | Historical undervoltage, normal on CM4-POE-UPS. Check bits 0-3 for current issues |
 
 ---
@@ -374,11 +374,10 @@ All settings in `config.py` (root level), organised into 12 sections:
 - Modes: shift (RPM), delta (lap time), overtake (radar), off
 - Direction: centre-out, edges-in, left-to-right, right-to-left
 
-### Brake Emissivity
-- MLX90614/ADC sensors use e=1.0 default
-- Software correction: `T_actual = T_measured / e^0.25`
-- Configure per corner in `BRAKE_ROTOR_EMISSIVITY`
-- Cast iron oxidised: 0.95, machined: 0.60-0.70
+### Brake Temperatures
+- Provided by CAN corner sensors (inner/outer zones)
+- Emissivity configured in sensor firmware (default 0.95)
+- Status includes sensor health (OK, Disconnected, Error, NotFound)
 
 ### CoPilot Rally Callouts (v0.18.1)
 - OSM-based corner detection with audio callouts

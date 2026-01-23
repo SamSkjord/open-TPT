@@ -84,8 +84,7 @@ ssh pi@192.168.199.246 "sudo systemctl status openTPT.service"
 - **G-Meter:** ICM-20649 IMU with real-time acceleration tracking
 - **OBD2:** Vehicle speed, RPM, fuel level via CAN bus
 - **CAN Auto-Start:** All 4 CAN interfaces automatically configured on boot
-- **Pico Thermal:** 1/4 operational (FL connected)
-- **Brake Temps:** FL (MCP9601 dual thermocouples), FR (ADC)
+- **Corner Sensors:** Tyre/brake temps via CAN (can_b2_0)
 - **Toyota Radar:** Enabled (can_b1_0/can_b1_1)
 - **GPS:** PA1616S at 10Hz for lap timing
 - **NeoDriver:** LED strip for shift/delta/overtake
@@ -271,8 +270,8 @@ sudo journalctl -u usb-patch.service
 - G-meter with IMU acceleration tracking and calibration wizard
 - OBD2 vehicle data (speed, RPM, fuel level, HV battery SOC)
 - Automatic CAN interface setup on boot
-- Tyre thermal imaging (MLX90640 or MLX90614) with temperature overlays
-- Brake temperature monitoring (MCP9601 thermocouples, IR sensors + ADC)
+- Tyre thermal imaging via CAN corner sensors (MLX90640)
+- Brake temperature monitoring via CAN corner sensors (inner/outer zones)
 - Lock-free rendering (60 FPS target)
 - Numba-optimised thermal processing
 - Toyota radar overlay with collision warnings

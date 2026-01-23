@@ -370,43 +370,6 @@ PRESSURE_REAR_OPTIMAL = 34.0  # Rear tyre optimal pressure
 
 I2C_BUS = 1  # Default I2C bus on Raspberry Pi 4
 
-# ==============================================================================
-# I2C MULTIPLEXER (TCA9548A)
-# ==============================================================================
-
-I2C_MUX_ADDRESS = 0x70  # TCA9548A default address
-I2C_MUX_RESET_PIN = None  # Not wired - GPIO17 conflicts with SPI1 CE1 (CAN HAT)
-# To enable: wire TCA9548A RESET to a free GPIO (6, 24, 26, or 27) and set here
-I2C_MUX_RESET_FAILURES = 3  # Consecutive failures before triggering mux reset
-
-# ==============================================================================
-# I2C DEVICE ADDRESSES
-# ==============================================================================
-
-ADS_ADDRESS = 0x48  # ADS1115/ADS1015 ADC default address
-
-# MCP9601 thermocouple amplifier addresses (two per corner for inner/outer pads)
-MCP9601_ADDRESSES = {
-    "inner": 0x65,  # Inner pad sensor
-    "outer": 0x66,  # Outer pad sensor
-}
-
-# ==============================================================================
-# I2C TIMING CONFIGURATION
-# ==============================================================================
-
-I2C_TIMEOUT_S = 0.5  # Timeout for I2C operations (seconds)
-I2C_SETTLE_DELAY_S = 0.005  # Delay after I2C operations for bus settle (seconds)
-I2C_MUX_RESET_PULSE_S = 0.001  # Mux reset pulse duration (seconds)
-I2C_MUX_STABILISE_S = 0.010  # Delay after mux reset for stabilisation (seconds)
-
-# ==============================================================================
-# I2C EXPONENTIAL BACKOFF (for error recovery)
-# ==============================================================================
-
-I2C_BACKOFF_INITIAL_S = 1.0  # Initial backoff delay (seconds)
-I2C_BACKOFF_MULTIPLIER = 2  # Backoff multiplier per failure
-I2C_BACKOFF_MAX_S = 64.0  # Maximum backoff delay (seconds)
 
 
 # ##############################################################################
@@ -416,38 +379,11 @@ I2C_BACKOFF_MAX_S = 64.0  # Maximum backoff delay (seconds)
 # ##############################################################################
 
 # ==============================================================================
-# TYRE SENSORS (Thermal)
+# TYRE SENSORS (Thermal via CAN)
 # ==============================================================================
 
-# Per-tyre sensor type selection
-# Options: "pico" for Pico I2C slave with MLX90640, "mlx90614" for single-point IR sensor
-TYRE_SENSOR_TYPES = {
-    "FL": "pico",  # Front Left
-    "FR": "pico",  # Front Right
-    "RL": "pico",  # Rear Left
-    "RR": "pico",  # Rear Right
-}
-
-# Pico I2C slave modules (MLX90640 thermal cameras)
-# Maps tyre positions to I2C multiplexer channels
-PICO_MUX_CHANNELS = {
-    "FL": 0,  # Front Left on channel 0
-    "FR": 1,  # Front Right on channel 1
-    "RL": 2,  # Rear Left on channel 2
-    "RR": 3,  # Rear Right on channel 3
-}
-
-# MLX90614 single-point IR sensors
-# Maps tyre positions to I2C multiplexer channels
-MLX90614_MUX_CHANNELS = {
-    "FL": 0,  # Front Left on channel 0
-    "FR": 1,  # Front Right on channel 1
-    "RL": 2,  # Rear Left on channel 2
-    "RR": 3,  # Rear Right on channel 3
-}
-
 # MLX90640 thermal camera settings (24x32 pixels)
-# Used by Pico I2C slaves for full thermal imaging
+# Used by Pico corner sensors for full thermal imaging
 MLX_WIDTH = 32
 MLX_HEIGHT = 24
 
@@ -467,70 +403,12 @@ MLX_DISPLAY_WIDTH = int(
 MLX_DISPLAY_HEIGHT = int(172 * SCALE_Y)  # Height of displayed heatmap
 
 # ==============================================================================
-# BRAKE SENSORS
+# BRAKE SENSORS (via CAN from corner sensors)
 # ==============================================================================
 
-# Per-corner brake sensor type selection
-# Options: "adc" for IR sensors via ADS1115, "mlx90614" for single-point IR,
-#          "mcp9601" for thermocouple via MCP9601, "obd" for CAN/OBD-II
-BRAKE_SENSOR_TYPES = {
-    "FL": "mcp9601",  # Front Left - MCP9601 thermocouples (inner/outer)
-    "FR": "adc",  # Front Right - ADC IR sensor
-    "RL": None,  # Rear Left - No sensor connected
-    "RR": None,  # Rear Right - No sensor connected
-}
-
-# ADC channel mapping for IR brake sensors (ADS1115)
-# Used when sensor type is "adc"
-ADC_BRAKE_CHANNELS = {
-    "FL": 0,  # A0
-    "FR": 1,  # A1
-    "RL": 2,  # A2
-    "RR": 3,  # A3
-}
-
-# MLX90614 I2C multiplexer channel mapping
-# Used when sensor type is "mlx90614"
-# Shares same mux channels as tyre sensors (one channel per corner)
-MLX90614_BRAKE_MUX_CHANNELS = {
-    "FL": 0,  # Channel 0 - shared with tyre sensor
-    "FR": 1,  # Channel 1 - shared with tyre sensor
-    "RL": 2,  # Channel 2 - shared with tyre sensor
-    "RR": 3,  # Channel 3 - shared with tyre sensor
-}
-
-# MCP9601 I2C multiplexer channel mapping
-# Shares same mux channels as other corner sensors
-MCP9601_MUX_CHANNELS = {
-    "FL": 0,  # Channel 0
-    "FR": 1,  # Channel 1
-    "RL": 2,  # Channel 2
-    "RR": 3,  # Channel 3
-}
-
-# MCP9601 Thermocouple Amplifier Configuration
-# Supports dual sensors per corner (inner and outer brake pads)
-# Set to True to enable dual-zone brake temperature monitoring
-MCP9601_DUAL_ZONE = {
-    "FL": True,  # Inner (0x65) and outer (0x66) thermocouples installed
-    "FR": False,
-    "RL": False,
-    "RR": False,
-}
-
-# Mock data for testing dual-zone brake display without hardware
-# Set to True to show animated test data for dual-zone brakes
-BRAKE_DUAL_ZONE_MOCK = False
-
-# OBD/CAN brake temperature mapping
-# Used when sensor type is "obd"
-# Maps brake positions to CAN signal names (if available)
-OBD_BRAKE_SIGNALS = {
-    "FL": None,  # Not typically available via OBD-II
-    "FR": None,  # Most cars don't broadcast brake temps
-    "RL": None,  # Would need custom CAN implementation
-    "RR": None,  # or aftermarket ECU
-}
+# Brake temperatures are now provided by CAN corner sensors via BrakeTemps messages.
+# Each corner sensor reports inner/outer brake temps with sensor status.
+# See CORNER_SENSOR_CAN_IDS for message IDs.
 
 # Brake display positions
 BRAKE_POSITIONS = {
@@ -540,39 +418,10 @@ BRAKE_POSITIONS = {
     "RR": scale_position((420, 344)),
 }
 
-# Brake rotor emissivity values
-# Emissivity ranges from 0.0 to 1.0, where 1.0 is a perfect black body
-#
-# IMPORTANT: MLX90614 and other IR sensors have a factory default emissivity
-# setting of 1.0 (perfect black body). Since brake rotors have lower emissivity,
-# the sensor will read LOWER than the actual temperature. The software applies
-# correction using apply_emissivity_correction() to compensate.
-#
-# NOTE: This is different from tyre sensors (MLX90640 via Pico), where emissivity
-# is configured in the Pico firmware (default 0.95 for rubber tyres) and applied
-# during temperature calculation. Brake sensors use software correction because
-# MLX90614/ADC sensors operate at their factory default ε = 1.0.
-#
-# How it works:
-#   1. MLX90614 sensor assumes ε = 1.0 (factory default, not changed)
-#   2. Actual brake rotor has ε = 0.95 (oxidised cast iron)
-#   3. Sensor reads lower than actual (less radiation from non-black-body surface)
-#   4. Software correction adjusts reading upward: T_actual = T_measured / ε^0.25
-#
-# Typical rotor emissivity values:
-#   - Cast iron (rusty/oxidised): 0.95
-#   - Cast iron (machined/clean): 0.60-0.70
-#   - Steel (oxidised): 0.80
-#   - Steel (polished): 0.15-0.25
-#   - Ceramic composite: 0.90-0.95
-#
-# Adjust per-corner values below to match your specific rotor materials.
-BRAKE_ROTOR_EMISSIVITY = {
-    "FL": 0.95,  # Front Left - typical oxidised cast iron
-    "FR": 0.95,  # Front Right
-    "RL": 0.95,  # Rear Left
-    "RR": 0.95,  # Rear Right
-}
+# Emissivity for corner sensors
+# Emissivity is configured in the corner sensor firmware (default 0.95) and
+# reported via the CAN Status message. No software correction is needed as
+# emissivity is applied during temperature calculation on the sensor itself.
 
 # ==============================================================================
 # TPMS (Tyre Pressure Monitoring System)
@@ -810,46 +659,35 @@ OBD_RPM_SMOOTHING_SAMPLES = 3  # Samples for RPM smoothing
 OBD_THROTTLE_SMOOTHING_SAMPLES = 2  # Samples for throttle smoothing
 
 # ==============================================================================
-# CORNER SENSORS CAN (Future: Tyre/Brake temps via CAN bus)
+# CORNER SENSORS CAN (Tyre/Brake temps via CAN bus)
 # ==============================================================================
 
 # Enable/disable CAN-based corner sensors
-# When enabled, corner sensor data is read from CAN instead of I2C
-# Requires Pico firmware with CAN support (MCP2515 or similar)
-CORNER_SENSOR_CAN_ENABLED = False  # Set to True when CAN sensors are ready
+# Corner sensors use Adafruit RP2040 CAN Bus Feather with MLX90640 thermal camera
+CORNER_SENSOR_CAN_ENABLED = True
 
 # Corner sensor CAN configuration
 # Available interfaces: can_b1_0, can_b1_1, can_b2_0, can_b2_1
 # Corner sensors use Board 2, CAN_0 connector (can_b2_0)
-# This channel was previously allocated to Ford Hybrid (now on HS-CAN via OBD2)
 CORNER_SENSOR_CAN_CHANNEL = "can_b2_0"
 CORNER_SENSOR_CAN_BITRATE = 500000  # Standard CAN bitrate (500 kbps)
 
-# CAN message IDs for each corner (standard 11-bit IDs)
-# Each corner sends one message containing tyre temperature data
-# Message format (8 bytes):
-#   Bytes 0-1: Left temp (int16, tenths of degrees C, big-endian)
-#   Bytes 2-3: Centre temp (int16, tenths of degrees C, big-endian)
-#   Bytes 4-5: Right temp (int16, tenths of degrees C, big-endian)
-#   Byte 6: Confidence (0-100%)
-#   Byte 7: Flags (bit 0: tyre detected, bits 1-7: reserved)
+# DBC file for decoding corner sensor CAN messages
+CORNER_SENSOR_CAN_DBC = "opendbc/pico_tyre_temp.dbc"
+
+# CAN message IDs per corner (from pico_tyre_temp.dbc)
+# Each corner has: TyreTemps, TyreDetection, BrakeTemps, Status, FrameData
 CORNER_SENSOR_CAN_IDS = {
-    "FL": 0x100,  # Front Left
-    "FR": 0x101,  # Front Right
-    "RL": 0x102,  # Rear Left
-    "RR": 0x103,  # Rear Right
+    "FL": {"tyre": 0x100, "detection": 0x101, "brake": 0x102, "status": 0x110, "frame": 0x11C},
+    "FR": {"tyre": 0x120, "detection": 0x121, "brake": 0x122, "status": 0x130, "frame": 0x13C},
+    "RL": {"tyre": 0x140, "detection": 0x141, "brake": 0x142, "status": 0x150, "frame": 0x15C},
+    "RR": {"tyre": 0x160, "detection": 0x161, "brake": 0x162, "status": 0x170, "frame": 0x17C},
 }
 
-# Optional: Brake temperature message IDs (separate messages)
-# Message format (8 bytes):
-#   Bytes 0-1: Inner temp (int16, tenths of degrees C, big-endian)
-#   Bytes 2-3: Outer temp (int16, tenths of degrees C, big-endian)
-#   Bytes 4-7: Reserved
-CORNER_SENSOR_CAN_BRAKE_IDS = {
-    "FL": 0x110,  # Front Left brake
-    "FR": 0x111,  # Front Right brake
-    "RL": 0x112,  # Rear Left brake
-    "RR": 0x113,  # Rear Right brake
+# Command message IDs (sent by openTPT to sensors)
+CORNER_SENSOR_CAN_CMD_IDS = {
+    "frame_request": 0x7F3,  # Request full thermal frame from specific wheel
+    "config_request": 0x7F1,  # Request configuration from all sensors
 }
 
 # Corner sensor CAN timing

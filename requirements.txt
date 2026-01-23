@@ -7,18 +7,6 @@ pygame>=2.0.0
 # Hardware interfaces
 adafruit-blinka>=8.0.0
 
-# I2C multiplexer (TCA9548A) - for accessing multiple sensors
-adafruit-circuitpython-tca9548a>=0.7.0
-
-# ADC (ADS1115) - for brake temperature IR sensors
-adafruit-circuitpython-ads1x15>=2.2.0
-
-# Thermal sensors
-# Note: MLX90640 used by Pico I2C slaves (not directly by Pi)
-# Pi reads processed data from Picos via I2C slave interface
-adafruit-circuitpython-mlx90640>=1.2.0  # Optional: for setup/diagnostic tools
-adafruit-circuitpython-mlx90614>=1.2.0  # Single-point IR sensors (per-tyre config)
-
 # NeoPixel buttons and rotary encoder
 adafruit-circuitpython-seesaw>=1.12.0  # Used for NeoKey 1x4 and I2C QT Rotary Encoder
 adafruit-circuitpython-neopixel>=6.3.0

@@ -25,7 +25,7 @@ class TyreTempsMenuMixin:
     Mixin providing tyre temperature sensor menu functionality.
 
     Requires:
-        self.corner_sensors: UnifiedCornerHandler instance
+        self.corner_sensors: CornerSensorHandler instance
         self.input_handler: InputHandler for button polling
     """
 
@@ -67,14 +67,28 @@ class TyreTempsMenuMixin:
         settings = get_settings()
         temp_unit = settings.get("units.temp", "C")
 
+        # Build status string with CAN-specific info
         fw_ver = info.get("firmware_version")
+        emissivity = info.get("emissivity")
+        fps = info.get("fps")
+
         if temp is not None:
             # Convert if needed
             if temp_unit == "F":
                 from utils.conversions import celsius_to_fahrenheit
                 temp = celsius_to_fahrenheit(temp)
+
+            # Build detail string
+            details = []
             if fw_ver is not None:
-                return f"{position}: {temp:.0f}{temp_unit} (FW v{fw_ver})"
+                details.append(f"FW v{fw_ver}")
+            if emissivity is not None:
+                details.append(f"e={emissivity/100:.2f}")
+            if fps is not None and fps > 0:
+                details.append(f"{fps}Hz")
+
+            if details:
+                return f"{position}: {temp:.0f}{temp_unit} ({', '.join(details)})"
             return f"{position}: {temp:.0f}{temp_unit}"
 
         if fw_ver is not None:
@@ -169,8 +183,9 @@ class TyreTempsMenuMixin:
         if info is None:
             return f"{position}: Not configured"
 
-        if info.get("sensor_type") != "pico":
-            return f"{position}: MLX90614 - no full frame"
+        sensor_type = info.get("sensor_type")
+        if sensor_type not in ("pico", "can"):
+            return f"{position}: {sensor_type} - no full frame"
 
         if not info.get("online", False):
             return f"{position}: Sensor offline"
