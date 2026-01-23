@@ -73,7 +73,7 @@ from gui.menu import MenuSystem
 from hardware.neodriver_handler import NeoDriverHandler, NeoDriverMode, NeoDriverDirection
 from hardware.oled_bonnet_handler import OLEDBonnetHandler, OLEDBonnetMode
 from hardware.tpms_input_optimized import TPMSHandler
-from hardware.unified_corner_handler import UnifiedCornerHandler
+from hardware.corner_sensor_handler import CornerSensorHandler
 
 logger = logging.getLogger('openTPT.init')
 
@@ -482,7 +482,7 @@ class InitializationMixin:
         self._show_splash("Initialising sensors...", 0.55)
         self.tpms = TPMSHandler()
         logger.debug("tpms init done t=%.1fs", time.time()-_boot_start)
-        self.corner_sensors = UnifiedCornerHandler()  # Unified tyre+brake handler
+        self.corner_sensors = CornerSensorHandler()
         logger.debug("corner sensors init done t=%.1fs", time.time()-_boot_start)
 
         # Aliases for backward compatibility

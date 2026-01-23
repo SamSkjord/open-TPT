@@ -110,7 +110,7 @@ openTPT/
 │   ├── pit_timer_display.py         # Pit timer UI page
 │   └── radar_overlay.py             # Radar visualisation
 ├── hardware/
-│   ├── unified_corner_handler.py    # All tyre sensors
+│   ├── corner_sensor_handler.py     # Corner sensors via CAN
 │   ├── tpms_input_optimized.py      # TPMS (tpms>=2.1.0)
 │   ├── radar_handler.py             # Toyota radar
 │   ├── obd2_handler.py              # OBD2/CAN

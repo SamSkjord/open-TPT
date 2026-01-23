@@ -524,7 +524,7 @@ openTPT/
 │   ├── icon_handler.py                  # Icon rendering
 │   └── scale_bars.py                    # Temperature/pressure scale bars
 ├── hardware/
-│   ├── unified_corner_handler.py        # Corner sensors via CAN (tyre/brake temps)
+│   ├── corner_sensor_handler.py         # Corner sensors via CAN (tyre/brake temps)
 │   ├── tpms_input_optimized.py          # TPMS with bounded queues
 │   ├── radar_handler.py                 # Toyota radar CAN handler
 │   ├── obd2_handler.py                  # OBD2/CAN vehicle data
