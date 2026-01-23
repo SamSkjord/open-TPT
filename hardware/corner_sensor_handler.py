@@ -246,8 +246,9 @@ class CornerSensorHandler(BoundedQueueHardwareHandler):
                 else:
                     brake[pos] = {"temp": None, "inner": None, "outer": None}
 
-        self._tyre_snapshot = tyre
-        self._brake_snapshot = brake
+            # Atomic snapshot swap (reference assignment is atomic, but keep in lock for consistency)
+            self._tyre_snapshot = tyre
+            self._brake_snapshot = brake
 
     # ---- Public API ----
 

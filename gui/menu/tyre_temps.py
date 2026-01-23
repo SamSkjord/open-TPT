@@ -25,7 +25,7 @@ class TyreTempsMenuMixin:
     Mixin providing tyre temperature sensor menu functionality.
 
     Requires:
-        self.corner_sensors: UnifiedCornerHandler instance
+        self.corner_sensors: CornerSensorHandler instance
         self.input_handler: InputHandler for button polling
     """
 
