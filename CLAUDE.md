@@ -561,11 +561,13 @@ git commit -m "Optimize thermal processing"  # wrong
 
 | Document | Purpose |
 |----------|---------|
-| `README.md` | Project overview, features, configuration |
+| `README.md` | Project overview, features, configuration, **TODO lists** |
 | `CHANGELOG.md` | Version history with detailed changes |
 | `QUICKSTART.md` | Quick commands for daily use |
 | `DEPLOYMENT.md` | Pi deployment and boot splash setup |
 | `CLAUDE.md` | AI assistant context (this file) |
+
+**Note:** Hardware and Software TODO lists are maintained in `README.md` (see "Hardware TODO" and "Software TODO" sections).
 
 ### Keeping Documentation Updated
 
