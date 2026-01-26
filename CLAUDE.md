@@ -66,6 +66,20 @@
 - OLED Bonnet: 128x32 SSD1305 at 0x3C with MCP23017 buttons at 0x20 (10 VBOX-style pages)
 - CoPilot: Rally callouts using OSM map data (USB/NVMe storage for 6.4GB roads.db)
 
+### Pi 5 Compatibility
+openTPT is compatible with both Pi 4 and Pi 5. The RP1 I/O chip on Pi 5 is abstracted by Adafruit Blinka and standard Linux interfaces.
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| I2C devices | Compatible | Same addresses, same bus |
+| CAN bus | Compatible | Standard socketcan interface |
+| USB cameras | Compatible | Same udev rules |
+| SPI CAN HATs | Compatible | Same GPIO pins |
+| GPS UART | **Verify** | May need `/dev/ttyS0` vs `/dev/ttyAMA0` |
+| TPMS UART | Compatible | `/dev/ttyAMA3` works on both |
+
+See `DEPLOYMENT.md` section 6 for migration steps.
+
 ---
 
 ## Directory Structure

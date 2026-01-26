@@ -200,7 +200,62 @@ EOF
 sudo systemctl enable rtc-hctosys.service
 ```
 
-### 6. I2C Bus Speed Configuration
+### 6. Raspberry Pi 5 Migration
+
+openTPT is compatible with both Raspberry Pi 4 and Pi 5. The Pi 5 uses a new RP1 I/O chip, but this is abstracted by Adafruit Blinka and standard Linux interfaces.
+
+**What Works Unchanged:**
+- I2C devices (NeoKey, encoder, OLED, NeoDriver, IMU) - same addresses, same bus
+- CAN bus (python-can with socketcan) - standard Linux interface
+- USB cameras - same udev rules apply
+- SPI CAN HATs - same GPIO pins for SPI0/SPI1
+- Display output - same HDMI configuration
+
+**Potential Differences to Verify:**
+
+| Component | Pi 4 Path | Pi 5 Path | Notes |
+|-----------|-----------|-----------|-------|
+| GPS UART | /dev/ttyS0 | /dev/ttyAMA0 | May need config.py update |
+| TPMS UART | /dev/ttyAMA3 | /dev/ttyAMA3 | Usually compatible |
+| Config file | /boot/firmware/config.txt | /boot/firmware/config.txt | Same on modern OS |
+
+**Migration Steps:**
+
+1. **Test UART paths** - GPS may require updating `GPS_SERIAL_PORT` in config.py:
+   ```bash
+   # Check available serial ports
+   ls -la /dev/tty*
+
+   # Test GPS on standard path
+   sudo cat /dev/ttyS0
+
+   # If no data, try AMA path
+   sudo cat /dev/ttyAMA0
+   ```
+
+2. **Verify I2C devices**:
+   ```bash
+   sudo i2cdetect -y 1
+   # Should show: 0x20, 0x30, 0x36, 0x3C, 0x60, 0x68
+   ```
+
+3. **Test CAN interfaces**:
+   ```bash
+   ip link show | grep can_b
+   candump can_b2_0  # Should show corner sensor messages
+   ```
+
+4. **Run install.sh** - handles Pi 5 automatically:
+   ```bash
+   sudo ./install.sh
+   ```
+
+**Performance Notes:**
+- Pi 5 has faster CPU - may see improved render times
+- More RAM bandwidth - thermal processing may be faster
+- Same 60 FPS target applies
+
+### 7. I2C Bus Speed Configuration
 
 The I2C bus runs at **400kHz (Fast Mode)** rather than 1MHz (Fast Mode Plus) for improved reliability in the motorsport environment.
 
