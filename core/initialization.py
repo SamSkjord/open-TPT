@@ -350,10 +350,18 @@ class InitializationMixin:
                 logger.warning("Could not initialise radar: %s", e)
                 self.radar = None
 
-        # Initialise camera (with optional radar)
+        # Initialise corner sensors early (needed for camera overlay - laser ranger)
+        self.corner_sensors = CornerSensorHandler()
+        logger.debug("corner sensors init done t=%.1fs", time.time()-_boot_start)
+
+        # Aliases for backward compatibility
+        self.thermal = self.corner_sensors  # Tyre data access
+        self.brakes = self.corner_sensors   # Brake data access
+
+        # Initialise camera (with optional radar and corner sensors for laser ranger)
         self._show_splash("Initialising cameras...", 0.15)
         logger.debug("camera init start t=%.1fs", time.time()-_boot_start)
-        self.camera = Camera(self.screen, radar_handler=self.radar)
+        self.camera = Camera(self.screen, radar_handler=self.radar, corner_sensors=self.corner_sensors)
         logger.debug("camera init done t=%.1fs", time.time()-_boot_start)
 
         # Initialise input handler (NeoKey)
@@ -482,12 +490,7 @@ class InitializationMixin:
         self._show_splash("Initialising sensors...", 0.55)
         self.tpms = TPMSHandler()
         logger.debug("tpms init done t=%.1fs", time.time()-_boot_start)
-        self.corner_sensors = CornerSensorHandler()
-        logger.debug("corner sensors init done t=%.1fs", time.time()-_boot_start)
-
-        # Aliases for backward compatibility
-        self.thermal = self.corner_sensors  # Tyre data access
-        self.brakes = self.corner_sensors   # Brake data access
+        # Note: corner_sensors already initialised earlier (needed for camera laser ranger)
 
         # Initialise IMU handler (optional, for G-meter)
         self._show_splash("Initialising IMU...", 0.65)
@@ -665,6 +668,6 @@ class InitializationMixin:
             if settings.get("oled.enabled", True):
                 self.oled_bonnet.start()  # Start OLED update thread
         self.tpms.start()
-        self.corner_sensors.start()
+        self.corner_sensors.start()  # Also starts laser ranger via shared CAN notifier
         self._show_splash("Ready!", 1.0)
         logger.debug("threads started t=%.1fs", time.time()-_boot_start)

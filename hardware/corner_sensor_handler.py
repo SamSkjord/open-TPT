@@ -2,6 +2,7 @@
 Corner Sensor Handler - CAN bus interface for tyre and brake temperatures.
 
 Receives data from four Pico-based corner sensors via CAN using pico_tyre_temp.dbc.
+Also handles laser ranger (TOF distance sensor) on the same CAN bus.
 """
 
 import logging
@@ -64,11 +65,25 @@ class CornerData:
     frame_complete: bool = False
 
 
+@dataclass
+class LaserRangerData:
+    """Live data from the laser ranger sensor."""
+    distance_mm: Optional[int] = None  # Distance in millimetres
+    status: int = 0  # 0=OK, 1=Error
+    error_code: int = 0  # Laser error code
+    measurement_count: int = 0  # Rolling counter
+    measurement_rate: float = 0.0  # Hz
+    firmware_version: int = 0
+    sensor_id: int = 0
+    last_update: float = 0.0
+
+
 class CornerSensorHandler(BoundedQueueHardwareHandler):
     """
     CAN handler for corner sensors (tyre temps, brake temps, detection).
 
     All four corners broadcast on can_b2_0 - no polling needed.
+    Also handles laser ranger (TOF distance sensor) on the same bus.
     Data access is lock-free via atomic snapshot updates.
     """
 
@@ -83,6 +98,12 @@ class CornerSensorHandler(BoundedQueueHardwareHandler):
             CORNER_SENSOR_CAN_IDS,
             CORNER_SENSOR_CAN_CMD_IDS,
             CORNER_SENSOR_CAN_TIMEOUT_S,
+            # Laser ranger config
+            LASER_RANGER_ENABLED,
+            LASER_RANGER_CAN_DBC,
+            LASER_RANGER_RANGE_DATA_ID,
+            LASER_RANGER_STATUS_ID,
+            LASER_RANGER_TIMEOUT_S,
         )
 
         self._channel = CORNER_SENSOR_CAN_CHANNEL
@@ -91,13 +112,25 @@ class CornerSensorHandler(BoundedQueueHardwareHandler):
         self._cmd_ids = CORNER_SENSOR_CAN_CMD_IDS
         self._timeout = CORNER_SENSOR_CAN_TIMEOUT_S
 
+        # Laser ranger config
+        self._laser_enabled = LASER_RANGER_ENABLED
+        self._laser_dbc_path = LASER_RANGER_CAN_DBC
+        self._laser_range_id = LASER_RANGER_RANGE_DATA_ID
+        self._laser_status_id = LASER_RANGER_STATUS_ID
+        self._laser_timeout = LASER_RANGER_TIMEOUT_S
+
         self._bus: Optional[can.Bus] = None
         self._db: Optional[cantools.database.Database] = None
+        self._laser_db: Optional[cantools.database.Database] = None
         self._notifier: Optional[can.Notifier] = None
 
         # Per-corner state (updated by notifier thread)
         self._corners: Dict[str, CornerData] = {p: CornerData() for p in POSITIONS}
         self._lock = threading.Lock()
+
+        # Laser ranger state
+        self._laser_data = LaserRangerData()
+        self._laser_snapshot: Optional[LaserRangerData] = None
 
         # Snapshots for lock-free render access
         self._tyre_snapshot: Optional[Dict] = None
@@ -111,25 +144,34 @@ class CornerSensorHandler(BoundedQueueHardwareHandler):
             self._init_can(CORNER_SENSOR_CAN_BITRATE)
 
     def _init_can(self, bitrate: int):
-        """Load DBC and open CAN bus."""
-        # Load DBC
-        dbc_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            self._dbc_path
-        )
+        """Load DBC files and open CAN bus."""
+        base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+        # Load corner sensor DBC
+        dbc_path = os.path.join(base_path, self._dbc_path)
         try:
             self._db = cantools.database.load_file(dbc_path)
         except Exception as e:
             logger.error("Failed to load DBC %s: %s", dbc_path, e)
             return
 
-        # Build message ID map
+        # Build message ID map for corner sensors
         for pos, ids in self._can_ids.items():
             self._msg_map[ids["tyre"]] = (pos, "tyre")
             self._msg_map[ids["detection"]] = (pos, "detection")
             self._msg_map[ids["brake"]] = (pos, "brake")
             self._msg_map[ids["status"]] = (pos, "status")
             self._msg_map[ids["frame"]] = (pos, "frame")
+
+        # Load laser ranger DBC (optional)
+        if self._laser_enabled:
+            laser_dbc_path = os.path.join(base_path, self._laser_dbc_path)
+            try:
+                self._laser_db = cantools.database.load_file(laser_dbc_path)
+                logger.info("Loaded laser ranger DBC: %s", laser_dbc_path)
+            except Exception as e:
+                logger.warning("Failed to load laser ranger DBC %s: %s", laser_dbc_path, e)
+                self._laser_enabled = False
 
         # Open CAN bus
         try:
@@ -160,7 +202,13 @@ class CornerSensorHandler(BoundedQueueHardwareHandler):
             self._notifier.stop()
 
     def _on_message(self, msg: can.Message):
-        """CAN message callback - decode and update corner data."""
+        """CAN message callback - decode and update corner/laser data."""
+        # Check for laser ranger messages first
+        if self._laser_enabled and msg.arbitration_id in (self._laser_range_id, self._laser_status_id):
+            self._on_laser_message(msg)
+            return
+
+        # Check for corner sensor messages
         if msg.arbitration_id not in self._msg_map:
             return
 
@@ -207,6 +255,32 @@ class CornerSensorHandler(BoundedQueueHardwareHandler):
                 c.frame_segments[idx] = [data.get("Pixel0"), data.get("Pixel1"), data.get("Pixel2")]
                 c.frame_complete = len(c.frame_segments) >= 256
 
+    def _on_laser_message(self, msg: can.Message):
+        """Handle laser ranger CAN messages."""
+        if not self._laser_db:
+            return
+
+        try:
+            db_msg = self._laser_db.get_message_by_frame_id(msg.arbitration_id)
+            data = db_msg.decode(msg.data)
+        except Exception:
+            return
+
+        now = time.time()
+
+        with self._lock:
+            if msg.arbitration_id == self._laser_range_id:
+                self._laser_data.distance_mm = int(data.get("Distance", 0))
+                self._laser_data.status = int(data.get("Status", 0))
+                self._laser_data.error_code = int(data.get("ErrorCode", 0))
+                self._laser_data.measurement_count = int(data.get("MeasurementCount", 0))
+                self._laser_data.last_update = now
+
+            elif msg.arbitration_id == self._laser_status_id:
+                self._laser_data.measurement_rate = float(data.get("MeasurementRate", 0))
+                self._laser_data.firmware_version = int(data.get("FirmwareVersion", 0))
+                self._laser_data.sensor_id = int(data.get("SensorID", 0))
+
     def _publish_snapshots(self):
         """Build immutable snapshots for lock-free consumer access."""
         now = time.time()
@@ -245,6 +319,24 @@ class CornerSensorHandler(BoundedQueueHardwareHandler):
                     brake[pos] = {"temp": avg, "inner": inner, "outer": outer}
                 else:
                     brake[pos] = {"temp": None, "inner": None, "outer": None}
+
+            # Laser ranger snapshot
+            laser_fresh = (now - self._laser_data.last_update) < self._laser_timeout
+            if (self._laser_enabled and laser_fresh and
+                    self._laser_data.distance_mm is not None and
+                    self._laser_data.status == 0):
+                self._laser_snapshot = LaserRangerData(
+                    distance_mm=self._laser_data.distance_mm,
+                    status=self._laser_data.status,
+                    error_code=self._laser_data.error_code,
+                    measurement_count=self._laser_data.measurement_count,
+                    measurement_rate=self._laser_data.measurement_rate,
+                    firmware_version=self._laser_data.firmware_version,
+                    sensor_id=self._laser_data.sensor_id,
+                    last_update=self._laser_data.last_update,
+                )
+            else:
+                self._laser_snapshot = None
 
             # Atomic snapshot swap (reference assignment is atomic, but keep in lock for consistency)
             self._tyre_snapshot = tyre
@@ -304,6 +396,51 @@ class CornerSensorHandler(BoundedQueueHardwareHandler):
                 "fps": c.fps if c.firmware else None,
                 "sensor_type": "can",
             }
+
+    # ---- Laser Ranger API ----
+
+    def laser_ranger_enabled(self) -> bool:
+        """Check if laser ranger is enabled and available."""
+        return self._laser_enabled and self._laser_db is not None
+
+    def get_laser_distance_m(self) -> Optional[float]:
+        """Get current laser distance in metres (or None if offline/error)."""
+        snapshot = self._laser_snapshot
+        if snapshot and snapshot.distance_mm is not None:
+            return snapshot.distance_mm / 1000.0
+        return None
+
+    def get_laser_distance_mm(self) -> Optional[int]:
+        """Get current laser distance in millimetres (or None if offline/error)."""
+        snapshot = self._laser_snapshot
+        if snapshot:
+            return snapshot.distance_mm
+        return None
+
+    def get_laser_status(self) -> dict:
+        """Get laser ranger status information."""
+        snapshot = self._laser_snapshot
+        if snapshot:
+            return {
+                "online": True,
+                "distance_m": snapshot.distance_mm / 1000.0 if snapshot.distance_mm else None,
+                "status": snapshot.status,
+                "error_code": snapshot.error_code,
+                "rate_hz": snapshot.measurement_rate,
+                "firmware": snapshot.firmware_version,
+                "sensor_id": snapshot.sensor_id,
+            }
+        return {
+            "online": False,
+            "distance_m": None,
+            "status": 1,
+            "error_code": 255,
+            "rate_hz": 0,
+            "firmware": 0,
+            "sensor_id": 0,
+        }
+
+    # ---- Frame Transfer API ----
 
     def read_full_frame(self, position: str) -> Optional[np.ndarray]:
         """Request full 24x32 thermal frame (blocking, ~3s timeout)."""

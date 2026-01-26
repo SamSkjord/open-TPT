@@ -1031,7 +1031,53 @@ PIT_TIMER_DATA_DIR = os.path.join(DATA_DIR, "pit_timer")
 
 # ##############################################################################
 #
-#                       14. HARDWARE - FORD HYBRID
+#                       14. HARDWARE - LASER RANGER
+#
+# ##############################################################################
+
+# ==============================================================================
+# LASER RANGER CAN (Front Distance Sensor)
+# ==============================================================================
+
+# Enable/disable laser ranger (TOF distance sensor on CAN bus)
+LASER_RANGER_ENABLED = True
+
+# Laser ranger CAN configuration
+# Uses same channel as corner sensors (can_b2_0)
+LASER_RANGER_CAN_CHANNEL = "can_b2_0"
+LASER_RANGER_CAN_BITRATE = 500000  # Standard CAN bitrate (500 kbps)
+
+# DBC file for decoding laser ranger CAN messages
+LASER_RANGER_CAN_DBC = "opendbc/pico_can_ranger.dbc"
+
+# CAN message IDs (Sensor ID 0 = base 0x200)
+# Supports up to 4 sensors (IDs 0-3) with 0x20 spacing
+LASER_RANGER_SENSOR_ID = 0  # Default sensor ID
+LASER_RANGER_RANGE_DATA_ID = 0x200  # RangeData message (base + sensor_id * 0x20)
+LASER_RANGER_STATUS_ID = 0x210  # Status message (base + 0x10 + sensor_id * 0x20)
+
+# Laser ranger timing
+LASER_RANGER_TIMEOUT_S = 1.0  # Data considered stale after this time
+
+# Display settings (when shown on front camera)
+LASER_RANGER_DISPLAY_ENABLED = True  # Show distance overlay on front camera
+LASER_RANGER_MAX_DISPLAY_M = 50.0  # Maximum distance to display (metres)
+LASER_RANGER_WARN_DISTANCE_M = 5.0  # Distance for warning colour (red)
+LASER_RANGER_CAUTION_DISTANCE_M = 15.0  # Distance for caution colour (yellow)
+LASER_RANGER_DISPLAY_POSITION = "bottom"  # Position: "top" or "bottom"
+LASER_RANGER_TEXT_SIZE = "medium"  # Text size: "small", "medium", "large"
+
+# Text size presets (base font sizes before scaling)
+LASER_RANGER_TEXT_SIZES = {
+    "small": 32,
+    "medium": 48,
+    "large": 64,
+}
+
+
+# ##############################################################################
+#
+#                       15. HARDWARE - FORD HYBRID
 #
 # ##############################################################################
 

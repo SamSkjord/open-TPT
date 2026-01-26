@@ -58,6 +58,7 @@
 - NeoKey 1x4: Physical buttons
 - Rotary Encoder: I2C QT with NeoPixel (0x36)
 - Corner Sensors: CAN bus (can_b2_0) - Pico RP2040 CAN with MLX90640 thermal + brake temps
+- Laser Ranger: CAN bus (can_b2_0) - Pico CAN Ranger with TOF laser, displayed on front camera
 - Toyota Radar: can_b1_0 (keep-alive), can_b1_1 (tracks)
 - OBD2: Speed, RPM, fuel level, Ford Mode 22 HV Battery SOC
 - GPS: PA1616S at 10Hz (serial /dev/ttyS0) for lap timing and CoPilot
@@ -110,7 +111,7 @@ openTPT/
 │   ├── pit_timer_display.py         # Pit timer UI page
 │   └── radar_overlay.py             # Radar visualisation
 ├── hardware/
-│   ├── corner_sensor_handler.py     # Corner sensors via CAN
+│   ├── corner_sensor_handler.py     # Corner sensors + laser ranger via CAN (can_b2_0)
 │   ├── tpms_input_optimized.py      # TPMS (tpms>=2.1.0)
 │   ├── radar_handler.py             # Toyota radar
 │   ├── obd2_handler.py              # OBD2/CAN
@@ -189,6 +190,42 @@ Corner sensors (tyre temps, brake temps, detection) use CAN bus instead of I2C f
 |----|------|---------|
 | 0x7F3 | FrameRequest | Request full thermal frame from specific wheel |
 | 0x7F1 | ConfigRequest | Request configuration from all sensors |
+
+---
+
+## Laser Ranger CAN (pico_can_ranger.dbc)
+
+TOF laser distance sensor for front camera overlay using Pico CAN Ranger on the same CAN bus as corner sensors.
+Handled by `corner_sensor_handler.py` (shares CAN notifier with corner sensors).
+
+### CAN Configuration
+| Setting | Value |
+|---------|-------|
+| Channel | `can_b2_0` (shared with corner sensors) |
+| Bitrate | 500 kbps |
+| DBC File | `opendbc/pico_can_ranger.dbc` |
+
+### Message IDs (Sensor ID 0)
+| ID | Name | Rate | Purpose |
+|----|------|------|---------|
+| 0x200 | RangeData | ~4Hz | Distance, status, error code |
+| 0x210 | Status | 1Hz | Measurement rate, firmware, sensor ID |
+
+### Message Contents
+- **RangeData**: Distance (uint16 mm), Status (0=OK, 1=Error), ErrorCode, MeasurementCount
+- **Status**: MeasurementRate (Hz*10), FirmwareVersion, SensorID, TotalMeasurements
+
+### Display Behaviour
+- Shows distance on front camera view (user-configurable position)
+- Colour coding: green (>15m), yellow (5-15m), red (<5m)
+- Hidden when distance exceeds 50m or sensor offline/error
+
+### User Settings (via Front Camera menu)
+| Setting | Options | Default |
+|---------|---------|---------|
+| `laser_ranger.display_enabled` | true/false | true |
+| `laser_ranger.display_position` | top, bottom | bottom |
+| `laser_ranger.text_size` | small, medium, large | medium |
 
 ---
 

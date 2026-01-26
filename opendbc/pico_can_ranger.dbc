@@ -1,0 +1,185 @@
+VERSION ""
+
+NS_ :
+	NS_DESC_
+	CM_
+	BA_DEF_
+	BA_
+	VAL_
+	CAT_DEF_
+	CAT_
+	FILTER
+	BA_DEF_DEF_
+	EV_DATA_
+	ENVVAR_DATA_
+	SGTYPE_
+	SGTYPE_VAL_
+	BA_DEF_SGTYPE_
+	BA_SGTYPE_
+	SIG_TYPE_REF_
+	VAL_TABLE_
+	SIG_GROUP_
+	SIG_VALTYPE_
+	SIGTYPE_VALTYPE_
+	BO_TX_BU_
+	BA_REL_
+	BA_SGTYPE_REL_
+	SG_MUL_VAL_
+
+BS_:
+
+BU_: Ranger0 Ranger1 Ranger2 Ranger3 ConfigTool
+
+VAL_TABLE_ LaserErrorCodes
+	0 "OK"
+	20 "CalcError"
+	21 "LaserLowPower"
+	24 "WeakSignal"
+	30 "LowPower"
+	32 "AmbientLight"
+	116 "OutOfRange"
+	253 "Unknown"
+	254 "InvalidFrame"
+	255 "NoResponse" ;
+
+VAL_TABLE_ RangeStatus
+	0 "OK"
+	1 "Error" ;
+
+
+BO_ 512 Ranger0_RangeData: 8 Ranger0
+ SG_ Distance : 0|16@1+ (1,0) [0|65535] "mm" Vector__XXX
+ SG_ Status : 16|8@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ ErrorCode : 24|8@1+ (1,0) [0|255] "" Vector__XXX
+ SG_ MeasurementCount : 32|32@1+ (1,0) [0|4294967295] "" Vector__XXX
+
+BO_ 528 Ranger0_Status: 8 Ranger0
+ SG_ MeasurementRate : 0|8@1+ (0.1,0) [0|25.5] "Hz" Vector__XXX
+ SG_ FirmwareVersion : 8|8@1+ (1,0) [0|255] "" Vector__XXX
+ SG_ SensorID : 16|8@1+ (1,0) [0|3] "" Vector__XXX
+ SG_ Reserved : 24|8@1+ (1,0) [0|255] "" Vector__XXX
+ SG_ TotalMeasurements : 32|32@1+ (1,0) [0|4294967295] "" Vector__XXX
+
+BO_ 544 Ranger1_RangeData: 8 Ranger1
+ SG_ Distance : 0|16@1+ (1,0) [0|65535] "mm" Vector__XXX
+ SG_ Status : 16|8@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ ErrorCode : 24|8@1+ (1,0) [0|255] "" Vector__XXX
+ SG_ MeasurementCount : 32|32@1+ (1,0) [0|4294967295] "" Vector__XXX
+
+BO_ 560 Ranger1_Status: 8 Ranger1
+ SG_ MeasurementRate : 0|8@1+ (0.1,0) [0|25.5] "Hz" Vector__XXX
+ SG_ FirmwareVersion : 8|8@1+ (1,0) [0|255] "" Vector__XXX
+ SG_ SensorID : 16|8@1+ (1,0) [0|3] "" Vector__XXX
+ SG_ Reserved : 24|8@1+ (1,0) [0|255] "" Vector__XXX
+ SG_ TotalMeasurements : 32|32@1+ (1,0) [0|4294967295] "" Vector__XXX
+
+BO_ 576 Ranger2_RangeData: 8 Ranger2
+ SG_ Distance : 0|16@1+ (1,0) [0|65535] "mm" Vector__XXX
+ SG_ Status : 16|8@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ ErrorCode : 24|8@1+ (1,0) [0|255] "" Vector__XXX
+ SG_ MeasurementCount : 32|32@1+ (1,0) [0|4294967295] "" Vector__XXX
+
+BO_ 592 Ranger2_Status: 8 Ranger2
+ SG_ MeasurementRate : 0|8@1+ (0.1,0) [0|25.5] "Hz" Vector__XXX
+ SG_ FirmwareVersion : 8|8@1+ (1,0) [0|255] "" Vector__XXX
+ SG_ SensorID : 16|8@1+ (1,0) [0|3] "" Vector__XXX
+ SG_ Reserved : 24|8@1+ (1,0) [0|255] "" Vector__XXX
+ SG_ TotalMeasurements : 32|32@1+ (1,0) [0|4294967295] "" Vector__XXX
+
+BO_ 608 Ranger3_RangeData: 8 Ranger3
+ SG_ Distance : 0|16@1+ (1,0) [0|65535] "mm" Vector__XXX
+ SG_ Status : 16|8@1+ (1,0) [0|1] "" Vector__XXX
+ SG_ ErrorCode : 24|8@1+ (1,0) [0|255] "" Vector__XXX
+ SG_ MeasurementCount : 32|32@1+ (1,0) [0|4294967295] "" Vector__XXX
+
+BO_ 624 Ranger3_Status: 8 Ranger3
+ SG_ MeasurementRate : 0|8@1+ (0.1,0) [0|25.5] "Hz" Vector__XXX
+ SG_ FirmwareVersion : 8|8@1+ (1,0) [0|255] "" Vector__XXX
+ SG_ SensorID : 16|8@1+ (1,0) [0|3] "" Vector__XXX
+ SG_ Reserved : 24|8@1+ (1,0) [0|255] "" Vector__XXX
+ SG_ TotalMeasurements : 32|32@1+ (1,0) [0|4294967295] "" Vector__XXX
+
+BO_ 2016 Config_SetSensorID: 8 ConfigTool
+ SG_ TargetSerial : 0|32@1+ (1,0) [0|4294967295] "" Vector__XXX
+ SG_ NewSensorID : 32|8@1+ (1,0) [0|3] "" Vector__XXX
+ SG_ Reserved : 40|24@1+ (1,0) [0|16777215] "" Vector__XXX
+
+BO_ 2017 Config_Request: 8 ConfigTool
+ SG_ RequestType : 0|8@1+ (1,0) [0|255] "" Vector__XXX
+ SG_ Reserved : 8|56@1+ (1,0) [0|0] "" Vector__XXX
+
+BO_ 2018 Config_Response: 8 Vector__XXX
+ SG_ SensorID : 0|8@1+ (1,0) [0|3] "" ConfigTool
+ SG_ SerialNumber : 8|32@1+ (1,0) [0|4294967295] "" ConfigTool
+ SG_ FirmwareVersion : 40|8@1+ (1,0) [0|255] "" ConfigTool
+ SG_ SpeedIndex : 48|8@1+ (1,0) [0|8] "" ConfigTool
+ SG_ Reserved : 56|8@1+ (1,0) [0|255] "" ConfigTool
+
+BO_ 2024 Config_SetCANSpeed: 8 ConfigTool
+ SG_ TargetSerial : 0|32@1+ (1,0) [0|4294967295] "" Vector__XXX
+ SG_ SpeedKbps : 32|16@1+ (1,0) [0|1000] "kbps" Vector__XXX
+ SG_ Reserved : 48|16@1+ (1,0) [0|65535] "" Vector__XXX
+
+
+CM_ BU_ Ranger0 "Laser distance sensor - Sensor ID 0 (Base ID 0x200)";
+CM_ BU_ Ranger1 "Laser distance sensor - Sensor ID 1 (Base ID 0x220)";
+CM_ BU_ Ranger2 "Laser distance sensor - Sensor ID 2 (Base ID 0x240)";
+CM_ BU_ Ranger3 "Laser distance sensor - Sensor ID 3 (Base ID 0x260)";
+CM_ BU_ ConfigTool "Configuration tool for remote sensor setup";
+
+CM_ BO_ 512 "Range measurement data from Sensor 0 (0x200). Transmitted at ~4Hz.";
+CM_ BO_ 528 "Status information from Sensor 0 (0x210). Transmitted at 1Hz.";
+CM_ BO_ 544 "Range measurement data from Sensor 1 (0x220). Transmitted at ~4Hz.";
+CM_ BO_ 560 "Status information from Sensor 1 (0x230). Transmitted at 1Hz.";
+CM_ BO_ 576 "Range measurement data from Sensor 2 (0x240). Transmitted at ~4Hz.";
+CM_ BO_ 592 "Status information from Sensor 2 (0x250). Transmitted at 1Hz.";
+CM_ BO_ 608 "Range measurement data from Sensor 3 (0x260). Transmitted at ~4Hz.";
+CM_ BO_ 624 "Status information from Sensor 3 (0x270). Transmitted at 1Hz.";
+CM_ BO_ 2016 "Set sensor ID remotely (0x7E0). Target identified by first 4 bytes of board serial number.";
+CM_ BO_ 2017 "Request configuration from all sensors (0x7E1). Sensors respond with Config_Response.";
+CM_ BO_ 2018 "Configuration response from sensor (0x7E2).";
+CM_ BO_ 2024 "Set CAN bus speed remotely (0x7E8). Requires sensor reboot to take effect.";
+
+CM_ SG_ 512 Distance "Distance measurement in millimeters. Max 65535mm (65.5m). Values over 65.535m are clamped.";
+CM_ SG_ 512 Status "Measurement status: 0=OK, 1=Error";
+CM_ SG_ 512 ErrorCode "Laser error code: 0x00=OK, 0x18=WeakSignal, 0x20=AmbientLight, 0x74=OutOfRange, 0xFF=NoResponse";
+CM_ SG_ 512 MeasurementCount "Rolling counter of successful measurements since boot";
+
+CM_ SG_ 528 MeasurementRate "Current measurement rate in Hz (raw value * 0.1, e.g. 40 = 4.0 Hz)";
+CM_ SG_ 528 FirmwareVersion "Firmware version number";
+CM_ SG_ 528 SensorID "Configured sensor ID (0-3)";
+CM_ SG_ 528 TotalMeasurements "Total successful measurements since boot";
+
+CM_ SG_ 2016 TargetSerial "First 4 bytes of target sensor's unique board ID";
+CM_ SG_ 2016 NewSensorID "New sensor ID to assign (0-3)";
+
+CM_ SG_ 2018 SpeedIndex "CAN speed as divisor of 125: 1=125K, 2=250K, 4=500K, 8=1000K";
+
+CM_ SG_ 2024 SpeedKbps "CAN bus speed in kbps (125, 250, 500, or 1000)";
+
+
+BA_DEF_ BO_ "GenMsgCycleTime" INT 0 10000;
+BA_DEF_ SG_ "GenSigStartValue" INT 0 65535;
+
+BA_DEF_DEF_ "GenMsgCycleTime" 0;
+BA_DEF_DEF_ "GenSigStartValue" 0;
+
+BA_ "GenMsgCycleTime" BO_ 512 250;
+BA_ "GenMsgCycleTime" BO_ 528 1000;
+BA_ "GenMsgCycleTime" BO_ 544 250;
+BA_ "GenMsgCycleTime" BO_ 560 1000;
+BA_ "GenMsgCycleTime" BO_ 576 250;
+BA_ "GenMsgCycleTime" BO_ 592 1000;
+BA_ "GenMsgCycleTime" BO_ 608 250;
+BA_ "GenMsgCycleTime" BO_ 624 1000;
+
+
+VAL_ 512 Status 0 "OK" 1 "Error" ;
+VAL_ 512 ErrorCode 0 "OK" 24 "WeakSignal" 32 "AmbientLight" 116 "OutOfRange" 255 "NoResponse" ;
+VAL_ 544 Status 0 "OK" 1 "Error" ;
+VAL_ 544 ErrorCode 0 "OK" 24 "WeakSignal" 32 "AmbientLight" 116 "OutOfRange" 255 "NoResponse" ;
+VAL_ 576 Status 0 "OK" 1 "Error" ;
+VAL_ 576 ErrorCode 0 "OK" 24 "WeakSignal" 32 "AmbientLight" 116 "OutOfRange" 255 "NoResponse" ;
+VAL_ 608 Status 0 "OK" 1 "Error" ;
+VAL_ 608 ErrorCode 0 "OK" 24 "WeakSignal" 32 "AmbientLight" 116 "OutOfRange" 255 "NoResponse" ;
+

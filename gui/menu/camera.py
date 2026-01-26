@@ -8,7 +8,13 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import pygame
 
-from config import BUTTON_VIEW_MODE
+from config import (
+    BUTTON_VIEW_MODE,
+    LASER_RANGER_DISPLAY_ENABLED,
+    LASER_RANGER_DISPLAY_POSITION,
+    LASER_RANGER_TEXT_SIZE,
+)
+from utils.settings import get_settings, save_settings
 
 logger = logging.getLogger('openTPT.menu.camera')
 
@@ -68,6 +74,31 @@ class CameraMenuMixin:
                     action=lambda n=camera_name: self._cycle_camera_rotate(n),
                 )
             )
+
+            # Laser ranger distance overlay settings (front camera only)
+            if camera_name == "front":
+                cam_menu.add_item(
+                    MenuItem(
+                        "Distance Overlay",
+                        dynamic_label=lambda: self._get_distance_overlay_label(),
+                        action=lambda: self._toggle_distance_overlay(),
+                    )
+                )
+                cam_menu.add_item(
+                    MenuItem(
+                        "Overlay Position",
+                        dynamic_label=lambda: self._get_distance_position_label(),
+                        action=lambda: self._cycle_distance_position(),
+                    )
+                )
+                cam_menu.add_item(
+                    MenuItem(
+                        "Text Size",
+                        dynamic_label=lambda: self._get_distance_text_size_label(),
+                        action=lambda: self._cycle_distance_text_size(),
+                    )
+                )
+
             cam_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
             cam_menu.parent = self.camera_menu
             self._camera_submenus[camera_name] = cam_menu
@@ -134,3 +165,55 @@ class CameraMenuMixin:
             return "Camera not available"
         new_value = self.camera_handler.cycle_rotate(camera_name)
         return f"Rotation: {new_value}deg"
+
+    # ---- Laser Ranger Distance Overlay Settings ----
+
+    def _get_distance_overlay_label(self) -> str:
+        """Get distance overlay enabled/disabled label."""
+        settings = get_settings()
+        enabled = settings.get("laser_ranger.display_enabled", LASER_RANGER_DISPLAY_ENABLED)
+        return f"Distance Overlay: {'On' if enabled else 'Off'}"
+
+    def _toggle_distance_overlay(self) -> str:
+        """Toggle distance overlay on/off."""
+        settings = get_settings()
+        current = settings.get("laser_ranger.display_enabled", LASER_RANGER_DISPLAY_ENABLED)
+        new_value = not current
+        settings.set("laser_ranger.display_enabled", new_value)
+        save_settings()
+        return f"Distance overlay {'enabled' if new_value else 'disabled'}"
+
+    def _get_distance_position_label(self) -> str:
+        """Get distance overlay position label."""
+        settings = get_settings()
+        position = settings.get("laser_ranger.display_position", LASER_RANGER_DISPLAY_POSITION)
+        return f"Overlay Position: {position.capitalize()}"
+
+    def _cycle_distance_position(self) -> str:
+        """Cycle distance overlay position (top/bottom)."""
+        settings = get_settings()
+        current = settings.get("laser_ranger.display_position", LASER_RANGER_DISPLAY_POSITION)
+        new_value = "top" if current == "bottom" else "bottom"
+        settings.set("laser_ranger.display_position", new_value)
+        save_settings()
+        return f"Position: {new_value}"
+
+    def _get_distance_text_size_label(self) -> str:
+        """Get distance text size label."""
+        settings = get_settings()
+        size = settings.get("laser_ranger.text_size", LASER_RANGER_TEXT_SIZE)
+        return f"Text Size: {size.capitalize()}"
+
+    def _cycle_distance_text_size(self) -> str:
+        """Cycle distance text size (small -> medium -> large -> small)."""
+        settings = get_settings()
+        current = settings.get("laser_ranger.text_size", LASER_RANGER_TEXT_SIZE)
+        sizes = ["small", "medium", "large"]
+        try:
+            idx = sizes.index(current)
+            new_value = sizes[(idx + 1) % len(sizes)]
+        except ValueError:
+            new_value = "medium"
+        settings.set("laser_ranger.text_size", new_value)
+        save_settings()
+        return f"Text size: {new_value}"

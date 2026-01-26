@@ -22,12 +22,22 @@ from config import (
     CAMERA_HEIGHT,
     CAMERA_FPS,
     FONT_PATH,
+    FONT_PATH_BOLD,
     CAMERA_REAR_MIRROR,
     CAMERA_REAR_ROTATE,
     CAMERA_FRONT_MIRROR,
     CAMERA_FRONT_ROTATE,
     CAMERA_FOV_DEGREES,
     CAMERA_FPS_UPDATE_INTERVAL_S,
+    LASER_RANGER_DISPLAY_ENABLED,
+    LASER_RANGER_MAX_DISPLAY_M,
+    LASER_RANGER_WARN_DISTANCE_M,
+    LASER_RANGER_CAUTION_DISTANCE_M,
+    LASER_RANGER_DISPLAY_POSITION,
+    LASER_RANGER_TEXT_SIZE,
+    LASER_RANGER_TEXT_SIZES,
+    SCALE_X,
+    SCALE_Y,
 )
 from utils.settings import get_settings
 
@@ -43,13 +53,14 @@ except ImportError:
 class Camera:
     """Camera handler for multi-camera display with optional radar overlay."""
 
-    def __init__(self, surface, radar_handler=None):
+    def __init__(self, surface, radar_handler=None, corner_sensors=None):
         """
         Initialise the camera handler.
 
         Args:
             surface: The pygame surface to draw on
             radar_handler: Optional radar handler for overlay (rear camera only)
+            corner_sensors: Optional corner sensor handler (provides laser ranger for front camera)
         """
         self.surface = surface
 
@@ -78,6 +89,12 @@ class Camera:
                 logger.info("Radar overlay enabled for rear camera")
             except ImportError as e:
                 logger.warning("Could not load radar overlay: %s", e)
+
+        # Corner sensors (provides laser ranger for front camera)
+        self.corner_sensors = corner_sensors
+        self._distance_font = None
+        if corner_sensors and corner_sensors.laser_ranger_enabled():
+            logger.info("Laser ranger overlay enabled for front camera")
 
         # Threading related attributes
         self.frame_queue = queue.Queue(maxsize=2)  # Small queue for maximum performance
@@ -666,12 +683,80 @@ class Camera:
                 tracks = self.radar_handler.get_tracks()
                 if tracks:
                     self.radar_overlay.render(self.surface, tracks)
+
+            # Render distance overlay if enabled (front camera only)
+            if (LASER_RANGER_DISPLAY_ENABLED and self.corner_sensors and
+                    self.corner_sensors.laser_ranger_enabled() and
+                    self.current_camera == 'front'):
+                self._render_distance_overlay()
+
             return True
 
         except Exception as e:
             self.error_message = f"Render error: {str(e)}"
             logger.warning("Camera render error: %s", e)
             return False
+
+    def _render_distance_overlay(self):
+        """Render distance overlay on front camera."""
+        if not self.corner_sensors:
+            return
+
+        # Check if overlay is enabled in settings
+        if not self._settings.get("laser_ranger.display_enabled", LASER_RANGER_DISPLAY_ENABLED):
+            return
+
+        distance_m = self.corner_sensors.get_laser_distance_m()
+        if distance_m is None:
+            return
+
+        # Don't display if beyond maximum
+        if distance_m > LASER_RANGER_MAX_DISPLAY_M:
+            return
+
+        # Get text size from settings
+        text_size = self._settings.get("laser_ranger.text_size", LASER_RANGER_TEXT_SIZE)
+        base_font_size = LASER_RANGER_TEXT_SIZES.get(text_size, 48)
+
+        # Recreate font if size changed
+        if self._distance_font is None or getattr(self, '_distance_font_size', None) != text_size:
+            font_size = int(base_font_size * min(SCALE_X, SCALE_Y))
+            self._distance_font = pygame.font.Font(FONT_PATH_BOLD, font_size)
+            self._distance_font_size = text_size
+
+        # Choose colour based on distance
+        if distance_m <= LASER_RANGER_WARN_DISTANCE_M:
+            colour = (255, 0, 0)  # Red - close
+        elif distance_m <= LASER_RANGER_CAUTION_DISTANCE_M:
+            colour = (255, 255, 0)  # Yellow - caution
+        else:
+            colour = (0, 255, 0)  # Green - safe
+
+        # Format distance text
+        if distance_m < 1.0:
+            text = f"{int(distance_m * 100)} cm"
+        else:
+            text = f"{distance_m:.1f} m"
+
+        # Render text with shadow for visibility
+        shadow = self._distance_font.render(text, True, (0, 0, 0))
+        text_surface = self._distance_font.render(text, True, colour)
+
+        # Get position from settings
+        position = self._settings.get("laser_ranger.display_position", LASER_RANGER_DISPLAY_POSITION)
+        edge_offset = int(50 * SCALE_Y)
+        shadow_offset = int(2 * min(SCALE_X, SCALE_Y))
+
+        if position == "top":
+            y_pos = edge_offset
+        else:  # bottom
+            y_pos = DISPLAY_HEIGHT - edge_offset
+
+        text_rect = text_surface.get_rect(center=(DISPLAY_WIDTH // 2, y_pos))
+        shadow_rect = shadow.get_rect(center=(DISPLAY_WIDTH // 2 + shadow_offset, y_pos + shadow_offset))
+
+        self.surface.blit(shadow, shadow_rect)
+        self.surface.blit(text_surface, text_rect)
 
     def is_active(self):
         """Check if camera view is currently active."""

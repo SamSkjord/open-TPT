@@ -6,7 +6,6 @@ fuel warnings, and brightness adjustment.
 """
 
 import logging
-import math
 import time
 
 import pygame
@@ -16,7 +15,6 @@ from config import (
     DISPLAY_HEIGHT,
     PRESSURE_UNIT,
     THERMAL_STALE_TIMEOUT,
-    BRAKE_DUAL_ZONE_MOCK,
     FONT_PATH,
     FONT_SIZE_MEDIUM,
     RED,
@@ -225,14 +223,6 @@ class RenderingMixin:
                 temp = data
                 inner = None
                 outer = None
-
-            # Mock data for testing dual-zone display
-            if BRAKE_DUAL_ZONE_MOCK:
-                t = now * 0.5  # Slow oscillation
-                base = 150 + 100 * math.sin(t)
-                inner = base + 30 * math.sin(t * 2)
-                outer = base - 20 * math.sin(t * 2 + 1)
-                temp = (inner + outer) / 2
 
             if temp is not None or inner is not None:
                 # Fresh data - update cache and display
