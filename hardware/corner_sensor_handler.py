@@ -67,7 +67,14 @@ class CornerData:
 
 @dataclass
 class LaserRangerData:
-    """Live data from the laser ranger sensor."""
+    """
+    Laser ranger sensor data.
+
+    Thread safety: Internal _laser_data is mutable and updated under lock.
+    Snapshots are new objects created under lock, then published via atomic
+    reference assignment. Consumers read snapshot reference without lock
+    (safe due to CPython GIL atomic reference reads).
+    """
     distance_mm: Optional[int] = None  # Distance in millimetres
     status: int = 0  # 0=OK, 1=Error
     error_code: int = 0  # Laser error code
@@ -168,10 +175,11 @@ class CornerSensorHandler(BoundedQueueHardwareHandler):
             laser_dbc_path = os.path.join(base_path, self._laser_dbc_path)
             try:
                 self._laser_db = cantools.database.load_file(laser_dbc_path)
-                logger.info("Loaded laser ranger DBC: %s", laser_dbc_path)
+                logger.info("Laser ranger: loaded DBC %s", laser_dbc_path)
             except Exception as e:
-                logger.warning("Failed to load laser ranger DBC %s: %s", laser_dbc_path, e)
+                logger.warning("Laser ranger disabled: failed to load DBC %s: %s", laser_dbc_path, e)
                 self._laser_enabled = False
+                self._laser_db = None
 
         # Open CAN bus
         try:

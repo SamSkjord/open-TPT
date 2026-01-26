@@ -92,9 +92,9 @@ class Camera:
 
         # Corner sensors (provides laser ranger for front camera)
         self.corner_sensors = corner_sensors
-        self._distance_font = None
+        self._distance_fonts = {}  # Cache fonts per size to avoid recreation
         if corner_sensors and corner_sensors.laser_ranger_enabled():
-            logger.info("Laser ranger overlay enabled for front camera")
+            logger.info("Laser ranger available for front camera overlay")
 
         # Threading related attributes
         self.frame_queue = queue.Queue(maxsize=2)  # Small queue for maximum performance
@@ -702,27 +702,38 @@ class Camera:
         if not self.corner_sensors:
             return
 
+        # Read settings fresh each frame (not cached) so menu changes apply immediately
+        settings = get_settings()
+
         # Check if overlay is enabled in settings
-        if not self._settings.get("laser_ranger.display_enabled", LASER_RANGER_DISPLAY_ENABLED):
+        if not settings.get("laser_ranger.display_enabled", LASER_RANGER_DISPLAY_ENABLED):
             return
 
         distance_m = self.corner_sensors.get_laser_distance_m()
         if distance_m is None:
             return
 
+        # Validate distance (filter invalid values from sensor errors)
+        if not isinstance(distance_m, (int, float)) or distance_m < 0 or distance_m != distance_m:
+            return  # NaN check: NaN != NaN
+
         # Don't display if beyond maximum
         if distance_m > LASER_RANGER_MAX_DISPLAY_M:
             return
 
-        # Get text size from settings
-        text_size = self._settings.get("laser_ranger.text_size", LASER_RANGER_TEXT_SIZE)
-        base_font_size = LASER_RANGER_TEXT_SIZES.get(text_size, 48)
+        # Get and validate text size from settings
+        text_size = settings.get("laser_ranger.text_size", LASER_RANGER_TEXT_SIZE)
+        if text_size not in LASER_RANGER_TEXT_SIZES:
+            text_size = LASER_RANGER_TEXT_SIZE  # Fall back to default
+        base_font_size = LASER_RANGER_TEXT_SIZES[text_size]
 
-        # Recreate font if size changed
-        if self._distance_font is None or getattr(self, '_distance_font_size', None) != text_size:
+        # Get or create cached font for this size (avoid recreation every frame)
+        if not hasattr(self, '_distance_fonts'):
+            self._distance_fonts = {}
+        if text_size not in self._distance_fonts:
             font_size = int(base_font_size * min(SCALE_X, SCALE_Y))
-            self._distance_font = pygame.font.Font(FONT_PATH_BOLD, font_size)
-            self._distance_font_size = text_size
+            self._distance_fonts[text_size] = pygame.font.Font(FONT_PATH_BOLD, font_size)
+        font = self._distance_fonts[text_size]
 
         # Choose colour based on distance
         if distance_m <= LASER_RANGER_WARN_DISTANCE_M:
@@ -739,13 +750,15 @@ class Camera:
             text = f"{distance_m:.1f} m"
 
         # Render text with shadow for visibility
-        shadow = self._distance_font.render(text, True, (0, 0, 0))
-        text_surface = self._distance_font.render(text, True, colour)
+        shadow = font.render(text, True, (0, 0, 0))
+        text_surface = font.render(text, True, colour)
 
-        # Get position from settings
-        position = self._settings.get("laser_ranger.display_position", LASER_RANGER_DISPLAY_POSITION)
+        # Get and validate position from settings
+        position = settings.get("laser_ranger.display_position", LASER_RANGER_DISPLAY_POSITION)
+        if position not in ("top", "bottom"):
+            position = LASER_RANGER_DISPLAY_POSITION
         edge_offset = int(50 * SCALE_Y)
-        shadow_offset = int(2 * min(SCALE_X, SCALE_Y))
+        shadow_offset = int(2 * SCALE_Y)  # Consistent with edge_offset scaling
 
         if position == "top":
             y_pos = edge_offset
