@@ -336,6 +336,40 @@ sudo systemctl enable can-setup.service
 sudo systemctl enable openTPT.service
 echo "Services enabled"
 
+# Configure quiet boot (no kernel messages)
+echo -e "\n==== Configuring quiet boot ===="
+CMDLINE_FILE=""
+if [[ -f /boot/firmware/cmdline.txt ]]; then
+  CMDLINE_FILE="/boot/firmware/cmdline.txt"
+elif [[ -f /boot/cmdline.txt ]]; then
+  CMDLINE_FILE="/boot/cmdline.txt"
+fi
+
+if [[ -n "$CMDLINE_FILE" ]]; then
+  if ! grep -q "quiet" "$CMDLINE_FILE"; then
+    # Add quiet boot parameters
+    sudo sed -i 's/$/ quiet splash loglevel=0 logo.nologo vt.global_cursor_default=0/' "$CMDLINE_FILE"
+    echo "Quiet boot parameters added to $CMDLINE_FILE"
+  else
+    echo "Quiet boot already configured"
+  fi
+else
+  echo "WARNING: Could not find cmdline.txt"
+fi
+
+# Install splash screen service
+echo -e "\n==== Installing boot splash ===="
+sudo apt install -y fbi
+SPLASH_SERVICE_SRC="$SCRIPT_DIR/services/boot/splash.service"
+if [[ -f "$SPLASH_SERVICE_SRC" ]]; then
+  sudo install -m 0644 "$SPLASH_SERVICE_SRC" /etc/systemd/system/splash.service
+  sudo systemctl daemon-reload
+  sudo systemctl enable splash.service
+  echo "Boot splash service installed"
+else
+  echo "WARNING: Missing $SPLASH_SERVICE_SRC"
+fi
+
 # Disable cloud-init to prevent boot delays and network configuration issues
 echo -e "\n==== Disabling cloud-init ===="
 if [ -d /etc/cloud ]; then
