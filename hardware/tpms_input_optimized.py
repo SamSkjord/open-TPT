@@ -108,7 +108,7 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
             self.tpms_device = TPMSDevice()
 
             # Register callbacks
-            self.tpms_device.register_tyre_state_callback(self._on_tyre_state_update)
+            self.tpms_device.register_tire_state_callback(self._on_tyre_state_update)
             self.tpms_device.register_pairing_callback(self._on_pairing_complete)
 
             # Set thresholds from config
