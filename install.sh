@@ -192,19 +192,28 @@ EOF
   fi
 
   # Configure UART and PPS for GPS/TPMS
+  # Detect Pi model for correct UART overlay (GPIO 4/5: uart3 on Pi4, uart2-pi5 on Pi5)
+  if grep -q "Raspberry Pi 5" /proc/device-tree/model 2>/dev/null; then
+    TPMS_UART_OVERLAY="uart2-pi5"
+    echo "Detected Pi 5 - using uart2-pi5 for TPMS on GPIO 4/5"
+  else
+    TPMS_UART_OVERLAY="uart3"
+    echo "Detected Pi 4 - using uart3 for TPMS on GPIO 4/5"
+  fi
+
   GPS_BLOCK_HEADER="# ==== openTPT GPS"
   if sudo grep -Fq "$GPS_BLOCK_HEADER" "$BOOT_CONFIG"; then
     echo "GPS configuration block already present."
   else
-    sudo tee -a "$BOOT_CONFIG" >/dev/null <<'EOF'
+    sudo tee -a "$BOOT_CONFIG" >/dev/null <<EOF
 
 # ==== openTPT GPS and TPMS Serial Configuration ====
 # Enable UART for GPS module (GPIO 14/15 TX/RX)
 enable_uart=1
 # PPS signal from GPS on GPIO 18
 dtoverlay=pps-gpio,gpiopin=18
-# UART3 on GPIO 4/5 for TPMS receiver
-dtoverlay=uart3
+# TPMS receiver on GPIO 4/5 (uart3 on Pi4, uart2-pi5 on Pi5)
+dtoverlay=${TPMS_UART_OVERLAY}
 # ==== end openTPT GPS and TPMS Serial Configuration ====
 EOF
     echo "Appended GPS configuration to $BOOT_CONFIG (reboot required)."
@@ -348,6 +357,12 @@ elif [[ -f /boot/cmdline.txt ]]; then
 fi
 
 if [[ -n "$CMDLINE_FILE" ]]; then
+  # Remove serial console to free UART for GPS (serial0 -> ttyAMA0)
+  if grep -q "console=serial0" "$CMDLINE_FILE"; then
+    sudo sed -i 's/console=serial0,[0-9]* //' "$CMDLINE_FILE"
+    echo "Serial console removed to free UART for GPS"
+  fi
+
   if ! grep -q "quiet" "$CMDLINE_FILE"; then
     # Add quiet boot parameters
     sudo sed -i 's/$/ quiet splash loglevel=0 logo.nologo vt.global_cursor_default=0/' "$CMDLINE_FILE"

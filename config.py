@@ -432,7 +432,9 @@ TPMS_HIGH_PRESSURE_KPA = 310  # High pressure alert threshold (kPa)
 TPMS_LOW_PRESSURE_KPA = 180  # Low pressure alert threshold (kPa)
 TPMS_HIGH_TEMP_C = 75  # High temperature alert threshold (Celsius)
 TPMS_DATA_TIMEOUT_S = 30.0  # Seconds before marking sensor as stale
-TPMS_SERIAL_PORT = "/dev/ttyAMA3"  # UART3 on GPIO4/5 (None for USB auto-detect)
+# TPMS serial port: Pi 4 uses /dev/ttyAMA3 (uart3), Pi 5 uses /dev/ttyAMA2 (uart2-pi5)
+# Both map to GPIO 4/5, but different overlay and device names
+TPMS_SERIAL_PORT = "/dev/ttyAMA2"  # Pi 5 (use /dev/ttyAMA3 for Pi 4)
 
 # TPMS positions on screen dynamically calculated based on MLX positions
 # The pressure text is centred above each tyre's thermal display
