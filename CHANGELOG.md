@@ -1,5 +1,73 @@
 # Changelog - openTPT
 
+## [v0.19.12] - 2026-01-27
+
+### Raspberry Pi 5 Compatibility and Install Script Overhaul
+
+Complete overhaul of install.sh for Pi 5 compatibility and comprehensive dependency management.
+
+#### Pi 5 Serial Port Changes
+
+- **GPS**: Changed from `/dev/ttyS0` to `/dev/serial0` (symlink works on both Pi 4/5)
+- **TPMS**: Pi 5 uses `uart2-pi5` overlay (not `uart3`) for GPIO 4/5, device is `/dev/ttyAMA2`
+- **Auto-detection**: install.sh now detects Pi model and configures correct UART overlay
+- **Serial console**: Removed `console=serial0,115200` from cmdline.txt to free UART for GPS
+
+#### TPMS Library Compatibility
+
+- **American spelling**: tpms library uses `TirePosition`, `TireState`, `register_tire_state_callback`
+- **Updated to tpms>=2.1.0**: Backwards compatible with American spelling
+
+#### Install Script Improvements
+
+- **Fixed paths**: Updated from `config/` to `services/` directory structure
+- **Quiet boot**: Added `quiet splash loglevel=0 logo.nologo vt.global_cursor_default=0`
+- **Boot splash**: Installed `fbi` package and enabled splash.service
+- **Disabled getty**: Prevents login prompt flashing before splash
+- **Disabled rainbow**: Added `disable_splash=1` and `boot_delay=0` to config.txt
+- **Reboot reminder**: Added reminder at end of installation
+
+#### New Dependencies Added
+
+System packages:
+- `sox`, `espeak-ng`, `alsa-utils` - CoPilot TTS and audio processing
+- `python3-gi`, `python3-dbus`, `libdbus-glib-1-dev` - D-Bus/GLib for MPRIS
+- `can-utils`, `i2c-tools` - Hardware debugging
+
+Python packages:
+- `python-can>=4.0.0`, `cantools>=39.0.0` - CAN bus support
+- `pyosmium`, `dbus-python` - Map processing, D-Bus
+- `adafruit-circuitpython-mcp9600` - MCP9601 brake thermocouples
+- `adafruit-circuitpython-vl53l0x` - TOF distance sensors
+- `numba` - JIT-compiled thermal zone processing
+
+User groups:
+- Added user to `dialout`, `gpio`, `i2c`, `spi` groups
+
+Data directories:
+- Creates `~/.opentpt/` structure and `~/telemetry/`
+
+#### Critical Bug Fixes
+
+- **Singleton race condition**: Fixed thread-unsafe double-checked locking in:
+  - `utils/settings.py` - Added lock protection to `__init__`
+  - `utils/lap_timing_store.py` - Removed outer check, added `__init__` lock
+  - `utils/pit_lane_store.py` - Removed outer check, added `__init__` lock
+- **Command injection**: Fixed `os.system()` with f-strings in `scratch/dualcan.py`
+  - Now uses `subprocess.run()` with argument list
+
+#### Modified Files
+
+- `install.sh` - Complete overhaul for Pi 5 and dependencies
+- `config.py` - Updated GPS and TPMS serial ports
+- `hardware/tpms_input_optimized.py` - Fixed American spelling imports
+- `utils/settings.py` - Thread-safe singleton
+- `utils/lap_timing_store.py` - Thread-safe singleton
+- `utils/pit_lane_store.py` - Thread-safe singleton
+- `scratch/dualcan.py` - Safe subprocess calls
+
+---
+
 ## [v0.19.11] - 2026-01-22
 
 ### Read-Only Root Filesystem with overlayroot
