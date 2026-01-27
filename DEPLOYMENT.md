@@ -221,7 +221,14 @@ openTPT is compatible with both Raspberry Pi 4 and Pi 5. The Pi 5 uses a new RP1
 
 **Migration Steps:**
 
-1. **Test UART paths** - GPS may require updating `GPS_SERIAL_PORT` in config.py:
+1. **Set up SSH key authentication** (on your Mac):
+   ```bash
+   ssh-keygen -t ed25519
+   ssh-copy-id pi@192.168.199.242
+   ```
+   Enter the Pi password once when prompted. Future connections will be passwordless.
+
+2. **Test UART paths** - GPS may require updating `GPS_SERIAL_PORT` in config.py:
    ```bash
    # Check available serial ports
    ls -la /dev/tty*
@@ -233,22 +240,35 @@ openTPT is compatible with both Raspberry Pi 4 and Pi 5. The Pi 5 uses a new RP1
    sudo cat /dev/ttyAMA0
    ```
 
-2. **Verify I2C devices**:
+3. **Verify I2C devices**:
    ```bash
    sudo i2cdetect -y 1
    # Should show: 0x20, 0x30, 0x36, 0x3C, 0x60, 0x68
    ```
 
-3. **Test CAN interfaces**:
+4. **Test CAN interfaces**:
    ```bash
    ip link show | grep can_b
    candump can_b2_0  # Should show corner sensor messages
    ```
 
-4. **Run install.sh** - handles Pi 5 automatically:
+5. **Run install.sh** - handles Pi 5 automatically:
    ```bash
    sudo ./install.sh
    ```
+
+6. **Enable user lingering** (Raspberry Pi OS Lite only):
+   ```bash
+   loginctl enable-linger
+   ```
+   This allows systemd user services to persist after logout.
+
+7. **Enable full USB power** - Add to `/boot/firmware/config.txt`:
+   ```
+   usb_max_current_enable=1
+   PSU_MAX_CURRENT=5000
+   ```
+   Provides full power to USB peripherals (cameras, CAN adapters, etc.).
 
 **Performance Notes:**
 - Pi 5 has faster CPU - may see improved render times
@@ -317,10 +337,15 @@ sudo ./install.sh
 Only sync Python files and configs (much faster):
 
 ```bash
-./tools/quick_sync.sh pi@192.168.199.246
+./tools/quick_sync.sh pi@192.168.199.242
 ```
 
 Use this when you've only changed code, not assets.
+
+**Note:** rsync doesn't preserve execute permissions. After first sync, run scripts with bash:
+```bash
+sudo bash ./install.sh
+```
 
 ### Method 3: Manual rsync
 

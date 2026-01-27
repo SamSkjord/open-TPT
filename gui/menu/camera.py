@@ -14,7 +14,7 @@ from config import (
     LASER_RANGER_DISPLAY_POSITION,
     LASER_RANGER_TEXT_SIZE,
 )
-from utils.settings import get_settings, save_settings
+from utils.settings import get_settings
 
 logger = logging.getLogger('openTPT.menu.camera')
 
@@ -180,7 +180,6 @@ class CameraMenuMixin:
         current = settings.get("laser_ranger.display_enabled", LASER_RANGER_DISPLAY_ENABLED)
         new_value = not current
         settings.set("laser_ranger.display_enabled", new_value)
-        save_settings()
         return f"Distance overlay {'enabled' if new_value else 'disabled'}"
 
     def _get_distance_position_label(self) -> str:
@@ -195,7 +194,6 @@ class CameraMenuMixin:
         current = settings.get("laser_ranger.display_position", LASER_RANGER_DISPLAY_POSITION)
         new_value = "top" if current == "bottom" else "bottom"
         settings.set("laser_ranger.display_position", new_value)
-        save_settings()
         return f"Position: {new_value}"
 
     def _get_distance_text_size_label(self) -> str:
@@ -215,5 +213,4 @@ class CameraMenuMixin:
         except ValueError:
             new_value = "medium"
         settings.set("laser_ranger.text_size", new_value)
-        save_settings()
         return f"Text size: {new_value}"

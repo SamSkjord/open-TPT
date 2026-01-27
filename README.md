@@ -613,6 +613,7 @@ openTPT/
 - [x] Migrate corner sensors to CAN bus - CAN more robust than I2C for automotive environments; all four corners on can_b2_0
 - [x] Direct TPMS serial connection - TPMS receiver via UART3 (GPIO4/5) at 19200 baud; frees USB port
 - [x] TOF laser sensor CAN device - front distance measurement displayed on front camera view (Pico CAN Ranger)
+- [ ] ANT+ heart rate monitoring - driver heart rate logging via ANT+ USB dongle
 
 ### Software TODO
 - [x] Bluetooth audio menu - scan, pair, connect, disconnect, forget (requires PulseAudio)

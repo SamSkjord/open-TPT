@@ -124,12 +124,23 @@ PYTHON_DEPS=(
   "numpy>=1.22.0,<2.3.0"
   "pillow>=9.0.0"
   "pyserial>=3.5"
+  "adafruit-blinka"
   "adafruit-circuitpython-neokey>=1.1.7"
+  "adafruit-circuitpython-seesaw"
+  "adafruit-circuitpython-neopixel"
+  "adafruit-circuitpython-tca9548a"
+  "adafruit-circuitpython-mlx90614"
+  "adafruit-circuitpython-mlx90640"
+  "adafruit-circuitpython-ssd1305"
+  "adafruit-circuitpython-mcp230xx"
+  "adafruit-circuitpython-icm20x"
   "tpms==2.0.1"
   "pytest>=7.0.0"
   "opencv-python"
   "matplotlib>=3.8.0"
   "pandas-stubs>=2.1.0"
+  "python-can>=4.0.0"
+  "cantools>=39.0.0"
 )
 "${PIP_CMD[@]}" install --break-system-packages "${PYTHON_DEPS[@]}"
 
@@ -221,8 +232,8 @@ sudo timedatectl set-ntp true 2>/dev/null || true
 
 # Install GPS 10Hz configuration script and service
 echo -e "\n==== Installing GPS 10Hz configuration ===="
-GPS_CONFIG_SRC="$SCRIPT_DIR/config/gps/gps-config.sh"
-GPS_SERVICE_SRC="$SCRIPT_DIR/config/gps/gps-config.service"
+GPS_CONFIG_SRC="$SCRIPT_DIR/services/gps/gps-config.sh"
+GPS_SERVICE_SRC="$SCRIPT_DIR/services/gps/gps-config.service"
 
 if [[ -f "$GPS_CONFIG_SRC" ]]; then
   sudo install -m 0755 "$GPS_CONFIG_SRC" /usr/local/bin/gps-config.sh
@@ -272,7 +283,7 @@ fi
 
 # Install persistent CAN naming rule
 echo -e "\n==== Installing persistent CAN interface naming rule ===="
-UDEV_RULE_SRC="$SCRIPT_DIR/config/can/80-can-persistent-names.rules"
+UDEV_RULE_SRC="$SCRIPT_DIR/services/can/80-can-persistent-names.rules"
 UDEV_RULE_DST="/etc/udev/rules.d/80-can-persistent-names.rules"
 
 if [[ -f "$UDEV_RULE_SRC" ]]; then
@@ -290,7 +301,7 @@ fi
 
 # Install camera persistent naming rule
 echo -e "\n==== Installing camera persistent naming rule ===="
-CAMERA_RULE_SRC="$SCRIPT_DIR/config/camera/99-camera-names.rules"
+CAMERA_RULE_SRC="$SCRIPT_DIR/services/camera/99-camera-names.rules"
 CAMERA_RULE_DST="/etc/udev/rules.d/99-camera-names.rules"
 
 if [[ -f "$CAMERA_RULE_SRC" ]]; then
@@ -312,9 +323,9 @@ fi
 
 # Copy systemd service files and enable
 echo -e "\n==== Setting up CAN interface auto-start ===="
-sudo cp "$SCRIPT_DIR/config/systemd/can-setup.sh" /usr/local/bin/
+sudo cp "$SCRIPT_DIR/services/systemd/can-setup.sh" /usr/local/bin/
 sudo chmod +x /usr/local/bin/can-setup.sh
-sudo cp "$SCRIPT_DIR/config/systemd/can-setup.service" /etc/systemd/system/
+sudo cp "$SCRIPT_DIR/services/systemd/can-setup.service" /etc/systemd/system/
 echo "CAN interface service installed"
 
 echo -e "\n==== Enabling systemd services ===="
