@@ -191,19 +191,21 @@ EOF
     echo "Appended Dual CAN block to $BOOT_CONFIG (reboot required)."
   fi
 
-  # Configure UART and PPS for GPS
-  GPS_BLOCK_HEADER="# ==== openTPT GPS Configuration ===="
+  # Configure UART and PPS for GPS/TPMS
+  GPS_BLOCK_HEADER="# ==== openTPT GPS"
   if sudo grep -Fq "$GPS_BLOCK_HEADER" "$BOOT_CONFIG"; then
     echo "GPS configuration block already present."
   else
     sudo tee -a "$BOOT_CONFIG" >/dev/null <<'EOF'
 
-# ==== openTPT GPS Configuration ====
+# ==== openTPT GPS and TPMS Serial Configuration ====
 # Enable UART for GPS module (GPIO 14/15 TX/RX)
 enable_uart=1
 # PPS signal from GPS on GPIO 18
 dtoverlay=pps-gpio,gpiopin=18
-# ==== end openTPT GPS Configuration ====
+# UART3 on GPIO 4/5 for TPMS receiver
+dtoverlay=uart3
+# ==== end openTPT GPS and TPMS Serial Configuration ====
 EOF
     echo "Appended GPS configuration to $BOOT_CONFIG (reboot required)."
   fi

@@ -752,8 +752,8 @@ RADAR_NOTIFIER_TIMEOUT_S = 0.1  # CAN notifier timeout (seconds)
 GPS_ENABLED = True  # Set to False to disable GPS
 
 # Serial port for GPS (Raspberry Pi UART)
-# GPIO 14 (TX) and GPIO 15 (RX) map to /dev/ttyS0 (mini UART on Pi 4/5)
-GPS_SERIAL_PORT = "/dev/ttyS0"
+# GPIO 14 (TX) and GPIO 15 (RX) - use /dev/serial0 symlink for Pi 4/5 compatibility
+GPS_SERIAL_PORT = "/dev/serial0"
 GPS_BAUD_RATE = 38400  # 38400 for 10Hz update rate (configure GPS module to match)
 
 # GPS serial timeout settings
