@@ -1,4 +1,4 @@
-import os
+import subprocess
 import can
 import time
 import threading
@@ -8,10 +8,11 @@ RX_IFACE = "can1"
 BITRATE = 500000
 
 def setup_interfaces():
-    os.system(f"sudo ip link set {TX_IFACE} down")
-    os.system(f"sudo ip link set {RX_IFACE} down")
-    os.system(f"sudo ip link set {TX_IFACE} up type can bitrate {BITRATE}")
-    os.system(f"sudo ip link set {RX_IFACE} up type can bitrate {BITRATE}")
+    # Use subprocess.run with argument list to avoid shell injection
+    subprocess.run(["sudo", "ip", "link", "set", TX_IFACE, "down"], check=False)
+    subprocess.run(["sudo", "ip", "link", "set", RX_IFACE, "down"], check=False)
+    subprocess.run(["sudo", "ip", "link", "set", TX_IFACE, "up", "type", "can", "bitrate", str(BITRATE)], check=True)
+    subprocess.run(["sudo", "ip", "link", "set", RX_IFACE, "up", "type", "can", "bitrate", str(BITRATE)], check=True)
     print(f"Interfaces {TX_IFACE} (TX) and {RX_IFACE} (RX) ready at {BITRATE}bps.")
 
 def listener():

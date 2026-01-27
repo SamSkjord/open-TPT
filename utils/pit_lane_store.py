@@ -67,23 +67,25 @@ class PitLaneStore:
 
     def __new__(cls):
         """Singleton pattern - only one store instance."""
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    cls._instance = super().__new__(cls)
-                    cls._instance._initialised = False
+        # Always acquire lock to avoid race condition from double-checked locking
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = super().__new__(cls)
+                cls._instance._initialised = False
         return cls._instance
 
     def __init__(self):
         """Initialise the pit lane store."""
-        if self._initialised:
-            return
+        # Use class lock to prevent race between concurrent __init__ calls
+        with PitLaneStore._lock:
+            if self._initialised:
+                return
 
-        self._db_path = DATABASE_FILE
-        self._db_lock = threading.Lock()
-        self._ensure_data_dir()
-        self._init_database()
-        self._initialised = True
+            self._db_path = DATABASE_FILE
+            self._db_lock = threading.Lock()
+            self._ensure_data_dir()
+            self._init_database()
+            self._initialised = True
 
     def _ensure_data_dir(self):
         """Create data directory if it doesn't exist."""

@@ -46,14 +46,16 @@ class SettingsManager:
 
     def __init__(self):
         """Initialise the settings manager."""
-        if self._initialised:
-            return
+        # Use class lock to prevent race between concurrent __init__ calls
+        with SettingsManager._lock:
+            if self._initialised:
+                return
 
-        self._settings = {}
-        self._file_path = SETTINGS_FILE
-        self._save_lock = threading.Lock()
-        self._load()
-        self._initialised = True
+            self._settings = {}
+            self._file_path = SETTINGS_FILE
+            self._save_lock = threading.Lock()
+            self._load()
+            self._initialised = True
 
     def _load(self):
         """Load settings from JSON file."""
