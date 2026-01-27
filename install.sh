@@ -370,6 +370,26 @@ else
   echo "WARNING: Missing $SPLASH_SERVICE_SRC"
 fi
 
+# Disable login prompt on tty1 (we want splash -> app, no login)
+echo -e "\n==== Disabling tty1 login prompt ===="
+sudo systemctl disable getty@tty1.service 2>/dev/null || true
+echo "tty1 login disabled"
+
+# Disable rainbow screen and boot diagnostics
+echo -e "\n==== Disabling boot diagnostics ===="
+if [[ -n "$BOOT_CONFIG" ]] && ! grep -q "disable_splash=1" "$BOOT_CONFIG"; then
+  sudo tee -a "$BOOT_CONFIG" >/dev/null <<'EOF'
+
+# ==== openTPT Boot Display ====
+disable_splash=1
+boot_delay=0
+# ==== end openTPT Boot Display ====
+EOF
+  echo "Rainbow screen and boot delay disabled"
+else
+  echo "Boot diagnostics already configured"
+fi
+
 # Disable cloud-init to prevent boot delays and network configuration issues
 echo -e "\n==== Disabling cloud-init ===="
 if [ -d /etc/cloud ]; then
