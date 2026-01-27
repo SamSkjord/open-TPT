@@ -1,6 +1,6 @@
 # Claude Context - openTPT Project
 
-**Version:** 0.19.11 | **Updated:** 2026-01-22
+**Version:** 0.19.12 | **Updated:** 2026-01-27
 
 ---
 
