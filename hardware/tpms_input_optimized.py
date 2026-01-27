@@ -20,7 +20,7 @@ from utils.hardware_base import BoundedQueueHardwareHandler
 
 # Import for actual TPMS hardware
 try:
-    from tpms_lib import TPMSDevice, TyrePosition, TyreState
+    from tpms_lib import TPMSDevice, TirePosition, TireState
     TPMS_AVAILABLE = True
 except ImportError:
     TPMS_AVAILABLE = False
@@ -57,10 +57,10 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
         self.position_map = {}
         if TPMS_AVAILABLE:
             self.position_map = {
-                TyrePosition.FRONT_LEFT: "FL",
-                TyrePosition.FRONT_RIGHT: "FR",
-                TyrePosition.REAR_LEFT: "RL",
-                TyrePosition.REAR_RIGHT: "RR",
+                TirePosition.FRONT_LEFT: "FL",
+                TirePosition.FRONT_RIGHT: "FR",
+                TirePosition.REAR_LEFT: "RL",
+                TirePosition.REAR_RIGHT: "RR",
             }
 
         # Lock for thread-safe cache access (callbacks may come from library thread)
@@ -131,13 +131,13 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
             self.tpms_device = None
             return False
 
-    def _on_tyre_state_update(self, position: 'TyrePosition', state: 'TyreState'):
+    def _on_tyre_state_update(self, position: 'TirePosition', state: 'TireState'):
         """
         Callback for tyre state updates (called by TPMS library).
 
         Args:
-            position: TyrePosition enum
-            state: TyreState object
+            position: TirePosition enum
+            state: TireState object
         """
         if not TPMS_AVAILABLE or position not in self.position_map:
             return
@@ -164,7 +164,7 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
         # Trigger immediate snapshot publish
         self._publish_current_state()
 
-    def _on_pairing_complete(self, position: 'TyrePosition', tyre_id: str):
+    def _on_pairing_complete(self, position: 'TirePosition', tyre_id: str):
         """Callback for pairing completion."""
         if not TPMS_AVAILABLE or position not in self.position_map:
             return
@@ -284,10 +284,10 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
 
         try:
             reverse_map = {
-                "FL": TyrePosition.FRONT_LEFT,
-                "FR": TyrePosition.FRONT_RIGHT,
-                "RL": TyrePosition.REAR_LEFT,
-                "RR": TyrePosition.REAR_RIGHT,
+                "FL": TirePosition.FRONT_LEFT,
+                "FR": TirePosition.FRONT_RIGHT,
+                "RL": TirePosition.REAR_LEFT,
+                "RR": TirePosition.REAR_RIGHT,
             }
 
             if position_code not in reverse_map:
