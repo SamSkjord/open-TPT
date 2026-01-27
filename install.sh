@@ -43,6 +43,18 @@ sudo apt install -y pulseaudio pulseaudio-module-bluetooth
 echo -e "\n==== Installing GPS and time sync packages ===="
 sudo apt install -y gpsd gpsd-clients chrony pps-tools
 
+# Install CoPilot audio dependencies (TTS, audio processing)
+echo -e "\n==== Installing audio/TTS packages ===="
+sudo apt install -y sox espeak-ng alsa-utils
+
+# Install D-Bus/GLib for MPRIS Bluetooth metadata
+echo -e "\n==== Installing D-Bus/GLib packages ===="
+sudo apt install -y python3-gi python3-dbus libdbus-glib-1-dev
+
+# Install CAN/I2C debugging tools
+echo -e "\n==== Installing hardware debugging tools ===="
+sudo apt install -y can-utils i2c-tools
+
 # Add D-Bus policy for Bluetooth audio (allows pi user to access A2DP profiles)
 echo -e "\n==== Configuring Bluetooth audio permissions ===="
 sudo tee /etc/dbus-1/system.d/bluetooth-audio.conf > /dev/null << 'BTEOF'
@@ -65,9 +77,13 @@ sudo tee /etc/dbus-1/system.d/bluetooth-audio.conf > /dev/null << 'BTEOF'
 </busconfig>
 BTEOF
 
-# Add pi user to bluetooth group
+# Add pi user to required groups
 sudo usermod -a -G bluetooth "$TARGET_USER" 2>/dev/null || true
-echo "Bluetooth audio permissions configured"
+sudo usermod -a -G dialout "$TARGET_USER" 2>/dev/null || true   # Serial ports (GPS, TPMS)
+sudo usermod -a -G gpio "$TARGET_USER" 2>/dev/null || true      # GPIO access
+sudo usermod -a -G i2c "$TARGET_USER" 2>/dev/null || true       # I2C devices
+sudo usermod -a -G spi "$TARGET_USER" 2>/dev/null || true       # SPI devices (CAN HATs)
+echo "User groups configured (bluetooth, dialout, gpio, i2c, spi)"
 
 echo -e "\n==== Upgrading pip tooling ===="
 if ! "${PIP_CMD[@]}" install --break-system-packages --upgrade pip setuptools wheel; then
@@ -141,6 +157,8 @@ PYTHON_DEPS=(
   "pandas-stubs>=2.1.0"
   "python-can>=4.0.0"
   "cantools>=39.0.0"
+  "pyosmium"
+  "dbus-python"
 )
 "${PIP_CMD[@]}" install --break-system-packages "${PYTHON_DEPS[@]}"
 
@@ -406,6 +424,21 @@ EOF
 else
   echo "Boot diagnostics already configured"
 fi
+
+# Create data directories (local fallback when USB not mounted)
+echo -e "\n==== Creating data directories ===="
+LOCAL_DATA_DIR="$TARGET_HOME/.opentpt"
+sudo -u "$TARGET_USER" mkdir -p "$LOCAL_DATA_DIR/lap_timing/tracks"
+sudo -u "$TARGET_USER" mkdir -p "$LOCAL_DATA_DIR/pit_timer"
+sudo -u "$TARGET_USER" mkdir -p "$LOCAL_DATA_DIR/copilot/maps"
+sudo -u "$TARGET_USER" mkdir -p "$LOCAL_DATA_DIR/copilot/routes"
+sudo -u "$TARGET_USER" mkdir -p "$LOCAL_DATA_DIR/copilot/cache"
+echo "Data directories created at $LOCAL_DATA_DIR"
+
+# Create telemetry directory
+TELEMETRY_DIR="$TARGET_HOME/telemetry"
+sudo -u "$TARGET_USER" mkdir -p "$TELEMETRY_DIR"
+echo "Telemetry directory created at $TELEMETRY_DIR"
 
 # Disable cloud-init to prevent boot delays and network configuration issues
 echo -e "\n==== Disabling cloud-init ===="
