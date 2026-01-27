@@ -2551,7 +2551,7 @@ SUBSYSTEM=="video4linux", KERNELS=="1-1.2", ATTR{index}=="0", SYMLINK+="video-fr
 
 The `install.sh` script now automatically installs camera udev rules:
 ```bash
-sudo ./install.sh
+sudo bash ./install.sh
 ```
 
 For manual installation:
@@ -2809,7 +2809,7 @@ python3 tools/performance_test.py
 ssh pi@raspberrypi.local
 cd /home/pi/open-TPT
 git pull
-sudo ./install.sh  # If dependencies changed
+sudo bash ./install.sh  # If dependencies changed
 ```
 
 #### 🎯 Deployment Workflow (Mac → Pi)

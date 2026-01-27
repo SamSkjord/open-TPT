@@ -14,13 +14,13 @@
 ssh pi@192.168.199.246
 git clone https://github.com/SamSkjord/open-TPT.git
 cd open-TPT
-sudo ./install.sh
+sudo bash ./install.sh
 
 # Update: SSH to Pi and pull latest changes
 ssh pi@192.168.199.246
 cd /home/pi/open-TPT
 git pull
-sudo ./install.sh  # If dependencies changed
+sudo bash ./install.sh  # If dependencies changed
 
 # Quick sync (code changes only - faster for development)
 ./tools/quick_sync.sh pi@192.168.199.246
@@ -166,7 +166,7 @@ ssh pi@192.168.199.246 "sudo systemctl restart openTPT.service"
 # SSH to Pi and re-run installation
 ssh pi@192.168.199.246
 cd /home/pi/open-TPT
-sudo ./install.sh
+sudo bash ./install.sh
 ```
 
 ## Development Workflow

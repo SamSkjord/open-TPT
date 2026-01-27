@@ -47,7 +47,7 @@ git clone https://github.com/SamSkjord/open-TPT.git
 cd open-TPT
 
 # Run the install script
-sudo ./install.sh
+sudo bash ./install.sh
 ```
 
 The install script will:
@@ -254,7 +254,7 @@ openTPT is compatible with both Raspberry Pi 4 and Pi 5. The Pi 5 uses a new RP1
 
 5. **Run install.sh** - handles Pi 5 automatically:
    ```bash
-   sudo ./install.sh
+   sudo bash ./install.sh
    ```
 
 6. **Enable user lingering** (Raspberry Pi OS Lite only):
@@ -329,7 +329,7 @@ cd /home/pi/open-TPT
 git pull
 
 # Re-run installer if dependencies changed
-sudo ./install.sh
+sudo bash ./install.sh
 ```
 
 ### Method 2: Quick Sync (Fast Updates for Development)
