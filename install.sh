@@ -55,6 +55,10 @@ sudo apt install -y python3-gi python3-dbus libdbus-glib-1-dev
 echo -e "\n==== Installing hardware debugging tools ===="
 sudo apt install -y can-utils i2c-tools
 
+# Install pyosmium (OSM map processing for CoPilot) - must be from apt, not pip
+echo -e "\n==== Installing pyosmium ===="
+sudo apt install -y python3-pyosmium
+
 # Add D-Bus policy for Bluetooth audio (allows pi user to access A2DP profiles)
 echo -e "\n==== Configuring Bluetooth audio permissions ===="
 sudo tee /etc/dbus-1/system.d/bluetooth-audio.conf > /dev/null << 'BTEOF'
@@ -160,7 +164,6 @@ PYTHON_DEPS=(
   "pandas-stubs>=2.1.0"
   "python-can>=4.0.0"
   "cantools>=39.0.0"
-  "pyosmium"
   "dbus-python"
 )
 "${PIP_CMD[@]}" install --break-system-packages "${PYTHON_DEPS[@]}"
