@@ -92,6 +92,7 @@ class LapTimingStore:
     def _init_database(self):
         """Initialise the SQLite database with required tables."""
         with self._db_lock:
+            conn = None
             try:
                 conn = sqlite3.connect(self._db_path)
                 cursor = conn.cursor()
@@ -148,11 +149,13 @@ class LapTimingStore:
                 ''')
 
                 conn.commit()
-                conn.close()
                 logger.info("Lap timing database initialised: %s", self._db_path)
 
             except Exception as e:
                 logger.warning("Could not initialise lap timing database: %s", e)
+            finally:
+                if conn:
+                    conn.close()
 
     def record_lap(self, lap: LapRecord) -> bool:
         """
@@ -167,6 +170,7 @@ class LapTimingStore:
         is_new_best = False
 
         with self._db_lock:
+            conn = None
             try:
                 conn = sqlite3.connect(self._db_path)
                 cursor = conn.cursor()
@@ -203,10 +207,12 @@ class LapTimingStore:
                     logger.info("New best lap for %s: %s", lap.track_name, lap.format_time())
 
                 conn.commit()
-                conn.close()
 
             except Exception as e:
                 logger.warning("Could not record lap: %s", e)
+            finally:
+                if conn:
+                    conn.close()
 
         return is_new_best
 
@@ -221,6 +227,7 @@ class LapTimingStore:
             Best lap record or None if no laps recorded
         """
         with self._db_lock:
+            conn = None
             try:
                 conn = sqlite3.connect(self._db_path)
                 cursor = conn.cursor()
@@ -230,7 +237,6 @@ class LapTimingStore:
                     FROM best_laps WHERE track_name = ?
                 ''', (track_name,))
                 row = cursor.fetchone()
-                conn.close()
 
                 if row:
                     sectors = json.loads(row[2]) if row[2] else None
@@ -243,6 +249,9 @@ class LapTimingStore:
 
             except Exception as e:
                 logger.warning("Could not get best lap: %s", e)
+            finally:
+                if conn:
+                    conn.close()
 
         return None
 
@@ -256,6 +265,7 @@ class LapTimingStore:
         result = {}
 
         with self._db_lock:
+            conn = None
             try:
                 conn = sqlite3.connect(self._db_path)
                 cursor = conn.cursor()
@@ -274,10 +284,11 @@ class LapTimingStore:
                         sectors=sectors
                     )
 
-                conn.close()
-
             except Exception as e:
                 logger.warning("Could not get best laps: %s", e)
+            finally:
+                if conn:
+                    conn.close()
 
         return result
 
@@ -292,6 +303,7 @@ class LapTimingStore:
             True if a record was deleted
         """
         with self._db_lock:
+            conn = None
             try:
                 conn = sqlite3.connect(self._db_path)
                 cursor = conn.cursor()
@@ -302,7 +314,6 @@ class LapTimingStore:
 
                 deleted = cursor.rowcount > 0
                 conn.commit()
-                conn.close()
 
                 if deleted:
                     logger.info("Cleared best lap for %s", track_name)
@@ -312,6 +323,9 @@ class LapTimingStore:
             except Exception as e:
                 logger.warning("Could not clear best lap: %s", e)
                 return False
+            finally:
+                if conn:
+                    conn.close()
 
     def clear_all_best_laps(self) -> int:
         """
@@ -321,6 +335,7 @@ class LapTimingStore:
             Number of records deleted
         """
         with self._db_lock:
+            conn = None
             try:
                 conn = sqlite3.connect(self._db_path)
                 cursor = conn.cursor()
@@ -328,7 +343,6 @@ class LapTimingStore:
                 cursor.execute('DELETE FROM best_laps')
                 deleted = cursor.rowcount
                 conn.commit()
-                conn.close()
 
                 logger.info("Cleared %d best lap records", deleted)
                 return deleted
@@ -336,6 +350,9 @@ class LapTimingStore:
             except Exception as e:
                 logger.warning("Could not clear best laps: %s", e)
                 return 0
+            finally:
+                if conn:
+                    conn.close()
 
     def save_reference_lap(
         self,
@@ -355,6 +372,7 @@ class LapTimingStore:
             True if saved successfully
         """
         with self._db_lock:
+            conn = None
             try:
                 conn = sqlite3.connect(self._db_path)
                 cursor = conn.cursor()
@@ -371,13 +389,15 @@ class LapTimingStore:
                 ))
 
                 conn.commit()
-                conn.close()
                 logger.info("Saved reference lap for %s: %d points", track_name, len(gps_trace))
                 return True
 
             except Exception as e:
                 logger.warning("Could not save reference lap: %s", e)
                 return False
+            finally:
+                if conn:
+                    conn.close()
 
     def get_reference_lap(self, track_name: str) -> Optional[ReferenceLap]:
         """
@@ -390,6 +410,7 @@ class LapTimingStore:
             Reference lap with GPS trace or None
         """
         with self._db_lock:
+            conn = None
             try:
                 conn = sqlite3.connect(self._db_path)
                 cursor = conn.cursor()
@@ -399,7 +420,6 @@ class LapTimingStore:
                     FROM reference_laps WHERE track_name = ?
                 ''', (track_name,))
                 row = cursor.fetchone()
-                conn.close()
 
                 if row:
                     return ReferenceLap(
@@ -411,6 +431,9 @@ class LapTimingStore:
 
             except Exception as e:
                 logger.warning("Could not get reference lap: %s", e)
+            finally:
+                if conn:
+                    conn.close()
 
         return None
 
@@ -432,6 +455,7 @@ class LapTimingStore:
         result = []
 
         with self._db_lock:
+            conn = None
             try:
                 conn = sqlite3.connect(self._db_path)
                 cursor = conn.cursor()
@@ -455,10 +479,11 @@ class LapTimingStore:
                         conditions=row[4]
                     ))
 
-                conn.close()
-
             except Exception as e:
                 logger.warning("Could not get recent laps: %s", e)
+            finally:
+                if conn:
+                    conn.close()
 
         return result
 
@@ -480,6 +505,7 @@ class LapTimingStore:
         }
 
         with self._db_lock:
+            conn = None
             try:
                 conn = sqlite3.connect(self._db_path)
                 cursor = conn.cursor()
@@ -498,10 +524,11 @@ class LapTimingStore:
                     stats['best_time'] = row[2]
                     stats['last_lap'] = row[3]
 
-                conn.close()
-
             except Exception as e:
                 logger.warning("Could not get track stats: %s", e)
+            finally:
+                if conn:
+                    conn.close()
 
         return stats
 

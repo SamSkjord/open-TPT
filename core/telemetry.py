@@ -47,42 +47,44 @@ class TelemetryMixin:
                 frame.tpms_rr_temp = temp
 
         # Tyre thermal data (3-zone temps from CAN corner sensors)
-        for position in ["FL", "FR", "RL", "RR"]:
-            zone_data = self.thermal.get_zone_data(position)
-            if zone_data:
-                # Zone data has left_median, centre_median, right_median
-                inner = zone_data.get("left_median")
-                centre = zone_data.get("centre_median")
-                outer = zone_data.get("right_median")
-                if position == "FL":
-                    frame.tyre_fl_inner = inner
-                    frame.tyre_fl_centre = centre
-                    frame.tyre_fl_outer = outer
-                elif position == "FR":
-                    frame.tyre_fr_inner = inner
-                    frame.tyre_fr_centre = centre
-                    frame.tyre_fr_outer = outer
-                elif position == "RL":
-                    frame.tyre_rl_inner = inner
-                    frame.tyre_rl_centre = centre
-                    frame.tyre_rl_outer = outer
-                elif position == "RR":
-                    frame.tyre_rr_inner = inner
-                    frame.tyre_rr_centre = centre
-                    frame.tyre_rr_outer = outer
+        if self.thermal:
+            for position in ["FL", "FR", "RL", "RR"]:
+                zone_data = self.thermal.get_zone_data(position)
+                if zone_data:
+                    # Zone data has left_median, centre_median, right_median
+                    inner = zone_data.get("left_median")
+                    centre = zone_data.get("centre_median")
+                    outer = zone_data.get("right_median")
+                    if position == "FL":
+                        frame.tyre_fl_inner = inner
+                        frame.tyre_fl_centre = centre
+                        frame.tyre_fl_outer = outer
+                    elif position == "FR":
+                        frame.tyre_fr_inner = inner
+                        frame.tyre_fr_centre = centre
+                        frame.tyre_fr_outer = outer
+                    elif position == "RL":
+                        frame.tyre_rl_inner = inner
+                        frame.tyre_rl_centre = centre
+                        frame.tyre_rl_outer = outer
+                    elif position == "RR":
+                        frame.tyre_rr_inner = inner
+                        frame.tyre_rr_centre = centre
+                        frame.tyre_rr_outer = outer
 
         # Brake temps
-        brake_temps = self.brakes.get_temps()
-        for position, data in brake_temps.items():
-            temp = data.get("temp") if isinstance(data, dict) else data
-            if position == "FL":
-                frame.brake_fl = temp
-            elif position == "FR":
-                frame.brake_fr = temp
-            elif position == "RL":
-                frame.brake_rl = temp
-            elif position == "RR":
-                frame.brake_rr = temp
+        if self.brakes:
+            brake_temps = self.brakes.get_temps()
+            for position, data in brake_temps.items():
+                temp = data.get("temp") if isinstance(data, dict) else data
+                if position == "FL":
+                    frame.brake_fl = temp
+                elif position == "FR":
+                    frame.brake_fr = temp
+                elif position == "RL":
+                    frame.brake_rl = temp
+                elif position == "RR":
+                    frame.brake_rr = temp
 
         # IMU data
         if self.imu:

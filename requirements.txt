@@ -12,7 +12,7 @@ adafruit-circuitpython-seesaw>=1.12.0  # Used for NeoKey 1x4 and I2C QT Rotary E
 adafruit-circuitpython-neopixel>=6.3.0
 
 # TPMS (Tyre Pressure Monitoring System)
-tpms>=2.1.0
+tpms>=2.1.2
 
 # IMU sensors (for G-meter)
 adafruit-circuitpython-icm20x>=2.0.0  # ICM20649/ICM20948 6-axis IMU

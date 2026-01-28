@@ -189,7 +189,34 @@ class CornerSensorHandler(BoundedQueueHardwareHandler):
             logger.error("Failed to open %s: %s", self._channel, e)
 
     def _worker_loop(self):
-        """Background thread - runs CAN notifier and publishes snapshots."""
+        """
+        Background thread that manages CAN bus reception and snapshot publishing.
+
+        This method sets up a python-can Notifier to receive CAN messages
+        asynchronously, then enters a loop that periodically publishes
+        snapshots for lock-free access by the main rendering thread.
+
+        Architecture:
+            1. CAN Notifier runs in its own thread (managed by python-can)
+            2. _on_message() callback processes each incoming CAN frame
+            3. This loop periodically builds immutable snapshots at 10Hz
+            4. Main thread reads snapshots without locks
+
+        Message Flow:
+            CAN bus -> Notifier -> _on_message() -> _corners dict (with lock)
+                                                 -> _laser_data (with lock)
+            This loop -> _publish_snapshots() -> atomic snapshot swap
+
+        Thread Safety:
+            - _on_message() acquires _lock when updating corner/laser data
+            - _publish_snapshots() acquires _lock when reading, then swaps
+              references atomically for lock-free consumer access
+            - Snapshots are immutable dicts/dataclasses, safe for concurrent read
+
+        Cleanup:
+            - Notifier is stopped when loop exits (normal or exception)
+            - CAN bus is shutdown in stop() method
+        """
         if not self._bus:
             logger.warning("Corner sensors: CAN not available")
             return
@@ -210,7 +237,34 @@ class CornerSensorHandler(BoundedQueueHardwareHandler):
             self._notifier.stop()
 
     def _on_message(self, msg: can.Message):
-        """CAN message callback - decode and update corner/laser data."""
+        """
+        CAN message callback invoked by python-can Notifier for each frame.
+
+        This callback is executed in the Notifier's thread, not the worker
+        thread. It decodes CAN messages using the DBC database and updates
+        the appropriate corner sensor or laser ranger data structure.
+
+        Message Routing:
+            1. Check if message is from laser ranger (0x200, 0x210)
+            2. Otherwise, lookup in _msg_map to find corner position and type
+            3. Decode using cantools DBC database
+            4. Update appropriate CornerData fields under lock
+
+        Corner Message Types (per pico_tyre_temp.dbc):
+            - tyre: Left/Centre/Right median temps + lateral gradient (10Hz)
+            - detection: Tyre detected flag, confidence, width, warnings (10Hz)
+            - brake: Inner/Outer brake temps + sensor status (10Hz)
+            - status: FPS, firmware version, emissivity (1Hz)
+            - frame: Thermal frame segments for full image requests
+
+        Thread Safety:
+            - Acquires _lock before updating _corners or _laser_data
+            - Updates are atomic within the lock
+            - Snapshots are built separately in _publish_snapshots()
+
+        Args:
+            msg: CAN message from python-can with arbitration_id and data
+        """
         # Check for laser ranger messages first
         if self._laser_enabled and msg.arbitration_id in (self._laser_range_id, self._laser_status_id):
             self._on_laser_message(msg)
@@ -264,7 +318,19 @@ class CornerSensorHandler(BoundedQueueHardwareHandler):
                 c.frame_complete = len(c.frame_segments) >= 256
 
     def _on_laser_message(self, msg: can.Message):
-        """Handle laser ranger CAN messages."""
+        """
+        Handle laser ranger CAN messages (pico_can_ranger.dbc).
+
+        Decodes and updates laser ranger data from the TOF distance sensor.
+        Called from _on_message when message ID matches laser ranger IDs.
+
+        Message Types:
+            - RangeData (0x200, ~4Hz): Distance in mm, status, error code
+            - Status (0x210, 1Hz): Measurement rate, firmware, sensor ID
+
+        Args:
+            msg: CAN message with laser ranger data
+        """
         if not self._laser_db:
             return
 
@@ -290,7 +356,38 @@ class CornerSensorHandler(BoundedQueueHardwareHandler):
                 self._laser_data.sensor_id = int(data.get("SensorID", 0))
 
     def _publish_snapshots(self):
-        """Build immutable snapshots for lock-free consumer access."""
+        """
+        Build immutable snapshots from live data for lock-free consumer access.
+
+        This method is called periodically (~10Hz) from _worker_loop to create
+        read-only snapshots of the current sensor state. These snapshots are
+        then accessible from the main rendering thread without locks.
+
+        Snapshot Building Process:
+            1. Acquire _lock to read current _corners and _laser_data
+            2. For each corner position (FL, FR, RL, RR):
+               - Check if data is fresh (within CORNER_SENSOR_CAN_TIMEOUT_S)
+               - Build tyre snapshot with thermal array and zone temps
+               - Build brake snapshot with inner/outer temps
+            3. Build laser ranger snapshot if enabled and fresh
+            4. Swap snapshot references atomically
+
+        Freshness Check:
+            - Data older than _timeout (typically 0.5s) is considered stale
+            - Stale corners return None in the snapshot
+            - This prevents displaying outdated data when a sensor goes offline
+
+        Lock-Free Access Pattern:
+            - Snapshots are new dict/dataclass objects, not references to _corners
+            - Reference assignment in Python is atomic (CPython GIL)
+            - Consumers read _tyre_snapshot/_brake_snapshot without locks
+            - Old snapshots are garbage collected after no references remain
+
+        Thread Safety:
+            - Lock is held only during snapshot building (brief)
+            - Reference swap is atomic, consumers see consistent state
+            - No blocking in the render path
+        """
         now = time.time()
 
         with self._lock:

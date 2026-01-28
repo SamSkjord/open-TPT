@@ -250,7 +250,31 @@ class GPSHandler(BoundedQueueHardwareHandler):
             )
 
     def _worker_loop(self):
-        """Background thread that reads NMEA from serial."""
+        """
+        Background thread that reads NMEA sentences from serial port.
+
+        This is the main polling loop for the GPS handler. It runs continuously
+        in a background thread, reading data from the serial port, parsing
+        complete NMEA sentences, and publishing snapshots to the bounded queue.
+
+        Processing Flow:
+            1. Read available bytes from serial port into buffer
+            2. Extract complete sentences (terminated by CRLF)
+            3. Parse RMC sentences for position, speed, heading, time
+            4. Parse GGA sentences for satellite count
+            5. Publish data snapshot after each RMC sentence
+            6. Calculate and track update rate (should be ~10Hz with fix)
+
+        Error Handling:
+            - Serial errors increment consecutive_errors counter
+            - After max_consecutive_errors (10), attempts to reinitialise
+            - Provides resilience against temporary USB disconnects
+
+        Thread Safety:
+            - All data is published via _publish_snapshot() to bounded queue
+            - Main thread reads via get_snapshot() (lock-free)
+            - Internal state (speed, position, etc.) updated atomically
+        """
         buffer = ""
         rate_start = time.monotonic()
         rate_count = 0

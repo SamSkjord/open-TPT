@@ -33,21 +33,23 @@ class EventHandlerMixin:
                 if event.key == pygame.K_ESCAPE:
                     self.running = False
 
-                # Cycle brightness with up arrow key
-                elif event.key == pygame.K_UP:
-                    self.input_handler.simulate_button_press(0)  # Brightness cycle
+                # Skip keyboard shortcuts if input handler not available
+                elif self.input_handler:
+                    # Cycle brightness with up arrow key
+                    if event.key == pygame.K_UP:
+                        self.input_handler.simulate_button_press(0)  # Brightness cycle
 
-                # Page settings with 'T' key or down arrow
-                elif event.key == pygame.K_t or event.key == pygame.K_DOWN:
-                    self.input_handler.simulate_button_press(BUTTON_PAGE_SETTINGS)
+                    # Page settings with 'T' key or down arrow
+                    elif event.key == pygame.K_t or event.key == pygame.K_DOWN:
+                        self.input_handler.simulate_button_press(BUTTON_PAGE_SETTINGS)
 
-                # Switch within category with spacebar
-                elif event.key == pygame.K_SPACE:
-                    self.input_handler.simulate_button_press(BUTTON_CATEGORY_SWITCH)
+                    # Switch within category with spacebar
+                    elif event.key == pygame.K_SPACE:
+                        self.input_handler.simulate_button_press(BUTTON_CATEGORY_SWITCH)
 
-                # Switch between camera/UI modes with right arrow
-                elif event.key == pygame.K_RIGHT:
-                    self.input_handler.simulate_button_press(BUTTON_VIEW_MODE)
+                    # Switch between camera/UI modes with right arrow
+                    elif event.key == pygame.K_RIGHT:
+                        self.input_handler.simulate_button_press(BUTTON_VIEW_MODE)
 
             # Reset UI auto-hide timer on any user interaction
             if event.type in (
@@ -56,13 +58,16 @@ class EventHandlerMixin:
                 pygame.MOUSEMOTION,
             ):
                 self.ui_last_interaction_time = time.time()
-                if not self.input_handler.ui_manually_toggled:
+                if self.input_handler and not self.input_handler.ui_manually_toggled:
                     self.input_handler.ui_visible = True
                     self.ui_fade_alpha = 255
                     self.ui_fading = False
 
     def _update_ui_visibility(self):
         """Update UI visibility based on timer and manual toggle state."""
+        if not self.input_handler:
+            return
+
         current_time = time.time()
 
         # If manually toggled, respect that setting completely
@@ -100,7 +105,8 @@ class EventHandlerMixin:
         elif self.current_category == "ui":
             if self.current_ui_page == "telemetry":
                 # Telemetry page: Toggle UI overlay visibility
-                self.input_handler.toggle_ui_visibility()
+                if self.input_handler:
+                    self.input_handler.toggle_ui_visibility()
             elif self.current_ui_page == "gmeter":
                 # G-meter page: Reset peak values
                 self.gmeter.reset_peaks()
@@ -126,7 +132,8 @@ class EventHandlerMixin:
             logger.debug("Switched to camera pages (current: %s)", self.current_camera_page)
 
         # Request LED update
-        self.input_handler.request_led_update()
+        if self.input_handler:
+            self.input_handler.request_led_update()
 
     def _get_enabled_pages(self) -> list:
         """Get list of enabled UI page IDs based on settings."""
@@ -173,7 +180,8 @@ class EventHandlerMixin:
                 logger.debug("Only one page enabled: %s", self.current_ui_page)
 
         # Request LED update
-        self.input_handler.request_led_update()
+        if self.input_handler:
+            self.input_handler.request_led_update()
 
     def _handle_recording_toggle(self):
         """Handle recording start/stop toggle from button hold."""
@@ -187,7 +195,8 @@ class EventHandlerMixin:
         else:
             # Start recording
             self.recorder.start_recording()
-            self.input_handler.recording = True
+            if self.input_handler:
+                self.input_handler.recording = True
 
     def _recording_cancel(self):
         """Cancel - close menu and continue recording."""
@@ -197,7 +206,8 @@ class EventHandlerMixin:
         """Save recording and stop."""
         self.recorder.stop_recording()
         filepath = self.recorder.save()
-        self.input_handler.recording = False
+        if self.input_handler:
+            self.input_handler.recording = False
         if filepath:
             logger.info("Recording saved to %s", filepath)
 
@@ -205,7 +215,8 @@ class EventHandlerMixin:
         """Delete recording without saving."""
         self.recorder.stop_recording()
         self.recorder.discard()
-        self.input_handler.recording = False
+        if self.input_handler:
+            self.input_handler.recording = False
         logger.info("Recording discarded")
 
     def _process_input_events(self):
@@ -213,7 +224,10 @@ class EventHandlerMixin:
         current_time = time.time()
 
         # Check for NeoKey inputs (non-blocking, handled by background thread)
-        input_events = self.input_handler.check_input()
+        if not self.input_handler:
+            input_events = {}
+        else:
+            input_events = self.input_handler.check_input()
 
         # Handle button 1: Page-specific settings
         if input_events.get("page_settings", False):
@@ -228,7 +242,7 @@ class EventHandlerMixin:
             self._switch_view_mode()
 
         # When UI is toggled via button, reset the fade state and timer
-        if input_events.get("ui_toggled", False):
+        if input_events.get("ui_toggled", False) and self.input_handler:
             self.ui_fade_alpha = 255 if self.input_handler.ui_visible else 0
             self.ui_fading = False
             # Reset the interaction timer when manually toggled on
@@ -256,6 +270,7 @@ class EventHandlerMixin:
                 if encoder_event.rotation_delta != 0:
                     self.encoder.adjust_brightness(encoder_event.rotation_delta)
                     # Sync brightness with input handler for consistency
-                    self.input_handler.brightness = self.encoder.get_brightness()
+                    if self.input_handler:
+                        self.input_handler.brightness = self.encoder.get_brightness()
                 if encoder_event.long_press:
                     self.menu.show()
