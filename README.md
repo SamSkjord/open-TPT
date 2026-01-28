@@ -137,6 +137,12 @@ make a cup of tea, this will take a little while
 sudo reboot
 ```
 
+**Note:** Some harmless warnings may appear during installation:
+- `pip upgrade failed` - Normal on Debian-managed Python, script continues with system pip
+- `dpkg-statoverride: warning` - Log directories created on first run
+- `CMake Deprecation Warning` - SDL2 still builds correctly
+- `detached HEAD state` - Normal when cloning specific release tags
+
 The install script handles everything:
 - System packages (SDL2, pygame dependencies, audio, GPS, CAN tools)
 - Python packages (all Adafruit libraries, numba, python-can, etc.)
