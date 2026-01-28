@@ -75,10 +75,10 @@ openTPT is compatible with both Pi 4 and Pi 5. The RP1 I/O chip on Pi 5 is abstr
 | CAN bus | Compatible | Standard socketcan interface |
 | USB cameras | Compatible | Same udev rules |
 | SPI CAN HATs | Compatible | Same GPIO pins |
-| GPS UART | **Verify** | May need `/dev/ttyS0` vs `/dev/ttyAMA0` |
-| TPMS UART | Compatible | `/dev/ttyAMA3` works on both |
+| GPS UART | Compatible | Uses `/dev/serial0` symlink (works on both) |
+| TPMS UART | Compatible | Pi 5 uses `uart2-pi5` overlay, device is `/dev/ttyAMA2` |
 
-See `DEPLOYMENT.md` section 6 for migration steps.
+The install script automatically detects Pi model and configures the correct UART overlays.
 
 ---
 
@@ -612,13 +612,9 @@ git commit -m "Optimize thermal processing"  # wrong
 
 | Document | Purpose |
 |----------|---------|
-| `README.md` | Project overview, features, configuration, **TODO lists** |
+| `README.md` | Project overview, installation, configuration, troubleshooting |
 | `CHANGELOG.md` | Version history with detailed changes |
-| `QUICKSTART.md` | Quick commands for daily use |
-| `DEPLOYMENT.md` | Pi deployment and boot splash setup |
 | `CLAUDE.md` | AI assistant context (this file) |
-
-**Note:** Hardware and Software TODO lists are maintained in `README.md` (see "Hardware TODO" and "Software TODO" sections).
 
 ### Keeping Documentation Updated
 
@@ -632,20 +628,11 @@ Documentation must be kept in sync with code changes:
 2. **README.md** - Update when adding/removing:
    - Features or capabilities
    - Hardware support
-   - Configuration options
-   - Project structure changes
-
-3. **QUICKSTART.md** - Update when changing:
-   - Common commands or workflows
-   - Hardware status
-   - Key configuration files
-
-4. **DEPLOYMENT.md** - Update when changing:
    - Installation steps
-   - Boot/service configuration
-   - Deployment scripts or methods
+   - Configuration options
+   - Troubleshooting tips
 
-5. **CLAUDE.md** - Update when changing:
+3. **CLAUDE.md** - Update when changing:
    - Hardware configuration or status
    - Directory structure
    - I2C addresses or registers

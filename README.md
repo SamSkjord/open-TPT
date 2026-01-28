@@ -49,7 +49,7 @@ openTPT features a high-performance architecture optimised for real-time telemet
   - Compatible Toyota radar unit (e.g., Prius 2017)
   - CAN-to-USB adapters or SPI CAN controllers
   - DBC files for radar decoding
-- Dual Waveshare 2-CH CAN HAT+ stack on the Waveshare CM4-POE-UPS-BASE for multi-bus CAN/OBD work (see `DEPLOYMENT.md` for hardware setup)
+- Dual Waveshare 2-CH CAN HAT+ stack for multi-bus CAN/OBD work
 
 ### GPIO Pin Allocation (Raspberry Pi 4/5)
 
@@ -192,19 +192,6 @@ With read-only mode enabled:
 - All persistent data (settings, lap times, telemetry) stored on USB at `/mnt/usb/.opentpt/`
 - To make changes, disable read-only mode: `sudo ./services/boot/disable-readonly.sh && sudo reboot`
 
-### Development (Mac/Linux)
-
-For local development without hardware:
-
-```bash
-# Install minimal dependencies
-pip3 install pygame numpy pillow
-
-# Run in mock mode (no hardware required)
-./main.py --windowed
-```
-
-See `DEPLOYMENT.md` for detailed deployment workflow and `QUICKSTART.md` for daily commands.
 
 ## Usage
 
@@ -722,13 +709,65 @@ openTPT/
 - [ ] Camera settings menu always opens on rear camera even when front camera is selected
 - [ ] Menu status bar text is horizontally aligned with the bottom of the menu square, appears to have a line through it - adjust spacing
 
+## Troubleshooting
+
+### Quick Checks
+
+```bash
+# Check service status
+ssh pi@<ip> "sudo systemctl status openTPT.service"
+
+# View live logs
+ssh pi@<ip> "sudo journalctl -u openTPT.service -f"
+
+# Check I2C devices (should see 0x30, 0x36, 0x60, 0x68)
+ssh pi@<ip> "sudo i2cdetect -y 1"
+
+# Check CAN interfaces
+ssh pi@<ip> "ip link show | grep can"
+
+# Check cameras
+ssh pi@<ip> "ls -l /dev/video-*"
+
+# Check throttling (0x0 = OK)
+ssh pi@<ip> "vcgencmd get_throttled && vcgencmd measure_temp"
+```
+
+### Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| Service won't start | Check logs: `journalctl -u openTPT.service -n 50` |
+| I2C devices not found | Verify I2C enabled: `ls /dev/i2c-*` |
+| CAN interfaces missing | Reboot after install, check `dmesg \| grep mcp` |
+| Camera not detected | Check USB port assignment and udev rules |
+| Read-only mode issues | Disable: `sudo ./services/boot/disable-readonly.sh && sudo reboot` |
+
+## Development
+
+### Quick Sync (Mac to Pi)
+
+```bash
+# Sync code changes (doesn't reinstall dependencies)
+./tools/quick_sync.sh pi@<pi-ip>
+
+# Auto-sync on file changes
+brew install fswatch
+fswatch -o . | xargs -n1 -I{} ./tools/quick_sync.sh pi@<pi-ip>
+```
+
+### Local Development (No Hardware)
+
+```bash
+pip3 install pygame numpy pillow
+./main.py --windowed
+```
+
 ## Documentation
 
 | Document | Purpose |
 |----------|---------|
 | `README.md` | Complete project documentation (this file) |
-| `QUICKSTART.md` | Quick reference for daily use |
-| `DEPLOYMENT.md` | Deployment workflow and troubleshooting |
 | `CHANGELOG.md` | Version history and features |
 | `CLAUDE.md` | AI assistant context guide |
 
