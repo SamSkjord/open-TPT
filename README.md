@@ -130,6 +130,9 @@ cd open-TPT
 # Run the install script
 sudo bash ./install.sh
 
+# Wait...
+make a cup of tea, this will take a little while
+
 # Reboot to apply config.txt changes (CAN, UART, I2C, etc.)
 sudo reboot
 ```
