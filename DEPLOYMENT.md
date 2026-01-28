@@ -314,6 +314,39 @@ sudo reboot
 dmesg | grep -i i2c
 ```
 
+### 8. Enable Read-Only Mode (Recommended)
+
+Once `config.py` is configured for your hardware, enable read-only mode to protect the SD card from corruption on power loss:
+
+```bash
+# Edit config.py for your setup
+sudo nano /home/pi/open-TPT/config.py
+
+# Enable read-only root filesystem
+cd /home/pi/open-TPT
+sudo ./services/boot/setup-readonly.sh
+sudo reboot
+```
+
+**How it works:**
+- Uses `overlayroot` to create a RAM-based overlay on the root filesystem
+- All writes go to RAM (lost on reboot), SD card is never written to
+- Persistent data (settings, lap times, telemetry) stored on USB at `/mnt/usb/.opentpt/`
+
+**To disable for maintenance:**
+```bash
+sudo ./services/boot/disable-readonly.sh
+sudo reboot
+```
+
+**Temporary write access (while overlay active):**
+```bash
+sudo overlayroot-chroot
+# Make changes, then exit
+```
+
+**USB patches work automatically** - the patch service detects overlayroot and uses `overlayroot-chroot` to apply updates to the underlying filesystem.
+
 ## Deployment Methods
 
 ### Method 1: Git Pull (Recommended for Updates)

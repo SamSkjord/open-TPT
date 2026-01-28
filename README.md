@@ -174,6 +174,24 @@ git pull
 sudo bash ./install.sh
 ```
 
+### 3. Configure and Enable Read-Only Mode
+
+Once `config.py` is configured for your hardware, enable read-only mode to protect the SD card from corruption on power loss:
+
+```bash
+# Edit config.py for your setup (CAN channels, thresholds, etc.)
+sudo nano /home/pi/open-TPT/config.py
+
+# Enable read-only root filesystem
+sudo ./services/boot/setup-readonly.sh
+sudo reboot
+```
+
+With read-only mode enabled:
+- SD card is protected from writes (no corruption on power loss)
+- All persistent data (settings, lap times, telemetry) stored on USB at `/mnt/usb/.opentpt/`
+- To make changes, disable read-only mode: `sudo ./services/boot/disable-readonly.sh && sudo reboot`
+
 ### Development (Mac/Linux)
 
 For local development without hardware:

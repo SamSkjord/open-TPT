@@ -50,6 +50,20 @@ ssh pi@192.168.199.246 "sudo journalctl -u openTPT.service -f"
 ssh pi@192.168.199.246 "sudo systemctl status openTPT.service"
 ```
 
+### Enable Read-Only Mode (Recommended)
+Once `config.py` is configured, enable read-only mode to protect the SD card:
+```bash
+ssh pi@192.168.199.246
+cd /home/pi/open-TPT
+sudo ./services/boot/setup-readonly.sh
+sudo reboot
+```
+
+To disable for maintenance:
+```bash
+sudo ./services/boot/disable-readonly.sh && sudo reboot
+```
+
 ## Hardware Controls
 
 ### NeoKey 1x4 Buttons
