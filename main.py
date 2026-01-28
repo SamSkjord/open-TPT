@@ -227,6 +227,7 @@ class OpenTPT(
         self.lap_timing = None
         self.copilot = None
         self.ford_hybrid = None
+        self.ant_hr = None
         self.menu = None
         self.gmeter = GMeterDisplay()
         self.lap_timing_display = LapTimingDisplay()
@@ -666,6 +667,11 @@ class OpenTPT(
         if self.ford_hybrid:
             logger.debug("Stopping Ford Hybrid...")
             self.ford_hybrid.cleanup()
+
+        # Stop ANT+ Heart Rate if enabled
+        if self.ant_hr:
+            logger.debug("Stopping ANT+ HR...")
+            self.ant_hr.stop()
 
         # Stop radar if enabled
         if self.radar:

@@ -1,0 +1,14 @@
+# ANT+ USB Dongle rules for openTPT
+# Provides access to Garmin ANT+ USB sticks without requiring root
+
+# Garmin ANT+ USB-m Stick (mini)
+SUBSYSTEM=="usb", ATTR{idVendor}=="0fcf", ATTR{idProduct}=="1008", MODE="0666"
+
+# Garmin ANT+ USB2 Stick
+SUBSYSTEM=="usb", ATTR{idVendor}=="0fcf", ATTR{idProduct}=="1009", MODE="0666"
+
+# Dynastream ANT+ USB Stick (older)
+SUBSYSTEM=="usb", ATTR{idVendor}=="0fcf", ATTR{idProduct}=="1004", MODE="0666"
+
+# ANTUSB-m (alternative ID)
+SUBSYSTEM=="usb", ATTR{idVendor}=="0fcf", ATTR{idProduct}=="1006", MODE="0666"

@@ -1,6 +1,6 @@
 # Claude Context - openTPT Project
 
-**Version:** 0.19.12 | **Updated:** 2026-01-27
+**Version:** 0.19.14 | **Updated:** 2026-01-28
 
 ---
 
@@ -65,6 +65,7 @@
 - NeoDriver: I2C LED strip at 0x60 (shift/delta/overtake modes)
 - OLED Bonnet: 128x32 SSD1305 at 0x3C with MCP23017 buttons at 0x20 (10 VBOX-style pages)
 - CoPilot: Rally callouts using OSM map data (USB/NVMe storage for 6.4GB roads.db)
+- ANT+ Heart Rate: USB ANT+ dongle for heart rate monitor logging
 
 ### Pi 5 Compatibility
 openTPT is compatible with both Pi 4 and Pi 5. The RP1 I/O chip on Pi 5 is abstracted by Adafruit Blinka and standard Linux interfaces.
@@ -111,6 +112,7 @@ openTPT/
 │   │   ├── __init__.py              # Exports Menu, MenuItem, MenuSystem
 │   │   ├── base.py                  # Core menu classes
 │   │   ├── bluetooth.py             # Bluetooth Audio + TPMS pairing
+│   │   ├── ant_hr.py                # ANT+ heart rate sensor settings
 │   │   ├── camera.py                # Camera settings
 │   │   ├── copilot.py               # CoPilot settings
 │   │   ├── lap_timing.py            # Lap timing + track selection
@@ -125,6 +127,7 @@ openTPT/
 │   ├── pit_timer_display.py         # Pit timer UI page
 │   └── radar_overlay.py             # Radar visualisation
 ├── hardware/
+│   ├── ant_hr_handler.py            # ANT+ heart rate via USB dongle
 │   ├── corner_sensor_handler.py     # Corner sensors + laser ranger via CAN (can_b2_0)
 │   ├── tpms_input_optimized.py      # TPMS (tpms>=2.1.0)
 │   ├── radar_handler.py             # Toyota radar
@@ -485,6 +488,28 @@ sudo systemctl enable usb-log-sync.timer     # 30s incremental sync
 sudo systemctl status usb-log-sync.timer
 ls -la /mnt/usb/logs/
 ```
+
+### ANT+ Heart Rate (v0.19.14)
+- USB ANT+ dongle support (Garmin ANT+ USB-m stick)
+- Sensor scanning and selection via menu (System > Hardware > ANT+ Heart Rate)
+- Heart rate logged at 1Hz to telemetry CSV files (`heart_rate_bpm` column)
+- Selected device ID persisted to settings (`ant_hr.device_id`)
+- Graceful degradation when dongle/sensor unavailable
+- Uses `openant>=0.4.0` library for ANT+ USB communication
+- Config: `ANT_HR_*` in config.py
+
+**Menu Structure:**
+```
+System > Hardware > ANT+ Heart Rate
+    Status: 72 BPM           (dynamic, read-only)
+    Device: Sensor 12345     (dynamic, read-only)
+    Scan Sensors             (action: start background scan)
+    Select Sensor            (action: show discovered devices)
+    Forget Sensor            (action: clear selection)
+```
+
+**USB Rules:**
+Copy `services/udev/99-ant-usb.rules` to `/etc/udev/rules.d/` for non-root access.
 
 ### Pit Timer (v0.19)
 - VBOX-style pit lane timer with GPS-based entry/exit detection

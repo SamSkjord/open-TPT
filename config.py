@@ -29,7 +29,7 @@ logger = logging.getLogger("openTPT.config")
 # ==============================================================================
 # Update this when releasing new versions
 # Format: MAJOR.MINOR.PATCH (e.g., "0.19.0")
-APP_VERSION = "0.19.11"
+APP_VERSION = "0.19.14"
 
 # Project root for asset paths
 _PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -1099,3 +1099,28 @@ FORD_HYBRID_BITRATE = 500000  # Standard CAN bitrate (500 kbps)
 # Ford Hybrid polling and timing
 FORD_HYBRID_POLL_INTERVAL_S = 0.2  # Seconds between PID queries (slower to avoid bus flooding)
 FORD_HYBRID_SEND_TIMEOUT_S = 0.05  # Timeout for CAN message sends (seconds)
+
+
+# ##############################################################################
+#
+#                       16. HARDWARE - ANT+ HEART RATE
+#
+# ##############################################################################
+
+# ==============================================================================
+# ANT+ HEART RATE CONFIGURATION
+# ==============================================================================
+
+# Enable/disable ANT+ heart rate monitor support
+# Requires USB ANT+ dongle (e.g., Garmin ANT+ USB-m stick)
+ANT_HR_ENABLED = True
+
+# Scanning timeout for discovering ANT+ sensors
+ANT_HR_SCAN_TIMEOUT_S = 30.0
+
+# Data timeout - how long before marking sensor as stale
+ANT_HR_DATA_TIMEOUT_S = 10.0
+
+# Heart rate validation range (reject implausible readings)
+ANT_HR_VALID_MIN_BPM = 30
+ANT_HR_VALID_MAX_BPM = 220

@@ -37,6 +37,7 @@ from config import (
 from utils.settings import get_settings
 
 # Import mixins
+from gui.menu.ant_hr import ANTHRMenuMixin
 from gui.menu.bluetooth import BluetoothMenuMixin
 from gui.menu.camera import CameraMenuMixin
 from gui.menu.copilot import CoPilotMenuMixin
@@ -347,6 +348,7 @@ class Menu:
 
 
 class MenuSystem(
+    ANTHRMenuMixin,
     BluetoothMenuMixin,
     CameraMenuMixin,
     CoPilotMenuMixin,
@@ -381,6 +383,7 @@ class MenuSystem(
         copilot_handler=None,
         pit_timer_handler=None,
         corner_sensors=None,
+        ant_hr_handler=None,
     ):
         """
         Initialise the menu system.
@@ -399,6 +402,7 @@ class MenuSystem(
             copilot_handler: CoPilot handler for rally callouts
             pit_timer_handler: Pit timer handler for pit lane timing
             corner_sensors: Corner sensors handler for tyre temp menus
+            ant_hr_handler: ANT+ heart rate handler for HRM
         """
         self.tpms_handler = tpms_handler
         self.encoder_handler = encoder_handler
@@ -413,6 +417,7 @@ class MenuSystem(
         self.copilot_handler = copilot_handler
         self.pit_timer_handler = pit_timer_handler
         self.corner_sensors = corner_sensors
+        self.ant_hr_handler = ant_hr_handler
         self.current_menu: Optional[Menu] = None
         self.root_menu: Optional[Menu] = None
 
@@ -1211,8 +1216,47 @@ class MenuSystem(
         imu_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
         self.imu_menu = imu_menu
 
+        # ANT+ Heart Rate submenu
+        ant_hr_menu = Menu("ANT+ Heart Rate")
+        ant_hr_menu.add_item(
+            MenuItem(
+                "Status",
+                dynamic_label=lambda: self._get_ant_hr_status_label(),
+                enabled=False,
+            )
+        )
+        ant_hr_menu.add_item(
+            MenuItem(
+                "Device",
+                dynamic_label=lambda: self._get_ant_hr_device_label(),
+                enabled=False,
+            )
+        )
+        ant_hr_menu.add_item(
+            MenuItem(
+                "Scan Sensors",
+                dynamic_label=lambda: self._get_ant_hr_scan_label(),
+                action=lambda: self._scan_ant_hr_sensors(),
+            )
+        )
+        ant_hr_menu.add_item(
+            MenuItem(
+                "Select Sensor",
+                action=lambda: self._show_ant_hr_select_menu(),
+            )
+        )
+        ant_hr_menu.add_item(
+            MenuItem(
+                "Forget Sensor",
+                action=lambda: self._forget_ant_hr_device(),
+            )
+        )
+        ant_hr_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        self.ant_hr_menu = ant_hr_menu
+
         hardware_menu.add_item(MenuItem("TPMS Pairing", submenu=tpms_menu))
         hardware_menu.add_item(MenuItem("IMU Calibration", submenu=imu_menu))
+        hardware_menu.add_item(MenuItem("ANT+ Heart Rate", submenu=ant_hr_menu))
         hardware_menu.add_item(
             MenuItem(
                 "Speed Source",
@@ -1363,6 +1407,7 @@ class MenuSystem(
         hardware_menu.parent = system_menu
         tpms_menu.parent = hardware_menu
         imu_menu.parent = hardware_menu
+        ant_hr_menu.parent = hardware_menu
         tyre_temps_menu.parent = system_menu
         fl_menu.parent = tyre_temps_menu
         fr_menu.parent = tyre_temps_menu

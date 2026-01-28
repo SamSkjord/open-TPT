@@ -147,4 +147,10 @@ class TelemetryMixin:
                 frame.fuel_rate_lph = fuel_state.get('fuel_rate_lph')
                 frame.fuel_consumption_lap_litres = fuel_state.get('current_lap_consumption_litres')
 
+        # ANT+ Heart Rate data
+        if hasattr(self, 'ant_hr') and self.ant_hr:
+            hr = self.ant_hr.get_heart_rate()
+            if hr is not None:
+                frame.heart_rate_bpm = hr
+
         self.recorder.record_frame(frame)

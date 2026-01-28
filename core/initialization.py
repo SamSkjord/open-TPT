@@ -289,6 +289,15 @@ class InitializationMixin:
             FORD_HYBRID_ENABLED = False
 
         try:
+            from hardware.ant_hr_handler import ANTHRHandler, ANT_HR_AVAILABLE
+            from config import ANT_HR_ENABLED
+        except ImportError as e:
+            ANT_HR_AVAILABLE = False
+            ANTHRHandler = None
+            ANT_HR_ENABLED = False
+            logger.debug("ANT+ HR not available: %s", e)
+
+        try:
             from hardware.lap_timing_handler import LapTimingHandler
             from config import LAP_TIMING_ENABLED
             LAP_TIMING_AVAILABLE = True
@@ -519,7 +528,7 @@ class InitializationMixin:
             self.obd2 = None
 
         # Initialise GPS handler (optional, for GPS speed)
-        self._show_splash("Initialising GPS...", 0.78)
+        self._show_splash("Initialising GPS...", 0.77)
         if GPS_ENABLED and GPS_AVAILABLE and GPSHandler:
             try:
                 self.gps = GPSHandler()
@@ -529,6 +538,17 @@ class InitializationMixin:
                 self.gps = None
         else:
             self.gps = None
+
+        # Initialise ANT+ Heart Rate handler (optional)
+        self._show_splash("Initialising ANT+ HR...", 0.78)
+        self.ant_hr = None
+        if ANT_HR_ENABLED and ANT_HR_AVAILABLE and ANTHRHandler:
+            try:
+                self.ant_hr = ANTHRHandler()
+                logger.info("ANT+ HR handler initialised")
+            except (IOError, OSError, RuntimeError, ValueError) as e:
+                logger.warning("Could not initialise ANT+ HR: %s", e)
+                self.ant_hr = None
 
         # Initialise Fuel Tracker (optional, requires OBD2)
         self._show_splash("Initialising fuel tracking...", 0.79)
@@ -654,6 +674,7 @@ class InitializationMixin:
             copilot_handler=self.copilot,
             pit_timer_handler=self.pit_timer,
             corner_sensors=self.corner_sensors,
+            ant_hr_handler=self.ant_hr,
         )
         logger.debug("menu init done t=%.1fs", time.time()-_boot_start)
 
@@ -669,5 +690,7 @@ class InitializationMixin:
                 self.oled_bonnet.start()  # Start OLED update thread
         self.tpms.start()
         self.corner_sensors.start()  # Also starts laser ranger via shared CAN notifier
+        if self.ant_hr:
+            self.ant_hr.start()
         self._show_splash("Ready!", 1.0)
         logger.debug("threads started t=%.1fs", time.time()-_boot_start)

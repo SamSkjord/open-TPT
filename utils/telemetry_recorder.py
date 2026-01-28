@@ -92,6 +92,9 @@ class TelemetryFrame:
     track_position: Optional[float] = None
     track_name: Optional[str] = None
 
+    # Heart rate data
+    heart_rate_bpm: Optional[int] = None
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for CSV writing."""
         return {
@@ -152,6 +155,7 @@ class TelemetryFrame:
             'sector_time': self.sector_time,
             'track_position': self.track_position,
             'track_name': self.track_name,
+            'heart_rate_bpm': self.heart_rate_bpm,
         }
 
 
