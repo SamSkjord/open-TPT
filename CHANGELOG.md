@@ -1,5 +1,55 @@
 # Changelog - openTPT
 
+## [v0.19.13] - 2026-01-28
+
+### Pi 5 Installation Fixes
+
+Critical fixes for Pi 5 installation discovered during fresh deployment testing.
+
+#### I2C Reliability Fix
+
+- **raspi-config I2C enable**: Added `raspi-config nonint do_i2c 0` to install.sh
+  - The `dtparam=i2c_arm=on` in config.txt wasn't being applied on Pi 5
+  - Using raspi-config is more reliable regardless of config.txt section ordering
+
+#### config.txt Inline Comments Fix
+
+- **Pi 5 parser incompatibility**: Inline comments on dtparam/dtoverlay lines break parsing
+  - Example: `dtparam=i2c_arm_baudrate=400000  # comment` - Pi 5 includes `# comment` in value
+  - Fix: All comments moved to separate lines preceding their settings
+
+#### pyosmium Installation Fix
+
+- **Native compilation required**: pyosmium cannot be installed via pip on aarch64
+  - Moved from pip to apt: `sudo apt install -y python3-pyosmium`
+
+#### README Installation Instructions
+
+- **Complete rewrite** of installation section with proper steps:
+  1. Flash SD card with Pi Imager (Raspberry Pi OS Lite 64-bit)
+  2. Configure hostname, SSH, user via Pi Imager settings
+  3. SSH in, install git, clone repo, run install.sh
+- **Harmless warnings note**: Added section explaining expected warnings during install
+  - pip upgrade notice (Debian-managed pip)
+  - dpkg-statoverride warnings (chrony)
+  - CMake deprecation warnings
+  - Git detached HEAD messages
+
+#### Documentation Updates
+
+- **QUICKSTART.md**: Changed `sudo ./install.sh` to `sudo bash ./install.sh`
+- **DEPLOYMENT.md**: Changed `sudo ./install.sh` to `sudo bash ./install.sh`
+- **README.md**: Updated GPIO pin allocation table for Pi 5 serial ports
+
+#### Modified Files
+
+- `install.sh` - pyosmium apt install, raspi-config I2C, inline comments fix
+- `README.md` - Complete installation instructions rewrite
+- `QUICKSTART.md` - Install command fix
+- `DEPLOYMENT.md` - Install command fix
+
+---
+
 ## [v0.19.12] - 2026-01-27
 
 ### Raspberry Pi 5 Compatibility and Install Script Overhaul
