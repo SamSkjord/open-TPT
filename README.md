@@ -103,14 +103,31 @@ See `requirements.txt` for the complete list.
 
 ## Installation
 
-### Quick Start (Raspberry Pi)
+### 1. Flash SD Card
+
+1. Download [Raspberry Pi Imager](https://www.raspberrypi.com/software/)
+2. Select **Raspberry Pi OS Lite (64-bit)** - no desktop needed
+3. Click the gear icon to configure:
+   - Set hostname (e.g., `open-tpt`)
+   - Enable SSH with password authentication
+   - Set username `pi` and password
+   - Configure WiFi (optional, for initial setup)
+4. Flash to SD card and boot the Pi
+
+### 2. Initial Setup
 
 ```bash
+# SSH into the Pi
+ssh pi@<pi-ip-address>
+
+# Update system and install git
+sudo apt update && sudo apt install -y git
+
 # Clone the repository
 git clone https://github.com/SamSkjord/open-TPT.git
 cd open-TPT
 
-# Run the install script (installs all dependencies, configures hardware)
+# Run the install script
 sudo bash ./install.sh
 
 # Reboot to apply config.txt changes (CAN, UART, I2C, etc.)
