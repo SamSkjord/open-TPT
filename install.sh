@@ -180,6 +180,11 @@ fi
 echo -e "\n==== Verifying pygame SDL linkage ===="
 "$PYTHON_BIN" -c "import pygame; print('Pygame SDL version:', pygame.get_sdl_version())"
 
+# Enable I2C via raspi-config (more reliable than dtparam on Pi 5)
+echo -e "\n==== Enabling I2C interface ===="
+sudo raspi-config nonint do_i2c 0
+echo "I2C enabled via raspi-config"
+
 # Configure Dual CAN hardware overlays
 echo -e "\n==== Configuring Waveshare Dual CAN HAT overlays ===="
 BOOT_CONFIG=""
