@@ -197,19 +197,27 @@ else
   if sudo grep -Fq "$CAN_BLOCK_HEADER" "$BOOT_CONFIG"; then
     echo "Dual Waveshare CAN block already present."
   else
+    # NOTE: Inline comments on dtparam/dtoverlay lines break parsing on Pi 5
     sudo tee -a "$BOOT_CONFIG" >/dev/null <<'EOF'
 
 # ==== openTPT Dual Waveshare 2-CH CAN HAT+ ====
+# I2C for NeoKey, encoder, OLED, NeoDriver, IMU
 dtparam=i2c_arm=on
-dtparam=i2c_arm_baudrate=400000  # 400kHz - better noise immunity for motorsport EMI
-dtparam=i2s=off        # Disabled to free GPIO19 for SPI1_MISO
+# 400kHz - better noise immunity for motorsport EMI
+dtparam=i2c_arm_baudrate=400000
+# Disabled to free GPIO19 for SPI1_MISO
+dtparam=i2s=off
 dtparam=spi=on
 dtoverlay=spi1-3cs
-dtoverlay=mcp2515,spi1-1,oscillator=16000000,interrupt=22  # Board 1, CAN_0 (GPIO22 IRQ)
-dtoverlay=mcp2515,spi1-2,oscillator=16000000,interrupt=13  # Board 1, CAN_1 (GPIO13 IRQ)
+# Board 1, CAN_0 (GPIO22 IRQ)
+dtoverlay=mcp2515,spi1-1,oscillator=16000000,interrupt=22
+# Board 1, CAN_1 (GPIO13 IRQ)
+dtoverlay=mcp2515,spi1-2,oscillator=16000000,interrupt=13
 dtoverlay=spi0-2cs
-dtoverlay=mcp2515,spi0-0,oscillator=16000000,interrupt=23  # Board 2, CAN_0 (GPIO23 IRQ)
-dtoverlay=mcp2515,spi0-1,oscillator=16000000,interrupt=25  # Board 2, CAN_1 (GPIO25 IRQ / OBD-II)
+# Board 2, CAN_0 (GPIO23 IRQ)
+dtoverlay=mcp2515,spi0-0,oscillator=16000000,interrupt=23
+# Board 2, CAN_1 (GPIO25 IRQ / OBD-II)
+dtoverlay=mcp2515,spi0-1,oscillator=16000000,interrupt=25
 # ==== end openTPT Dual Waveshare 2-CH CAN HAT+ ====
 EOF
     echo "Appended Dual CAN block to $BOOT_CONFIG (reboot required)."
