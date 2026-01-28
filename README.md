@@ -57,15 +57,15 @@ openTPT features a high-performance architecture optimised for real-time telemet
 |------|----------|-----------|-------|
 | 2 | I2C1 SDA | I2C | NeoKey, encoder, OLED, NeoDriver, IMU |
 | 3 | I2C1 SCL | I2C | NeoKey, encoder, OLED, NeoDriver, IMU |
-| 4 | UART3 TX | UART | TPMS receiver (/dev/ttyAMA3) |
-| 5 | UART3 RX | UART | TPMS receiver |
+| 4 | UART2 TX | UART | TPMS receiver (/dev/ttyAMA2 on Pi 5) |
+| 5 | UART2 RX | UART | TPMS receiver |
 | 7 | SPI0 CE1 | SPI | CAN HAT Board 2, CAN_1 (OBD-II) |
 | 8 | SPI0 CE0 | SPI | CAN HAT Board 2, CAN_0 (Corner Sensors) |
 | 9 | SPI0 MISO | SPI | CAN HAT Board 2 |
 | 10 | SPI0 MOSI | SPI | CAN HAT Board 2 |
 | 11 | SPI0 SCLK | SPI | CAN HAT Board 2 |
 | 13 | CAN1_1 IRQ | IRQ | CAN HAT Board 1, CAN_1 interrupt |
-| 14 | UART TX | UART | GPS PA1616S (/dev/ttyS0) |
+| 14 | UART TX | UART | GPS PA1616S (/dev/serial0) |
 | 15 | UART RX | UART | GPS PA1616S |
 | 16 | SPI1 CE2 | SPI | CAN HAT Board 1, CAN_1 |
 | 17 | SPI1 CE1 | SPI | CAN HAT Board 1, CAN_0 |
@@ -103,38 +103,64 @@ See `requirements.txt` for the complete list.
 
 ## Installation
 
-1. Clone this repository:
+### Quick Start (Raspberry Pi)
+
 ```bash
-git clone https://github.com/yourusername/open-TPT.git
+# Clone the repository
+git clone https://github.com/SamSkjord/open-TPT.git
 cd open-TPT
+
+# Run the install script (installs all dependencies, configures hardware)
+sudo bash ./install.sh
+
+# Reboot to apply config.txt changes (CAN, UART, I2C, etc.)
+sudo reboot
 ```
 
-2. Install dependencies:
+The install script handles everything:
+- System packages (SDL2, pygame dependencies, audio, GPS, CAN tools)
+- Python packages (all Adafruit libraries, numba, python-can, etc.)
+- Hardware configuration (I2C, SPI, UART, CAN bus overlays)
+- Udev rules (cameras, CAN interfaces)
+- Systemd service (auto-start on boot)
+- Boot optimisation (quiet boot, splash screen)
+- User groups (gpio, i2c, spi, dialout, bluetooth)
+
+### Running the Application
+
 ```bash
-pip3 install -r requirements.txt
+# Run with hardware (requires sudo for GPIO/I2C access)
+sudo ./main.py
+
+# Run in windowed mode (for testing/development)
+sudo ./main.py --windowed
 ```
 
-3. (Optional) For Numba acceleration:
+### Updating
+
 ```bash
-pip3 install numba
+# Quick sync from development machine (code only)
+./tools/quick_sync.sh pi@192.168.199.242
+
+# Or on the Pi, pull and re-run install if dependencies changed
+cd /home/pi/open-TPT
+git pull
+sudo bash ./install.sh
 ```
 
-4. (Optional) For radar overlay support:
+### Development (Mac/Linux)
+
+For local development without hardware:
+
 ```bash
-pip3 install python-can cantools
-# Copy toyota_radar_driver.py to your project or install as package
+# Install minimal dependencies
+pip3 install pygame numpy pillow
+
+# Run in mock mode (no hardware required)
+./main.py --windowed
 ```
 
-5. (Optional) For Bluetooth audio support:
-```bash
-sudo apt install pulseaudio pulseaudio-module-bluetooth
-```
-
-6. Run the application:
-```bash
-sudo python3 ./main.py
-```
-Note: `sudo` is required for GPIO and I2C hardware access.
+See `DEPLOYMENT.md` for detailed deployment workflow and `QUICKSTART.md` for daily commands.
 
 ## Usage
 
