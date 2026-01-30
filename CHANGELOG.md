@@ -1,5 +1,45 @@
 # Changelog - openTPT
 
+## [v0.19.15] - 2026-01-30
+
+### TPMS Menu Enhancement
+
+Comprehensive TPMS sensor management menu with status display, pairing, corner swapping, and device reset.
+
+#### New Features
+
+- **TPMS Menu** (System > Hardware > TPMS): Full sensor management interface
+  - Live status display for all four corners (pressure, temperature, status)
+  - Sensor ID display for each paired sensor
+  - Unit conversion support (kPa/psi/bar, C/F)
+- **Pair Sensor submenu**: Initiate pairing for any corner with encoder LED feedback
+- **Swap Corners submenu**: Exchange sensor assignments between any two corners
+  - Front (FL/FR), Rear (RL/RR), Left (FL/RL), Right (FR/RR), Diagonals
+- **Reset Device**: Clear all sensor pairings from TPMS dongle
+
+#### Code Organisation
+
+- New `gui/menu/tpms.py` mixin following established pattern (like `ant_hr.py`)
+- TPMS pairing methods moved from `BluetoothMenuMixin` to `TPMSMenuMixin`
+- Handler extended with `get_sensor_id()`, `exchange_tires()`, `reset_device()`
+- Consolidated position mapping with `reverse_position_map` class attribute
+
+#### Encoder LED Feedback
+
+- Orange pulse: Pairing in progress
+- Green flash: Pairing successful
+- Blue flash: Corner swap successful
+- Red flash: Operation failed or device reset
+
+#### Modified Files
+
+- `gui/menu/tpms.py` - NEW: TPMS menu mixin
+- `gui/menu/base.py` - Import TPMSMenuMixin, use `_build_tpms_menu()`
+- `gui/menu/bluetooth.py` - Remove TPMS methods (moved to tpms.py)
+- `hardware/tpms_input_optimized.py` - Add sensor ID tracking, exchange, reset
+
+---
+
 ## [v0.19.13] - 2026-01-28
 
 ### Pi 5 Installation Fixes

@@ -48,6 +48,7 @@ from gui.menu.oled import OLEDMenuMixin
 from gui.menu.pit_timer import PitTimerMenuMixin
 from gui.menu.settings import SettingsMenuMixin
 from gui.menu.system import SystemMenuMixin
+from gui.menu.tpms import TPMSMenuMixin
 from gui.menu.tyre_temps import TyreTempsMenuMixin
 
 logger = logging.getLogger('openTPT.menu')
@@ -359,6 +360,7 @@ class MenuSystem(
     PitTimerMenuMixin,
     SettingsMenuMixin,
     SystemMenuMixin,
+    TPMSMenuMixin,
     TyreTempsMenuMixin,
 ):
     """
@@ -1173,21 +1175,8 @@ class MenuSystem(
         # --- Hardware submenu (TPMS, IMU, Speed Source) ---
         hardware_menu = Menu("Hardware")
 
-        # TPMS Pairing submenu
-        tpms_menu = Menu("TPMS Pairing")
-        tpms_menu.add_item(
-            MenuItem("Pair FL", action=lambda: self._start_tpms_pairing("FL"))
-        )
-        tpms_menu.add_item(
-            MenuItem("Pair FR", action=lambda: self._start_tpms_pairing("FR"))
-        )
-        tpms_menu.add_item(
-            MenuItem("Pair RL", action=lambda: self._start_tpms_pairing("RL"))
-        )
-        tpms_menu.add_item(
-            MenuItem("Pair RR", action=lambda: self._start_tpms_pairing("RR"))
-        )
-        tpms_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        # TPMS menu (built by TPMSMenuMixin)
+        tpms_menu = self._build_tpms_menu()
         self.tpms_menu = tpms_menu
 
         # IMU calibration submenu
@@ -1254,7 +1243,7 @@ class MenuSystem(
         ant_hr_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
         self.ant_hr_menu = ant_hr_menu
 
-        hardware_menu.add_item(MenuItem("TPMS Pairing", submenu=tpms_menu))
+        hardware_menu.add_item(MenuItem("TPMS", submenu=tpms_menu))
         hardware_menu.add_item(MenuItem("IMU Calibration", submenu=imu_menu))
         hardware_menu.add_item(MenuItem("ANT+ Heart Rate", submenu=ant_hr_menu))
         hardware_menu.add_item(

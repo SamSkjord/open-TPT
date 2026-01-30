@@ -6,8 +6,7 @@ Uses bounded queues and lock-free snapshots per system plan.
 import logging
 import threading
 import time
-
-logger = logging.getLogger('openTPT.tpms')
+from typing import Callable, Optional
 
 from config import (
     TPMS_HIGH_PRESSURE_KPA,
@@ -17,6 +16,8 @@ from config import (
     TPMS_SERIAL_PORT,
 )
 from utils.hardware_base import BoundedQueueHardwareHandler
+
+logger = logging.getLogger('openTPT.tpms')
 
 # Import for actual TPMS hardware
 try:
@@ -55,6 +56,7 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
 
         # Position mapping (only set if TPMS available)
         self.position_map = {}
+        self.reverse_position_map = {}
         if TPMS_AVAILABLE:
             self.position_map = {
                 TirePosition.FRONT_LEFT: "FL",
@@ -62,6 +64,7 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
                 TirePosition.REAR_LEFT: "RL",
                 TirePosition.REAR_RIGHT: "RR",
             }
+            self.reverse_position_map = {v: k for k, v in self.position_map.items()}
 
         # Lock for thread-safe cache access (callbacks may come from library thread)
         self._cache_lock = threading.Lock()
@@ -73,26 +76,33 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
                 "temp": None,
                 "status": "N/A",
                 "last_update": 0,
+                "sensor_id": None,
             },
             "FR": {
                 "pressure": None,
                 "temp": None,
                 "status": "N/A",
                 "last_update": 0,
+                "sensor_id": None,
             },
             "RL": {
                 "pressure": None,
                 "temp": None,
                 "status": "N/A",
                 "last_update": 0,
+                "sensor_id": None,
             },
             "RR": {
                 "pressure": None,
                 "temp": None,
                 "status": "N/A",
                 "last_update": 0,
+                "sensor_id": None,
             },
         }
+
+        # Exchange callback for menu notifications
+        self._exchange_callback: Optional[Callable[[str, str], None]] = None
 
         # Initialise TPMS device
         self._initialise_device()
@@ -170,6 +180,11 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
             return
 
         pos_code = self.position_map[position]
+
+        # Store sensor ID in cache
+        with self._cache_lock:
+            self._sensor_cache[pos_code]["sensor_id"] = tyre_id
+
         logger.info("TPMS pairing complete for %s: ID %s", pos_code, tyre_id)
 
     def _worker_loop(self):
@@ -283,17 +298,10 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
             return False
 
         try:
-            reverse_map = {
-                "FL": TirePosition.FRONT_LEFT,
-                "FR": TirePosition.FRONT_RIGHT,
-                "RL": TirePosition.REAR_LEFT,
-                "RR": TirePosition.REAR_RIGHT,
-            }
-
-            if position_code not in reverse_map:
+            if position_code not in self.reverse_position_map:
                 return False
 
-            return self.tpms_device.pair_sensor(reverse_map[position_code])
+            return self.tpms_device.pair_sensor(self.reverse_position_map[position_code])
         except (OSError, IOError, RuntimeError, ValueError) as e:
             logger.warning("Error pairing sensor: %s", e)
             return False
@@ -308,6 +316,119 @@ class TPMSHandlerOptimised(BoundedQueueHardwareHandler):
         except (OSError, IOError, RuntimeError) as e:
             logger.warning("Error stopping pairing: %s", e)
             return False
+
+    def get_sensor_id(self, corner: str) -> Optional[str]:
+        """
+        Get sensor ID for a corner.
+
+        Args:
+            corner: Corner code ("FL", "FR", "RL", "RR")
+
+        Returns:
+            Sensor ID string or None if not paired
+        """
+        with self._cache_lock:
+            cache_data = self._sensor_cache.get(corner)
+            if cache_data:
+                return cache_data.get("sensor_id")
+        return None
+
+    def exchange_tires(self, corner1: str, corner2: str) -> bool:
+        """
+        Swap TPMS sensor assignments between two corners.
+
+        Args:
+            corner1: First corner code ("FL", "FR", "RL", "RR")
+            corner2: Second corner code
+
+        Returns:
+            True if exchange command sent successfully
+        """
+        if not TPMS_AVAILABLE or not self.tpms_device or not self.running:
+            return False
+
+        if corner1 == corner2:
+            return False
+
+        try:
+            if corner1 not in self.reverse_position_map or corner2 not in self.reverse_position_map:
+                return False
+
+            pos1 = self.reverse_position_map[corner1]
+            pos2 = self.reverse_position_map[corner2]
+
+            # Call tpms_lib exchange_tires method
+            result = self.tpms_device.exchange_tires(pos1, pos2)
+
+            if result:
+                # Swap all cached data between corners for immediate UI update
+                with self._cache_lock:
+                    cache1 = self._sensor_cache[corner1].copy()
+                    cache2 = self._sensor_cache[corner2].copy()
+                    self._sensor_cache[corner1] = cache2
+                    self._sensor_cache[corner2] = cache1
+
+                logger.info("TPMS exchange: %s <-> %s", corner1, corner2)
+
+                # Notify callback if registered
+                if self._exchange_callback:
+                    try:
+                        self._exchange_callback(corner1, corner2)
+                    except Exception as e:
+                        logger.debug("Exchange callback error: %s", e)
+
+            return result
+
+        except (OSError, IOError, RuntimeError, ValueError) as e:
+            logger.warning("Error exchanging tires: %s", e)
+            return False
+
+    def set_exchange_callback(self, callback: Optional[Callable[[str, str], None]]):
+        """
+        Set callback for exchange completion notification.
+
+        Args:
+            callback: Function(corner1, corner2) called after successful exchange
+        """
+        self._exchange_callback = callback
+
+    def reset_device(self) -> bool:
+        """
+        Reset the TPMS device, clearing all sensor pairings.
+
+        Returns:
+            True if reset command sent successfully
+        """
+        if not TPMS_AVAILABLE or not self.tpms_device or not self.running:
+            return False
+
+        try:
+            result = self.tpms_device.reset_device()
+
+            if result:
+                # Clear all cached sensor IDs
+                with self._cache_lock:
+                    for corner in self._sensor_cache:
+                        self._sensor_cache[corner]["sensor_id"] = None
+
+                logger.info("TPMS device reset")
+
+            return result
+
+        except (OSError, IOError, RuntimeError, ValueError) as e:
+            logger.warning("Error resetting TPMS device: %s", e)
+            return False
+
+    def query_sensor_ids(self):
+        """Query sensor IDs from device and update cache."""
+        if not TPMS_AVAILABLE or not self.tpms_device:
+            return
+
+        try:
+            # tpms_lib query_sensor_ids triggers callbacks with current state
+            self.tpms_device.query_sensor_ids()
+        except (OSError, IOError, RuntimeError) as e:
+            logger.debug("Error querying sensor IDs: %s", e)
 
 
 # Backwards compatibility wrapper

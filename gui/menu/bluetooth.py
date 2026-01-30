@@ -1,5 +1,5 @@
 """
-Bluetooth Audio and TPMS pairing menu mixin for openTPT.
+Bluetooth Audio menu mixin for openTPT.
 """
 
 import logging
@@ -57,7 +57,7 @@ def _get_audio_user() -> Tuple[str, int, str]:
 
 
 class BluetoothMenuMixin:
-    """Mixin providing Bluetooth Audio and TPMS pairing menu functionality."""
+    """Mixin providing Bluetooth Audio menu functionality."""
 
     # Volume methods
 
@@ -86,56 +86,6 @@ class BluetoothMenuMixin:
         except Exception as e:
             logger.debug("Failed to check PulseAudio: %s", e)
             return False
-
-    # TPMS Pairing methods
-
-    def _start_tpms_pairing(self, position: str) -> str:
-        """Start TPMS pairing for a position."""
-        if not self.tpms_handler:
-            return "TPMS not available"
-
-        if self.pairing_active:
-            return "Pairing already in progress"
-
-        try:
-            if self.tpms_handler.pair_sensor(position):
-                self.pairing_active = True
-                self.pairing_position = position
-                # Set encoder LED to orange for pairing
-                if self.encoder_handler:
-                    self.encoder_handler.pulse_pixel(255, 128, 0, True)
-                return f"Pairing {position}... Rotate tyre"
-            else:
-                return f"Failed to start pairing {position}"
-        except Exception as e:
-            logger.debug("TPMS pairing failed: %s", e)
-            return f"Error: {e}"
-
-    def stop_pairing(self):
-        """Stop any active TPMS pairing."""
-        if self.pairing_active and self.tpms_handler:
-            self.tpms_handler.stop_pairing()
-            self.pairing_active = False
-            self.pairing_position = None
-            # Turn off encoder LED
-            if self.encoder_handler:
-                self.encoder_handler.set_pixel_colour(0, 0, 0)
-
-    def on_pairing_complete(self, position: str, success: bool):
-        """Called when TPMS pairing completes."""
-        self.pairing_active = False
-        self.pairing_position = None
-
-        if self.encoder_handler:
-            if success:
-                self.encoder_handler.flash_pixel(0, 255, 0)  # Green flash
-            else:
-                self.encoder_handler.flash_pixel(255, 0, 0)  # Red flash
-            self.encoder_handler.set_pixel_colour(0, 0, 0)  # Off after flash
-
-        if self.current_menu:
-            status = f"{position} paired!" if success else f"{position} pairing failed"
-            self.current_menu.set_status(status)
 
     # Bluetooth scanning and device methods
 
