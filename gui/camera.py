@@ -36,6 +36,7 @@ from config import (
     LASER_RANGER_DISPLAY_POSITION,
     LASER_RANGER_TEXT_SIZE,
     LASER_RANGER_TEXT_SIZES,
+    LASER_RANGER_OFFSET_M,
     SCALE_X,
     SCALE_Y,
 )
@@ -717,8 +718,12 @@ class Camera:
         if not isinstance(distance_m, (int, float)) or distance_m < 0 or distance_m != distance_m:
             return  # NaN check: NaN != NaN
 
-        # Don't display if beyond maximum
-        if distance_m > LASER_RANGER_MAX_DISPLAY_M:
+        # Apply mounting offset (sensor position to front of vehicle)
+        offset_m = settings.get("laser_ranger.offset_m", LASER_RANGER_OFFSET_M)
+        distance_m = distance_m - offset_m
+
+        # Don't display if negative (object behind sensor mount point) or beyond maximum
+        if distance_m < 0 or distance_m > LASER_RANGER_MAX_DISPLAY_M:
             return
 
         # Get and validate text size from settings

@@ -13,6 +13,7 @@ from config import (
     LASER_RANGER_DISPLAY_ENABLED,
     LASER_RANGER_DISPLAY_POSITION,
     LASER_RANGER_TEXT_SIZE,
+    LASER_RANGER_OFFSET_M,
 )
 from utils.settings import get_settings
 
@@ -96,6 +97,19 @@ class CameraMenuMixin:
                         "Text Size",
                         dynamic_label=lambda: self._get_distance_text_size_label(),
                         action=lambda: self._cycle_distance_text_size(),
+                    )
+                )
+                cam_menu.add_item(
+                    MenuItem(
+                        "Mount Offset",
+                        dynamic_label=lambda: self._get_distance_offset_label(),
+                        action=lambda: self._increase_distance_offset(),
+                    )
+                )
+                cam_menu.add_item(
+                    MenuItem(
+                        "Offset -",
+                        action=lambda: self._decrease_distance_offset(),
                     )
                 )
 
@@ -214,3 +228,25 @@ class CameraMenuMixin:
             new_value = "medium"
         settings.set("laser_ranger.text_size", new_value)
         return f"Text size: {new_value}"
+
+    def _get_distance_offset_label(self) -> str:
+        """Get distance offset label."""
+        settings = get_settings()
+        offset = settings.get("laser_ranger.offset_m", LASER_RANGER_OFFSET_M)
+        return f"Mount Offset: {offset:.2f} m"
+
+    def _increase_distance_offset(self) -> str:
+        """Increase distance offset by 0.05m."""
+        settings = get_settings()
+        current = settings.get("laser_ranger.offset_m", LASER_RANGER_OFFSET_M)
+        new_value = min(5.0, current + 0.05)  # Max 5m offset
+        settings.set("laser_ranger.offset_m", new_value)
+        return f"Offset: {new_value:.2f} m"
+
+    def _decrease_distance_offset(self) -> str:
+        """Decrease distance offset by 0.05m."""
+        settings = get_settings()
+        current = settings.get("laser_ranger.offset_m", LASER_RANGER_OFFSET_M)
+        new_value = max(0.0, current - 0.05)  # Min 0m offset
+        settings.set("laser_ranger.offset_m", new_value)
+        return f"Offset: {new_value:.2f} m"

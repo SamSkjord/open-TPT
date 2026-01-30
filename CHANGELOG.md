@@ -1,5 +1,26 @@
 # Changelog - openTPT
 
+## [v0.19.16] - 2026-01-30
+
+### Laser Ranger Mount Offset
+
+Added configurable offset for laser ranger distance display to account for sensor mounting position.
+
+#### New Features
+
+- **Mount Offset setting**: Adjustable offset (0-5m) to subtract from raw sensor distance
+- **Menu controls**: Front Camera menu now has "Mount Offset" +/- items (0.05m steps)
+- Displayed distance now represents distance to front of vehicle, not sensor position
+
+#### Modified Files
+
+- `config.py` - Added `LASER_RANGER_OFFSET_M` default (0.0m)
+- `gui/camera.py` - Apply offset in `_render_distance_overlay()`
+- `gui/menu/camera.py` - Add offset label and +/- menu items
+- `CLAUDE.md` - Document new `laser_ranger.offset_m` setting
+
+---
+
 ## [v0.19.15] - 2026-01-30
 
 ### TPMS Menu Enhancement

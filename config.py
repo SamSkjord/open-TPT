@@ -1068,6 +1068,7 @@ LASER_RANGER_WARN_DISTANCE_M = 5.0  # Distance for warning colour (red)
 LASER_RANGER_CAUTION_DISTANCE_M = 15.0  # Distance for caution colour (yellow)
 LASER_RANGER_DISPLAY_POSITION = "bottom"  # Position: "top" or "bottom"
 LASER_RANGER_TEXT_SIZE = "medium"  # Text size: "small", "medium", "large"
+LASER_RANGER_OFFSET_M = 0.0  # Offset from sensor to front of vehicle (metres)
 
 # Text size presets (base font sizes before scaling)
 LASER_RANGER_TEXT_SIZES = {

@@ -1,6 +1,6 @@
 # Claude Context - openTPT Project
 
-**Version:** 0.19.15 | **Updated:** 2026-01-30
+**Version:** 0.19.16 | **Updated:** 2026-01-30
 
 ---
 
@@ -243,6 +243,9 @@ Handled by `corner_sensor_handler.py` (shares CAN notifier with corner sensors).
 | `laser_ranger.display_enabled` | true/false | true |
 | `laser_ranger.display_position` | top, bottom | bottom |
 | `laser_ranger.text_size` | small, medium, large | medium |
+| `laser_ranger.offset_m` | 0.0 - 5.0 | 0.0 |
+
+The offset setting accounts for the sensor mounting position relative to the front of the vehicle. Set this to the distance from the sensor to the frontmost point of the vehicle.
 
 ---
 
