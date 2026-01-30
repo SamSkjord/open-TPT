@@ -103,13 +103,7 @@ class CameraMenuMixin:
                     MenuItem(
                         "Mount Offset",
                         dynamic_label=lambda: self._get_distance_offset_label(),
-                        action=lambda: self._increase_distance_offset(),
-                    )
-                )
-                cam_menu.add_item(
-                    MenuItem(
-                        "Offset -",
-                        action=lambda: self._decrease_distance_offset(),
+                        action=lambda: self._toggle_offset_editing(),
                     )
                 )
 
@@ -230,23 +224,37 @@ class CameraMenuMixin:
         return f"Text size: {new_value}"
 
     def _get_distance_offset_label(self) -> str:
-        """Get distance offset label."""
+        """Get distance offset label with current distance."""
         settings = get_settings()
         offset = settings.get("laser_ranger.offset_m", LASER_RANGER_OFFSET_M)
-        return f"Mount Offset: {offset:.2f} m"
 
-    def _increase_distance_offset(self) -> str:
-        """Increase distance offset by 0.05m."""
+        # Get current displayed distance if available
+        distance_str = ""
+        if self.corner_sensors and self.corner_sensors.laser_ranger_enabled():
+            raw_distance = self.corner_sensors.get_laser_distance_m()
+            if raw_distance is not None and raw_distance > 0:
+                display_distance = raw_distance - offset
+                if display_distance >= 0:
+                    distance_str = f" ({display_distance:.1f}m)"
+
+        if self.offset_editing:
+            return f"[ Offset: {offset:.2f}m{distance_str} ]"
+        return f"Offset: {offset:.2f}m{distance_str}"
+
+    def _toggle_offset_editing(self) -> str:
+        """Toggle offset editing mode."""
+        if self.offset_editing:
+            self.offset_editing = False
+            return "Offset saved"
+        else:
+            self.offset_editing = True
+            return "Rotate to adjust, press to save"
+
+    def _adjust_distance_offset(self, delta: int):
+        """Adjust distance offset by encoder delta (0.05m per step)."""
         settings = get_settings()
         current = settings.get("laser_ranger.offset_m", LASER_RANGER_OFFSET_M)
-        new_value = min(5.0, current + 0.05)  # Max 5m offset
+        new_value = current + (delta * 0.05)
+        # Clamp to valid range (0-5m)
+        new_value = max(0.0, min(5.0, new_value))
         settings.set("laser_ranger.offset_m", new_value)
-        return f"Offset: {new_value:.2f} m"
-
-    def _decrease_distance_offset(self) -> str:
-        """Decrease distance offset by 0.05m."""
-        settings = get_settings()
-        current = settings.get("laser_ranger.offset_m", LASER_RANGER_OFFSET_M)
-        new_value = max(0.0, current - 0.05)  # Min 0m offset
-        settings.set("laser_ranger.offset_m", new_value)
-        return f"Offset: {new_value:.2f} m"

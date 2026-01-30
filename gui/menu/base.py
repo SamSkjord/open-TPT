@@ -434,6 +434,7 @@ class MenuSystem(
         # Editing modes
         self.volume_editing = False
         self.brightness_editing = False
+        self.offset_editing = False
 
         # IMU calibration wizard state
         self.imu_cal_step = None  # None, 'zero', 'accel', 'turn'
@@ -1409,6 +1410,7 @@ class MenuSystem(
         self.volume_editing = False
         self.brightness_editing = False
         self.threshold_editing = None
+        self.offset_editing = False
 
         if self.current_menu and self.current_menu.parent:
             self.current_menu.hide()
@@ -1434,6 +1436,7 @@ class MenuSystem(
         self.volume_editing = False
         self.brightness_editing = False
         self.threshold_editing = None
+        self.offset_editing = False
 
         # Stop any active pairing
         self.stop_pairing()
@@ -1457,6 +1460,11 @@ class MenuSystem(
         if self.threshold_editing:
             # Adjust threshold instead of navigating
             self._adjust_threshold(self.threshold_editing, delta)
+            return
+
+        if self.offset_editing:
+            # Adjust laser ranger offset instead of navigating
+            self._adjust_distance_offset(delta)
             return
 
         if self.current_menu:
