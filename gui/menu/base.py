@@ -33,6 +33,12 @@ from config import (
     NEODRIVER_START_RPM,
     NEODRIVER_SHIFT_RPM,
     NEODRIVER_MAX_RPM,
+    # Engine temperature defaults
+    COOLANT_TEMP_WARNING,
+    COOLANT_TEMP_CRITICAL,
+    OIL_TEMP_WARNING,
+    OIL_TEMP_CRITICAL,
+    INTAKE_TEMP_WARNING,
 )
 from utils.settings import get_settings
 
@@ -478,6 +484,12 @@ class MenuSystem(
             "shift_start": ("thresholds.shift.start", NEODRIVER_START_RPM, 1000, 8000, 100, "Start RPM"),
             "shift_light": ("thresholds.shift.light", NEODRIVER_SHIFT_RPM, 2000, 10000, 100, "Shift RPM"),
             "shift_max": ("thresholds.shift.max", NEODRIVER_MAX_RPM, 3000, 12000, 100, "Max RPM"),
+            # Engine temperature thresholds
+            "coolant_warning": ("thresholds.coolant.warning", COOLANT_TEMP_WARNING, 80, 130, 5, "Warning"),
+            "coolant_critical": ("thresholds.coolant.critical", COOLANT_TEMP_CRITICAL, 100, 150, 5, "Critical"),
+            "oil_warning": ("thresholds.oil.warning", OIL_TEMP_WARNING, 90, 160, 5, "Warning"),
+            "oil_critical": ("thresholds.oil.critical", OIL_TEMP_CRITICAL, 110, 180, 5, "Critical"),
+            "intake_warning": ("thresholds.intake.warning", INTAKE_TEMP_WARNING, 30, 80, 5, "Warning"),
         }
 
         # Check Bluetooth audio dependencies
@@ -792,9 +804,49 @@ class MenuSystem(
         )
         shift_thresh_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
 
+        # Engine temperature thresholds
+        engine_thresh_menu = Menu("Engine Temps")
+        engine_thresh_menu.add_item(
+            MenuItem(
+                "Coolant Warning",
+                dynamic_label=lambda: self._get_threshold_label("coolant_warning"),
+                action=lambda: self._toggle_threshold_editing("coolant_warning"),
+            )
+        )
+        engine_thresh_menu.add_item(
+            MenuItem(
+                "Coolant Critical",
+                dynamic_label=lambda: self._get_threshold_label("coolant_critical"),
+                action=lambda: self._toggle_threshold_editing("coolant_critical"),
+            )
+        )
+        engine_thresh_menu.add_item(
+            MenuItem(
+                "Oil Warning",
+                dynamic_label=lambda: self._get_threshold_label("oil_warning"),
+                action=lambda: self._toggle_threshold_editing("oil_warning"),
+            )
+        )
+        engine_thresh_menu.add_item(
+            MenuItem(
+                "Oil Critical",
+                dynamic_label=lambda: self._get_threshold_label("oil_critical"),
+                action=lambda: self._toggle_threshold_editing("oil_critical"),
+            )
+        )
+        engine_thresh_menu.add_item(
+            MenuItem(
+                "Intake Warning",
+                dynamic_label=lambda: self._get_threshold_label("intake_warning"),
+                action=lambda: self._toggle_threshold_editing("intake_warning"),
+            )
+        )
+        engine_thresh_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+
         # Add submenus to thresholds menu
         thresholds_menu.add_item(MenuItem("Tyre Temps", submenu=tyre_thresh_menu))
         thresholds_menu.add_item(MenuItem("Brake Temps", submenu=brake_thresh_menu))
+        thresholds_menu.add_item(MenuItem("Engine Temps", submenu=engine_thresh_menu))
         thresholds_menu.add_item(MenuItem("Pressures", submenu=pressure_thresh_menu))
         thresholds_menu.add_item(MenuItem("Boost Range", submenu=boost_thresh_menu))
         thresholds_menu.add_item(MenuItem("Shift Light", submenu=shift_thresh_menu))
@@ -844,6 +896,13 @@ class MenuSystem(
                 "Brightness",
                 dynamic_label=lambda: self._get_brightness_label(),
                 action=lambda: self._toggle_brightness_editing(),
+            )
+        )
+        display_menu.add_item(
+            MenuItem(
+                "Bottom Gauge",
+                dynamic_label=lambda: self._get_bottom_gauge_label(),
+                action=lambda: self._cycle_bottom_gauge(),
             )
         )
         # Pages submenu nested under Display
@@ -1377,6 +1436,7 @@ class MenuSystem(
         # Thresholds submenus
         tyre_thresh_menu.parent = thresholds_menu
         brake_thresh_menu.parent = thresholds_menu
+        engine_thresh_menu.parent = thresholds_menu
         pressure_thresh_menu.parent = thresholds_menu
         boost_thresh_menu.parent = thresholds_menu
         shift_thresh_menu.parent = thresholds_menu

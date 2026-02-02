@@ -5,7 +5,7 @@ Display, Units, Thresholds, and Pages settings.
 
 import logging
 
-from config import UI_PAGES
+from config import UI_PAGES, BOTTOM_GAUGE_OPTIONS, BOTTOM_GAUGE_DEFAULT
 
 logger = logging.getLogger('openTPT.menu.settings')
 
@@ -197,3 +197,40 @@ class SettingsMenuMixin:
 
         self._settings.set(f"pages.{page_id}.enabled", new_value)
         return f"{page_name} {'enabled' if new_value else 'disabled'}"
+
+    # Bottom gauge methods
+
+    def _get_bottom_gauge(self) -> str:
+        """Get current bottom gauge selection."""
+        return self._settings.get("display.bottom_gauge", BOTTOM_GAUGE_DEFAULT)
+
+    def _get_bottom_gauge_label(self) -> str:
+        """Get bottom gauge label for menu display."""
+        gauge = self._get_bottom_gauge()
+        labels = {
+            "off": "Off",
+            "soc": "Battery SOC",
+            "coolant": "Coolant Temp",
+            "oil": "Oil Temp",
+            "intake": "Intake Temp",
+            "fuel": "Fuel Level",
+        }
+        return f"Bottom Gauge: {labels.get(gauge, gauge)}"
+
+    def _cycle_bottom_gauge(self) -> str:
+        """Cycle through bottom gauge options."""
+        current = self._get_bottom_gauge()
+        options = BOTTOM_GAUGE_OPTIONS
+        idx = options.index(current) if current in options else 0
+        new_gauge = options[(idx + 1) % len(options)]
+        self._settings.set("display.bottom_gauge", new_gauge)
+        # Labels for feedback
+        labels = {
+            "off": "Off",
+            "soc": "Battery SOC",
+            "coolant": "Coolant Temp",
+            "oil": "Oil Temp",
+            "intake": "Intake Temp",
+            "fuel": "Fuel Level",
+        }
+        return f"Bottom Gauge: {labels[new_gauge]}"

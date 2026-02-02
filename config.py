@@ -350,6 +350,33 @@ BRAKE_TEMP_HOT = 300.0  # Yellow to red
 BRAKE_TEMP_HOT_TO_BLACK = 100.0  # Range over which red fades to black after HOT
 
 # ==============================================================================
+# ENGINE TEMPERATURE THRESHOLDS (Celsius)
+# ==============================================================================
+
+# Coolant temperature thresholds
+COOLANT_TEMP_NORMAL = 90.0    # Normal operating temperature
+COOLANT_TEMP_WARNING = 105.0  # Warning threshold
+COOLANT_TEMP_CRITICAL = 115.0  # Critical/overheat
+
+# Oil temperature thresholds
+OIL_TEMP_COLD = 60.0          # Too cold for hard driving
+OIL_TEMP_NORMAL = 90.0        # Normal operating temperature
+OIL_TEMP_WARNING = 120.0      # Warning threshold
+OIL_TEMP_CRITICAL = 140.0     # Critical
+
+# Intake air temperature thresholds
+INTAKE_TEMP_NORMAL = 30.0     # Normal
+INTAKE_TEMP_WARNING = 50.0    # High (affects performance)
+
+# ==============================================================================
+# BOTTOM GAUGE OPTIONS
+# ==============================================================================
+
+# Available gauge options for bottom status bar
+BOTTOM_GAUGE_OPTIONS = ["off", "soc", "coolant", "oil", "intake", "fuel"]
+BOTTOM_GAUGE_DEFAULT = "soc"
+
+# ==============================================================================
 # TYRE PRESSURE THRESHOLDS
 # ==============================================================================
 

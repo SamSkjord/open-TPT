@@ -57,6 +57,14 @@ from config import (
     FONT_SIZE_SMALL,
     FONT_PATH,
     PRESSURE_UNIT,
+    BOTTOM_GAUGE_DEFAULT,
+    COOLANT_TEMP_WARNING,
+    COOLANT_TEMP_CRITICAL,
+    OIL_TEMP_WARNING,
+    OIL_TEMP_CRITICAL,
+    INTAKE_TEMP_WARNING,
+    FUEL_LOW_THRESHOLD_PERCENT,
+    FUEL_CRITICAL_THRESHOLD_PERCENT,
 )
 from utils.conversions import kpa_to_psi
 
@@ -491,35 +499,31 @@ class OpenTPT(
 
         # Update status bars (if enabled) - on ALL pages
         if self.status_bar_enabled:
-            # Update SOC bar - use real SOC from OBD2, grey out if unavailable
-            if self.obd2:
-                obd_snapshot = self.obd2.get_data()
-                if obd_snapshot and obd_snapshot.get('soc_available', False) and obd_snapshot.get('real_soc') is not None:
-                    # Real HV Battery SOC available (Ford Mode 22 DID 0x4801)
-                    soc = obd_snapshot['real_soc']
-                    self.bottom_bar.set_value(soc)
-                    self.bottom_bar.set_greyed_out(False)
-                    # Blue colour for battery SOC
-                    self.bottom_bar.set_colour_zones([
-                        (0, (0, 0, 255)), (50, (64, 64, 255)), (100, (0, 0, 255))
-                    ])
-                else:
-                    # No SOC data available
-                    self.bottom_bar.set_greyed_out(True)
-            elif self.ford_hybrid:
-                # Legacy Ford Hybrid handler (separate handler)
-                hybrid_snapshot = self.ford_hybrid.get_data()
-                if hybrid_snapshot and 'soc_percent' in hybrid_snapshot:
-                    soc = hybrid_snapshot['soc_percent']
-                    self.bottom_bar.set_value(soc)
-                    self.bottom_bar.set_greyed_out(False)
-                    self.bottom_bar.set_colour_zones([
-                        (0, (0, 0, 255)), (50, (64, 64, 255)), (100, (0, 0, 255))
-                    ])
-                else:
-                    self.bottom_bar.set_greyed_out(True)
+            # Update bottom bar based on user's gauge selection
+            # Get settings once for the entire update (avoid repeated calls)
+            settings = get_settings()
+            gauge = settings.get("display.bottom_gauge", BOTTOM_GAUGE_DEFAULT)
+
+            if gauge == "off":
+                # Hide the bar
+                self.bottom_bar.set_greyed_out(True)
+            elif gauge == "soc":
+                # Battery SOC (Ford Hybrid)
+                self._update_bottom_bar_soc()
+            elif gauge == "coolant":
+                # Engine coolant temperature
+                self._update_bottom_bar_coolant(settings)
+            elif gauge == "oil":
+                # Engine oil temperature
+                self._update_bottom_bar_oil(settings)
+            elif gauge == "intake":
+                # Intake air temperature
+                self._update_bottom_bar_intake(settings)
+            elif gauge == "fuel":
+                # Fuel tank level
+                self._update_bottom_bar_fuel(settings)
             else:
-                # No OBD2 handler
+                # Unknown gauge type - grey out
                 self.bottom_bar.set_greyed_out(True)
 
             # Update top bar - show lap delta if track active, else boost pressure
@@ -612,6 +616,211 @@ class OpenTPT(
 
         # Record telemetry frame if recording is active
         self._record_telemetry_frame()
+
+    def _update_bottom_bar_soc(self):
+        """Update bottom bar with Battery State of Charge."""
+        if self.obd2:
+            obd_snapshot = self.obd2.get_data()
+            if obd_snapshot and obd_snapshot.get('soc_available', False) and obd_snapshot.get('real_soc') is not None:
+                # Real HV Battery SOC available (Ford Mode 22 DID 0x4801)
+                soc = obd_snapshot['real_soc']
+                self.bottom_bar.set_label("SOC")
+                self.bottom_bar.set_unit("%")
+                self.bottom_bar.set_range(0, 100)
+                self.bottom_bar.set_value(soc)
+                self.bottom_bar.set_greyed_out(False)
+                # Blue colour for battery SOC
+                self.bottom_bar.set_colour_zones([
+                    (0, (0, 0, 255)), (50, (64, 64, 255)), (100, (0, 0, 255))
+                ])
+            else:
+                # No SOC data available
+                self.bottom_bar.set_greyed_out(True)
+        elif self.ford_hybrid:
+            # Legacy Ford Hybrid handler (separate handler)
+            hybrid_snapshot = self.ford_hybrid.get_data()
+            if hybrid_snapshot and 'soc_percent' in hybrid_snapshot:
+                soc = hybrid_snapshot['soc_percent']
+                self.bottom_bar.set_label("SOC")
+                self.bottom_bar.set_unit("%")
+                self.bottom_bar.set_range(0, 100)
+                self.bottom_bar.set_value(soc)
+                self.bottom_bar.set_greyed_out(False)
+                self.bottom_bar.set_colour_zones([
+                    (0, (0, 0, 255)), (50, (64, 64, 255)), (100, (0, 0, 255))
+                ])
+            else:
+                self.bottom_bar.set_greyed_out(True)
+        else:
+            # No OBD2 handler
+            self.bottom_bar.set_greyed_out(True)
+
+    def _update_bottom_bar_coolant(self, settings):
+        """Update bottom bar with coolant temperature."""
+        if not self.obd2:
+            self.bottom_bar.set_greyed_out(True)
+            return
+
+        obd_data = self.obd2.get_data()
+        temp = obd_data.get('coolant_temp_c') if obd_data else None
+
+        if temp is not None:
+            temp_unit = settings.get("units.temp", "C")
+
+            # Convert to user's preferred unit
+            if temp_unit == "F":
+                display_temp = (temp * 9 / 5) + 32
+                unit_str = "F"
+                # Convert thresholds to Fahrenheit
+                warning = settings.get("thresholds.coolant.warning", COOLANT_TEMP_WARNING) * 9 / 5 + 32
+                critical = settings.get("thresholds.coolant.critical", COOLANT_TEMP_CRITICAL) * 9 / 5 + 32
+                range_min, range_max = 104, 266  # 40C to 130C in Fahrenheit
+            else:
+                display_temp = temp
+                unit_str = "C"
+                warning = settings.get("thresholds.coolant.warning", COOLANT_TEMP_WARNING)
+                critical = settings.get("thresholds.coolant.critical", COOLANT_TEMP_CRITICAL)
+                range_min, range_max = 40, 130
+
+            self.bottom_bar.set_label("Coolant")
+            self.bottom_bar.set_unit(unit_str)
+            self.bottom_bar.set_range(range_min, range_max)
+            self.bottom_bar.set_value(display_temp)
+            self.bottom_bar.set_greyed_out(False)
+
+            # Colour zones based on thresholds
+            # Blue (cold) -> Green (normal) -> Yellow (warning) -> Red (critical)
+            normal_start = range_min + (range_max - range_min) * 0.3  # ~30% of range
+            self.bottom_bar.set_colour_zones([
+                (range_min, (0, 128, 255)),       # Blue (cold)
+                (normal_start, (0, 255, 0)),     # Green (warming)
+                (warning - 10, (0, 255, 0)),     # Green (normal)
+                (warning, (255, 255, 0)),        # Yellow (warning)
+                (critical, (255, 0, 0)),         # Red (critical)
+            ])
+        else:
+            self.bottom_bar.set_greyed_out(True)
+
+    def _update_bottom_bar_oil(self, settings):
+        """Update bottom bar with oil temperature."""
+        if not self.obd2:
+            self.bottom_bar.set_greyed_out(True)
+            return
+
+        obd_data = self.obd2.get_data()
+        temp = obd_data.get('oil_temp_c') if obd_data else None
+
+        if temp is not None:
+            temp_unit = settings.get("units.temp", "C")
+
+            # Convert to user's preferred unit
+            if temp_unit == "F":
+                display_temp = (temp * 9 / 5) + 32
+                unit_str = "F"
+                # Convert thresholds to Fahrenheit
+                warning = settings.get("thresholds.oil.warning", OIL_TEMP_WARNING) * 9 / 5 + 32
+                critical = settings.get("thresholds.oil.critical", OIL_TEMP_CRITICAL) * 9 / 5 + 32
+                range_min, range_max = 104, 320  # 40C to 160C in Fahrenheit
+            else:
+                display_temp = temp
+                unit_str = "C"
+                warning = settings.get("thresholds.oil.warning", OIL_TEMP_WARNING)
+                critical = settings.get("thresholds.oil.critical", OIL_TEMP_CRITICAL)
+                range_min, range_max = 40, 160
+
+            self.bottom_bar.set_label("Oil")
+            self.bottom_bar.set_unit(unit_str)
+            self.bottom_bar.set_range(range_min, range_max)
+            self.bottom_bar.set_value(display_temp)
+            self.bottom_bar.set_greyed_out(False)
+
+            # Colour zones: Blue (cold) -> Green (normal) -> Yellow (warning) -> Red (critical)
+            cold_end = range_min + (range_max - range_min) * 0.25  # ~60C/140F
+            normal_start = range_min + (range_max - range_min) * 0.4  # ~90C/194F
+            self.bottom_bar.set_colour_zones([
+                (range_min, (0, 128, 255)),       # Blue (cold)
+                (cold_end, (0, 200, 255)),        # Lighter blue
+                (normal_start, (0, 255, 0)),     # Green (normal)
+                (warning - 10, (0, 255, 0)),     # Green
+                (warning, (255, 255, 0)),        # Yellow (warning)
+                (critical, (255, 0, 0)),         # Red (critical)
+            ])
+        else:
+            self.bottom_bar.set_greyed_out(True)
+
+    def _update_bottom_bar_intake(self, settings):
+        """Update bottom bar with intake air temperature."""
+        if not self.obd2:
+            self.bottom_bar.set_greyed_out(True)
+            return
+
+        obd_data = self.obd2.get_data()
+        temp = obd_data.get('intake_temp_c') if obd_data else None
+
+        if temp is not None:
+            temp_unit = settings.get("units.temp", "C")
+
+            # Convert to user's preferred unit
+            if temp_unit == "F":
+                display_temp = (temp * 9 / 5) + 32
+                unit_str = "F"
+                # Convert threshold to Fahrenheit
+                warning = settings.get("thresholds.intake.warning", INTAKE_TEMP_WARNING) * 9 / 5 + 32
+                range_min, range_max = 32, 176  # 0C to 80C in Fahrenheit
+            else:
+                display_temp = temp
+                unit_str = "C"
+                warning = settings.get("thresholds.intake.warning", INTAKE_TEMP_WARNING)
+                range_min, range_max = 0, 80
+
+            self.bottom_bar.set_label("Intake")
+            self.bottom_bar.set_unit(unit_str)
+            self.bottom_bar.set_range(range_min, range_max)
+            self.bottom_bar.set_value(display_temp)
+            self.bottom_bar.set_greyed_out(False)
+
+            # Colour zones: Green (normal) -> Yellow (high)
+            normal_range = (range_max - range_min) * 0.4  # ~30C/86F
+            self.bottom_bar.set_colour_zones([
+                (range_min, (0, 255, 0)),         # Green (cold/normal)
+                (range_min + normal_range, (0, 255, 0)),  # Green (normal)
+                (warning - 10, (200, 255, 0)),   # Yellow-green
+                (warning, (255, 255, 0)),        # Yellow (warning)
+                (range_max, (255, 128, 0)),      # Orange (hot)
+            ])
+        else:
+            self.bottom_bar.set_greyed_out(True)
+
+    def _update_bottom_bar_fuel(self, settings):
+        """Update bottom bar with fuel tank level."""
+        if not self.obd2:
+            self.bottom_bar.set_greyed_out(True)
+            return
+
+        obd_data = self.obd2.get_data()
+        fuel_level = obd_data.get('fuel_level_percent') if obd_data else None
+
+        if fuel_level is not None:
+            low_thresh = settings.get("thresholds.fuel.low", FUEL_LOW_THRESHOLD_PERCENT)
+            critical_thresh = settings.get("thresholds.fuel.critical", FUEL_CRITICAL_THRESHOLD_PERCENT)
+
+            self.bottom_bar.set_label("Fuel")
+            self.bottom_bar.set_unit("%")
+            self.bottom_bar.set_range(0, 100)
+            self.bottom_bar.set_value(fuel_level)
+            self.bottom_bar.set_greyed_out(False)
+
+            # Colour zones: Red (critical) -> Yellow (low) -> Green (good)
+            # Note: inverted from temperature - low is bad, high is good
+            self.bottom_bar.set_colour_zones([
+                (0, (255, 0, 0)),                 # Red (empty)
+                (critical_thresh, (255, 0, 0)),  # Red (critical)
+                (low_thresh, (255, 255, 0)),     # Yellow (low)
+                (low_thresh + 5, (0, 255, 0)),   # Green (good)
+                (100, (0, 255, 0)),              # Green (full)
+            ])
+        else:
+            self.bottom_bar.set_greyed_out(True)
 
     def _cleanup(self):
         """Clean up resources before exiting."""
