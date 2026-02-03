@@ -237,7 +237,8 @@ Hardware and system constants are in `config.py`:
 User preferences changed via the on-screen menu are saved to `~/.opentpt_settings.json` and persist across restarts:
 - **Units**: Temperature (C/F), Pressure (PSI/BAR/kPa), Speed (km/h/mph)
 - **Camera**: Mirror and rotation for front/rear cameras
-- **Display**: Brightness level
+- **Display**: Brightness level, bottom gauge selection (SOC/Coolant/Oil/Intake/Fuel/Off)
+- **Thresholds**: Tyre, brake, engine temperature warning/critical levels
 - **Radar**: Enabled/disabled state
 - **Speed source**: OBD or GPS
 
@@ -698,7 +699,8 @@ openTPT/
 - [x] USB persistent storage - settings, lap times, tracks on USB drive
 - [x] USB patch deployment - offline updates with automatic overlay handling
 - [ ] Configurable OBD2 PIDs - move to config.py with key, mode, pid, bytes, formula, priority, smoothing
-- [ ] Status bar configuration - choose which PIDs/data to display on status bars
+- [x] Bottom gauge selection - choose data source for bottom status bar (SOC, coolant, oil, intake, fuel, off)
+- [ ] Top bar configuration - choose which PIDs/data to display on top status bar
 
 - [ ] Lap corner analysis logging - per lap, per corner: min speeds, yaw acceleration
 - [x] Pitlane timer - countdown/countup timer for pitlane speed limits and pit stop duration
