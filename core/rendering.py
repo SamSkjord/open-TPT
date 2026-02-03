@@ -15,6 +15,7 @@ from config import (
     DISPLAY_HEIGHT,
     PRESSURE_UNIT,
     THERMAL_STALE_TIMEOUT,
+    TYRE_HISTORY_STALE_TIMEOUT,
     FONT_PATH,
     FONT_SIZE_MEDIUM,
     RED,
@@ -269,9 +270,9 @@ class RenderingMixin:
                         position, history_snapshot, show_zone_temps, flip_enabled
                     )
                 elif position in self._history_cache:
-                    # No fresh data - use cache if within timeout
+                    # No fresh data - use cache if within timeout (longer for history since EMAs are smoothed)
                     cache = self._history_cache[position]
-                    if now - cache["timestamp"] < THERMAL_STALE_TIMEOUT:
+                    if now - cache["timestamp"] < TYRE_HISTORY_STALE_TIMEOUT:
                         flip_enabled = get_settings().get(f"tyre_temps.flip.{position}", False)
                         self.display.draw_thermal_image_with_history(
                             position, cache["data"], show_zone_temps, flip_enabled

@@ -49,6 +49,7 @@ from config import (
     FPS_COUNTER_ENABLED,
     FPS_COUNTER_POSITION,
     FPS_COUNTER_COLOUR,
+    TYRE_HISTORY_BAND_COUNT,
     # ROTATION,
 )
 from utils.settings import get_settings
@@ -738,8 +739,8 @@ class Display:
             is_front = position in ["FL", "FR"]
             is_right_side = position in ["FR", "RR"]
 
-            # Band count (7 bands: current + 6 historical)
-            num_bands = 7
+            # Band count from config (7 bands: current + 6 historical)
+            num_bands = TYRE_HISTORY_BAND_COUNT
 
             # Pre-calculate all row colours for better performance
             # Instead of drawing line-by-line, draw larger horizontal strips
@@ -749,13 +750,15 @@ class Display:
 
             for y in range(section_height_px + 1):  # +1 to flush final strip
                 if y < section_height_px:
-                    # Calculate fractional band position
+                    # Calculate fractional band position (0 to num_bands-1)
+                    # Use (num_bands - 1) as max to map y range to band indices
+                    y_fraction = y / (section_height_px - 1) if section_height_px > 1 else 0
                     if is_front:
                         # Front: current at top (y=0), 15min at bottom (y=max)
-                        band_pos = (y / section_height_px) * (num_bands - 1)
+                        band_pos = y_fraction * (num_bands - 1)
                     else:
                         # Rear: 15min at top (y=0), current at bottom (y=max)
-                        band_pos = ((section_height_px - 1 - y) / section_height_px) * (num_bands - 1)
+                        band_pos = (1 - y_fraction) * (num_bands - 1)
 
                     # Get the two bands to interpolate between
                     band_lower = int(band_pos)

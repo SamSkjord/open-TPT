@@ -11,9 +11,12 @@ import time
 from dataclasses import dataclass, field
 from typing import Dict, Optional, Tuple
 
+# Temperature bounds for validation (reject corrupted CAN data)
+TEMP_MIN_C = -40.0   # Minimum plausible tyre temp
+TEMP_MAX_C = 250.0   # Maximum plausible tyre temp
+
 # EMA alpha values calculated for 10Hz update rate
 # alpha = 2 / (N + 1) where N = time_window * update_rate
-# For smoother EMAs at longer windows, use: alpha = 1 - exp(-1 / (time_window * update_rate))
 EMA_ALPHAS = {
     '5s': 0.039,      # 5 seconds at 10Hz
     '15s': 0.013,     # 15 seconds at 10Hz
@@ -42,13 +45,20 @@ class TyreZoneHistory:
     avg_15m: float = 0.0
     initialised: bool = False
 
-    def update(self, value: float) -> None:
+    def update(self, value: float) -> bool:
         """
         Update all EMAs with a new temperature reading.
 
         Args:
             value: New temperature value in Celsius
+
+        Returns:
+            True if value was accepted, False if rejected (out of bounds)
         """
+        # Reject implausible values that would poison the EMAs
+        if value < TEMP_MIN_C or value > TEMP_MAX_C:
+            return False
+
         if not self.initialised:
             # First reading - initialise all EMAs to current value
             self.current = value
@@ -59,7 +69,7 @@ class TyreZoneHistory:
             self.avg_5m = value
             self.avg_15m = value
             self.initialised = True
-            return
+            return True
 
         self.current = value
 
@@ -70,6 +80,7 @@ class TyreZoneHistory:
         self.avg_1m = EMA_ALPHAS['1m'] * value + (1 - EMA_ALPHAS['1m']) * self.avg_1m
         self.avg_5m = EMA_ALPHAS['5m'] * value + (1 - EMA_ALPHAS['5m']) * self.avg_5m
         self.avg_15m = EMA_ALPHAS['15m'] * value + (1 - EMA_ALPHAS['15m']) * self.avg_15m
+        return True
 
     def get_band_temps(self) -> Tuple[float, float, float, float, float, float, float]:
         """

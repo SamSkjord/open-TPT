@@ -432,10 +432,11 @@ MLX_DISPLAY_HEIGHT = int(172 * SCALE_Y)  # Height of displayed heatmap
 # Tyre temperature history display settings
 # "current" shows only current temps, "history" shows vertical gradient with history
 TYRE_HISTORY_DISPLAY_DEFAULT = "current"
-# Time windows for history bands (seconds): 5s, 15s, 30s, 1min, 5min, 15min
-TYRE_HISTORY_TIME_WINDOWS = [5, 15, 30, 60, 300, 900]
 # Number of bands in history gradient (7: current + 6 historical)
+# Time windows defined in utils/tyre_history.py: current, 5s, 15s, 30s, 1m, 5m, 15m
 TYRE_HISTORY_BAND_COUNT = 7
+# Stale timeout for history data (longer than THERMAL_STALE_TIMEOUT since EMAs are smoothed)
+TYRE_HISTORY_STALE_TIMEOUT = 5.0  # seconds
 
 # ==============================================================================
 # BRAKE SENSORS (via CAN from corner sensors)
