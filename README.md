@@ -672,6 +672,7 @@ openTPT/
 - [x] Direct TPMS serial connection - TPMS receiver via UART3 (GPIO4/5) at 19200 baud; frees USB port
 - [x] TOF laser sensor CAN device - front distance measurement displayed on front camera view (Pico CAN Ranger)
 - [ ] ANT+ heart rate monitoring - driver heart rate logging via ANT+ USB dongle
+- [ ] CHT sensor - 14mm under spark plug cylinder head temperature (thermomart.com/14mm-under-spark-plug)
 
 ### Software TODO
 - [x] Bluetooth audio menu - scan, pair, connect, disconnect, forget (requires PulseAudio)
@@ -706,6 +707,10 @@ openTPT/
 - [x] Pitlane timer - countdown/countup timer for pitlane speed limits and pit stop duration
 - [x] Fuel tracking page - average fuel per lap, laps remaining, fuel used this session
 - [ ] Tyre temp graphs - show tyre temperature graphs on edges of track timer and camera views
+- [ ] Gear-based shift points - optimal shift RPM per gear based on torque curve crossover (glennmessersmith.com/shiftpt.html)
+- [ ] Tyre slip indicator - compare wheel speed (OBD2) vs ground speed (GPS) to show acceleration/braking slip percentage
+- [ ] Steering angle - read steering angle sensor via OBD2/CAN for oversteer/understeer analysis
+- [ ] Brake input - pedal force sensor (driver input) and hydraulic line pressure for brake analysis
 
 ### Bugs
 - [ ] Camera settings menu always opens on rear camera even when front camera is selected
