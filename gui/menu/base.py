@@ -1319,6 +1319,13 @@ class MenuSystem(
         # --- Tyre Temps submenu ---
         tyre_temps_menu = Menu("Tyre Temps")
 
+        # Display mode toggle (current-only vs history gradient)
+        tyre_temps_menu.add_item(MenuItem(
+            "Display Mode",
+            dynamic_label=lambda: self._get_tyre_display_mode_label(),
+            action=lambda: self._toggle_tyre_display_mode(),
+        ))
+
         # FL corner menu
         fl_menu = Menu("FL")
         fl_menu.add_item(MenuItem(

@@ -1,6 +1,7 @@
 """
 Tyre temperature menu mixin for openTPT.
-Provides sensor status, full frame view, and flip inner/outer settings.
+Provides sensor status, full frame view, flip inner/outer settings,
+and display mode toggle (current-only vs history gradient).
 """
 
 import logging
@@ -14,6 +15,7 @@ from config import (
     DISPLAY_HEIGHT,
     FONT_PATH,
     FONT_SIZE_MEDIUM,
+    TYRE_HISTORY_DISPLAY_DEFAULT,
 )
 from utils.settings import get_settings
 
@@ -28,6 +30,26 @@ class TyreTempsMenuMixin:
         self.corner_sensors: CornerSensorHandler instance
         self.input_handler: InputHandler for button polling
     """
+
+    # Display mode (current-only vs history gradient)
+
+    def _get_tyre_display_mode_label(self) -> str:
+        """Get display mode label for menu."""
+        settings = get_settings()
+        mode = settings.get("tyre_temps.display_mode", TYRE_HISTORY_DISPLAY_DEFAULT)
+        if mode == "history":
+            return "Display: History Gradient"
+        return "Display: Current Only"
+
+    def _toggle_tyre_display_mode(self) -> str:
+        """Toggle between current-only and history gradient display modes."""
+        settings = get_settings()
+        current = settings.get("tyre_temps.display_mode", TYRE_HISTORY_DISPLAY_DEFAULT)
+        new_mode = "history" if current == "current" else "current"
+        settings.set("tyre_temps.display_mode", new_mode)
+        if new_mode == "history":
+            return "Display: History Gradient"
+        return "Display: Current Only"
 
     # Per-corner status labels
 

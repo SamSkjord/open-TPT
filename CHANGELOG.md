@@ -1,5 +1,41 @@
 # Changelog - openTPT
 
+## [v0.19.18] - 2026-02-03
+
+### Tyre Temperature History Gradient
+
+Added vertical historical temperature gradients to tyre temp heatmaps, showing temperature history in smooth bands from current to 15-minute average.
+
+#### New Features
+
+- **History Gradient Display**: Toggle between current-only and history gradient modes
+  - Front tyres show newest at top, oldest (15min) at bottom
+  - Rear tyres show oldest at top, newest at bottom
+  - Smooth colour transitions between time bands
+- **Time Windows**: 7 bands tracking current, 5s, 15s, 30s, 1min, 5min, 15min averages
+- **EMA Tracking**: Exponential Moving Averages for efficient, low-memory history tracking
+- **Menu Toggle**: System > Tyre Temps > Display Mode to switch between modes
+
+#### Technical Details
+
+- Uses EMAs with pre-calculated alpha values for 10Hz update rate
+- Memory efficient: ~1KB total for all 4 tyres
+- Lock-free render path maintained (immutable snapshots)
+- Minimal CPU overhead (~0.01ms per update at 10Hz)
+- Render time increase: ~2ms (4 tyres) within 12ms frame budget
+
+#### Modified Files
+
+- `utils/tyre_history.py` - NEW: EMA-based temperature history tracker
+- `config.py` - Added `TYRE_HISTORY_DISPLAY_DEFAULT`, `TYRE_HISTORY_TIME_WINDOWS`, `TYRE_HISTORY_BAND_COUNT`
+- `hardware/corner_sensor_handler.py` - Added history tracker integration and API methods
+- `gui/display.py` - Added `draw_thermal_image_with_history()` method
+- `core/rendering.py` - Added display mode check and history rendering path
+- `gui/menu/tyre_temps.py` - Added display mode label/toggle methods
+- `gui/menu/base.py` - Added Display Mode menu item to Tyre Temps menu
+
+---
+
 ## [v0.19.17] - 2026-02-03
 
 ### Bottom Status Bar Gauge Selection

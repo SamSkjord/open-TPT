@@ -689,6 +689,163 @@ class Display:
                 text_rect = text.get_rect(center=(text_x, text_y))
                 # self.surface.blit(text, text_rect)
 
+    def draw_thermal_image_with_history(self, position, history_snapshot, show_text=False,
+                                         flip_enabled=False):
+        """
+        Draw thermal heatmap with vertical history gradient.
+
+        Shows temperature history as vertical bands from current to 15-minute average.
+        Front tyres show newest at top, rear tyres show newest at bottom.
+
+        Args:
+            position: String key for tyre position (FL, FR, RL, RR)
+            history_snapshot: TyreHistorySnapshot with band temperatures for all zones
+            show_text: If True, overlay temperature values on the display
+            flip_enabled: If True, swap inner/outer zones for this corner
+        """
+        from utils.tyre_history import TyreHistorySnapshot
+
+        if position not in MLX_POSITIONS:
+            return
+
+        pos = MLX_POSITIONS[position]
+
+        # Size of each section (3 horizontal zones)
+        section_width_px = MLX_DISPLAY_WIDTH // 3
+        section_height_px = MLX_DISPLAY_HEIGHT
+
+        # Create a surface for the thermal image
+        thermal_surface = pygame.Surface((MLX_DISPLAY_WIDTH, MLX_DISPLAY_HEIGHT))
+
+        if history_snapshot is None or not isinstance(history_snapshot, TyreHistorySnapshot):
+            # No data available - draw all sections as grey
+            for i in range(3):
+                x_offset = i * section_width_px
+                rect = pygame.Rect(x_offset, 0, section_width_px, section_height_px)
+                pygame.draw.rect(thermal_surface, GREY, rect)
+        else:
+            # Get band temperatures for each zone
+            # Tuple order: (current, 5s, 15s, 30s, 1m, 5m, 15m)
+            inner_bands = history_snapshot.inner_bands
+            outer_bands = history_snapshot.outer_bands
+            centre_bands = history_snapshot.centre_bands
+
+            # Apply flip if enabled (swap inner/outer)
+            if flip_enabled:
+                inner_bands, outer_bands = outer_bands, inner_bands
+
+            # Determine if front or rear tyre for band ordering
+            is_front = position in ["FL", "FR"]
+            is_right_side = position in ["FR", "RR"]
+
+            # Band count (7 bands: current + 6 historical)
+            num_bands = 7
+
+            # Pre-calculate all row colours for better performance
+            # Instead of drawing line-by-line, draw larger horizontal strips
+            # when consecutive rows have the same colour
+            last_colours = None
+            strip_start_y = 0
+
+            for y in range(section_height_px + 1):  # +1 to flush final strip
+                if y < section_height_px:
+                    # Calculate fractional band position
+                    if is_front:
+                        # Front: current at top (y=0), 15min at bottom (y=max)
+                        band_pos = (y / section_height_px) * (num_bands - 1)
+                    else:
+                        # Rear: 15min at top (y=0), current at bottom (y=max)
+                        band_pos = ((section_height_px - 1 - y) / section_height_px) * (num_bands - 1)
+
+                    # Get the two bands to interpolate between
+                    band_lower = int(band_pos)
+                    band_upper = min(band_lower + 1, num_bands - 1)
+                    t = band_pos - band_lower  # Interpolation factor
+
+                    # Interpolate temperature for each zone
+                    inner_temp = inner_bands[band_lower] * (1 - t) + inner_bands[band_upper] * t
+                    centre_temp = centre_bands[band_lower] * (1 - t) + centre_bands[band_upper] * t
+                    outer_temp = outer_bands[band_lower] * (1 - t) + outer_bands[band_upper] * t
+
+                    # Get colours for each zone
+                    inner_colour = self._get_heat_colour(inner_temp)
+                    centre_colour = self._get_heat_colour(centre_temp)
+                    outer_colour = self._get_heat_colour(outer_temp)
+
+                    # Section order depends on which side of car
+                    if is_right_side:
+                        # Right side: Inner, Centre, Outer (left to right)
+                        current_colours = (inner_colour, centre_colour, outer_colour)
+                    else:
+                        # Left side: Outer, Centre, Inner (left to right)
+                        current_colours = (outer_colour, centre_colour, inner_colour)
+                else:
+                    # Final iteration to flush last strip
+                    current_colours = None
+
+                # Draw strip when colours change or at end
+                if current_colours != last_colours and last_colours is not None:
+                    strip_height = y - strip_start_y
+                    for i, colour in enumerate(last_colours):
+                        x_start = i * section_width_px
+                        rect = pygame.Rect(x_start, strip_start_y, section_width_px, strip_height)
+                        pygame.draw.rect(thermal_surface, colour, rect)
+                    strip_start_y = y
+
+                last_colours = current_colours
+
+            # Overlay temperature text on each zone when UI is visible
+            if show_text:
+                # Show current temperatures (first band)
+                inner_temp = inner_bands[0]
+                centre_temp = centre_bands[0]
+                outer_temp = outer_bands[0]
+
+                if is_right_side:
+                    sections = [(inner_temp, 0), (centre_temp, section_width_px),
+                                (outer_temp, 2 * section_width_px)]
+                else:
+                    sections = [(outer_temp, 0), (centre_temp, section_width_px),
+                                (inner_temp, 2 * section_width_px)]
+
+                for temp, x_offset in sections:
+                    temp_str = f"{temp:.1f}"
+                    # Centre text within the zone
+                    text_x = x_offset + (section_width_px // 2)
+                    text_y = section_height_px // 2
+
+                    # Render black outline (8 directions)
+                    outline_surface = self.font_small.render(temp_str, True, (0, 0, 0))
+                    outline_rect = outline_surface.get_rect(center=(text_x, text_y))
+                    for dx, dy in [(-1, -1), (-1, 0), (-1, 1), (0, -1),
+                                   (0, 1), (1, -1), (1, 0), (1, 1)]:
+                        thermal_surface.blit(outline_surface,
+                                             (outline_rect.x + dx, outline_rect.y + dy))
+
+                    # Render white text on top
+                    text_surface = self.font_small.render(temp_str, True, (255, 255, 255))
+                    text_rect = text_surface.get_rect(center=(text_x, text_y))
+                    thermal_surface.blit(text_surface, text_rect)
+
+        # Draw vertical separator lines
+        pygame.draw.line(
+            thermal_surface,
+            (0, 0, 0),
+            (section_width_px, 0),
+            (section_width_px, section_height_px),
+            5,
+        )
+        pygame.draw.line(
+            thermal_surface,
+            (0, 0, 0),
+            (2 * section_width_px, 0),
+            (2 * section_width_px, section_height_px),
+            5,
+        )
+
+        # Display the thermal image
+        self.surface.blit(thermal_surface, pos)
+
     def draw_mirroring_indicators(self, thermal_handler):
         """
         Draw red chevron indicators for tyres where temperature is mirrored from centre channel.

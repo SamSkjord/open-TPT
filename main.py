@@ -154,6 +154,7 @@ class OpenTPT(
         # before displaying offline state (prevents flashing at display fps > data fps)
         self._thermal_cache = {}  # {position: {"data": array, "timestamp": time}}
         self._brake_cache = {}    # {position: {"temp": value, "timestamp": time}}
+        self._history_cache = {}  # {position: {"data": snapshot, "timestamp": time}}
 
         # Telemetry recording
         self.recorder = TelemetryRecorder()

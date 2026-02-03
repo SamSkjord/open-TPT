@@ -15,6 +15,7 @@ from typing import Dict, Optional
 import numpy as np
 
 from utils.hardware_base import BoundedQueueHardwareHandler
+from utils.tyre_history import TyreHistoryTracker, TyreHistorySnapshot
 
 logger = logging.getLogger('openTPT.hardware.corners')
 
@@ -142,6 +143,9 @@ class CornerSensorHandler(BoundedQueueHardwareHandler):
         # Snapshots for lock-free render access
         self._tyre_snapshot: Optional[Dict] = None
         self._brake_snapshot: Optional[Dict] = None
+
+        # Tyre temperature history tracker for gradient display
+        self._history_tracker = TyreHistoryTracker()
 
         # Message ID lookup: msg_id -> (position, type)
         self._msg_map: Dict[int, tuple] = {}
@@ -293,6 +297,10 @@ class CornerSensorHandler(BoundedQueueHardwareHandler):
                 c.right = data.get("RightMedianTemp")
                 c.gradient = data.get("LateralGradient")
                 c.last_update = now
+
+                # Update temperature history tracker for gradient display
+                if c.left is not None and c.centre is not None and c.right is not None:
+                    self._history_tracker.update(pos, c.left, c.centre, c.right)
 
             elif msg_type == "detection":
                 c.detected = bool(data.get("Detected", 0))
@@ -501,6 +509,29 @@ class CornerSensorHandler(BoundedQueueHardwareHandler):
                 "fps": c.fps if c.firmware else None,
                 "sensor_type": "can",
             }
+
+    # ---- Tyre History API ----
+
+    def get_history_snapshot(self, position: str) -> Optional[TyreHistorySnapshot]:
+        """
+        Get temperature history snapshot for a single tyre (lock-free for render).
+
+        Args:
+            position: Tyre position ('FL', 'FR', 'RL', 'RR')
+
+        Returns:
+            TyreHistorySnapshot or None if no history available
+        """
+        return self._history_tracker.get_snapshot(position)
+
+    def get_all_history_snapshots(self) -> Dict[str, Optional[TyreHistorySnapshot]]:
+        """
+        Get temperature history snapshots for all tyres (lock-free for render).
+
+        Returns:
+            Dictionary mapping position to TyreHistorySnapshot
+        """
+        return self._history_tracker.get_all_snapshots()
 
     # ---- Laser Ranger API ----
 

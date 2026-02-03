@@ -29,7 +29,7 @@ logger = logging.getLogger("openTPT.config")
 # ==============================================================================
 # Update this when releasing new versions
 # Format: MAJOR.MINOR.PATCH (e.g., "0.19.0")
-APP_VERSION = "0.19.17"
+APP_VERSION = "0.19.18"
 
 # Project root for asset paths
 _PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -428,6 +428,14 @@ MLX_DISPLAY_WIDTH = int(
     150 * SCALE_X
 )  # Width of displayed heatmap - to cover the complete tyre width
 MLX_DISPLAY_HEIGHT = int(172 * SCALE_Y)  # Height of displayed heatmap
+
+# Tyre temperature history display settings
+# "current" shows only current temps, "history" shows vertical gradient with history
+TYRE_HISTORY_DISPLAY_DEFAULT = "current"
+# Time windows for history bands (seconds): 5s, 15s, 30s, 1min, 5min, 15min
+TYRE_HISTORY_TIME_WINDOWS = [5, 15, 30, 60, 300, 900]
+# Number of bands in history gradient (7: current + 6 historical)
+TYRE_HISTORY_BAND_COUNT = 7
 
 # ==============================================================================
 # BRAKE SENSORS (via CAN from corner sensors)

@@ -22,8 +22,10 @@ from config import (
     SCALE_X,
     SCALE_Y,
     COPILOT_OVERLAY_POSITION,
+    TYRE_HISTORY_DISPLAY_DEFAULT,
 )
 from utils.conversions import kpa_to_psi
+from utils.settings import get_settings
 
 logger = logging.getLogger('openTPT.render')
 
@@ -250,21 +252,52 @@ class RenderingMixin:
         # Get thermal camera data (LOCK-FREE snapshot access)
         # Uses stale data cache to prevent flashing when display fps > data fps
         t0 = time.time()
+
+        # Check display mode from settings (imports at module level for performance)
+        display_mode = get_settings().get("tyre_temps.display_mode", TYRE_HISTORY_DISPLAY_DEFAULT)
+
         for position in ["FL", "FR", "RL", "RR"]:
-            thermal_data = self.thermal.get_thermal_data(position)
-            if thermal_data is not None:
-                # Fresh data - update cache and display
-                self._thermal_cache[position] = {"data": thermal_data, "timestamp": now}
-                self.display.draw_thermal_image(position, thermal_data, show_zone_temps)
-            elif position in self._thermal_cache:
-                # No fresh data - use cache if within timeout
-                cache = self._thermal_cache[position]
-                if now - cache["timestamp"] < THERMAL_STALE_TIMEOUT:
-                    self.display.draw_thermal_image(position, cache["data"], show_zone_temps)
+            if display_mode == "history":
+                # History gradient mode - use temperature history snapshots
+                history_snapshot = self.thermal.get_history_snapshot(position)
+                if history_snapshot is not None:
+                    # Fresh data - update cache and display
+                    self._history_cache[position] = {"data": history_snapshot, "timestamp": now}
+                    # Check if flip is enabled for this corner
+                    flip_enabled = get_settings().get(f"tyre_temps.flip.{position}", False)
+                    self.display.draw_thermal_image_with_history(
+                        position, history_snapshot, show_zone_temps, flip_enabled
+                    )
+                elif position in self._history_cache:
+                    # No fresh data - use cache if within timeout
+                    cache = self._history_cache[position]
+                    if now - cache["timestamp"] < THERMAL_STALE_TIMEOUT:
+                        flip_enabled = get_settings().get(f"tyre_temps.flip.{position}", False)
+                        self.display.draw_thermal_image_with_history(
+                            position, cache["data"], show_zone_temps, flip_enabled
+                        )
+                    else:
+                        self.display.draw_thermal_image_with_history(
+                            position, None, show_zone_temps
+                        )
+                else:
+                    self.display.draw_thermal_image_with_history(position, None, show_zone_temps)
+            else:
+                # Current-only mode - original behaviour
+                thermal_data = self.thermal.get_thermal_data(position)
+                if thermal_data is not None:
+                    # Fresh data - update cache and display
+                    self._thermal_cache[position] = {"data": thermal_data, "timestamp": now}
+                    self.display.draw_thermal_image(position, thermal_data, show_zone_temps)
+                elif position in self._thermal_cache:
+                    # No fresh data - use cache if within timeout
+                    cache = self._thermal_cache[position]
+                    if now - cache["timestamp"] < THERMAL_STALE_TIMEOUT:
+                        self.display.draw_thermal_image(position, cache["data"], show_zone_temps)
+                    else:
+                        self.display.draw_thermal_image(position, None, show_zone_temps)
                 else:
                     self.display.draw_thermal_image(position, None, show_zone_temps)
-            else:
-                self.display.draw_thermal_image(position, None, show_zone_temps)
         render_times['thermal'] = (time.time() - t0) * 1000
 
         t0 = time.time()
