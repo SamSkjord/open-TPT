@@ -1,5 +1,38 @@
 # Changelog - openTPT
 
+## [v0.19.17] - 2026-02-03
+
+### Bottom Status Bar Gauge Selection
+
+Added user-selectable gauge options for the bottom status bar, replacing the hardcoded Ford Hybrid SOC display.
+
+#### New Features
+
+- **Gauge Selection** (System > Display > Bottom Gauge): Cycle through available gauges
+  - Off: Hide bottom bar entirely
+  - SOC: Battery State of Charge (Ford Hybrid) - default, existing behaviour
+  - Coolant: Engine coolant temperature with cold/normal/warning/critical zones
+  - Oil: Engine oil temperature with cold/normal/warning/critical zones
+  - Intake: Intake air temperature with normal/warning zones
+  - Fuel: Fuel tank level with critical/low/good zones
+- **Engine Temperature Thresholds** (Thresholds > Engine Temps): Configurable warning/critical levels
+  - Coolant Warning (default 105C) and Critical (default 115C)
+  - Oil Warning (default 120C) and Critical (default 140C)
+  - Intake Warning (default 50C)
+- **Temperature Unit Support**: All temperature gauges respect the user's C/F preference
+- **Colour-Coded Zones**: Each gauge type has appropriate colour schemes
+  - Temperature gauges: Blue (cold) -> Green (normal) -> Yellow (warning) -> Red (critical)
+  - Fuel gauge: Red (critical) -> Yellow (low) -> Green (good)
+
+#### Modified Files
+
+- `config.py` - Added engine temperature thresholds and `BOTTOM_GAUGE_OPTIONS`/`BOTTOM_GAUGE_DEFAULT`
+- `gui/menu/base.py` - Added Engine Temps submenu, Bottom Gauge menu item, threshold definitions
+- `gui/menu/settings.py` - Added `_get_bottom_gauge()`, `_get_bottom_gauge_label()`, `_cycle_bottom_gauge()`
+- `main.py` - Replaced hardcoded SOC logic with gauge selection, added `_update_bottom_bar_*()` methods
+
+---
+
 ## [v0.19.16] - 2026-01-30
 
 ### Laser Ranger Mount Offset
