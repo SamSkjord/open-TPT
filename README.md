@@ -673,6 +673,7 @@ openTPT/
 - [x] TOF laser sensor CAN device - front distance measurement displayed on front camera view (Pico CAN Ranger)
 - [ ] ANT+ heart rate monitoring - driver heart rate logging via ANT+ USB dongle
 - [ ] CHT sensor - 14mm under spark plug cylinder head temperature (thermomart.com/14mm-under-spark-plug)
+- [ ] Suspension sensors - strain gauge load cells for force and linear potentiometers for travel (strainblog.micro-measurements.com/content/measuring-load-raspberry-pi)
 
 ### Software TODO
 - [x] Bluetooth audio menu - scan, pair, connect, disconnect, forget (requires PulseAudio)
