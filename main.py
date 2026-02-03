@@ -840,8 +840,10 @@ class OpenTPT(
             self.neodriver.stop()
         if self.oled_bonnet:
             self.oled_bonnet.stop()
-        self.tpms.stop()
-        self.corner_sensors.stop()
+        if self.tpms:
+            self.tpms.stop()
+        if self.corner_sensors:
+            self.corner_sensors.stop()
 
         # Stop IMU if enabled
         if self.imu:

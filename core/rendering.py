@@ -179,13 +179,13 @@ class RenderingMixin:
 
         # Draw FPS counter (always on top)
         t0 = time.time()
-        camera_fps = self.camera.fps if self.camera.is_active() else None
+        camera_fps = self.camera.fps if self.camera and self.camera.is_active() else None
         self.display.draw_fps_counter(self.fps, camera_fps)
         render_times['fps_counter'] = (time.time() - t0) * 1000
 
         # Draw menu overlay (if visible)
         t0 = time.time()
-        if self.menu.is_visible():
+        if self.menu and self.menu.is_visible():
             self.menu.render(self.screen)
         render_times['menu'] = (time.time() - t0) * 1000
 
