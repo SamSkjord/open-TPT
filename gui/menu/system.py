@@ -233,6 +233,8 @@ class SystemMenuMixin:
         """Get radar CAN channel."""
         if not self.radar_handler:
             return "Channel: --"
+        if self.radar_handler.radar_type == "tesla":
+            return f"Channel: {self.radar_handler.tesla_channel}"
         return f"Channel: {self.radar_handler.radar_channel}"
 
     # System Status methods

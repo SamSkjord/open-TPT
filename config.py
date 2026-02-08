@@ -733,13 +733,16 @@ CORNER_SENSOR_CAN_TIMEOUT_S = 0.5  # Data considered stale after this time
 CORNER_SENSOR_CAN_NOTIFIER_TIMEOUT_S = 0.1  # CAN notifier timeout
 
 # ==============================================================================
-# RADAR (Toyota Radar Overlay)
+# RADAR (Configurable: Toyota or Tesla)
 # ==============================================================================
 
 # Enable/disable radar overlay
 RADAR_ENABLED = True  # Set to True to enable radar overlay on camera
 
-# Toyota radar CAN configuration
+# Radar type: "toyota" or "tesla"
+RADAR_TYPE = "toyota"
+
+# --- Toyota radar CAN configuration (used when RADAR_TYPE = "toyota") ---
 # Available interfaces: can_b1_0, can_b1_1, can_b2_0, can_b2_1
 # Radar outputs tracks on Board 1, CAN_1 connector (can_b1_1)
 # Car keep-alive sent on Board 1, CAN_0 connector (can_b1_0)
@@ -747,10 +750,16 @@ RADAR_CHANNEL = "can_b1_1"  # CAN channel for radar data (tracks come FROM radar
 CAR_CHANNEL = "can_b1_0"  # CAN channel for car keep-alive (we send TO radar)
 RADAR_INTERFACE = "socketcan"  # python-can interface
 RADAR_BITRATE = 500000  # CAN bitrate
-
-# DBC files for radar decoding
 RADAR_DBC = "opendbc/toyota_prius_2017_adas.dbc"
 CONTROL_DBC = "opendbc/toyota_prius_2017_pt_generated.dbc"
+
+# --- Tesla radar CAN configuration (used when RADAR_TYPE = "tesla") ---
+# Tesla Bosch MRRevo14F uses a single CAN bus (no separate car keepalive bus)
+TESLA_RADAR_CHANNEL = "can_b1_0"  # Single CAN bus for Tesla radar
+TESLA_RADAR_INTERFACE = "socketcan"  # python-can interface
+TESLA_RADAR_DBC = "opendbc/tesla_radar.dbc"
+TESLA_RADAR_VIN = None  # None = auto-read VIN from radar via UDS at startup
+TESLA_RADAR_AUTO_VIN = True  # Auto-read VIN at startup (requires quiet bus)
 
 # Radar tracking parameters
 RADAR_TRACK_TIMEOUT = 0.5  # Seconds before removing stale tracks

@@ -1,5 +1,51 @@
 # Changelog - openTPT
 
+## [v0.19.19] - 2026-02-07
+
+### Tesla Radar Integration
+
+Added Tesla Bosch MRRevo14F radar as a configurable radar source alongside the existing Toyota Denso radar. Radar type is selectable via `RADAR_TYPE` in config.py.
+
+#### New Features
+
+- **Configurable radar type**: Set `RADAR_TYPE = "toyota"` or `"tesla"` in config.py
+- **Tesla radar driver**: Full standalone driver with 100Hz vehicle state simulation, 32-object tracking, classification, and probability fields
+- **VIN auto-read**: Tesla radar VIN read automatically via UDS at startup (no manual configuration needed)
+- **Radar-agnostic overlay**: Existing radar overlay works unchanged with both radar types (same `long_dist`/`lat_dist`/`rel_speed` interface)
+- **Tesla-specific track data**: Extended fields available for Tesla tracks — `prob_exist`, `object_class`, `long_accel`, `lat_speed`, `moving_state`, `prob_obstacle`, `length`
+- **Menu support**: Radar status and channel display adapts to selected radar type
+
+#### Radar Comparison
+
+| Aspect | Toyota (Denso) | Tesla (Bosch MRRevo14F) |
+|--------|---------------|------------------------|
+| CAN buses | 2 (data + keep-alive) | 1 (single bus) |
+| Track count | 16 | 32 |
+| Track fields | 5 basic | 16+ with classification |
+| Keep-alive | ACC_CONTROL + 9 static | ~30 messages at 100Hz |
+| VIN | Not needed | Auto-read via UDS |
+| Compatible units | Prius/Corolla 2017+ | Tesla Model S/X/3 |
+
+#### New Files
+
+- `hardware/tesla_radar_driver.py` - Tesla radar driver (API-compatible with Toyota driver)
+- `hardware/tesla_radar_protocol.py` - Tesla CAN protocol with threaded 100Hz TX
+- `hardware/uds_can.py` - ISO-TP / UDS transport layer for VIN auto-read
+- `opendbc/tesla_radar.dbc` - Tesla radar object/status CAN definitions
+- `opendbc/tesla_can.dbc` - Tesla vehicle CAN definitions
+
+#### Modified Files
+
+- `config.py` - Added `RADAR_TYPE`, `TESLA_RADAR_CHANNEL`, `TESLA_RADAR_INTERFACE`, `TESLA_RADAR_DBC`, `TESLA_RADAR_VIN`, `TESLA_RADAR_AUTO_VIN`
+- `hardware/radar_handler.py` - Refactored to dispatch to Toyota or Tesla driver based on `radar_type`
+- `core/initialization.py` - Passes new Tesla config vars to radar handler
+- `gui/menu/system.py` - Fixed radar channel label to show correct channel per radar type
+- `README.md` - Updated with both radar types, comparison table, configuration examples
+- `CLAUDE.md` - Updated hardware status, directory structure, subsystem reference
+- `BUILD_GUIDE.md` - Updated CAN bus table and radar wiring for both types
+
+---
+
 ## [v0.19.18] - 2026-02-03
 
 ### Tyre Temperature History Gradient

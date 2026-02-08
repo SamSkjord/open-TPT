@@ -13,7 +13,7 @@ openTPT provides real-time monitoring of:
 - Brake rotor temperatures (via IR sensors + ADC)
 - Tyre surface thermal imaging (via Pico CAN corner sensors with MLX90640)
 - Multi-camera support with seamless switching (dual USB UVC cameras)
-- Toyota radar overlay on rear camera (CAN bus radar with collision warnings)
+- Radar overlay on rear camera (Toyota or Tesla, configurable via CAN bus with collision warnings)
 - Fuel tracking with consumption rate and laps remaining estimation
 - GPS lap timing with delta display (circuit tracks and point-to-point stages)
 - NeoDriver LED strip for shift lights, delta, and overtake warnings
@@ -44,11 +44,11 @@ openTPT features a high-performance architecture optimised for real-time telemet
 
 ### Optional Components
 - USB UVC cameras (up to 2 cameras for rear/front views with seamless switching)
-- Toyota radar with CAN interface (for radar overlay on rear camera):
-  - Dual CAN bus support (radar data + car keepalive)
-  - Compatible Toyota radar unit (e.g., Prius 2017)
+- CAN radar for rear camera overlay (one of):
+  - **Toyota** (Denso): Prius/Corolla 2017+ unit, dual CAN bus (radar data + car keepalive)
+  - **Tesla** (Bosch MRRevo14F): Any Model S/X/3 unit, single CAN bus, auto-VIN
   - CAN-to-USB adapters or SPI CAN controllers
-  - DBC files for radar decoding
+  - DBC files included in `opendbc/`
 - Dual Waveshare 2-CH CAN HAT+ stack for multi-bus CAN/OBD work
 
 ### GPIO Pin Allocation (Raspberry Pi 4/5)
@@ -382,9 +382,21 @@ Common USB port mappings on Raspberry Pi 4:
 
 ### Radar Configuration
 
-The Toyota radar overlay is now **enabled by default** and displays collision warnings on the rear camera.
+The radar overlay is **enabled by default** and displays collision warnings on the rear camera. Two radar types are supported — select with `RADAR_TYPE` in `config.py`.
 
-#### Hardware Setup
+#### Supported Radars
+
+| Aspect | Toyota (Denso) | Tesla (Bosch MRRevo14F) |
+|--------|---------------|------------------------|
+| Compatible units | Prius/Corolla 2017+ | Any Model S/X/3 unit |
+| CAN buses | 2 (radar data + car keepalive) | 1 (single bus, TX+RX) |
+| Track count | 16 | 32 |
+| Track data | 5 fields (dist, lat, speed, new, valid) | 16+ fields (+ classification, probability, acceleration) |
+| Keepalive | ACC_CONTROL + 9 static frames | ~30 vehicle state messages at 100 Hz |
+| VIN | Not needed | Auto-read via UDS at startup |
+| DBC files | `toyota_prius_2017_adas.dbc` | `tesla_radar.dbc` + `tesla_can.dbc` |
+
+#### Hardware Setup — Toyota
 
 1. **Waveshare Dual CAN HAT** (Board 1):
    - CAN_0 connector (can_b1_0): Car keep-alive messages (TX to radar)
@@ -394,25 +406,37 @@ The Toyota radar overlay is now **enabled by default** and displays collision wa
    - Connect to both CAN buses as per wiring diagram
    - Radar will output ~320 Hz track messages
 
+#### Hardware Setup — Tesla
+
+1. **Waveshare Dual CAN HAT** (Board 1):
+   - CAN_0 connector (can_b1_0): Single bus — all radar traffic (TX keepalive + RX tracks)
+
+2. **Tesla Bosch MRRevo14F radar** (any Model S/X/3 unit):
+   - Connect radar CAN1 to the single CAN bus
+   - VIN is auto-read from the radar via UDS at startup
+   - Radar outputs 32 object tracks on 0x310-0x36E at ~1100 msg/s
+
 #### Software Configuration
 
 The radar is configured in `config.py`:
 
 ```python
-# Enable/disable radar overlay
-RADAR_ENABLED = True  # Now enabled by default
+RADAR_ENABLED = True     # Enable/disable radar overlay
+RADAR_TYPE = "toyota"    # "toyota" or "tesla"
 
-# CAN channel configuration (for Waveshare Dual CAN HAT)
+# --- Toyota config (RADAR_TYPE = "toyota") ---
 RADAR_CHANNEL = "can_b1_1"  # Radar outputs tracks here
 CAR_CHANNEL = "can_b1_0"    # Keep-alive sent here
-RADAR_INTERFACE = "socketcan"
-RADAR_BITRATE = 500000
-
-# DBC files (included in opendbc/ directory)
 RADAR_DBC = "opendbc/toyota_prius_2017_adas.dbc"
 CONTROL_DBC = "opendbc/toyota_prius_2017_pt_generated.dbc"
 
-# Display parameters
+# --- Tesla config (RADAR_TYPE = "tesla") ---
+TESLA_RADAR_CHANNEL = "can_b1_0"  # Single bus for Tesla
+TESLA_RADAR_DBC = "opendbc/tesla_radar.dbc"
+TESLA_RADAR_VIN = None             # None = auto-read from radar
+TESLA_RADAR_AUTO_VIN = True
+
+# Display parameters (shared)
 RADAR_CAMERA_FOV = 106.0           # Camera field of view (degrees)
 RADAR_TRACK_COUNT = 3              # Number of tracks to display
 RADAR_MAX_DISTANCE = 120.0         # Maximum distance (metres)
@@ -584,7 +608,7 @@ openTPT/
 ├── hardware/
 │   ├── corner_sensor_handler.py         # Corner sensors via CAN (tyre/brake temps)
 │   ├── tpms_input_optimized.py          # TPMS with bounded queues
-│   ├── radar_handler.py                 # Toyota radar CAN handler
+│   ├── radar_handler.py                 # Radar CAN handler (Toyota + Tesla)
 │   ├── obd2_handler.py                  # OBD2/CAN vehicle data
 │   ├── gps_handler.py                   # GPS serial NMEA parsing
 │   ├── imu_handler.py                   # ICM-20649 IMU for G-meter
@@ -634,7 +658,7 @@ openTPT/
 - Numba JIT thermal processing (< 1ms per sensor)
 - Dynamic resolution scaling
 - UI auto-hide with fade animation
-- Toyota radar overlay with collision warnings
+- Radar overlay with collision warnings (Toyota + Tesla)
 - NeoDriver LED strip (shift lights, delta, overtake modes)
 - Performance monitoring and validation
 - TPMS sensor pairing via on-screen menu
@@ -655,7 +679,7 @@ openTPT/
 ### Future Enhancements
 - CAN bus scheduler for multi-bus OBD-II data
 - Web-based remote monitoring
-- Additional radar compatibility (other manufacturers)
+- Additional radar compatibility (Continental, Delphi)
 - Buildroot image - minimal Linux for sub-5s boot, tiny footprint
 
 ### Might Get Round To It One Day

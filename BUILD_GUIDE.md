@@ -218,8 +218,8 @@ For power system details, see [POWER_ARCHITECTURE.md](POWER_ARCHITECTURE.md).
 
 | Channel | Board | Purpose | Bitrate |
 |---------|-------|---------|---------|
-| can_b1_0 | 1, CAN_0 | Radar keep-alive (TX) | 500 kbps |
-| can_b1_1 | 1, CAN_1 | Radar tracks (RX) | 500 kbps |
+| can_b1_0 | 1, CAN_0 | Radar (Toyota: keep-alive TX / Tesla: single bus TX+RX) | 500 kbps |
+| can_b1_1 | 1, CAN_1 | Radar tracks RX (Toyota only, unused for Tesla) | 500 kbps |
 | can_b2_0 | 2, CAN_0 | Corner sensors + Laser ranger | 500 kbps |
 | can_b2_1 | 2, CAN_1 | OBD2 vehicle data | 500 kbps |
 
@@ -315,9 +315,9 @@ When using Cat5 for CAN:
 
 ## Radar Connection
 
-The Toyota radar module connects via Cat5 to the main enclosure.
+The radar module connects via Cat5 to the main enclosure. Set `RADAR_TYPE` in `config.py` to select the radar type.
 
-### Cat5 Wiring
+### Toyota Denso (Prius/Corolla 2017+) — Dual CAN
 
 | Cat5 Pair | Signal | CAN Channel |
 |-----------|--------|-------------|
@@ -326,9 +326,23 @@ The Toyota radar module connects via Cat5 to the main enclosure.
 | 3 | +12V/GND | Radar power |
 | 4 | Spare | |
 
-The radar requires its own 12V supply and uses two CAN channels:
+The Toyota radar requires 12V and uses two CAN channels:
 - **can_b1_0:** Pi sends keep-alive messages to radar
 - **can_b1_1:** Radar sends track data to Pi
+
+### Tesla Bosch MRRevo14F (Model S/X/3) — Single CAN
+
+| Cat5 Pair | Signal | CAN Channel |
+|-----------|--------|-------------|
+| 1 | CAN-H/CAN-L (all traffic) | can_b1_0 |
+| 2 | Spare (unused) | — |
+| 3 | +12V/GND | Radar power |
+| 4 | Spare | |
+
+The Tesla radar requires 12V and uses a single CAN channel:
+- **can_b1_0:** All traffic — Pi sends ~30 vehicle simulation messages at 100Hz, radar returns status and 32 object tracks
+- **can_b1_1:** Not used (leave disconnected)
+- VIN is auto-read from the radar via UDS (0x641/0x651) at startup
 
 ---
 

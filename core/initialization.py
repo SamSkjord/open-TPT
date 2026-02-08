@@ -19,6 +19,7 @@ from config import (
     FONT_PATH,
     # Radar configuration
     RADAR_ENABLED,
+    RADAR_TYPE,
     RADAR_CHANNEL,
     CAR_CHANNEL,
     RADAR_INTERFACE,
@@ -26,6 +27,11 @@ from config import (
     RADAR_DBC,
     CONTROL_DBC,
     RADAR_TRACK_TIMEOUT,
+    TESLA_RADAR_CHANNEL,
+    TESLA_RADAR_INTERFACE,
+    TESLA_RADAR_DBC,
+    TESLA_RADAR_VIN,
+    TESLA_RADAR_AUTO_VIN,
     # Encoder configuration
     ENCODER_ENABLED,
     ENCODER_I2C_ADDRESS,
@@ -344,6 +350,7 @@ class InitializationMixin:
                 # Load radar enabled state from persistent settings (default True)
                 radar_enabled = settings.get("radar.enabled", True)
                 self.radar = RadarHandler(
+                    radar_type=RADAR_TYPE,
                     radar_channel=RADAR_CHANNEL,
                     car_channel=CAR_CHANNEL,
                     interface=RADAR_INTERFACE,
@@ -351,6 +358,11 @@ class InitializationMixin:
                     radar_dbc=RADAR_DBC,
                     control_dbc=CONTROL_DBC,
                     track_timeout=RADAR_TRACK_TIMEOUT,
+                    tesla_channel=TESLA_RADAR_CHANNEL,
+                    tesla_interface=TESLA_RADAR_INTERFACE,
+                    tesla_radar_dbc=TESLA_RADAR_DBC,
+                    tesla_vin=TESLA_RADAR_VIN,
+                    tesla_auto_vin=TESLA_RADAR_AUTO_VIN,
                     enabled=radar_enabled,
                 )
                 self.radar.start()

@@ -1,13 +1,15 @@
 """
-Optimised Toyota Radar Handler for openTPT.
+Radar handler for openTPT — supports Toyota and Tesla radars.
 Uses bounded queues and lock-free snapshots per system plan.
 
-Based on toyota_radar_driver from scratch/sources/uvc-radar-overlay
+Radar type is selected via RADAR_TYPE in config.py:
+  "toyota" — Toyota Denso radar (Prius/Corolla 2017+), dual CAN bus
+  "tesla"  — Tesla Bosch MRRevo14F (Model S/X/3), single CAN bus
 """
 
 import logging
 import time
-from typing import Dict, Optional, List
+from typing import Dict, Optional
 
 logger = logging.getLogger('openTPT.radar')
 
@@ -17,27 +19,33 @@ from utils.hardware_base import BoundedQueueHardwareHandler
 # Try to import Toyota radar driver
 try:
     from hardware.toyota_radar_driver import ToyotaRadarDriver, ToyotaRadarConfig, RadarTrack
-    RADAR_AVAILABLE = True
+    TOYOTA_AVAILABLE = True
 except ImportError:
     try:
-        # Try relative import if running from hardware directory
         from .toyota_radar_driver import ToyotaRadarDriver, ToyotaRadarConfig, RadarTrack
-        RADAR_AVAILABLE = True
+        TOYOTA_AVAILABLE = True
     except ImportError:
-        RADAR_AVAILABLE = False
-        logger.warning("toyota_radar_driver not available")
-        # Create mock classes for type hints
-        class RadarTrack:
-            pass
-        class ToyotaRadarDriver:
-            pass
-        class ToyotaRadarConfig:
-            pass
+        TOYOTA_AVAILABLE = False
+        logger.debug("Toyota radar driver not available")
+
+# Try to import Tesla radar driver
+try:
+    from hardware.tesla_radar_driver import TeslaRadarDriver, TeslaRadarConfig
+    TESLA_AVAILABLE = True
+except ImportError:
+    try:
+        from .tesla_radar_driver import TeslaRadarDriver, TeslaRadarConfig
+        TESLA_AVAILABLE = True
+    except ImportError:
+        TESLA_AVAILABLE = False
+        logger.debug("Tesla radar driver not available")
+
+RADAR_AVAILABLE = TOYOTA_AVAILABLE or TESLA_AVAILABLE
 
 
 class RadarHandlerOptimised(BoundedQueueHardwareHandler):
     """
-    Optimised Toyota radar handler using bounded queues.
+    Radar handler using bounded queues — supports Toyota and Tesla radars.
 
     Key optimisations:
     - Lock-free data access for render path
@@ -49,6 +57,8 @@ class RadarHandlerOptimised(BoundedQueueHardwareHandler):
 
     def __init__(
         self,
+        radar_type: str = "toyota",
+        # Toyota-specific
         radar_channel: str = "can0",
         car_channel: str = "can1",
         interface: str = "socketcan",
@@ -56,30 +66,26 @@ class RadarHandlerOptimised(BoundedQueueHardwareHandler):
         radar_dbc: str = "opendbc/toyota_prius_2017_adas.dbc",
         control_dbc: str = "opendbc/toyota_prius_2017_pt_generated.dbc",
         track_timeout: float = 0.5,
+        # Tesla-specific
+        tesla_channel: str = "can0",
+        tesla_interface: str = "socketcan",
+        tesla_radar_dbc: str = "opendbc/tesla_radar.dbc",
+        tesla_vin: Optional[str] = None,
+        tesla_auto_vin: bool = True,
+        # Common
         enabled: bool = True,
     ):
-        """
-        Initialise the optimised radar handler.
-
-        Args:
-            radar_channel: CAN channel for radar
-            car_channel: CAN channel for car keepalive
-            interface: python-can interface type
-            bitrate: CAN bitrate
-            radar_dbc: Path to radar DBC file
-            control_dbc: Path to control DBC file
-            track_timeout: Seconds before removing stale tracks
-            enabled: Whether radar is enabled
-        """
         super().__init__(queue_depth=2)
 
+        self.radar_type = radar_type.lower()
         self.enabled = enabled and RADAR_AVAILABLE
 
         # Hardware
-        self.driver: Optional['ToyotaRadarDriver'] = None
-        self.config: Optional['ToyotaRadarConfig'] = None
+        self.driver = None
+        self.config = None
 
-        # Configuration
+        # Store config for both types (only the relevant set is used)
+        # Toyota
         self.radar_channel = radar_channel
         self.car_channel = car_channel
         self.interface = interface
@@ -87,6 +93,12 @@ class RadarHandlerOptimised(BoundedQueueHardwareHandler):
         self.radar_dbc = radar_dbc
         self.control_dbc = control_dbc
         self.track_timeout = track_timeout
+        # Tesla
+        self.tesla_channel = tesla_channel
+        self.tesla_interface = tesla_interface
+        self.tesla_radar_dbc = tesla_radar_dbc
+        self.tesla_vin = tesla_vin
+        self.tesla_auto_vin = tesla_auto_vin
 
         # Overlay visibility (separate from enabled - can be toggled at runtime)
         self.overlay_visible = True
@@ -96,14 +108,19 @@ class RadarHandlerOptimised(BoundedQueueHardwareHandler):
             self._initialise_radar()
 
     def _initialise_radar(self) -> bool:
+        """Initialise the appropriate radar driver based on radar_type."""
+        if self.radar_type == "tesla":
+            return self._initialise_tesla()
+        return self._initialise_toyota()
+
+    def _initialise_toyota(self) -> bool:
         """Initialise the Toyota radar driver."""
-        if not RADAR_AVAILABLE:
+        if not TOYOTA_AVAILABLE:
             logger.warning("Toyota radar driver not available")
             self.enabled = False
             return False
 
         try:
-            # Create configuration
             self.config = ToyotaRadarConfig(
                 radar_channel=self.radar_channel,
                 car_channel=self.car_channel,
@@ -119,14 +136,42 @@ class RadarHandlerOptimised(BoundedQueueHardwareHandler):
                 setup_extra_args=[],
                 keepalive_enabled=True,
             )
-
-            # Initialise driver
             self.driver = ToyotaRadarDriver(self.config)
             logger.info("Toyota radar driver initialised")
             return True
 
         except Exception as e:
-            logger.warning("Error initialising radar: %s", e)
+            logger.warning("Error initialising Toyota radar: %s", e)
+            self.driver = None
+            self.enabled = False
+            return False
+
+    def _initialise_tesla(self) -> bool:
+        """Initialise the Tesla radar driver."""
+        if not TESLA_AVAILABLE:
+            logger.warning("Tesla radar driver not available")
+            self.enabled = False
+            return False
+
+        try:
+            self.config = TeslaRadarConfig(
+                channel=self.tesla_channel,
+                interface=self.tesla_interface,
+                bitrate=self.bitrate,
+                radar_dbc=self.tesla_radar_dbc,
+                vin=self.tesla_vin,
+                track_timeout=self.track_timeout,
+                auto_vin=self.tesla_auto_vin,
+                auto_setup=False,  # CAN interfaces managed by systemd
+                use_sudo=False,
+                setup_extra_args=[],
+            )
+            self.driver = TeslaRadarDriver(self.config)
+            logger.info("Tesla radar driver initialised")
+            return True
+
+        except Exception as e:
+            logger.warning("Error initialising Tesla radar: %s", e)
             self.driver = None
             self.enabled = False
             return False
@@ -140,7 +185,7 @@ class RadarHandlerOptimised(BoundedQueueHardwareHandler):
         try:
             # Start radar driver
             self.driver.start()
-            logger.info("Radar driver started")
+            logger.info("Radar driver started (%s)", self.radar_type)
 
             # Start worker thread
             super().start()
@@ -215,7 +260,7 @@ class RadarHandlerOptimised(BoundedQueueHardwareHandler):
                 self._last_track_log = time.time()
 
             for track_id, track in tracks.items():
-                data[track_id] = {
+                track_data = {
                     "track_id": track.track_id,
                     "long_dist": track.long_dist,
                     "lat_dist": track.lat_dist,
@@ -223,6 +268,11 @@ class RadarHandlerOptimised(BoundedQueueHardwareHandler):
                     "new_track": track.new_track,
                     "timestamp": track.timestamp,
                 }
+                # Include Tesla-specific fields when available
+                if hasattr(track, "prob_exist"):
+                    track_data["prob_exist"] = track.prob_exist
+                    track_data["object_class"] = track.object_class
+                data[track_id] = track_data
 
             # Publish snapshot to queue (lock-free)
             self._publish_snapshot(data, metadata)
