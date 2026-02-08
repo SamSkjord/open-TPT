@@ -1,5 +1,60 @@
 # Changelog - openTPT
 
+## [v0.19.21] - 2026-02-08
+
+### Dual Radar Support (Front + Rear)
+
+Added support for two independent radar units -- one front-facing and one rear-facing. Each unit can be independently configured as Toyota Denso, Tesla Bosch, or disabled. Supports all combinations: 2x Tesla, 2x Denso, Tesla+Denso, or single radar with the other set to "none". CAN bus sharing is supported (e.g. two Denso radars sharing the same keep-alive channel).
+
+#### New Features
+
+- **Independent front/rear radar**: Two radar units can operate simultaneously with independent type selection
+- **Per-unit configuration**: `RADAR_REAR_*` and `RADAR_FRONT_*` config variables for channel, DBC, and Tesla settings
+- **Separate menu entries**: System > Status now shows "Rear Radar" and "Front Radar" submenus with per-unit enable/disable, type, status, tracks, and channel
+- **Rear radar drives chevron overlay**: Rear camera chevron overlay uses the rear radar handler
+- **Front radar drives distance overlay**: Front camera distance/gap overlay uses the front radar handler
+- **Backward compatible**: Single rear radar configuration (`RADAR_REAR_TYPE = "toyota"`, `RADAR_FRONT_TYPE = "none"`) behaves identically to previous single-radar setup
+
+#### Configuration
+
+Replace old `RADAR_TYPE` with per-unit types:
+```python
+RADAR_REAR_TYPE = "toyota"   # "none", "toyota", "tesla"
+RADAR_FRONT_TYPE = "none"    # "none", "toyota", "tesla"
+```
+
+#### Modified Files
+
+- `config.py` - Replaced `RADAR_TYPE`/`RADAR_CHANNEL`/`CAR_CHANNEL`/`TESLA_RADAR_*` with `RADAR_REAR_*` and `RADAR_FRONT_*` variants
+- `main.py` - Replaced `self.radar` with `self.radar_rear` + `self.radar_front`, updated shutdown
+- `core/initialization.py` - Two independent RadarHandler instances via helper function, updated Camera + MenuSystem wiring
+- `core/event_handlers.py` - Overlay toggle uses `self.radar_rear`
+- `gui/camera.py` - Separate `radar_handler_rear` (chevrons) and `radar_handler_front` (distance overlay)
+- `gui/menu/base.py` - Dual radar handler params, separate Rear Radar and Front Radar submenus
+- `gui/menu/system.py` - Parameterised radar methods accepting position ("rear"/"front"), sensor status shows both
+
+## [v0.19.20] - 2026-02-08
+
+### Radar Distance Overlay (Front Camera)
+
+Added radar distance overlay on the front camera showing distance to the car ahead, time gap, and closing/opening rate. Coexists with the existing laser ranger overlay.
+
+#### New Features
+
+- **Distance to car ahead**: Shows nearest radar track distance in metres on front camera
+- **Time gap display**: Calculates and shows time gap in seconds when vehicle speed available (OBD2 or GPS)
+- **Closing rate indicator**: Shows closing/opening speed in km/h when delta exceeds 0.5 km/h
+- **Colour-coded warnings**: Red (<1s gap), yellow (<2s gap), green (safe) based on time gap; falls back to distance-based colouring when stationary
+- **Menu settings**: Toggle on/off, position (top/bottom), text size (small/medium/large) via Front Camera menu
+- **Independent of laser ranger**: Both overlays can be active simultaneously (laser defaults to bottom, radar defaults to top)
+
+#### Modified Files
+
+- `config.py` - Added `RADAR_DISTANCE_*` configuration constants
+- `gui/camera.py` - Added `_render_radar_distance_overlay()`, `set_speed_sources()`, `_get_vehicle_speed_kmh()`
+- `gui/menu/camera.py` - Added radar overlay menu items and toggle/cycle methods
+- `core/initialization.py` - Wired OBD2/GPS speed sources to camera handler
+
 ## [v0.19.19] - 2026-02-07
 
 ### Tesla Radar Integration

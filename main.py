@@ -226,7 +226,9 @@ class OpenTPT(
         # to ensure proper ordering. All optional handlers initialised to None
         # here to prevent AttributeError if init fails partway through.
         self.camera = None
-        self.radar = None
+        self.radar_rear = None
+        self.radar_front = None
+        self.radar = None  # Backward compat alias (set to radar_rear after init)
         self.input_handler = None
         self.encoder = None
         self.neodriver = None
@@ -886,9 +888,12 @@ class OpenTPT(
             self.ant_hr.stop()
 
         # Stop radar if enabled
-        if self.radar:
-            logger.debug("Stopping radar...")
-            self.radar.stop()
+        if self.radar_rear:
+            logger.debug("Stopping rear radar...")
+            self.radar_rear.stop()
+        if self.radar_front:
+            logger.debug("Stopping front radar...")
+            self.radar_front.stop()
 
         # Close camera
         if self.camera:

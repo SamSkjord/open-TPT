@@ -74,6 +74,7 @@ class RadarHandlerOptimised(BoundedQueueHardwareHandler):
         tesla_auto_vin: bool = True,
         # Common
         enabled: bool = True,
+        keepalive_enabled: bool = True,
     ):
         super().__init__(queue_depth=2)
 
@@ -93,6 +94,7 @@ class RadarHandlerOptimised(BoundedQueueHardwareHandler):
         self.radar_dbc = radar_dbc
         self.control_dbc = control_dbc
         self.track_timeout = track_timeout
+        self.keepalive_enabled = keepalive_enabled
         # Tesla
         self.tesla_channel = tesla_channel
         self.tesla_interface = tesla_interface
@@ -134,7 +136,7 @@ class RadarHandlerOptimised(BoundedQueueHardwareHandler):
                 auto_setup=False,  # CAN interfaces managed by systemd
                 use_sudo=False,
                 setup_extra_args=[],
-                keepalive_enabled=True,
+                keepalive_enabled=self.keepalive_enabled,
             )
             self.driver = ToyotaRadarDriver(self.config)
             logger.info("Toyota radar driver initialised")

@@ -190,52 +190,66 @@ class SystemMenuMixin:
         self.imu_cal_step = "turn_done"
         return f"Lateral: {axis_str} - Done!"
 
-    # Radar methods
+    # Radar methods (parameterised for dual front/rear support)
 
-    def _get_radar_enabled_label(self) -> str:
+    def _get_radar_handler(self, position: str):
+        """Get radar handler by position."""
+        if position == "front":
+            return self.radar_handler_front
+        return self.radar_handler_rear
+
+    def _get_radar_enabled_label(self, position: str) -> str:
         """Get radar enabled status label."""
-        if not self.radar_handler:
+        handler = self._get_radar_handler(position)
+        if not handler:
             return "Enabled: N/A"
-        enabled = self.radar_handler.enabled
-        return f"Enabled: {'Yes' if enabled else 'No'}"
+        return f"Enabled: {'Yes' if handler.enabled else 'No'}"
 
-    def _toggle_radar_enabled(self) -> str:
+    def _toggle_radar_enabled(self, position: str) -> str:
         """Toggle radar enabled state."""
-        if not self.radar_handler:
+        handler = self._get_radar_handler(position)
+        if not handler:
             return "Radar not available"
-        self.radar_handler.enabled = not self.radar_handler.enabled
-        self._settings.set("radar.enabled", self.radar_handler.enabled)
-        return f"Radar {'enabled' if self.radar_handler.enabled else 'disabled'}"
+        handler.enabled = not handler.enabled
+        self._settings.set(f"radar.{position}.enabled", handler.enabled)
+        return f"Radar {'enabled' if handler.enabled else 'disabled'}"
 
-    def _get_radar_status_label(self) -> str:
+    def _get_radar_type_label(self, position: str) -> str:
+        """Get radar type label."""
+        handler = self._get_radar_handler(position)
+        if not handler:
+            return "Type: None"
+        return f"Type: {handler.radar_type.capitalize()}"
+
+    def _get_radar_status_label(self, position: str) -> str:
         """Get radar operational status."""
-        if not self.radar_handler:
-            return "Status: No handler"
-        if not self.radar_handler.enabled:
+        handler = self._get_radar_handler(position)
+        if not handler:
+            return "Status: Not configured"
+        if not handler.enabled:
             return "Status: Disabled"
-        if self.radar_handler.driver is None:
+        if handler.driver is None:
             return "Status: No driver"
-        if self.radar_handler.running:
+        if handler.running:
             return "Status: Running"
         return "Status: Stopped"
 
-    def _get_radar_tracks_label(self) -> str:
+    def _get_radar_tracks_label(self, position: str) -> str:
         """Get current radar track count."""
-        if not self.radar_handler:
+        handler = self._get_radar_handler(position)
+        if not handler or not handler.enabled:
             return "Tracks: --"
-        if not self.radar_handler.enabled:
-            return "Tracks: --"
-        tracks = self.radar_handler.get_tracks()
-        count = len(tracks) if tracks else 0
-        return f"Tracks: {count}"
+        tracks = handler.get_tracks()
+        return f"Tracks: {len(tracks) if tracks else 0}"
 
-    def _get_radar_channel_label(self) -> str:
+    def _get_radar_channel_label(self, position: str) -> str:
         """Get radar CAN channel."""
-        if not self.radar_handler:
+        handler = self._get_radar_handler(position)
+        if not handler:
             return "Channel: --"
-        if self.radar_handler.radar_type == "tesla":
-            return f"Channel: {self.radar_handler.tesla_channel}"
-        return f"Channel: {self.radar_handler.radar_channel}"
+        if handler.radar_type == "tesla":
+            return f"Channel: {handler.tesla_channel}"
+        return f"Channel: {handler.radar_channel}"
 
     # System Status methods
 
@@ -295,8 +309,10 @@ class SystemMenuMixin:
         active = []
         if self.tpms_handler:
             active.append("TPMS")
-        if self.radar_handler and self.radar_handler.enabled:
-            active.append("Radar")
+        if self.radar_handler_rear and self.radar_handler_rear.enabled:
+            active.append("Radar(R)")
+        if self.radar_handler_front and self.radar_handler_front.enabled:
+            active.append("Radar(F)")
         if self.imu_handler:
             active.append("IMU")
         if self.gps_handler:

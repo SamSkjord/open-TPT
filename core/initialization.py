@@ -19,19 +19,29 @@ from config import (
     FONT_PATH,
     # Radar configuration
     RADAR_ENABLED,
-    RADAR_TYPE,
-    RADAR_CHANNEL,
-    CAR_CHANNEL,
     RADAR_INTERFACE,
     RADAR_BITRATE,
-    RADAR_DBC,
-    CONTROL_DBC,
     RADAR_TRACK_TIMEOUT,
-    TESLA_RADAR_CHANNEL,
-    TESLA_RADAR_INTERFACE,
-    TESLA_RADAR_DBC,
-    TESLA_RADAR_VIN,
-    TESLA_RADAR_AUTO_VIN,
+    # Rear radar
+    RADAR_REAR_TYPE,
+    RADAR_REAR_CHANNEL,
+    RADAR_REAR_CAR_CHANNEL,
+    RADAR_REAR_DBC,
+    RADAR_REAR_CONTROL_DBC,
+    RADAR_REAR_TESLA_CHANNEL,
+    RADAR_REAR_TESLA_DBC,
+    RADAR_REAR_TESLA_VIN,
+    RADAR_REAR_TESLA_AUTO_VIN,
+    # Front radar
+    RADAR_FRONT_TYPE,
+    RADAR_FRONT_CHANNEL,
+    RADAR_FRONT_CAR_CHANNEL,
+    RADAR_FRONT_DBC,
+    RADAR_FRONT_CONTROL_DBC,
+    RADAR_FRONT_TESLA_CHANNEL,
+    RADAR_FRONT_TESLA_DBC,
+    RADAR_FRONT_TESLA_VIN,
+    RADAR_FRONT_TESLA_AUTO_VIN,
     # Encoder configuration
     ENCODER_ENABLED,
     ENCODER_I2C_ADDRESS,
@@ -343,33 +353,68 @@ class InitializationMixin:
         # Load persistent user settings (used by multiple handlers below)
         settings = get_settings()
 
-        # Initialise radar handler (optional)
-        self._show_splash("Initialising radar...", 0.05)
-        if RADAR_ENABLED and RADAR_AVAILABLE and RadarHandler:
+        # Initialise radar handlers (optional, supports independent front + rear)
+        def _init_radar_unit(label, radar_type, settings_key,
+                             radar_channel, car_channel, radar_dbc, control_dbc,
+                             tesla_channel, tesla_dbc, tesla_vin, tesla_auto_vin,
+                             keepalive_enabled=True):
+            """Initialise a single radar unit. Returns RadarHandler or None."""
+            if radar_type == "none" or not RADAR_ENABLED or not RADAR_AVAILABLE or not RadarHandler:
+                return None
             try:
-                # Load radar enabled state from persistent settings (default True)
-                radar_enabled = settings.get("radar.enabled", True)
-                self.radar = RadarHandler(
-                    radar_type=RADAR_TYPE,
-                    radar_channel=RADAR_CHANNEL,
-                    car_channel=CAR_CHANNEL,
+                enabled = settings.get(settings_key, True)
+                handler = RadarHandler(
+                    radar_type=radar_type,
+                    radar_channel=radar_channel,
+                    car_channel=car_channel,
                     interface=RADAR_INTERFACE,
                     bitrate=RADAR_BITRATE,
-                    radar_dbc=RADAR_DBC,
-                    control_dbc=CONTROL_DBC,
+                    radar_dbc=radar_dbc,
+                    control_dbc=control_dbc,
                     track_timeout=RADAR_TRACK_TIMEOUT,
-                    tesla_channel=TESLA_RADAR_CHANNEL,
-                    tesla_interface=TESLA_RADAR_INTERFACE,
-                    tesla_radar_dbc=TESLA_RADAR_DBC,
-                    tesla_vin=TESLA_RADAR_VIN,
-                    tesla_auto_vin=TESLA_RADAR_AUTO_VIN,
-                    enabled=radar_enabled,
+                    tesla_channel=tesla_channel,
+                    tesla_interface=RADAR_INTERFACE,
+                    tesla_radar_dbc=tesla_dbc,
+                    tesla_vin=tesla_vin,
+                    tesla_auto_vin=tesla_auto_vin,
+                    enabled=enabled,
+                    keepalive_enabled=keepalive_enabled,
                 )
-                self.radar.start()
-                logger.info("Radar overlay enabled")
+                handler.start()
+                logger.info("%s radar initialised (%s, keepalive=%s)",
+                            label, radar_type, keepalive_enabled)
+                return handler
             except (IOError, OSError, RuntimeError, ValueError) as e:
-                logger.warning("Could not initialise radar: %s", e)
-                self.radar = None
+                logger.warning("Could not initialise %s radar: %s", label, e)
+                return None
+
+        self._show_splash("Initialising radar...", 0.05)
+
+        # Determine whether front Toyota radar should suppress keep-alive
+        # to avoid duplicate TX when sharing the same car channel as the rear unit.
+        # The rear unit (initialised first) owns the keep-alive; the front unit
+        # only needs to listen on its own radar_channel.
+        front_keepalive = True
+        if (RADAR_REAR_TYPE == "toyota" and RADAR_FRONT_TYPE == "toyota"
+                and RADAR_REAR_CAR_CHANNEL == RADAR_FRONT_CAR_CHANNEL):
+            front_keepalive = False
+            logger.info("Front radar sharing car channel %s with rear - "
+                        "keep-alive suppressed on front", RADAR_FRONT_CAR_CHANNEL)
+
+        self.radar_rear = _init_radar_unit(
+            "Rear", RADAR_REAR_TYPE, "radar.rear.enabled",
+            RADAR_REAR_CHANNEL, RADAR_REAR_CAR_CHANNEL,
+            RADAR_REAR_DBC, RADAR_REAR_CONTROL_DBC,
+            RADAR_REAR_TESLA_CHANNEL, RADAR_REAR_TESLA_DBC,
+            RADAR_REAR_TESLA_VIN, RADAR_REAR_TESLA_AUTO_VIN)
+        self.radar_front = _init_radar_unit(
+            "Front", RADAR_FRONT_TYPE, "radar.front.enabled",
+            RADAR_FRONT_CHANNEL, RADAR_FRONT_CAR_CHANNEL,
+            RADAR_FRONT_DBC, RADAR_FRONT_CONTROL_DBC,
+            RADAR_FRONT_TESLA_CHANNEL, RADAR_FRONT_TESLA_DBC,
+            RADAR_FRONT_TESLA_VIN, RADAR_FRONT_TESLA_AUTO_VIN,
+            keepalive_enabled=front_keepalive)
+        self.radar = self.radar_rear  # Backward compat alias
 
         # Initialise corner sensors early (needed for camera overlay - laser ranger)
         self.corner_sensors = CornerSensorHandler()
@@ -382,7 +427,9 @@ class InitializationMixin:
         # Initialise camera (with optional radar and corner sensors for laser ranger)
         self._show_splash("Initialising cameras...", 0.15)
         logger.debug("camera init start t=%.1fs", time.time()-_boot_start)
-        self.camera = Camera(self.screen, radar_handler=self.radar, corner_sensors=self.corner_sensors)
+        self.camera = Camera(self.screen, radar_handler_rear=self.radar_rear,
+                             radar_handler_front=self.radar_front,
+                             corner_sensors=self.corner_sensors)
         logger.debug("camera init done t=%.1fs", time.time()-_boot_start)
 
         # Initialise input handler (NeoKey)
@@ -551,6 +598,10 @@ class InitializationMixin:
         else:
             self.gps = None
 
+        # Wire speed sources to camera for radar distance gap calculation
+        if self.camera:
+            self.camera.set_speed_sources(obd2_handler=self.obd2, gps_handler=self.gps)
+
         # Initialise ANT+ Heart Rate handler (optional)
         self._show_splash("Initialising ANT+ HR...", 0.78)
         self.ant_hr = None
@@ -680,7 +731,8 @@ class InitializationMixin:
             oled_handler=self.oled_bonnet,
             imu_handler=self.imu,
             gps_handler=self.gps,
-            radar_handler=self.radar,
+            radar_handler_rear=self.radar_rear,
+            radar_handler_front=self.radar_front,
             camera_handler=self.camera,
             lap_timing_handler=self.lap_timing,
             copilot_handler=self.copilot,

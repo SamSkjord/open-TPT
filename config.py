@@ -29,7 +29,7 @@ logger = logging.getLogger("openTPT.config")
 # ==============================================================================
 # Update this when releasing new versions
 # Format: MAJOR.MINOR.PATCH (e.g., "0.19.0")
-APP_VERSION = "0.19.18"
+APP_VERSION = "0.19.21"
 
 # Project root for asset paths
 _PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -733,39 +733,47 @@ CORNER_SENSOR_CAN_TIMEOUT_S = 0.5  # Data considered stale after this time
 CORNER_SENSOR_CAN_NOTIFIER_TIMEOUT_S = 0.1  # CAN notifier timeout
 
 # ==============================================================================
-# RADAR (Configurable: Toyota or Tesla)
+# RADAR (Dual Radar Support - Front and Rear)
 # ==============================================================================
 
-# Enable/disable radar overlay
-RADAR_ENABLED = True  # Set to True to enable radar overlay on camera
+# Global radar enable
+RADAR_ENABLED = True
 
-# Radar type: "toyota" or "tesla"
-RADAR_TYPE = "toyota"
-
-# --- Toyota radar CAN configuration (used when RADAR_TYPE = "toyota") ---
-# Available interfaces: can_b1_0, can_b1_1, can_b2_0, can_b2_1
-# Radar outputs tracks on Board 1, CAN_1 connector (can_b1_1)
-# Car keep-alive sent on Board 1, CAN_0 connector (can_b1_0)
-RADAR_CHANNEL = "can_b1_1"  # CAN channel for radar data (tracks come FROM radar)
-CAR_CHANNEL = "can_b1_0"  # CAN channel for car keep-alive (we send TO radar)
-RADAR_INTERFACE = "socketcan"  # python-can interface
-RADAR_BITRATE = 500000  # CAN bitrate
-RADAR_DBC = "opendbc/toyota_prius_2017_adas.dbc"
-CONTROL_DBC = "opendbc/toyota_prius_2017_pt_generated.dbc"
-
-# --- Tesla radar CAN configuration (used when RADAR_TYPE = "tesla") ---
-# Tesla Bosch MRRevo14F uses a single CAN bus (no separate car keepalive bus)
-TESLA_RADAR_CHANNEL = "can_b1_0"  # Single CAN bus for Tesla radar
-TESLA_RADAR_INTERFACE = "socketcan"  # python-can interface
-TESLA_RADAR_DBC = "opendbc/tesla_radar.dbc"
-TESLA_RADAR_VIN = None  # None = auto-read VIN from radar via UDS at startup
-TESLA_RADAR_AUTO_VIN = True  # Auto-read VIN at startup (requires quiet bus)
-
-# Radar tracking parameters
+# Common parameters (shared by both units)
+RADAR_INTERFACE = "socketcan"
+RADAR_BITRATE = 500000
 RADAR_TRACK_TIMEOUT = 0.5  # Seconds before removing stale tracks
 RADAR_MAX_DISTANCE = 120.0  # Maximum distance to display (metres)
+RADAR_POLL_INTERVAL_S = 0.05  # Seconds between radar reads (20 Hz)
+RADAR_NOTIFIER_TIMEOUT_S = 0.1  # CAN notifier timeout (seconds)
 
-# Radar overlay display settings
+# --- Rear Radar (chevron overlay on rear camera) ---
+RADAR_REAR_TYPE = "toyota"                # "none", "toyota", "tesla"
+# Toyota rear
+RADAR_REAR_CHANNEL = "can_b1_1"           # Track data RX
+RADAR_REAR_CAR_CHANNEL = "can_b1_0"       # Keep-alive TX (shareable)
+RADAR_REAR_DBC = "opendbc/toyota_prius_2017_adas.dbc"
+RADAR_REAR_CONTROL_DBC = "opendbc/toyota_prius_2017_pt_generated.dbc"
+# Tesla rear
+RADAR_REAR_TESLA_CHANNEL = "can_b1_0"
+RADAR_REAR_TESLA_DBC = "opendbc/tesla_radar.dbc"
+RADAR_REAR_TESLA_VIN = None               # None = auto-read via UDS
+RADAR_REAR_TESLA_AUTO_VIN = True
+
+# --- Front Radar (distance overlay on front camera) ---
+RADAR_FRONT_TYPE = "none"                 # "none", "toyota", "tesla"
+# Toyota front
+RADAR_FRONT_CHANNEL = "can_b1_0"          # Track data RX
+RADAR_FRONT_CAR_CHANNEL = "can_b1_0"      # Keep-alive TX (can share with rear)
+RADAR_FRONT_DBC = "opendbc/toyota_prius_2017_adas.dbc"
+RADAR_FRONT_CONTROL_DBC = "opendbc/toyota_prius_2017_pt_generated.dbc"
+# Tesla front
+RADAR_FRONT_TESLA_CHANNEL = "can_b1_0"
+RADAR_FRONT_TESLA_DBC = "opendbc/tesla_radar.dbc"
+RADAR_FRONT_TESLA_VIN = None
+RADAR_FRONT_TESLA_AUTO_VIN = True
+
+# Rear radar overlay display settings
 RADAR_CAMERA_FOV = 106.0  # Camera horizontal field of view (degrees)
 RADAR_TRACK_COUNT = 3  # Number of nearest tracks to display
 RADAR_MERGE_RADIUS = 1.0  # Merge tracks within this radius (metres)
@@ -779,10 +787,6 @@ RADAR_OVERTAKE_TIME_THRESHOLD = 1.0  # Time-to-overtake threshold (seconds)
 RADAR_OVERTAKE_MIN_CLOSING_KPH = 5.0  # Minimum closing speed (km/h)
 RADAR_OVERTAKE_MIN_LATERAL = 0.5  # Minimum lateral offset (metres)
 RADAR_OVERTAKE_ARROW_DURATION = 1.0  # Duration to show arrow (seconds)
-
-# Radar polling and timing
-RADAR_POLL_INTERVAL_S = 0.05  # Seconds between radar reads (20 Hz)
-RADAR_NOTIFIER_TIMEOUT_S = 0.1  # CAN notifier timeout (seconds)
 
 
 # ##############################################################################
@@ -1121,6 +1125,18 @@ LASER_RANGER_TEXT_SIZES = {
     "medium": 48,
     "large": 64,
 }
+
+# ==============================================================================
+# RADAR DISTANCE OVERLAY (Front Camera - Car Ahead)
+# ==============================================================================
+RADAR_DISTANCE_DISPLAY_ENABLED = True
+RADAR_DISTANCE_DISPLAY_POSITION = "top"         # "top" or "bottom"
+RADAR_DISTANCE_TEXT_SIZE = "medium"              # "small", "medium", "large"
+RADAR_DISTANCE_TEXT_SIZES = {"small": 28, "medium": 36, "large": 48}
+RADAR_DISTANCE_MAX_DISPLAY_M = 100.0            # Hide if beyond this
+RADAR_DISTANCE_GAP_RED_S = 1.0                  # Red if gap < 1.0s
+RADAR_DISTANCE_GAP_YELLOW_S = 2.0               # Yellow if gap < 2.0s
+RADAR_DISTANCE_MIN_SPEED_KMH = 5.0              # Min speed for gap calc
 
 
 # ##############################################################################

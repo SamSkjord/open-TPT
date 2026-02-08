@@ -14,6 +14,9 @@ from config import (
     LASER_RANGER_DISPLAY_POSITION,
     LASER_RANGER_TEXT_SIZE,
     LASER_RANGER_OFFSET_M,
+    RADAR_DISTANCE_DISPLAY_ENABLED,
+    RADAR_DISTANCE_DISPLAY_POSITION,
+    RADAR_DISTANCE_TEXT_SIZE,
 )
 from utils.settings import get_settings
 
@@ -104,6 +107,29 @@ class CameraMenuMixin:
                         "Mount Offset",
                         dynamic_label=lambda: self._get_distance_offset_label(),
                         action=lambda: self._toggle_offset_editing(),
+                    )
+                )
+
+                # Radar distance overlay settings (front camera only)
+                cam_menu.add_item(
+                    MenuItem(
+                        "Radar Overlay",
+                        dynamic_label=lambda: self._get_radar_distance_overlay_label(),
+                        action=lambda: self._toggle_radar_distance_overlay(),
+                    )
+                )
+                cam_menu.add_item(
+                    MenuItem(
+                        "Radar Position",
+                        dynamic_label=lambda: self._get_radar_distance_position_label(),
+                        action=lambda: self._cycle_radar_distance_position(),
+                    )
+                )
+                cam_menu.add_item(
+                    MenuItem(
+                        "Radar Text Size",
+                        dynamic_label=lambda: self._get_radar_distance_text_size_label(),
+                        action=lambda: self._cycle_radar_distance_text_size(),
                     )
                 )
 
@@ -258,3 +284,52 @@ class CameraMenuMixin:
         # Clamp to valid range (0-5m)
         new_value = max(0.0, min(5.0, new_value))
         settings.set("laser_ranger.offset_m", new_value)
+
+    # ---- Radar Distance Overlay Settings ----
+
+    def _get_radar_distance_overlay_label(self) -> str:
+        """Get radar distance overlay enabled/disabled label."""
+        settings = get_settings()
+        enabled = settings.get("radar_distance.display_enabled", RADAR_DISTANCE_DISPLAY_ENABLED)
+        return f"Radar Overlay: {'On' if enabled else 'Off'}"
+
+    def _toggle_radar_distance_overlay(self) -> str:
+        """Toggle radar distance overlay on/off."""
+        settings = get_settings()
+        current = settings.get("radar_distance.display_enabled", RADAR_DISTANCE_DISPLAY_ENABLED)
+        new_value = not current
+        settings.set("radar_distance.display_enabled", new_value)
+        return f"Radar overlay {'enabled' if new_value else 'disabled'}"
+
+    def _get_radar_distance_position_label(self) -> str:
+        """Get radar distance overlay position label."""
+        settings = get_settings()
+        position = settings.get("radar_distance.display_position", RADAR_DISTANCE_DISPLAY_POSITION)
+        return f"Radar Position: {position.capitalize()}"
+
+    def _cycle_radar_distance_position(self) -> str:
+        """Cycle radar distance overlay position (top/bottom)."""
+        settings = get_settings()
+        current = settings.get("radar_distance.display_position", RADAR_DISTANCE_DISPLAY_POSITION)
+        new_value = "top" if current == "bottom" else "bottom"
+        settings.set("radar_distance.display_position", new_value)
+        return f"Radar position: {new_value}"
+
+    def _get_radar_distance_text_size_label(self) -> str:
+        """Get radar distance text size label."""
+        settings = get_settings()
+        size = settings.get("radar_distance.text_size", RADAR_DISTANCE_TEXT_SIZE)
+        return f"Radar Text Size: {size.capitalize()}"
+
+    def _cycle_radar_distance_text_size(self) -> str:
+        """Cycle radar distance text size (small -> medium -> large -> small)."""
+        settings = get_settings()
+        current = settings.get("radar_distance.text_size", RADAR_DISTANCE_TEXT_SIZE)
+        sizes = ["small", "medium", "large"]
+        try:
+            idx = sizes.index(current)
+            new_value = sizes[(idx + 1) % len(sizes)]
+        except ValueError:
+            new_value = "medium"
+        settings.set("radar_distance.text_size", new_value)
+        return f"Radar text size: {new_value}"

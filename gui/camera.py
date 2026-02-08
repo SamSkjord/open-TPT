@@ -37,6 +37,14 @@ from config import (
     LASER_RANGER_TEXT_SIZE,
     LASER_RANGER_TEXT_SIZES,
     LASER_RANGER_OFFSET_M,
+    RADAR_DISTANCE_DISPLAY_ENABLED,
+    RADAR_DISTANCE_DISPLAY_POSITION,
+    RADAR_DISTANCE_TEXT_SIZE,
+    RADAR_DISTANCE_TEXT_SIZES,
+    RADAR_DISTANCE_MAX_DISPLAY_M,
+    RADAR_DISTANCE_GAP_RED_S,
+    RADAR_DISTANCE_GAP_YELLOW_S,
+    RADAR_DISTANCE_MIN_SPEED_KMH,
     SCALE_X,
     SCALE_Y,
 )
@@ -54,13 +62,14 @@ except ImportError:
 class Camera:
     """Camera handler for multi-camera display with optional radar overlay."""
 
-    def __init__(self, surface, radar_handler=None, corner_sensors=None):
+    def __init__(self, surface, radar_handler_rear=None, radar_handler_front=None, corner_sensors=None):
         """
         Initialise the camera handler.
 
         Args:
             surface: The pygame surface to draw on
-            radar_handler: Optional radar handler for overlay (rear camera only)
+            radar_handler_rear: Optional radar handler for chevron overlay (rear camera)
+            radar_handler_front: Optional radar handler for distance overlay (front camera)
             corner_sensors: Optional corner sensor handler (provides laser ranger for front camera)
         """
         self.surface = surface
@@ -75,10 +84,11 @@ class Camera:
         self.error_message = None
         self.frame = None
 
-        # Radar integration (rear camera only)
-        self.radar_handler = radar_handler
+        # Radar integration
+        self.radar_handler = radar_handler_rear       # Rear camera chevrons (backward compat name)
+        self.radar_handler_front = radar_handler_front # Front camera distance overlay
         self.radar_overlay = None
-        if radar_handler and radar_handler.is_enabled():
+        if radar_handler_rear and radar_handler_rear.is_enabled():
             try:
                 from gui.radar_overlay import RadarOverlayRenderer
                 self.radar_overlay = RadarOverlayRenderer(
@@ -94,6 +104,11 @@ class Camera:
         # Corner sensors (provides laser ranger for front camera)
         self.corner_sensors = corner_sensors
         self._distance_fonts = {}  # Cache fonts per size to avoid recreation
+
+        # Speed sources for radar distance gap calculation (wired post-init)
+        self.obd2_handler = None
+        self.gps_handler = None
+        self._radar_distance_fonts = {}  # Cache fonts per size to avoid recreation
         if corner_sensors and corner_sensors.laser_ranger_enabled():
             logger.info("Laser ranger available for front camera overlay")
 
@@ -691,6 +706,11 @@ class Camera:
                     self.current_camera == 'front'):
                 self._render_distance_overlay()
 
+            # Render radar distance overlay if enabled (front camera only)
+            if (self.radar_handler_front and self.radar_handler_front.is_enabled() and
+                    self.current_camera == 'front'):
+                self._render_radar_distance_overlay()
+
             return True
 
         except Exception as e:
@@ -779,3 +799,143 @@ class Camera:
     def is_active(self):
         """Check if camera view is currently active."""
         return self.active
+
+    def set_speed_sources(self, obd2_handler=None, gps_handler=None):
+        """Set speed data sources for radar distance gap calculation."""
+        self.obd2_handler = obd2_handler
+        self.gps_handler = gps_handler
+
+    def _get_vehicle_speed_kmh(self) -> float:
+        """Get current vehicle speed in km/h. Prefers OBD2, falls back to GPS."""
+        if self.obd2_handler:
+            try:
+                speed = self.obd2_handler.get_speed_kmh()
+                if speed > 0:
+                    return float(speed)
+            except Exception:
+                pass
+        if self.gps_handler:
+            try:
+                speed = self.gps_handler.get_speed()
+                if speed > 0:
+                    return float(speed)
+            except Exception:
+                pass
+        return 0.0
+
+    def _render_radar_distance_overlay(self):
+        """Render radar distance overlay on front camera showing nearest car ahead."""
+        if not self.radar_handler_front:
+            return
+
+        # Read settings fresh each frame (not cached) so menu changes apply immediately
+        settings = get_settings()
+
+        # Check if overlay is enabled in settings
+        if not settings.get("radar_distance.display_enabled", RADAR_DISTANCE_DISPLAY_ENABLED):
+            return
+
+        # Get tracks and find nearest ahead (smallest positive long_dist)
+        tracks = self.radar_handler_front.get_tracks()
+        if not tracks:
+            return
+
+        nearest_dist = None
+        nearest_rel_speed = None
+        for track in tracks.values():
+            long_dist = track.get("long_dist", 0)
+            if long_dist > 0:
+                if nearest_dist is None or long_dist < nearest_dist:
+                    nearest_dist = long_dist
+                    nearest_rel_speed = track.get("rel_speed", 0)
+
+        if nearest_dist is None or nearest_dist > RADAR_DISTANCE_MAX_DISPLAY_M:
+            return
+
+        # Get vehicle speed for time gap calculation
+        vehicle_speed_kmh = self._get_vehicle_speed_kmh()
+        has_speed = vehicle_speed_kmh >= RADAR_DISTANCE_MIN_SPEED_KMH
+
+        # Calculate time gap (seconds)
+        time_gap_s = None
+        if has_speed:
+            vehicle_speed_ms = vehicle_speed_kmh / 3.6
+            time_gap_s = nearest_dist / vehicle_speed_ms
+
+        # Choose colour based on time gap (if available) or distance
+        if time_gap_s is not None:
+            if time_gap_s < RADAR_DISTANCE_GAP_RED_S:
+                colour = (255, 0, 0)      # Red - dangerously close
+            elif time_gap_s < RADAR_DISTANCE_GAP_YELLOW_S:
+                colour = (255, 255, 0)    # Yellow - caution
+            else:
+                colour = (0, 255, 0)      # Green - safe gap
+        else:
+            # Fallback: distance-based colour (no speed available)
+            if nearest_dist < 15.0:
+                colour = (255, 0, 0)
+            elif nearest_dist < 40.0:
+                colour = (255, 255, 0)
+            else:
+                colour = (0, 255, 0)
+
+        # Get and validate text size from settings
+        text_size = settings.get("radar_distance.text_size", RADAR_DISTANCE_TEXT_SIZE)
+        if text_size not in RADAR_DISTANCE_TEXT_SIZES:
+            text_size = RADAR_DISTANCE_TEXT_SIZE
+        base_font_size = RADAR_DISTANCE_TEXT_SIZES[text_size]
+
+        # Get or create cached font for this size
+        if text_size not in self._radar_distance_fonts:
+            font_size = int(base_font_size * min(SCALE_X, SCALE_Y))
+            self._radar_distance_fonts[text_size] = pygame.font.Font(FONT_PATH_BOLD, font_size)
+        font = self._radar_distance_fonts[text_size]
+
+        # Build text lines
+        lines = []
+
+        # Line 1: Distance (always)
+        lines.append(f"{nearest_dist:.1f} m")
+
+        # Line 2: Time gap (only when moving)
+        if time_gap_s is not None:
+            lines.append(f"{time_gap_s:.1f}s")
+
+        # Line 3: Closing rate (only if significant)
+        # rel_speed is relative speed in m/s (negative = closing, positive = opening)
+        # Display convention: positive = closing (gap shrinking), negative = opening
+        if nearest_rel_speed is not None:
+            closing_kmh = -nearest_rel_speed * 3.6  # Negate: rel_speed negative = closing
+            if abs(closing_kmh) >= 0.5:
+                sign = "+" if closing_kmh > 0 else ""
+                lines.append(f"{sign}{closing_kmh:.1f} km/h")
+
+        # Position from settings
+        position = settings.get("radar_distance.display_position", RADAR_DISTANCE_DISPLAY_POSITION)
+        if position not in ("top", "bottom"):
+            position = RADAR_DISTANCE_DISPLAY_POSITION
+        edge_offset = int(50 * SCALE_Y)
+        shadow_offset = int(2 * SCALE_Y)
+        line_spacing = int(base_font_size * min(SCALE_X, SCALE_Y) * 1.1)
+
+        # Calculate starting Y based on position
+        if position == "top":
+            start_y = edge_offset
+        else:
+            # Stack upward from bottom
+            start_y = DISPLAY_HEIGHT - edge_offset - (len(lines) - 1) * line_spacing
+
+        # Render each line
+        for i, text in enumerate(lines):
+            y_pos = start_y + i * line_spacing
+
+            shadow_surface = font.render(text, True, (0, 0, 0))
+            text_surface = font.render(text, True, colour)
+
+            text_rect = text_surface.get_rect(center=(DISPLAY_WIDTH // 2, y_pos))
+            shadow_rect = shadow_surface.get_rect(
+                center=(DISPLAY_WIDTH // 2 + shadow_offset, y_pos + shadow_offset)
+            )
+
+            self.surface.blit(shadow_surface, shadow_rect)
+            self.surface.blit(text_surface, text_rect)

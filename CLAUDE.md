@@ -1,6 +1,6 @@
 # Claude Context - openTPT Project
 
-**Version:** 0.19.19 | **Updated:** 2026-02-07
+**Version:** 0.19.21 | **Updated:** 2026-02-08
 
 ---
 
@@ -59,9 +59,11 @@
 - Rotary Encoder: I2C QT with NeoPixel (0x36)
 - Corner Sensors: CAN bus (can_b2_0) - Pico RP2040 CAN with MLX90640 thermal + brake temps
 - Laser Ranger: CAN bus (can_b2_0) - Pico CAN Ranger with TOF laser, displayed on front camera
-- Radar (Toyota or Tesla, configurable via RADAR_TYPE in config.py):
-  - Toyota Denso: can_b1_0 (keep-alive TX), can_b1_1 (tracks RX) — dual CAN, 16 tracks
-  - Tesla Bosch MRRevo14F: can_b1_0 (single bus, TX+RX) — 32 tracks, VIN auto-read via UDS
+- Radar (Dual front/rear, each independently configurable via RADAR_REAR_TYPE / RADAR_FRONT_TYPE):
+  - Toyota Denso: dual CAN (keep-alive TX + tracks RX), 16 tracks
+  - Tesla Bosch MRRevo14F: single CAN bus (TX+RX), 32 tracks, VIN auto-read via UDS
+  - Rear radar: chevron overlay on rear camera
+  - Front radar: distance/gap overlay on front camera
 - OBD2: Speed, RPM, fuel level, Ford Mode 22 HV Battery SOC
 - GPS: PA1616S at 10Hz (serial /dev/ttyS0) for lap timing and CoPilot
 - NeoDriver: I2C LED strip at 0x60 (shift/delta/overtake modes)
@@ -419,11 +421,13 @@ All settings in `config.py` (root level), organised into 12 sections:
 - Freeze-frame transitions (no checkerboard)
 - Radar overlay on rear camera only
 
-### Radar (v0.10 Toyota, v0.19.19 Tesla)
-- **Type selection:** `RADAR_TYPE` in config.py (`"toyota"` or `"tesla"`)
-- **Toyota Denso** (Prius/Corolla 2017+): Dual CAN — can_b1_0 keep-alive TX, can_b1_1 tracks RX, 16 tracks
-- **Tesla Bosch MRRevo14F** (Model S/X/3): Single CAN — can_b1_0 all traffic, 32 tracks with classification/probability, VIN auto-read via UDS at startup
-- Chevrons: green safe, yellow moderate, red rapid approach, blue overtaking
+### Radar (v0.10 Toyota, v0.19.19 Tesla, v0.19.21 Dual)
+- **Dual radar:** Independent front and rear units, each set via `RADAR_REAR_TYPE` / `RADAR_FRONT_TYPE` (`"none"`, `"toyota"`, `"tesla"`)
+- **Toyota Denso** (Prius/Corolla 2017+): Dual CAN — keep-alive TX + tracks RX, 16 tracks
+- **Tesla Bosch MRRevo14F** (Model S/X/3): Single CAN — TX+RX, 32 tracks with classification/probability, VIN auto-read via UDS
+- Rear radar: chevron overlay on rear camera (green safe, yellow moderate, red rapid approach, blue overtaking)
+- Front radar: distance/gap overlay on front camera
+- CAN bus sharing supported (e.g. two Denso units sharing keep-alive channel)
 - Overlay renderer is radar-agnostic (consumes same `long_dist`/`lat_dist`/`rel_speed` fields)
 - Requires `cantools` package
 

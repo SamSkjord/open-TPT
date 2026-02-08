@@ -385,7 +385,8 @@ class MenuSystem(
         oled_handler=None,
         imu_handler=None,
         gps_handler=None,
-        radar_handler=None,
+        radar_handler_rear=None,
+        radar_handler_front=None,
         camera_handler=None,
         lap_timing_handler=None,
         copilot_handler=None,
@@ -404,7 +405,8 @@ class MenuSystem(
             oled_handler: OLED Bonnet handler for secondary display
             imu_handler: IMU handler for G-meter calibration
             gps_handler: GPS handler for speed and position
-            radar_handler: Radar handler for Toyota radar
+            radar_handler_rear: Rear radar handler for chevron overlay
+            radar_handler_front: Front radar handler for distance overlay
             camera_handler: Camera handler for camera settings
             lap_timing_handler: Lap timing handler for track selection
             copilot_handler: CoPilot handler for rally callouts
@@ -419,7 +421,9 @@ class MenuSystem(
         self.oled_handler = oled_handler
         self.imu_handler = imu_handler
         self.gps_handler = gps_handler
-        self.radar_handler = radar_handler
+        self.radar_handler = radar_handler_rear       # Backward compat for system.py methods
+        self.radar_handler_rear = radar_handler_rear
+        self.radar_handler_front = radar_handler_front
         self.camera_handler = camera_handler
         self.lap_timing_handler = lap_timing_handler
         self.copilot_handler = copilot_handler
@@ -1167,37 +1171,83 @@ class MenuSystem(
         )
         gps_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
 
-        # Radar submenu
-        radar_menu = Menu("Radar")
-        radar_menu.add_item(
+        # Rear Radar submenu
+        rear_radar_menu = Menu("Rear Radar")
+        rear_radar_menu.add_item(
             MenuItem(
                 "Enabled",
-                dynamic_label=lambda: self._get_radar_enabled_label(),
-                action=lambda: self._toggle_radar_enabled(),
+                dynamic_label=lambda: self._get_radar_enabled_label("rear"),
+                action=lambda: self._toggle_radar_enabled("rear"),
             )
         )
-        radar_menu.add_item(
+        rear_radar_menu.add_item(
+            MenuItem(
+                "Type",
+                dynamic_label=lambda: self._get_radar_type_label("rear"),
+                enabled=False,
+            )
+        )
+        rear_radar_menu.add_item(
             MenuItem(
                 "Status",
-                dynamic_label=lambda: self._get_radar_status_label(),
+                dynamic_label=lambda: self._get_radar_status_label("rear"),
                 enabled=False,
             )
         )
-        radar_menu.add_item(
+        rear_radar_menu.add_item(
             MenuItem(
                 "Tracks",
-                dynamic_label=lambda: self._get_radar_tracks_label(),
+                dynamic_label=lambda: self._get_radar_tracks_label("rear"),
                 enabled=False,
             )
         )
-        radar_menu.add_item(
+        rear_radar_menu.add_item(
             MenuItem(
                 "CAN Channel",
-                dynamic_label=lambda: self._get_radar_channel_label(),
+                dynamic_label=lambda: self._get_radar_channel_label("rear"),
                 enabled=False,
             )
         )
-        radar_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+        rear_radar_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
+
+        # Front Radar submenu
+        front_radar_menu = Menu("Front Radar")
+        front_radar_menu.add_item(
+            MenuItem(
+                "Enabled",
+                dynamic_label=lambda: self._get_radar_enabled_label("front"),
+                action=lambda: self._toggle_radar_enabled("front"),
+            )
+        )
+        front_radar_menu.add_item(
+            MenuItem(
+                "Type",
+                dynamic_label=lambda: self._get_radar_type_label("front"),
+                enabled=False,
+            )
+        )
+        front_radar_menu.add_item(
+            MenuItem(
+                "Status",
+                dynamic_label=lambda: self._get_radar_status_label("front"),
+                enabled=False,
+            )
+        )
+        front_radar_menu.add_item(
+            MenuItem(
+                "Tracks",
+                dynamic_label=lambda: self._get_radar_tracks_label("front"),
+                enabled=False,
+            )
+        )
+        front_radar_menu.add_item(
+            MenuItem(
+                "CAN Channel",
+                dynamic_label=lambda: self._get_radar_channel_label("front"),
+                enabled=False,
+            )
+        )
+        front_radar_menu.add_item(MenuItem("Back", action=lambda: self._go_back()))
 
         status_menu.add_item(MenuItem("GPS", submenu=gps_menu))
         status_menu.add_item(
@@ -1207,7 +1257,8 @@ class MenuSystem(
                 enabled=False,
             )
         )
-        status_menu.add_item(MenuItem("Radar", submenu=radar_menu))
+        status_menu.add_item(MenuItem("Rear Radar", submenu=rear_radar_menu))
+        status_menu.add_item(MenuItem("Front Radar", submenu=front_radar_menu))
         status_menu.add_item(
             MenuItem(
                 "Network (IP)",
@@ -1460,7 +1511,8 @@ class MenuSystem(
         units_menu.parent = system_menu
         status_menu.parent = system_menu
         gps_menu.parent = status_menu
-        radar_menu.parent = status_menu
+        rear_radar_menu.parent = status_menu
+        front_radar_menu.parent = status_menu
         hardware_menu.parent = system_menu
         tpms_menu.parent = hardware_menu
         imu_menu.parent = hardware_menu
