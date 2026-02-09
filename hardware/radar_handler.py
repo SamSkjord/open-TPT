@@ -2,7 +2,8 @@
 Radar handler for openTPT — supports Toyota and Tesla radars.
 Uses bounded queues and lock-free snapshots per system plan.
 
-Radar type is selected via RADAR_TYPE in config.py:
+Radar type is selected per unit via RADAR_REAR_TYPE / RADAR_FRONT_TYPE in config.py:
+  "none"   — Disabled (no radar for this position)
   "toyota" — Toyota Denso radar (Prius/Corolla 2017+), dual CAN bus
   "tesla"  — Tesla Bosch MRRevo14F (Model S/X/3), single CAN bus
 """

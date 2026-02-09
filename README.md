@@ -13,7 +13,7 @@ openTPT provides real-time monitoring of:
 - Brake rotor temperatures (via IR sensors + ADC)
 - Tyre surface thermal imaging (via Pico CAN corner sensors with MLX90640)
 - Multi-camera support with seamless switching (dual USB UVC cameras)
-- Radar overlay on rear camera (Toyota or Tesla, configurable via CAN bus with collision warnings)
+- Dual radar support with independent front and rear units (Toyota Denso or Tesla Bosch, per-unit CAN bus configuration)
 - Fuel tracking with consumption rate and laps remaining estimation
 - GPS lap timing with delta display (circuit tracks and point-to-point stages)
 - NeoDriver LED strip for shift lights, delta, and overtake warnings
@@ -44,7 +44,7 @@ openTPT features a high-performance architecture optimised for real-time telemet
 
 ### Optional Components
 - USB UVC cameras (up to 2 cameras for rear/front views with seamless switching)
-- CAN radar for rear camera overlay (one of):
+- CAN radar (up to 2 units — independent front and rear, any combination):
   - **Toyota** (Denso): Prius/Corolla 2017+ unit, dual CAN bus (radar data + car keepalive)
   - **Tesla** (Bosch MRRevo14F): Any Model S/X/3 unit, single CAN bus, auto-VIN
   - CAN-to-USB adapters or SPI CAN controllers
@@ -239,7 +239,7 @@ User preferences changed via the on-screen menu are saved to `~/.opentpt_setting
 - **Camera**: Mirror and rotation for front/rear cameras
 - **Display**: Brightness level, bottom gauge selection (SOC/Coolant/Oil/Intake/Fuel/Off)
 - **Thresholds**: Tyre, brake, engine temperature warning/critical levels
-- **Radar**: Enabled/disabled state
+- **Radar**: Per-unit enabled/disabled state (rear and front independently)
 - **Speed source**: OBD or GPS
 
 Settings are saved immediately when changed. If the file doesn't exist, defaults from `config.py` are used.
@@ -376,13 +376,16 @@ Common USB port mappings on Raspberry Pi 4:
 - Press Button 1 (or Spacebar) to switch within the current category:
   - In camera mode: Toggle between rear and front cameras
   - In UI mode: Cycle through enabled pages (telemetry, G-meter, lap timing, fuel, CoPilot)
-- When radar is enabled, the overlay only appears on the rear camera view
+- Rear radar overlay (chevrons) appears on the rear camera; front radar overlay (distance) appears on the front camera
 - Camera switching is seamless with smooth frame transitions (no checkerboard flash)
 - Dual FPS counters show both camera feed FPS and overall system FPS
 
 ### Radar Configuration
 
-The radar overlay is **enabled by default** and displays collision warnings on the rear camera. Two radar types are supported — select with `RADAR_TYPE` in `config.py`.
+openTPT supports **dual independent radar units** — one rear-facing and one front-facing. Each unit can be a Toyota Denso or Tesla Bosch radar, or disabled. Any combination is supported: 2x Denso, 2x Tesla, Denso+Tesla, or a single unit with the other set to `"none"`.
+
+- **Rear radar** drives the chevron overlay on the rear camera (collision/overtake warnings)
+- **Front radar** drives the distance overlay on the front camera
 
 #### Supported Radars
 
@@ -392,11 +395,13 @@ The radar overlay is **enabled by default** and displays collision warnings on t
 | CAN buses | 2 (radar data + car keepalive) | 1 (single bus, TX+RX) |
 | Track count | 16 | 32 |
 | Track data | 5 fields (dist, lat, speed, new, valid) | 16+ fields (+ classification, probability, acceleration) |
-| Keepalive | ACC_CONTROL + 9 static frames | ~30 vehicle state messages at 100 Hz |
+| Keepalive | ACC_CONTROL + 9 static frames at 100 Hz | ~30 vehicle state messages at 100 Hz |
 | VIN | Not needed | Auto-read via UDS at startup |
 | DBC files | `toyota_prius_2017_adas.dbc` | `tesla_radar.dbc` + `tesla_can.dbc` |
 
-#### Hardware Setup — Toyota
+#### Hardware Setup — Toyota (Denso)
+
+The Toyota Denso radar requires **two CAN buses**: one for keep-alive messages (TX) and one for radar track data (RX).
 
 1. **Waveshare Dual CAN HAT** (Board 1):
    - CAN_0 connector (can_b1_0): Car keep-alive messages (TX to radar)
@@ -404,45 +409,78 @@ The radar overlay is **enabled by default** and displays collision warnings on t
 
 2. **Toyota Radar Module** (Prius/Corolla 2017+):
    - Connect to both CAN buses as per wiring diagram
-   - Radar will output ~320 Hz track messages
+   - Radar will output ~320 Hz track messages once keep-alive is active
 
-#### Hardware Setup — Tesla
+**CAN bus sharing:** When running two Denso units, they can share the same car (keep-alive) channel. The system automatically detects this and suppresses duplicate keep-alive messages — only the rear unit sends the 100 Hz ACC_CONTROL frames, while the front unit listens passively on the shared bus.
+
+#### Hardware Setup — Tesla (Bosch MRRevo14F)
+
+The Tesla radar uses a **single CAN bus** for all traffic (TX keepalive + RX tracks).
 
 1. **Waveshare Dual CAN HAT** (Board 1):
-   - CAN_0 connector (can_b1_0): Single bus — all radar traffic (TX keepalive + RX tracks)
+   - CAN_0 connector (can_b1_0): Single bus — all radar traffic
 
 2. **Tesla Bosch MRRevo14F radar** (any Model S/X/3 unit):
-   - Connect radar CAN1 to the single CAN bus
-   - VIN is auto-read from the radar via UDS at startup
+   - Connect radar CAN1 to the CAN bus
+   - VIN is auto-read from the radar via UDS at startup (or set manually)
    - Radar outputs 32 object tracks on 0x310-0x36E at ~1100 msg/s
+   - Each track includes object classification (car, truck, bike, pedestrian, unknown) and existence probability
 
 #### Software Configuration
 
-The radar is configured in `config.py`:
+Radar is configured in `config.py` with per-unit settings. Set the type to `"toyota"`, `"tesla"`, or `"none"` for each position:
 
 ```python
-RADAR_ENABLED = True     # Enable/disable radar overlay
-RADAR_TYPE = "toyota"    # "toyota" or "tesla"
+RADAR_ENABLED = True          # Global radar enable
 
-# --- Toyota config (RADAR_TYPE = "toyota") ---
-RADAR_CHANNEL = "can_b1_1"  # Radar outputs tracks here
-CAR_CHANNEL = "can_b1_0"    # Keep-alive sent here
-RADAR_DBC = "opendbc/toyota_prius_2017_adas.dbc"
-CONTROL_DBC = "opendbc/toyota_prius_2017_pt_generated.dbc"
+# Common parameters (shared by both units)
+RADAR_INTERFACE = "socketcan"
+RADAR_BITRATE = 500000
+RADAR_TRACK_TIMEOUT = 0.5
 
-# --- Tesla config (RADAR_TYPE = "tesla") ---
-TESLA_RADAR_CHANNEL = "can_b1_0"  # Single bus for Tesla
-TESLA_RADAR_DBC = "opendbc/tesla_radar.dbc"
-TESLA_RADAR_VIN = None             # None = auto-read from radar
-TESLA_RADAR_AUTO_VIN = True
+# --- Rear Radar (chevron overlay on rear camera) ---
+RADAR_REAR_TYPE = "toyota"                # "none", "toyota", "tesla"
+# Toyota rear
+RADAR_REAR_CHANNEL = "can_b1_1"           # Track data RX
+RADAR_REAR_CAR_CHANNEL = "can_b1_0"       # Keep-alive TX (shareable between Denso units)
+RADAR_REAR_DBC = "opendbc/toyota_prius_2017_adas.dbc"
+RADAR_REAR_CONTROL_DBC = "opendbc/toyota_prius_2017_pt_generated.dbc"
+# Tesla rear
+RADAR_REAR_TESLA_CHANNEL = "can_b1_0"
+RADAR_REAR_TESLA_DBC = "opendbc/tesla_radar.dbc"
+RADAR_REAR_TESLA_VIN = None               # None = auto-read via UDS
+RADAR_REAR_TESLA_AUTO_VIN = True
 
-# Display parameters (shared)
+# --- Front Radar (distance overlay on front camera) ---
+RADAR_FRONT_TYPE = "none"                 # "none", "toyota", "tesla"
+# Toyota front
+RADAR_FRONT_CHANNEL = "can_b1_0"
+RADAR_FRONT_CAR_CHANNEL = "can_b1_0"      # Can share with rear Denso unit
+RADAR_FRONT_DBC = "opendbc/toyota_prius_2017_adas.dbc"
+RADAR_FRONT_CONTROL_DBC = "opendbc/toyota_prius_2017_pt_generated.dbc"
+# Tesla front
+RADAR_FRONT_TESLA_CHANNEL = "can_b1_0"
+RADAR_FRONT_TESLA_DBC = "opendbc/tesla_radar.dbc"
+RADAR_FRONT_TESLA_VIN = None
+RADAR_FRONT_TESLA_AUTO_VIN = True
+
+# Display parameters (rear overlay)
 RADAR_CAMERA_FOV = 106.0           # Camera field of view (degrees)
 RADAR_TRACK_COUNT = 3              # Number of tracks to display
 RADAR_MAX_DISTANCE = 120.0         # Maximum distance (metres)
 RADAR_WARN_YELLOW_KPH = 10.0       # Yellow warning threshold
 RADAR_WARN_RED_KPH = 20.0          # Red warning threshold
 ```
+
+**Example configurations:**
+
+| Setup | Rear Type | Front Type | Notes |
+|-------|-----------|------------|-------|
+| Single rear Denso | `"toyota"` | `"none"` | Default — original single-radar behaviour |
+| Single rear Tesla | `"tesla"` | `"none"` | Single Tesla unit on rear camera |
+| Dual Denso | `"toyota"` | `"toyota"` | Two Denso units, shared car channel supported |
+| Dual Tesla | `"tesla"` | `"tesla"` | Two Tesla units on separate CAN buses |
+| Mixed | `"toyota"` | `"tesla"` | Denso rear + Tesla front (or vice versa) |
 
 #### Dependencies
 
@@ -458,14 +496,18 @@ pip3 install --break-system-packages -r requirements.txt
 
 #### Visual Display
 
-When enabled, the radar overlay shows on the **rear camera only**:
+**Rear camera** — chevron overlay (from rear radar):
 - **Green chevrons**: Vehicle detected, safe distance (<10 km/h closing)
 - **Yellow chevrons**: Moderate closing speed (10-20 km/h)
 - **Red chevrons**: Rapid approach (>20 km/h closing speed)
 - **Blue side arrows**: Overtaking vehicle warning
 - **Distance and speed text**: Range in metres and relative velocity
 
-Chevrons are **3x larger (120×108px) and solid-filled** for high visibility.
+Chevrons are **3x larger (120x108px) and solid-filled** for high visibility.
+
+**Front camera** — distance overlay (from front radar):
+- Displays closest tracked object distance in metres
+- Configurable via the Front Camera menu (position, text size)
 
 ### Read-Only Root Filesystem (SD Card Protection)
 
@@ -658,7 +700,7 @@ openTPT/
 - Numba JIT thermal processing (< 1ms per sensor)
 - Dynamic resolution scaling
 - UI auto-hide with fade animation
-- Radar overlay with collision warnings (Toyota + Tesla)
+- Dual radar support with collision warnings (Toyota Denso + Tesla Bosch, independent front/rear)
 - NeoDriver LED strip (shift lights, delta, overtake modes)
 - Performance monitoring and validation
 - TPMS sensor pairing via on-screen menu

@@ -706,8 +706,9 @@ class Camera:
                     self.current_camera == 'front'):
                 self._render_distance_overlay()
 
-            # Render radar distance overlay if enabled (front camera only)
+            # Render radar distance overlay if enabled and visible (front camera only)
             if (self.radar_handler_front and self.radar_handler_front.is_enabled() and
+                    self.radar_handler_front.overlay_visible and
                     self.current_camera == 'front'):
                 self._render_radar_distance_overlay()
 

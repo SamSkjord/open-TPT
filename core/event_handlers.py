@@ -98,10 +98,13 @@ class EventHandlerMixin:
     def _handle_page_settings(self):
         """Handle button 1: Context-sensitive page settings."""
         if self.current_category == "camera":
-            # Camera page: Toggle radar overlay visibility (if radar enabled)
-            if self.radar_rear:
+            # Camera page: Toggle radar overlay visibility for the active camera
+            if self.current_camera_page == "front" and self.radar_front:
+                self.radar_front.toggle_overlay()
+                logger.debug("Front radar overlay toggled")
+            elif self.radar_rear:
                 self.radar_rear.toggle_overlay()
-                logger.debug("Radar overlay toggled")
+                logger.debug("Rear radar overlay toggled")
         elif self.current_category == "ui":
             if self.current_ui_page == "telemetry":
                 # Telemetry page: Toggle UI overlay visibility
