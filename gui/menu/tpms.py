@@ -7,6 +7,8 @@ status display, pairing, corner swapping, and device reset.
 
 import logging
 
+from utils.settings import get_settings
+
 logger = logging.getLogger('openTPT.menu.tpms')
 
 # Corner pairs for swapping
@@ -50,9 +52,10 @@ class TPMSMenuMixin:
 
         # Format pressure and temperature
         if pressure is not None and temp is not None:
-            # Get unit preferences
-            pressure_unit = getattr(self, 'pressure_unit', 'kPa')
-            temp_unit = getattr(self, 'temp_unit', 'C')
+            # Get unit preferences from settings
+            settings = get_settings()
+            pressure_unit = settings.get("units.pressure", "kPa")
+            temp_unit = settings.get("units.temp", "C")
 
             # Convert pressure if needed
             if pressure_unit == 'psi':

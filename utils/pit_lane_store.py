@@ -100,45 +100,47 @@ class PitLaneStore:
         with self._db_lock:
             try:
                 conn = sqlite3.connect(self._db_path)
-                cursor = conn.cursor()
+                try:
+                    cursor = conn.cursor()
 
-                # Pit waypoints table - entry/exit lines per track
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS pit_waypoints (
-                        track_name TEXT PRIMARY KEY,
-                        entry_lat1 REAL, entry_lon1 REAL,
-                        entry_lat2 REAL, entry_lon2 REAL,
-                        exit_lat1 REAL, exit_lon1 REAL,
-                        exit_lat2 REAL, exit_lon2 REAL,
-                        speed_limit_kmh REAL DEFAULT 60.0,
-                        min_stop_time_s REAL DEFAULT 0.0,
-                        updated_at REAL
-                    )
-                ''')
+                    # Pit waypoints table - entry/exit lines per track
+                    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS pit_waypoints (
+                            track_name TEXT PRIMARY KEY,
+                            entry_lat1 REAL, entry_lon1 REAL,
+                            entry_lat2 REAL, entry_lon2 REAL,
+                            exit_lat1 REAL, exit_lon1 REAL,
+                            exit_lat2 REAL, exit_lon2 REAL,
+                            speed_limit_kmh REAL DEFAULT 60.0,
+                            min_stop_time_s REAL DEFAULT 0.0,
+                            updated_at REAL
+                        )
+                    ''')
 
-                # Pit sessions table - history of pit stops
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS pit_sessions (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        track_name TEXT,
-                        entry_time REAL,
-                        exit_time REAL,
-                        stationary_time REAL,
-                        total_time REAL,
-                        speed_violations INTEGER DEFAULT 0,
-                        timestamp REAL
-                    )
-                ''')
+                    # Pit sessions table - history of pit stops
+                    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS pit_sessions (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            track_name TEXT,
+                            entry_time REAL,
+                            exit_time REAL,
+                            stationary_time REAL,
+                            total_time REAL,
+                            speed_violations INTEGER DEFAULT 0,
+                            timestamp REAL
+                        )
+                    ''')
 
-                # Index for faster queries
-                cursor.execute('''
-                    CREATE INDEX IF NOT EXISTS idx_pit_sessions_track
-                    ON pit_sessions(track_name)
-                ''')
+                    # Index for faster queries
+                    cursor.execute('''
+                        CREATE INDEX IF NOT EXISTS idx_pit_sessions_track
+                        ON pit_sessions(track_name)
+                    ''')
 
-                conn.commit()
-                conn.close()
-                logger.info("Pit timer database initialised: %s", self._db_path)
+                    conn.commit()
+                    logger.info("Pit timer database initialised: %s", self._db_path)
+                finally:
+                    conn.close()
 
             except Exception as e:
                 logger.warning("Could not initialise pit timer database: %s", e)
@@ -156,33 +158,35 @@ class PitLaneStore:
         with self._db_lock:
             try:
                 conn = sqlite3.connect(self._db_path)
-                cursor = conn.cursor()
+                try:
+                    cursor = conn.cursor()
 
-                # Extract line coordinates
-                entry_lat1, entry_lon1 = waypoints.entry_line.point1 if waypoints.entry_line else (None, None)
-                entry_lat2, entry_lon2 = waypoints.entry_line.point2 if waypoints.entry_line else (None, None)
-                exit_lat1, exit_lon1 = waypoints.exit_line.point1 if waypoints.exit_line else (None, None)
-                exit_lat2, exit_lon2 = waypoints.exit_line.point2 if waypoints.exit_line else (None, None)
+                    # Extract line coordinates
+                    entry_lat1, entry_lon1 = waypoints.entry_line.point1 if waypoints.entry_line else (None, None)
+                    entry_lat2, entry_lon2 = waypoints.entry_line.point2 if waypoints.entry_line else (None, None)
+                    exit_lat1, exit_lon1 = waypoints.exit_line.point1 if waypoints.exit_line else (None, None)
+                    exit_lat2, exit_lon2 = waypoints.exit_line.point2 if waypoints.exit_line else (None, None)
 
-                cursor.execute('''
-                    INSERT OR REPLACE INTO pit_waypoints
-                    (track_name, entry_lat1, entry_lon1, entry_lat2, entry_lon2,
-                     exit_lat1, exit_lon1, exit_lat2, exit_lon2,
-                     speed_limit_kmh, min_stop_time_s, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    waypoints.track_name,
-                    entry_lat1, entry_lon1, entry_lat2, entry_lon2,
-                    exit_lat1, exit_lon1, exit_lat2, exit_lon2,
-                    waypoints.speed_limit_kmh,
-                    waypoints.min_stop_time_s,
-                    time.time()
-                ))
+                    cursor.execute('''
+                        INSERT OR REPLACE INTO pit_waypoints
+                        (track_name, entry_lat1, entry_lon1, entry_lat2, entry_lon2,
+                         exit_lat1, exit_lon1, exit_lat2, exit_lon2,
+                         speed_limit_kmh, min_stop_time_s, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (
+                        waypoints.track_name,
+                        entry_lat1, entry_lon1, entry_lat2, entry_lon2,
+                        exit_lat1, exit_lon1, exit_lat2, exit_lon2,
+                        waypoints.speed_limit_kmh,
+                        waypoints.min_stop_time_s,
+                        time.time()
+                    ))
 
-                conn.commit()
-                conn.close()
-                logger.info("Saved pit waypoints for %s", waypoints.track_name)
-                return True
+                    conn.commit()
+                    logger.info("Saved pit waypoints for %s", waypoints.track_name)
+                    return True
+                finally:
+                    conn.close()
 
             except Exception as e:
                 logger.warning("Could not save pit waypoints: %s", e)
@@ -201,16 +205,18 @@ class PitLaneStore:
         with self._db_lock:
             try:
                 conn = sqlite3.connect(self._db_path)
-                cursor = conn.cursor()
+                try:
+                    cursor = conn.cursor()
 
-                cursor.execute('''
-                    SELECT entry_lat1, entry_lon1, entry_lat2, entry_lon2,
-                           exit_lat1, exit_lon1, exit_lat2, exit_lon2,
-                           speed_limit_kmh, min_stop_time_s
-                    FROM pit_waypoints WHERE track_name = ?
-                ''', (track_name,))
-                row = cursor.fetchone()
-                conn.close()
+                    cursor.execute('''
+                        SELECT entry_lat1, entry_lon1, entry_lat2, entry_lon2,
+                               exit_lat1, exit_lon1, exit_lat2, exit_lon2,
+                               speed_limit_kmh, min_stop_time_s
+                        FROM pit_waypoints WHERE track_name = ?
+                    ''', (track_name,))
+                    row = cursor.fetchone()
+                finally:
+                    conn.close()
 
                 if row:
                     entry_line = None
@@ -284,28 +290,30 @@ class PitLaneStore:
         with self._db_lock:
             try:
                 conn = sqlite3.connect(self._db_path)
-                cursor = conn.cursor()
+                try:
+                    cursor = conn.cursor()
 
-                cursor.execute('''
-                    INSERT INTO pit_sessions
-                    (track_name, entry_time, exit_time, stationary_time,
-                     total_time, speed_violations, timestamp)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    session.track_name,
-                    session.entry_time,
-                    session.exit_time,
-                    session.stationary_time,
-                    session.total_time,
-                    session.speed_violations,
-                    time.time()
-                ))
+                    cursor.execute('''
+                        INSERT INTO pit_sessions
+                        (track_name, entry_time, exit_time, stationary_time,
+                         total_time, speed_violations, timestamp)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ''', (
+                        session.track_name,
+                        session.entry_time,
+                        session.exit_time,
+                        session.stationary_time,
+                        session.total_time,
+                        session.speed_violations,
+                        time.time()
+                    ))
 
-                conn.commit()
-                conn.close()
-                logger.info("Recorded pit session for %s: %.1fs total, %.1fs stationary",
-                           session.track_name, session.total_time, session.stationary_time)
-                return True
+                    conn.commit()
+                    logger.info("Recorded pit session for %s: %.1fs total, %.1fs stationary",
+                               session.track_name, session.total_time, session.stationary_time)
+                    return True
+                finally:
+                    conn.close()
 
             except Exception as e:
                 logger.warning("Could not record pit session: %s", e)
@@ -331,29 +339,30 @@ class PitLaneStore:
         with self._db_lock:
             try:
                 conn = sqlite3.connect(self._db_path)
-                cursor = conn.cursor()
+                try:
+                    cursor = conn.cursor()
 
-                cursor.execute('''
-                    SELECT entry_time, exit_time, stationary_time,
-                           total_time, speed_violations, timestamp
-                    FROM pit_sessions
-                    WHERE track_name = ?
-                    ORDER BY timestamp DESC
-                    LIMIT ?
-                ''', (track_name, limit))
+                    cursor.execute('''
+                        SELECT entry_time, exit_time, stationary_time,
+                               total_time, speed_violations, timestamp
+                        FROM pit_sessions
+                        WHERE track_name = ?
+                        ORDER BY timestamp DESC
+                        LIMIT ?
+                    ''', (track_name, limit))
 
-                for row in cursor.fetchall():
-                    result.append(PitSession(
-                        track_name=track_name,
-                        entry_time=row[0],
-                        exit_time=row[1],
-                        stationary_time=row[2],
-                        total_time=row[3],
-                        speed_violations=row[4],
-                        timestamp=row[5]
-                    ))
-
-                conn.close()
+                    for row in cursor.fetchall():
+                        result.append(PitSession(
+                            track_name=track_name,
+                            entry_time=row[0],
+                            exit_time=row[1],
+                            stationary_time=row[2],
+                            total_time=row[3],
+                            speed_violations=row[4],
+                            timestamp=row[5]
+                        ))
+                finally:
+                    conn.close()
 
             except Exception as e:
                 logger.warning("Could not get recent pit sessions: %s", e)
@@ -373,15 +382,17 @@ class PitLaneStore:
         with self._db_lock:
             try:
                 conn = sqlite3.connect(self._db_path)
-                cursor = conn.cursor()
+                try:
+                    cursor = conn.cursor()
 
-                cursor.execute('''
-                    SELECT MIN(total_time)
-                    FROM pit_sessions
-                    WHERE track_name = ?
-                ''', (track_name,))
-                row = cursor.fetchone()
-                conn.close()
+                    cursor.execute('''
+                        SELECT MIN(total_time)
+                        FROM pit_sessions
+                        WHERE track_name = ?
+                    ''', (track_name,))
+                    row = cursor.fetchone()
+                finally:
+                    conn.close()
 
                 if row and row[0] is not None:
                     return row[0]
@@ -404,20 +415,22 @@ class PitLaneStore:
         with self._db_lock:
             try:
                 conn = sqlite3.connect(self._db_path)
-                cursor = conn.cursor()
+                try:
+                    cursor = conn.cursor()
 
-                cursor.execute('''
-                    DELETE FROM pit_waypoints WHERE track_name = ?
-                ''', (track_name,))
+                    cursor.execute('''
+                        DELETE FROM pit_waypoints WHERE track_name = ?
+                    ''', (track_name,))
 
-                deleted = cursor.rowcount > 0
-                conn.commit()
-                conn.close()
+                    deleted = cursor.rowcount > 0
+                    conn.commit()
 
-                if deleted:
-                    logger.info("Cleared pit waypoints for %s", track_name)
+                    if deleted:
+                        logger.info("Cleared pit waypoints for %s", track_name)
 
-                return deleted
+                    return deleted
+                finally:
+                    conn.close()
 
             except Exception as e:
                 logger.warning("Could not clear pit waypoints: %s", e)

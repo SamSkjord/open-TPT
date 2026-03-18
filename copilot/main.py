@@ -127,6 +127,7 @@ class CoPilot:
         self._last_fetch_pos: Optional[Position] = None
         self._visualizer = None
         self._loading_thread: Optional[threading.Thread] = None
+        self._pending_lock = threading.Lock()
         self._pending_network: Optional[RoadNetwork] = None
         self._pending_pos: Optional[Position] = None
 
@@ -308,8 +309,9 @@ class CoPilot:
                 print(f"Loading roads near {pos.lat:.4f}, {pos.lon:.4f}...")
                 network = self.map_loader.load_around(pos.lat, pos.lon, radius)
                 # Store for main thread to pick up
-                self._pending_network = network
-                self._pending_pos = pos
+                with self._pending_lock:
+                    self._pending_network = network
+                    self._pending_pos = pos
             except Exception as e:
                 print(f"Error loading roads: {e}")
 
@@ -318,12 +320,17 @@ class CoPilot:
 
     def _apply_pending_network(self) -> None:
         """Apply network loaded by background thread."""
-        if self._pending_network is None:
-            return
+        with self._pending_lock:
+            if self._pending_network is None:
+                return
+            network = self._pending_network
+            pos = self._pending_pos
+            self._pending_network = None
+            self._pending_pos = None
 
-        self._network = self._pending_network
+        self._network = network
         self._projector = PathProjector(self._network)
-        self._last_fetch_pos = self._pending_pos
+        self._last_fetch_pos = pos
 
         print(f"Loaded {len(self._network.ways)} roads, "
               f"{len(self._network.junctions)} junctions")
@@ -344,7 +351,3 @@ class CoPilot:
             except ImportError as e:
                 print(f"Visualisation unavailable: {e}")
                 self.visualize = False
-
-        # Clear pending
-        self._pending_network = None
-        self._pending_pos = None

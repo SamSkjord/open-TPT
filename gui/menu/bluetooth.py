@@ -48,9 +48,12 @@ def _get_audio_user() -> Tuple[str, int, str]:
         pass
 
     # Last resort: first non-root user
-    for pw in pwd.getpwall():
-        if pw.pw_uid >= 1000:
-            return pw.pw_name, pw.pw_uid, f'/run/user/{pw.pw_uid}'
+    try:
+        for pw in pwd.getpwall():
+            if pw.pw_uid >= 1000:
+                return pw.pw_name, pw.pw_uid, f'/run/user/{pw.pw_uid}'
+    except AttributeError:
+        pass
 
     # Absolute fallback
     return 'pi', 1000, '/run/user/1000'

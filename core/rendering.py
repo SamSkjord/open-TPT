@@ -138,6 +138,7 @@ class RenderingMixin:
         render_times['status_bars'] = (time.time() - t0) * 1000
 
         # Draw fuel warnings on all pages (except fuel page which has its own)
+        t0 = time.time()
         if self.fuel_tracker and self.current_ui_page != "fuel":
             self._draw_fuel_warning()
         render_times['fuel_warning'] = (time.time() - t0) * 1000
@@ -254,8 +255,9 @@ class RenderingMixin:
         # Uses stale data cache to prevent flashing when display fps > data fps
         t0 = time.time()
 
-        # Check display mode from settings (imports at module level for performance)
-        display_mode = get_settings().get("tyre_temps.display_mode", TYRE_HISTORY_DISPLAY_DEFAULT)
+        # Check display mode from settings (cached for loop)
+        settings = get_settings()
+        display_mode = settings.get("tyre_temps.display_mode", TYRE_HISTORY_DISPLAY_DEFAULT)
 
         for position in ["FL", "FR", "RL", "RR"]:
             if display_mode == "history":
@@ -265,7 +267,7 @@ class RenderingMixin:
                     # Fresh data - update cache and display
                     self._history_cache[position] = {"data": history_snapshot, "timestamp": now}
                     # Check if flip is enabled for this corner
-                    flip_enabled = get_settings().get(f"tyre_temps.flip.{position}", False)
+                    flip_enabled = settings.get(f"tyre_temps.flip.{position}", False)
                     self.display.draw_thermal_image_with_history(
                         position, history_snapshot, show_zone_temps, flip_enabled
                     )
@@ -273,7 +275,7 @@ class RenderingMixin:
                     # No fresh data - use cache if within timeout (longer for history since EMAs are smoothed)
                     cache = self._history_cache[position]
                     if now - cache["timestamp"] < TYRE_HISTORY_STALE_TIMEOUT:
-                        flip_enabled = get_settings().get(f"tyre_temps.flip.{position}", False)
+                        flip_enabled = settings.get(f"tyre_temps.flip.{position}", False)
                         self.display.draw_thermal_image_with_history(
                             position, cache["data"], show_zone_temps, flip_enabled
                         )

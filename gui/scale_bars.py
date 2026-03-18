@@ -71,6 +71,10 @@ class ScaleBars:
         self.tyre_bar_x = DISPLAY_WIDTH - self.padding - self.bar_width
         self.tyre_bar_y = (DISPLAY_HEIGHT - self.bar_height) // 2
 
+        # Pre-render gradient surfaces (avoids per-frame line-by-line drawing)
+        self._brake_gradient_surface = self._create_gradient_surface(self.brake_colourmap)
+        self._tyre_gradient_surface = self._create_gradient_surface(self.tyre_colourmap)
+
     def _get_tyre_thresholds(self):
         """Get tyre temperature thresholds from settings."""
         cold = self._settings.get("thresholds.tyre.cold", TYRE_TEMP_COLD)
@@ -90,6 +94,16 @@ class ScaleBars:
         rear = self._settings.get("thresholds.pressure.rear", PRESSURE_REAR_OPTIMAL)
         return front, rear
 
+    def _create_gradient_surface(self, colourmap):
+        """Pre-render a vertical gradient surface from a colourmap."""
+        surf = pygame.Surface((self.bar_width, self.bar_height))
+        colourmap_height = colourmap.get_height()
+        for y in range(self.bar_height):
+            colour_idx = int((1.0 - y / self.bar_height) * (colourmap_height - 1))
+            colour = colourmap.get_at((0, colour_idx))
+            pygame.draw.line(surf, colour, (0, y), (self.bar_width, y))
+        return surf
+
     def _check_threshold_changes(self):
         """Check if thresholds changed and regenerate colourmaps if needed."""
         tyre_thresholds = self._get_tyre_thresholds()
@@ -98,10 +112,12 @@ class ScaleBars:
         if tyre_thresholds != self._cached_tyre_thresholds:
             self._cached_tyre_thresholds = tyre_thresholds
             self.tyre_colourmap = self._create_tyre_colourmap()
+            self._tyre_gradient_surface = self._create_gradient_surface(self.tyre_colourmap)
 
         if brake_thresholds != self._cached_brake_thresholds:
             self._cached_brake_thresholds = brake_thresholds
             self.brake_colourmap = self._create_brake_colourmap()
+            self._brake_gradient_surface = self._create_gradient_surface(self.brake_colourmap)
 
     def _get_temp_unit_str(self) -> str:
         """Get temperature unit string from settings."""
@@ -299,19 +315,7 @@ class ScaleBars:
 
     def draw_brake_scale(self):
         """Draw the brake temperature scale bar on the left side."""
-        # Create vertical brake temp scale surface
-        scale_surf = pygame.Surface((self.bar_width, self.bar_height))
-
-        # Draw the gradient
-        for y in range(self.bar_height):
-            # Map y position to colour index (inverted, so higher temps at top)
-            colour_idx = int(
-                (1.0 - y / self.bar_height) * (self.brake_colourmap.get_height() - 1)
-            )
-            colour = self.brake_colourmap.get_at((0, colour_idx))
-
-            # Draw horizontal line with the colour
-            pygame.draw.line(scale_surf, colour, (0, y), (self.bar_width, y))
+        scale_surf = self._brake_gradient_surface
 
         # Get thresholds from settings
         brake_optimal, brake_hot = self._get_brake_thresholds()
@@ -388,19 +392,7 @@ class ScaleBars:
 
     def draw_tyre_scale(self):
         """Draw the tyre temperature scale bar on the right side."""
-        # Create vertical tyre temp scale surface
-        scale_surf = pygame.Surface((self.bar_width, self.bar_height))
-
-        # Draw the gradient
-        for y in range(self.bar_height):
-            # Map y position to colour index (inverted, so higher temps at top)
-            colour_idx = int(
-                (1.0 - y / self.bar_height) * (self.tyre_colourmap.get_height() - 1)
-            )
-            colour = self.tyre_colourmap.get_at((0, colour_idx))
-
-            # Draw horizontal line with the colour
-            pygame.draw.line(scale_surf, colour, (0, y), (self.bar_width, y))
+        scale_surf = self._tyre_gradient_surface
 
         # Get thresholds from settings
         tyre_cold, tyre_optimal, tyre_hot = self._get_tyre_thresholds()

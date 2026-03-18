@@ -648,13 +648,13 @@ class CornerSensorHandler(BoundedQueueHardwareHandler):
         if self._notifier:
             try:
                 self._notifier.stop()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Corner sensor notifier stop error: %s", e)
         if self._bus:
             try:
                 self._bus.shutdown()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Corner sensor CAN bus shutdown error: %s", e)
         logger.info("Corner sensor handler stopped")
 
 

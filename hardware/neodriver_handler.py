@@ -118,6 +118,7 @@ class NeoDriverHandler:
         self.shift_rpm = shift_rpm  # RPM at which redline activates
         self.start_rpm = start_rpm  # RPM at which lights begin (0 = always on)
         self.rainbow_offset = 0  # Animation offset
+        self._do_startup_animation = False
 
         # Initialise hardware
         self._initialise()

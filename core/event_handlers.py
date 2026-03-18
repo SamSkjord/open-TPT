@@ -188,7 +188,7 @@ class EventHandlerMixin:
 
     def _handle_recording_toggle(self):
         """Handle recording start/stop toggle from button hold."""
-        if self.recorder.is_recording():
+        if self.recorder.is_recording() and self.menu:
             # Show recording menu (Cancel/Save/Delete)
             self.menu.show_recording_menu(
                 on_cancel=self._recording_cancel,
@@ -260,7 +260,7 @@ class EventHandlerMixin:
         if self.encoder:
             encoder_event = self.encoder.check_input()
 
-            if self.menu.is_visible():
+            if self.menu and self.menu.is_visible():
                 # Menu is open - route encoder to menu
                 if encoder_event.rotation_delta != 0:
                     self.menu.navigate(encoder_event.rotation_delta)
@@ -275,5 +275,5 @@ class EventHandlerMixin:
                     # Sync brightness with input handler for consistency
                     if self.input_handler:
                         self.input_handler.brightness = self.encoder.get_brightness()
-                if encoder_event.long_press:
+                if encoder_event.long_press and self.menu:
                     self.menu.show()

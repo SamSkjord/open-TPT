@@ -212,9 +212,14 @@ class TelemetryRecorder:
             try:
                 # Test write access
                 test_file = os.path.join(usb_mount, ".write_test")
-                with open(test_file, 'w') as f:
-                    f.write("test")
-                os.remove(test_file)
+                try:
+                    with open(test_file, 'w') as f:
+                        f.write("test")
+                finally:
+                    try:
+                        os.remove(test_file)
+                    except OSError:
+                        pass
                 logger.info("USB storage available for telemetry")
                 return self.USB_PATH
             except (IOError, OSError) as e:

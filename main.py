@@ -561,7 +561,6 @@ class OpenTPT(
 
                 if boost_kpa is not None:
                     # Convert to user's preferred pressure unit
-                    settings = get_settings()
                     pressure_unit = settings.get("units.pressure", PRESSURE_UNIT)
 
                     # Get user-configured boost range (stored in PSI)

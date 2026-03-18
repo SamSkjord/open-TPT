@@ -85,9 +85,8 @@ class MenuItem:
             try:
                 return self.dynamic_label()
             except Exception as e:
-                # Return error indicator if dynamic label fails
-                # (e.g., handler unavailable at runtime)
-                return f"[Error: {e}]"
+                logger.debug("Menu label error: %s", e)
+                return "[Error]"
         return self.label
 
     def is_selectable(self) -> bool:

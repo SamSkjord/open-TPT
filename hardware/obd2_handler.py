@@ -331,8 +331,8 @@ class OBD2Handler(BoundedQueueHardwareHandler):
                     if self.bus:
                         try:
                             self.bus.shutdown()
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.warning("OBD2: Failed to shutdown CAN bus: %s", e)
                         self.bus = None
                     self._initialise()
                     self.last_reconnect_attempt = time.time()

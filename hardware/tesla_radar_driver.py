@@ -15,8 +15,11 @@ Uses the Tesla Bosch MRRevo14F radar protocol (30+ CAN message types at
 from __future__ import annotations
 
 import dataclasses
+import logging
 import threading
 import time
+
+logger = logging.getLogger('openTPT.tesla_radar')
 from typing import Callable, Dict, Iterable, List, Optional
 
 import can
@@ -161,7 +164,7 @@ class TeslaRadarDriver:
                 vin = self._read_vin()
             except Exception as exc:
                 if self.config.debug:
-                    print(f"VIN auto-read failed ({exc}), using default")
+                    logger.debug("VIN auto-read failed (%s), using default", exc)
                 vin = None
 
         # 3. Load DBC for object decoding

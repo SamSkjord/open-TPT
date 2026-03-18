@@ -1,5 +1,58 @@
 # Changelog - openTPT
 
+## [v0.19.22] - 2026-03-18
+
+### Code Review Fixes
+
+Comprehensive code review identified and fixed resource leaks, race conditions, render path performance issues, and error handling gaps across 14 files.
+
+#### Critical Fixes
+
+- **PitLaneStore database connection leak** - All 7 database methods now use `try/finally` to guarantee `conn.close()` runs even on exception. Previously, any exception between `sqlite3.connect()` and `conn.close()` would leak the connection.
+- **CoPilot map load race condition** - Added `threading.Lock` to protect `_pending_network` and `_pending_pos` shared between the background map loader thread and the main update thread. Previously, unsynchronised writes could cause partial/corrupt state reads.
+
+#### High Priority Fixes
+
+- **Null guard on menu in event handler** - Added null checks on `self.menu` in `core/event_handlers.py` (3 locations) to prevent `AttributeError` crash if menu initialisation fails.
+- **Render path settings caching** - `get_settings()` now called once before the tyre temp render loop instead of once per corner (4 calls reduced to 1).
+- **Scale bar gradient caching** - Pre-rendered gradient surfaces in `__init__` and on threshold change, replacing per-frame line-by-line pixel drawing. Eliminates ~600 `pygame.draw.line` calls per frame.
+
+#### Medium Priority Fixes
+
+- **OBD2 CAN shutdown logging** - Bare `except Exception: pass` on CAN bus shutdown now logs the error instead of silently swallowing it.
+- **Fuel warning render timing** - Fixed incorrect `t0` timestamp that included status bar rendering time in the fuel warning measurement.
+- **Tesla radar logging** - Replaced `print()` with `logger.debug()` for VIN auto-read failure; added missing module-level logger.
+- **Corner sensor shutdown logging** - CAN notifier stop and bus shutdown errors now logged instead of silently swallowed.
+- **Bluetooth portability** - Guarded `pwd.getpwall()` with `try/except AttributeError` for systems where the function is unavailable.
+- **TPMS menu units** - Unit preferences now read from persistent settings instead of stale instance attributes.
+- **Duplicate settings call** - Removed redundant `get_settings()` call in boost pressure path of `_update_hardware()`.
+
+#### Low Priority Fixes
+
+- **Menu error labels** - Dynamic label errors now show generic `[Error]` to user and log details at debug level, instead of exposing internal exception text.
+- **Telemetry write test cleanup** - USB write test file removal now wrapped in `finally` block.
+- **NeoDriver init** - `_do_startup_animation` now initialised in `__init__` instead of first appearing in `start()`.
+
+#### Modified Files
+
+- `utils/pit_lane_store.py` - try/finally on all 7 database methods
+- `copilot/main.py` - Added `_pending_lock` for thread-safe map loading
+- `core/event_handlers.py` - Null guards on `self.menu` (3 locations)
+- `core/rendering.py` - Cached settings before loop; fixed fuel warning timing
+- `gui/scale_bars.py` - Pre-cached gradient surfaces, regenerated on threshold change
+- `hardware/obd2_handler.py` - Log CAN shutdown errors
+- `hardware/tesla_radar_driver.py` - Added logger, replaced print with logger.debug
+- `hardware/corner_sensor_handler.py` - Log CAN shutdown errors
+- `gui/menu/bluetooth.py` - Guard pwd.getpwall() for portability
+- `gui/menu/tpms.py` - Read units from settings, added get_settings import
+- `gui/menu/base.py` - Sanitised error labels
+- `main.py` - Removed duplicate get_settings() call
+- `utils/telemetry_recorder.py` - Write test cleanup in finally block
+- `hardware/neodriver_handler.py` - Initialise _do_startup_animation in __init__
+- `config.py` - Bumped APP_VERSION to 0.19.22
+
+---
+
 ## [v0.19.21] - 2026-02-08
 
 ### Dual Radar Support (Front + Rear)
