@@ -47,9 +47,9 @@ class ThermalSensor:
             self.i2c = busio.I2C(board.SCL, board.SDA)
             self.mlx = adafruit_mlx90640.MLX90640(self.i2c)
             self.mlx.refresh_rate = Config.REFRESH_RATE
-            print(f"✓ MLX90640 initialized (Serial: {[hex(i) for i in self.mlx.serial_number]})")
+            print(f"MLX90640 initialized (Serial: {[hex(i) for i in self.mlx.serial_number]})")
         except Exception as e:
-            print(f"✗ Failed to initialize MLX90640 sensor: {e}")
+            print(f"Failed to initialize MLX90640 sensor: {e}")
             print("  Check I2C connections and sensor power")
             sys.exit(1)
     
@@ -363,18 +363,18 @@ class TerminalDisplay:
     @staticmethod
     def print_detection_info(detection: Dict):
         """Print detection information"""
-        print(f"\n📍 Detection Info:")
+        print(f"\nDetection Info:")
         print(f"   Method: {detection['method']}")
         print(f"   Tire Position: columns {detection['tire_start']}-{detection['tire_end']} (width: {detection['tire_width']})")
         print(f"   Average Temperature: {detection['avg_temp']:.1f}°C")
         print(f"   Detection Threshold: {detection['threshold']:.1f}°C")
         if detection['rotor_detected']:
-            print(f"   ⚠️  Hot spot detected and filtered (>150°C)")
+            print(f"   WARNING: Hot spot detected and filtered (>150°C)")
     
     @staticmethod
     def print_section_temps(sections: Dict):
         """Print section temperature analysis"""
-        print(f"\n🌡️  Tire Temperature Analysis:")
+        print(f"\nTire Temperature Analysis:")
         print(f"   {'Section':<10} {'Avg':<8} {'Min':<8} {'Max':<8} {'StdDev':<8}")
         print(f"   {'-'*50}")
         
@@ -392,7 +392,7 @@ class TerminalDisplay:
     @staticmethod
     def print_temperature_bar(sections: Dict):
         """Print ASCII temperature bar chart"""
-        print(f"\n📊 Temperature Visualization:")
+        print(f"\nTemperature Visualization:")
         
         # Find temperature range for scaling
         temps = [s['avg'] for s in sections.values() if s['count'] > 0]
@@ -448,9 +448,9 @@ class TerminalDisplay:
             warnings.append(f"High temperature detected: {hottest.upper()} section at {max_temp:.1f}°C")
         
         if warnings:
-            print(f"\n⚠️  Warnings:")
+            print(f"\nWarnings:")
             for warning in warnings:
-                print(f"   • {warning}")
+                print(f"   - {warning}")
     
     def display_results(self, stats: Dict):
         """Display complete analysis results"""
@@ -487,7 +487,7 @@ def main():
             if frame is None:
                 error_count += 1
                 if error_count >= max_errors:
-                    print(f"\n✗ Too many errors ({error_count}), exiting...")
+                    print(f"\nToo many errors ({error_count}), exiting...")
                     break
                 time.sleep(0.1)
                 continue
@@ -500,17 +500,17 @@ def main():
             stats = processor.analyze_tire_temperatures(middle_frame, Config.TEMP_THRESHOLD_OFFSET)
             
             # Display results
-            print(f"\n🔄 Frame #{frame_count} - {time.strftime('%H:%M:%S')}")
+            print(f"\nFrame #{frame_count} - {time.strftime('%H:%M:%S')}")
             display.display_results(stats)
             
             # Wait before next update
             time.sleep(Config.UPDATE_INTERVAL)
             
     except KeyboardInterrupt:
-        print("\n\n✓ Shutting down gracefully...")
+        print("\n\nShutting down gracefully...")
         print(f"  Total frames processed: {frame_count}")
     except Exception as e:
-        print(f"\n✗ Unexpected error: {e}")
+        print(f"\nUnexpected error: {e}")
         sys.exit(1)
 
 

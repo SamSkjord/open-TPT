@@ -15,7 +15,7 @@
 | Display | Waveshare 1024×600 HDMI |
 | Graphics | SDL2/pygame with KMS/DRM |
 | Architecture | Multi-threaded, bounded queues, lock-free rendering |
-| Performance | 60 FPS, ≤12ms render time |
+| Performance | 60 FPS, <=12ms render time |
 | **Spelling** | **British English throughout** |
 
 ---
@@ -320,7 +320,7 @@ sudo journalctl -u openTPT.service -f | grep -E "failures|error|backoff"
 
 | Thread | Purpose | Blocking Allowed |
 |--------|---------|------------------|
-| **Main Thread** | Pygame event loop, rendering at 60 FPS | NO - must complete in ≤12ms |
+| **Main Thread** | Pygame event loop, rendering at 60 FPS | NO - must complete in <=12ms |
 | **Hardware Threads** | I2C/CAN/Serial I/O, one per handler | YES - isolated from render |
 | **Background Threads** | Bluetooth ops, menu actions, audio | YES - daemon threads |
 
@@ -423,8 +423,8 @@ All settings in `config.py` (root level), organised into 12 sections:
 
 ### Radar (v0.10 Toyota, v0.19.19 Tesla, v0.19.21 Dual)
 - **Dual radar:** Independent front and rear units, each set via `RADAR_REAR_TYPE` / `RADAR_FRONT_TYPE` (`"none"`, `"toyota"`, `"tesla"`)
-- **Toyota Denso** (Prius/Corolla 2017+): Dual CAN — keep-alive TX + tracks RX, 16 tracks
-- **Tesla Bosch MRRevo14F** (Model S/X/3): Single CAN — TX+RX, 32 tracks with classification/probability, VIN auto-read via UDS
+- **Toyota Denso** (Prius/Corolla 2017+): Dual CAN - keep-alive TX + tracks RX, 16 tracks
+- **Tesla Bosch MRRevo14F** (Model S/X/3): Single CAN - TX+RX, 32 tracks with classification/probability, VIN auto-read via UDS
 - Rear radar: chevron overlay on rear camera (green safe, yellow moderate, red rapid approach, blue overtaking)
 - Front radar: distance/gap overlay on front camera
 - CAN bus sharing supported (e.g. two Denso units sharing keep-alive channel)

@@ -120,7 +120,7 @@ Added Tesla Bosch MRRevo14F radar as a configurable radar source alongside the e
 - **Tesla radar driver**: Full standalone driver with 100Hz vehicle state simulation, 32-object tracking, classification, and probability fields
 - **VIN auto-read**: Tesla radar VIN read automatically via UDS at startup (no manual configuration needed)
 - **Radar-agnostic overlay**: Existing radar overlay works unchanged with both radar types (same `long_dist`/`lat_dist`/`rel_speed` interface)
-- **Tesla-specific track data**: Extended fields available for Tesla tracks — `prob_exist`, `object_class`, `long_accel`, `lat_speed`, `moving_state`, `prob_obstacle`, `length`
+- **Tesla-specific track data**: Extended fields available for Tesla tracks - `prob_exist`, `object_class`, `long_accel`, `lat_speed`, `moving_state`, `prob_obstacle`, `length`
 - **Menu support**: Radar status and channel display adapts to selected radar type
 
 #### Radar Comparison
@@ -747,7 +747,7 @@ New menu under System > Tyre Temps for tyre temperature sensor configuration and
 
 - **Per-corner submenus** (FL, FR, RL, RR) with sensor status display
 - **Full Frame View** - 24×32 thermal heatmap modal for installation verification
-  - Auto-ranging colour map (blue→cyan→green→yellow→red)
+  - Auto-ranging colour map (blue->cyan->green->yellow->red)
   - Shows min/avg/max temperature stats
   - 5-second timeout or encoder click to close
   - Uses Pico register 0x51 with i2c_rdwr block transfer
@@ -1204,8 +1204,8 @@ Cleaner separation between Python configuration and Pi service files.
   - `services/systemd/` - CAN setup service
 
 - **Updated CoPilot AVRCP metadata**
-  - Artist: "CoPilot" → "Skjord Motorsport"
-  - Album: "openTPT" → "CoPilot"
+  - Artist: "CoPilot" -> "Skjord Motorsport"
+  - Album: "openTPT" -> "CoPilot"
 
 #### Modified Files
 
@@ -1242,12 +1242,12 @@ Comprehensive camera performance improvements, increasing frame rates significan
   - Some cameras need codec set first for proper resolution negotiation
 
 - **Faster Render with frombuffer** - Replace direct pixel array copy with frombuffer+blit
-  - 39% faster rendering (19ms → 12ms per frame)
+  - 39% faster rendering (19ms -> 12ms per frame)
   - tobytes: 2.1ms, frombuffer: 0.1ms, blit: 3.2ms, flip: 6.2ms
 
 - **Increased FPS Targets** - Allow faster cameras to reach their potential
-  - `CAMERA_FPS`: 30 → 60 (cameras deliver what they can)
-  - `FPS_TARGET`: 30 → 60 (render loop cap)
+  - `CAMERA_FPS`: 30 -> 60 (cameras deliver what they can)
+  - `FPS_TARGET`: 30 -> 60 (render loop cap)
 
 #### Results
 
@@ -1845,8 +1845,8 @@ gui/menu/
 - **Settings file corruption** - Atomic writes via temp file + rename
 - **Missing UTF-8 encoding** - Added explicit encoding to file operations in
   `settings.py` and `telemetry_recorder.py`
-- **British English violations** - Fixed `FPS_COUNTER_COLOR` → `FPS_COUNTER_COLOUR`,
-  "Colorkey" → "Colourkey", "Tire" → "Tyre" in docstrings
+- **British English violations** - Fixed `FPS_COUNTER_COLOR` -> `FPS_COUNTER_COLOUR`,
+  "Colorkey" -> "Colourkey", "Tire" -> "Tyre" in docstrings
 - **Update rate calculation** - Fixed formula in `get_update_rate()` to correctly
   calculate Hz from queue timestamps
 - **GPS serial port leak** - Fixed resource leak in `_configure_mtk3339()` when
@@ -2087,9 +2087,9 @@ gui/menu/
 
 - **Menu scrolling** - Long menus now scroll automatically
   - Auto-scroll keeps selection visible as you navigate
-  - "▲ more" / "▼ more" indicators show hidden items
+  - "^ more" / "v more" indicators show hidden items
   - Scroll offset resets when opening a menu
-  - Proper wrap-around scrolling (top↔bottom)
+  - Proper wrap-around scrolling (top<->bottom)
 
 - **Encoder-based volume control** - Adjust volume with the rotary encoder
   - Click Volume to enter edit mode (shown as `[ Volume: 50% ]`)
@@ -2137,7 +2137,7 @@ gui/menu/
   - Disconnect current device
   - Forget/unpair devices
   - Volume control (display, up/down adjustment)
-  - Refresh BT Services (restarts PulseAudio→Bluetooth in correct order)
+  - Refresh BT Services (restarts PulseAudio->Bluetooth in correct order)
   - Status display shows connected device or dependency warning
   - PulseAudio dependency check with "! Install pulseaudio" warning if missing
   - D-Bus policy for pi user to access A2DP audio profiles
@@ -2214,9 +2214,9 @@ gui/menu/
 #### Improvements
 
 - **Updated to TPMS library v2.1.0** - Library now uses British spelling throughout
-  - `TirePosition` → `TyrePosition`
-  - `TireState` → `TyreState`
-  - `register_tire_state_callback` → `register_tyre_state_callback`
+  - `TirePosition` -> `TyrePosition`
+  - `TireState` -> `TyreState`
+  - `register_tire_state_callback` -> `register_tyre_state_callback`
 
 - **Added TPMS to requirements.txt** - `tpms>=2.1.0` now explicitly listed
 
@@ -2320,7 +2320,7 @@ New settings in `utils/config.py`:
 - `MCP9601_MUX_CHANNELS` - Mux channel mapping
 - `BRAKE_DUAL_ZONE_MOCK` - Test mode with animated mock data
 
-#### 📦 Dependencies
+#### Dependencies
 
 ```bash
 pip3 install --break-system-packages adafruit-circuitpython-mcp9600
@@ -2345,9 +2345,9 @@ pip3 install --break-system-packages adafruit-circuitpython-mcp9600
   - A failed Pico sensor won't block TOF reads on the same corner
   - Improves reliability when running with partial sensor configurations
 
-#### 🎨 Display
+#### Display
 
-- Current distance shown in colour-coded text (red → green → yellow based on thresholds)
+- Current distance shown in colour-coded text (red -> green -> yellow based on thresholds)
 - "mm" unit label below current value
 - Minimum distance from last 10 seconds shown below with "min:" prefix
 - Shows "--" when sensor out of range or not connected (no spam)
@@ -2369,7 +2369,7 @@ New settings in `utils/config.py`:
 - `gui/display.py` - Added `draw_tof_distance()` method
 - `main.py` - Integrated TOF rendering in main loop
 
-#### 📦 Dependencies
+#### Dependencies
 
 ```bash
 pip3 install --break-system-packages adafruit-circuitpython-vl53l0x
@@ -2410,7 +2410,7 @@ pip3 install --break-system-packages adafruit-circuitpython-vl53l0x
 
 - **Exponential backoff for failed sensors** - Prevents I2C bus hammering
   - Missing/failed sensors no longer spam the I2C bus with constant read attempts
-  - Backoff starts at 1s, doubles each failure (1s → 2s → 4s → ... → 64s max)
+  - Backoff starts at 1s, doubles each failure (1s -> 2s -> 4s -> ... -> 64s max)
   - Logs only at key intervals (1, 3, 10, 50, then every 100 failures)
   - Resets immediately on successful read with recovery message
   - Prevents bus lockups when sensors are disconnected or not yet installed
@@ -2443,7 +2443,7 @@ Both libraries accessed I2C bus 1 without synchronisation. When one library was 
 **Solution:**
 A `threading.Lock()` now ensures only one I2C transaction occurs at a time, preventing bus contention.
 
-#### 🧪 Testing
+#### Testing
 
 -I2C bus no longer locks up during extended operation
 -All sensors continue to read correctly
@@ -2461,7 +2461,7 @@ A `threading.Lock()` now ensures only one I2C transaction occurs at a time, prev
 - **Stefan-Boltzmann correction** - Accurate temperature calculation: `T_actual = T_measured / ε^0.25`
 - **Material-specific defaults** - Pre-configured for oxidised cast iron (ε = 0.95)
 
-#### 📝 Overview
+#### Overview
 
 All IR sensors (MLX90614 and ADC-based) have factory default emissivity of 1.0, assuming a perfect black body. Since brake rotors have lower emissivity (typically 0.95 for oxidised cast iron), sensors read lower than actual temperature. This update adds automatic software correction to compensate.
 
@@ -2518,7 +2518,7 @@ T_actual (K) = T_measured (K) / ε^0.25
 - Polished/clean rotors (ε = 0.60-0.70) may show significantly different readings
 - Correction applied automatically to ALL brake temperature readings
 
-#### 📖 Documentation Updates
+#### Documentation Updates
 
 - Updated `README.md` with brake sensor configuration section
 - Updated `AI_CONTEXT.md` with emissivity correction details
@@ -2569,11 +2569,11 @@ T_actual (K) = T_measured (K) / ε^0.25
 - **Verification:** Message objects no longer appear in top 10 object types
 - **Memory profiling added:** Logs top object types and growth deltas every 60s
 
-#### ⚡ Performance Optimisations
+#### Performance Optimisations
 
 **Replaced manual list management with `collections.deque`**
 - **Files modified:** `hardware/obd2_handler.py`, `hardware/ford_hybrid_handler.py`
-- **Improvement:** O(n) → O(1) for rolling window operations
+- **Improvement:** O(n) -> O(1) for rolling window operations
 - **Details:**
   - OBD2 handler: Replaced `speed_history` and `map_history` list management
   - Ford Hybrid handler: Replaced `soc_history` list management
@@ -2595,10 +2595,10 @@ self.speed_history = deque(maxlen=5)
 self.speed_history.append(speed)  # O(1) - auto-drops oldest
 ```
 
-#### 🧪 Testing
+#### Testing
 
 -Emissivity correction applied to both ADC and MLX90614 brake sensors
--Invalid emissivity values (≤0 or >1.0) safely handled
+-Invalid emissivity values (<=0 or >1.0) safely handled
 -Default emissivity (1.0) returns uncorrected temperature
 -Configuration properly documented with typical material values
 -Voltage monitoring detects power issues on CM4-POE-UPS carrier
@@ -2620,7 +2620,7 @@ self.speed_history.append(speed)  # O(1) - auto-drops oldest
 - **Overtake warnings** - Blue side arrows for rapidly approaching vehicles
 - **Automatic track merging** - Combines nearby tracks within 1m radius
 
-#### 📦 New Files
+#### New Files
 
 ```
 hardware/
@@ -2692,7 +2692,7 @@ RADAR_WARN_RED_KPH = 20.0               # Red warning threshold
 - Corrected radar/car channel swap (tracks now received correctly)
 - Copied missing DBC files from scratch/sources
 
-#### 🧪 Testing
+#### Testing
 
 -Radar successfully receives 1-3 tracks
 -CAN bus confirmed active (960 track messages in 3 seconds)
@@ -2700,14 +2700,14 @@ RADAR_WARN_RED_KPH = 20.0               # Red warning threshold
 -3x larger solid-filled chevrons highly visible
 -No CAN interface conflicts with systemd
 
-#### 📝 Dependencies (Raspberry Pi)
+#### Dependencies (Raspberry Pi)
 
 ```bash
 # Install cantools for DBC file parsing
 pip3 install --break-system-packages cantools
 ```
 
-#### 🎯 Hardware Requirements
+#### Hardware Requirements
 
 - Waveshare Dual CAN HAT (Board 1)
 - Toyota radar module (Prius/Corolla 2017+)
@@ -2769,7 +2769,7 @@ STATUS_BAR_HEIGHT = 20          # Height of status bars in pixels
 - **Top Bar**: Lap time delta (simulated for testing)
   - Green = faster than reference lap
   - Red = slower than reference lap
-  - ⚪ Grey = same pace
+  - Grey = same pace
 - **Bottom Bar**: Battery State of Charge
   - Blue = idle (steady throttle)
   - Green = charging (throttle decreasing, MAP down, SOC up)
@@ -2778,10 +2778,10 @@ STATUS_BAR_HEIGHT = 20          # Height of status bars in pixels
 **MAP-to-SOC Mapping**
 ```python
 # Direct mapping (instant updates)
-MAP 20 kPa  → 100% SOC (minimum throttle)
-MAP 30 kPa  → 87% SOC  (idle)
-MAP 60 kPa  → 50% SOC  (moderate throttle)
-MAP 100 kPa → 0% SOC   (wide open throttle)
+MAP 20 kPa  -> 100% SOC (minimum throttle)
+MAP 30 kPa  -> 87% SOC  (idle)
+MAP 60 kPa  -> 50% SOC  (moderate throttle)
+MAP 100 kPa -> 0% SOC   (wide open throttle)
 ```
 
 **State Detection**
@@ -2802,7 +2802,7 @@ MAP 100 kPa → 0% SOC   (wide open throttle)
 - **Stale camera frame on reactivation** - Clear frame buffer when stopping camera
 - **Front camera mirrored** - Only flip rear camera, not front
 
-#### 🧪 Testing
+#### Testing
 
 -Status bars visible on all pages (telemetry, gmeter, camera)
 -SOC updates instantly when MAP changes
@@ -2811,7 +2811,7 @@ MAP 100 kPa → 0% SOC   (wide open throttle)
 -Front camera shows normal view (not mirrored)
 -Rear camera remains mirrored for backing up
 
-#### 🎯 Use Cases
+#### Use Cases
 
 **Desk Testing**
 - Connect to vehicle OBD2 port without driving
@@ -2839,7 +2839,7 @@ MAP 100 kPa → 0% SOC   (wide open throttle)
 - **Dual FPS counters** - Shows both camera feed FPS and overall system FPS
 - **Radar overlay on rear camera only** - Front camera displays clean video feed
 
-#### 📦 New Files
+#### New Files
 
 ```
 config/
@@ -2922,8 +2922,8 @@ ls -l /dev/video-*
 7. Start capture thread for new camera
 
 **USB Port Assignment**
-- Rear camera → USB port 1.1 (creates `/dev/video-rear`)
-- Front camera → USB port 1.2 (creates `/dev/video-front`)
+- Rear camera -> USB port 1.1 (creates `/dev/video-rear`)
+- Front camera -> USB port 1.2 (creates `/dev/video-front`)
 
 Common USB port mappings on Raspberry Pi 4:
 - `1-1.1` = Top-left USB 2.0 port
@@ -2931,20 +2931,20 @@ Common USB port mappings on Raspberry Pi 4:
 - `1-1.3` = Top-right USB 2.0 port
 - `1-1.4` = Bottom-right USB 2.0 port
 
-#### 🧪 Testing
+#### Testing
 
 -Both cameras initialize correctly
--Camera switching works in all directions (telemetry ↔ rear ↔ front)
+-Camera switching works in all directions (telemetry <-> rear <-> front)
 -No checkerboard flash during transitions
 -Deterministic identification survives reboots
 -Radar overlay only appears on rear camera
 -Dual FPS counters display correctly
 -Resource management prevents conflicts
 
-#### 🎯 Controls
+#### Controls
 
 - **Button 2** (or **Spacebar**): Cycle through views
-  - Telemetry → Rear Camera → Front Camera → Telemetry
+  - Telemetry -> Rear Camera -> Front Camera -> Telemetry
 - Camera switching is seamless with smooth freeze-frame transitions
 - FPS counters show camera feed performance
 
@@ -2961,7 +2961,7 @@ Common USB port mappings on Raspberry Pi 4:
 - **Distance and speed display** - Real-time relative speed in m/s and km/h
 - **Graceful degradation** - System automatically disables radar if hardware unavailable
 
-#### 📦 New Files
+#### New Files
 
 ```
 hardware/
@@ -3016,7 +3016,7 @@ RADAR_OVERTAKE_ARROW_DURATION = 1.0       # Arrow display duration (seconds)
 2. `RADAR_AVAILABLE` import check (toyota_radar_driver)
 3. `radar_handler.is_enabled()` runtime check
 
-#### 🧪 Testing
+#### Testing
 
 -Camera initializes correctly with `radar_handler=None`
 -Radar handler gracefully disables when hardware unavailable
@@ -3025,7 +3025,7 @@ RADAR_OVERTAKE_ARROW_DURATION = 1.0       # Arrow display duration (seconds)
 -Configuration defaults are safe (RADAR_ENABLED = False)
 -Integration tested on Mac and Pi
 
-#### 📝 Dependencies (Optional)
+#### Dependencies (Optional)
 
 For radar support:
 ```bash
@@ -3043,13 +3043,13 @@ Copy `toyota_radar_driver.py` from `scratch/sources/toyota-radar/` or install as
 #### Fixed
 - **NameError in TPMS handler** - Fixed `TirePosition` being used before TPMS library check
 - **Infinite recursion in MLXHandler** - Fixed backwards compatibility wrapper
-- **British English throughout** - Changed all "Tire" → "Tyre", "Optimized" → "Optimised", "Initialize" → "Initialise"
+- **British English throughout** - Changed all "Tire" -> "Tyre", "Optimized" -> "Optimised", "Initialize" -> "Initialise"
 
 #### Performance Optimisations Added
 
 **Bounded Queue Architecture**
 - Lock-free data snapshots for render path
-- Zero blocking in render loop (≤ 12 ms/frame target)
+- Zero blocking in render loop (<= 12 ms/frame target)
 - Double-buffering with queue depth = 2
 - Automatic frame dropping when queue full
 
@@ -3057,7 +3057,7 @@ Copy `toyota_radar_driver.py` from `scratch/sources/toyota-radar/` or install as
 - I/C/O (Inner/Centre/Outer) zone analysis
 - Edge detection with hysteresis (±2 px)
 - Trimmed median filtering
-- EMA smoothing (α ≈ 0.3)
+- EMA smoothing (α ~ 0.3)
 - Slew-rate limiting (~50 °C/s)
 - **Performance**: < 1 ms/frame/sensor
 
@@ -3073,7 +3073,7 @@ Copy `toyota_radar_driver.py` from `scratch/sources/toyota-radar/` or install as
 - Automatic target checking with warnings
 - Periodic performance summaries
 
-#### 📦 New Files
+#### New Files
 
 ```
 utils/
@@ -3090,7 +3090,7 @@ hardware/
 
 tools/
 ├── performance_test.py        # Validation tests
-└── quick_sync.sh              # Fast Mac→Pi deployment
+└── quick_sync.sh              # Fast Mac->Pi deployment
 
 # Installation and requirements
 install.sh                     # Raspberry Pi installation script
@@ -3120,12 +3120,12 @@ DEPLOYMENT.md                  # Deployment guide
 
 | Component | Target | Status |
 |-----------|--------|--------|
-| Render loop | ≤ 12 ms/frame | Done |
+| Render loop | <= 12 ms/frame | Done |
 | Thermal zones | < 1 ms/sensor | Done |
 | Lock-free access | < 0.1 ms | Done |
 | FPS | 30-60 FPS | Done |
 
-#### 🧪 Testing
+#### Testing
 
 **Run Performance Tests**
 ```bash
@@ -3146,7 +3146,7 @@ git pull
 sudo bash ./install.sh  # If dependencies changed
 ```
 
-#### 🎯 Deployment Workflow (Mac → Pi)
+#### Deployment Workflow (Mac -> Pi)
 
 1. **Develop on Mac**
    ```bash
@@ -3170,7 +3170,7 @@ sudo bash ./install.sh  # If dependencies changed
    ./main.py
    ```
 
-#### 📝 British English Changes
+#### British English Changes
 
 - Tyre (not Tire)
 - Optimised (not Optimized)
@@ -3179,7 +3179,7 @@ sudo bash ./install.sh  # If dependencies changed
 - Metres (not Meters) - in comments
 - Centre (not Center) - in zone names
 
-#### 🔮 Next Steps (from System Plan)
+#### Next Steps (from System Plan)
 
 - [ ] Radar module with modular plugins
 - [ ] Multi-CAN scheduler (HS/MS/OBD/radar)

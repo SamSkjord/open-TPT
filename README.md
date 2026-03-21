@@ -24,7 +24,7 @@ The system is designed for racing applications where real-time monitoring of tyr
 ### Performance Architecture
 
 openTPT features a high-performance architecture optimised for real-time telemetry:
-- **Lock-free rendering** - No blocking operations in the render path (target: ≤12ms/frame)
+- **Lock-free rendering** - No blocking operations in the render path (target: <=12ms/frame)
 - **Bounded queue system** - Double-buffered data snapshots for all hardware handlers
 - **Numba JIT compilation** - Optimised thermal zone processing (< 1ms per sensor)
 - **60 FPS target** - Smooth camera feed and telemetry updates
@@ -44,7 +44,7 @@ openTPT features a high-performance architecture optimised for real-time telemet
 
 ### Optional Components
 - USB UVC cameras (up to 2 cameras for rear/front views with seamless switching)
-- CAN radar (up to 2 units — independent front and rear, any combination):
+- CAN radar (up to 2 units - independent front and rear, any combination):
   - **Toyota** (Denso): Prius/Corolla 2017+ unit, dual CAN bus (radar data + car keepalive)
   - **Tesla** (Bosch MRRevo14F): Any Model S/X/3 unit, single CAN bus, auto-VIN
   - CAN-to-USB adapters or SPI CAN controllers
@@ -212,8 +212,8 @@ sudo python3 ./main.py --windowed
 ### Controls
 
 When using physical NeoKey 1x4 (board mounted upside down for LED orientation, so physical positions inverted):
-- Button 0: Switch view mode (camera pages ↔ UI pages)
-- Button 1: Switch within category (camera: rear↔front | UI: cycles through enabled pages)
+- Button 0: Switch view mode (camera pages <-> UI pages)
+- Button 1: Switch within category (camera: rear<->front | UI: cycles through enabled pages)
 - Button 2: Page settings (context-sensitive: hide overlay, reset peaks, toggle map view, etc.)
 - Button 3: Toggle telemetry recording (hold 1 second to activate)
 
@@ -301,8 +301,8 @@ openTPT supports dual USB cameras for rear and front views with seamless switchi
 #### Hardware Setup
 
 1. Connect cameras to specific USB ports:
-   - **Rear camera** → USB port 1.1 (creates `/dev/video-rear`)
-   - **Front camera** → USB port 1.2 (creates `/dev/video-front`)
+   - **Rear camera** -> USB port 1.1 (creates `/dev/video-rear`)
+   - **Front camera** -> USB port 1.2 (creates `/dev/video-front`)
 
 2. Enable cameras in `config.py`:
    ```python
@@ -382,7 +382,7 @@ Common USB port mappings on Raspberry Pi 4:
 
 ### Radar Configuration
 
-openTPT supports **dual independent radar units** — one rear-facing and one front-facing. Each unit can be a Toyota Denso or Tesla Bosch radar, or disabled. Any combination is supported: 2x Denso, 2x Tesla, Denso+Tesla, or a single unit with the other set to `"none"`.
+openTPT supports **dual independent radar units** - one rear-facing and one front-facing. Each unit can be a Toyota Denso or Tesla Bosch radar, or disabled. Any combination is supported: 2x Denso, 2x Tesla, Denso+Tesla, or a single unit with the other set to `"none"`.
 
 - **Rear radar** drives the chevron overlay on the rear camera (collision/overtake warnings)
 - **Front radar** drives the distance overlay on the front camera
@@ -399,7 +399,7 @@ openTPT supports **dual independent radar units** — one rear-facing and one fr
 | VIN | Not needed | Auto-read via UDS at startup |
 | DBC files | `toyota_prius_2017_adas.dbc` | `tesla_radar.dbc` + `tesla_can.dbc` |
 
-#### Hardware Setup — Toyota (Denso)
+#### Hardware Setup - Toyota (Denso)
 
 The Toyota Denso radar requires **two CAN buses**: one for keep-alive messages (TX) and one for radar track data (RX).
 
@@ -411,14 +411,14 @@ The Toyota Denso radar requires **two CAN buses**: one for keep-alive messages (
    - Connect to both CAN buses as per wiring diagram
    - Radar will output ~320 Hz track messages once keep-alive is active
 
-**CAN bus sharing:** When running two Denso units, they can share the same car (keep-alive) channel. The system automatically detects this and suppresses duplicate keep-alive messages — only the rear unit sends the 100 Hz ACC_CONTROL frames, while the front unit listens passively on the shared bus.
+**CAN bus sharing:** When running two Denso units, they can share the same car (keep-alive) channel. The system automatically detects this and suppresses duplicate keep-alive messages - only the rear unit sends the 100 Hz ACC_CONTROL frames, while the front unit listens passively on the shared bus.
 
-#### Hardware Setup — Tesla (Bosch MRRevo14F)
+#### Hardware Setup - Tesla (Bosch MRRevo14F)
 
 The Tesla radar uses a **single CAN bus** for all traffic (TX keepalive + RX tracks).
 
 1. **Waveshare Dual CAN HAT** (Board 1):
-   - CAN_0 connector (can_b1_0): Single bus — all radar traffic
+   - CAN_0 connector (can_b1_0): Single bus - all radar traffic
 
 2. **Tesla Bosch MRRevo14F radar** (any Model S/X/3 unit):
    - Connect radar CAN1 to the CAN bus
@@ -476,7 +476,7 @@ RADAR_WARN_RED_KPH = 20.0          # Red warning threshold
 
 | Setup | Rear Type | Front Type | Notes |
 |-------|-----------|------------|-------|
-| Single rear Denso | `"toyota"` | `"none"` | Default — original single-radar behaviour |
+| Single rear Denso | `"toyota"` | `"none"` | Default - original single-radar behaviour |
 | Single rear Tesla | `"tesla"` | `"none"` | Single Tesla unit on rear camera |
 | Dual Denso | `"toyota"` | `"toyota"` | Two Denso units, shared car channel supported |
 | Dual Tesla | `"tesla"` | `"tesla"` | Two Tesla units on separate CAN buses |
@@ -496,7 +496,7 @@ pip3 install --break-system-packages -r requirements.txt
 
 #### Visual Display
 
-**Rear camera** — chevron overlay (from rear radar):
+**Rear camera** - chevron overlay (from rear radar):
 - **Green chevrons**: Vehicle detected, safe distance (<10 km/h closing)
 - **Yellow chevrons**: Moderate closing speed (10-20 km/h)
 - **Red chevrons**: Rapid approach (>20 km/h closing speed)
@@ -505,7 +505,7 @@ pip3 install --break-system-packages -r requirements.txt
 
 Chevrons are **3x larger (120x108px) and solid-filled** for high visibility.
 
-**Front camera** — distance overlay (from front radar):
+**Front camera** - distance overlay (from front radar):
 - Displays closest tracked object distance in metres
 - Configurable via the Front Camera menu (position, text size)
 
@@ -696,7 +696,7 @@ openTPT/
 - NeoKey 1x4 physical controls
 - Rotary encoder input with menu system
 - Performance-optimised architecture with bounded queues
-- Lock-free rendering (≤12ms per frame target)
+- Lock-free rendering (<=12ms per frame target)
 - Numba JIT thermal processing (< 1ms per sensor)
 - Dynamic resolution scaling
 - UI auto-hide with fade animation
